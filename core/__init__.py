@@ -5,8 +5,8 @@
     
     
 """
-from ._version import __version__
+from core._version import __version__
 
-from .system import Systems, System
-from .model import Model
-from .database import Database
+from core.database import Database
+from core.system import Systems, System, Component
+from core.model import Model
