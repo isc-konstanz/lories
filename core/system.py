@@ -100,7 +100,8 @@ class Systems(MutableSequence):
             config_dir = configs.get('General', 'data_dir')
         
         for entry in os.scandir(config_dir):
-            if entry.is_file() and entry.path.endswith('.cfg') and entry.name.startswith(tuple(system._component_types)):
+            if entry.is_file() and entry.path.endswith('.cfg') and not entry.path.endswith('default.cfg') \
+                    and entry.name.startswith(tuple(system._component_types)):
                 component = system._read_component(entry, **kwargs)
                 system[component.id] = component
         
