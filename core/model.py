@@ -27,6 +27,15 @@ class Model(ABC):
         self._configure(configs, **kwargs)
         self._build(context, **kwargs)
 
+    def __repr__(self):
+        configs = '[Model]'
+        for section in self._configs.sections():
+            configs += '\n    [{}]'.format(section) + '\n'
+            for (k, v) in self._configs.items(section):
+                configs += '        {} = {}'.format(k, v) + '\n'
+        
+        return configs
+
     @staticmethod
     def build(system, **kwargs):
         from core import System
@@ -55,6 +64,12 @@ class Model(ABC):
             package = kwargs.get('package') if 'package' in kwargs else system._configs.get('General', 'package')
             configs.set('General', 'package', package)
         
+        configs.set('General', 'root_dir', system._configs.get('General', 'root_dir'))
+        configs.set('General', 'lib_dir', system._configs.get('General', 'lib_dir'))
+        configs.set('General', 'data_dir', system._configs.get('General', 'data_dir'))
+        configs.set('General', 'config_dir', config_dir)
+        configs.set('General', 'config_file', config_file)
+        
         module = __import__(configs['General']['package']+'.'+configs['General']['module'], 
                             fromlist=[configs['General']['type']])
         model = getattr(module, configs['General']['type'])(system, configs, **kwargs)
@@ -64,18 +79,12 @@ class Model(ABC):
         
         return model
 
-    def _build(self, system, **_):
+    def _build(self, system, **kwargs):
         pass
 
-    def _configure(self, configs, **_):
+    def _configure(self, configs, **kwargs): #@UnusedVariable
         if logger.isEnabledFor(logging.DEBUG):
-            text = ''
-            for section in configs.sections():
-                text += '\n        [{}]'.format(section) + '\n'
-                for (k, v) in configs.items(section):
-                    text += '            {} = {}'.format(k, v) + '\n'
-            
-            print('    [Model]{}'.format(text))
+            print(self)
 
     @abstractmethod
     def run(self, **kwargs):

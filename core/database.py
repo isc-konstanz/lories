@@ -9,29 +9,26 @@ import logging
 logger = logging.getLogger(__name__)
 
 import os
-import time
 import pytz as tz
 import datetime as dt
 import pandas as pd
-import numpy as np
 
 from abc import ABC, abstractmethod
 
 
 class Database(ABC):
 
-    def __init__(self, configs, **_):
-        self.disabled = configs.get('disabled', fallback='false').lower() == 'true'
-        self.timezone = tz.timezone(configs.get('timezone', fallback='UTC'))
+    def __init__(self, disabled='false', timezone='UTC', **_):
+        self.disabled = disabled.lower() == 'true'
+        self.timezone = tz.timezone(timezone)
 
     @staticmethod
     def open(configs, **kwargs):
-        datbase_type = configs['Database']['type'].lower()
-        if datbase_type == 'emoncms':
-            return EmoncmsDatabase(configs['Database'], **kwargs)
+        dbargs = dict(configs.items('Database'))
         
-        elif datbase_type == 'csv':
-            return CsvDatabase(configs['Database'], **kwargs)
+        database_type = dbargs['type'].lower()
+        if database_type == 'csv':
+            return CsvDatabase(**dbargs, **kwargs)
         else:
             raise ValueError('Invalid database type argument')
 
@@ -83,56 +80,25 @@ class Database(ABC):
         pass
 
 
-class EmoncmsDatabase(Database):
-
-    def __init__(self, configs, **kwargs):
-        super().__init__(configs, **kwargs)
-        from emonpy import Emoncms
-        from configparser import ConfigParser
-        
-        emoncmsfile = configs['configs']
-        emoncms = ConfigParser()
-        emoncms.open(emoncmsfile)
-        
-        self.node = configs['node']
-        self.connection = Emoncms(emoncms['address'], emoncms['authentication'])
-
-    def get(self, system, start, stop, interval, **kwargs):
-        pass
-
-    def persist(self, system, data, *_):
-        from emonpy import EmoncmsData
-        
-        if hasattr(system, 'apikey'):
-            bulk = EmoncmsData(timezone=self.timezone)
-            for key in data.columns:
-                name = system.name.lower()
-                
-                if len(data.columns) > 1 and name != key.lower():
-                    name += '_' + key.replace(' ', '_').lower()
-                
-                for time, value in data[key].items():
-                    if value is not None and not np.isnan(value):
-                        bulk.add(time, self.node, name, float(value))
-            
-            self.connection.persist(bulk, apikey=system.apikey)
-
-
 class CsvDatabase(Database):
 
-    def __init__(self, configs, **kwargs):
-        super().__init__(configs, **kwargs)
+    def __init__(self, dir = os.getcwd(), format = '%Y%m%d_%H%M%S',  #@ReservedAssignment
+                 index_column = 'time', index_unix = False, merge = False, 
+                 interval = 24, decimal = '.', separator = ',', **kwargs):
         
-        self.dir = configs.get('dir', fallback='.')
-        self.merge = configs.get('merge', fallback='false').lower() == 'true'
+        super().__init__(**kwargs)
         
-        self.format = configs.get('format', fallback='%Y%m%d_%H%M%S')
-        self.interval = int(configs.get('interval', fallback='24'))
-        self.index_column = configs.get('index_column', fallback='time')
-        self.index_unix = configs.get('index_unix', fallback='false').lower() == 'true'
+        self.dir = dir
         
-        self.decimal = configs.get('decimal', fallback='.')
-        self.separator = configs.get('separator', fallback=',')
+        self.format = format
+        self.index_column = index_column
+        self.index_unix = _bool(index_unix)
+        
+        self.interval = _int(interval)
+        self.merge = _bool(merge)
+        
+        self.decimal = decimal
+        self.separator = separator
 
     def exists(self, time, subdir='', *_):
         return os.path.exists(os.path.join(self.dir, subdir, time.strftime(self.format) + '.csv'))
@@ -231,4 +197,23 @@ class CsvDatabase(Database):
         csv.index.name = 'time'
         
         return csv
+
+
+def _bool(v):
+    if isinstance(v, str):
+        return v.lower() == 'true'
+    
+    return v
+
+def _float(v):
+    if isinstance(v, str):
+        return float(v)
+    
+    return v
+
+def _int(v):
+    if isinstance(v, str):
+        return int(v)
+    
+    return v
 

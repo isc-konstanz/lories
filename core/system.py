@@ -43,6 +43,7 @@ class Systems(MutableSequence):
             raise TypeError('Invalid system type: {}'.format(type(value)))
         
         self._systems.insert(index, value)
+        
 
     def read(self, 
              root_dir='.', 
@@ -124,9 +125,9 @@ class Systems(MutableSequence):
                 raise TypeError('Invalid system type: {}'.format(type(system)))
         
         except (ImportError, TypeError) as e:
-            logger.warning('Error instancing {}.{}.{} and core class will be used: {}'.format(configs['General']['package'], 
+            logger.warning('Error instancing {}.{}.{} and core class will be used: '.format(configs['General']['package'], 
                                                                                               configs['General']['module'], 
-                                                                                              configs['General']['type']), e)
+                                                                                              configs['General']['type']) + str(e))
             configs.set('General', 'type', 'System')
             configs.set('General', 'module', 'system')
             configs.set('General', 'package', 'core')
@@ -206,6 +207,15 @@ class System(MutableMapping):
     def __keytransform__(self, key):
         return key
 
+    def __repr__(self):
+        configs = '[System]'
+        for section in self._configs.sections():
+            configs += '\n    [{}]'.format(section) + '\n'
+            for (k, v) in self._configs.items(section):
+                configs += '        {} = {}'.format(k, v) + '\n'
+        
+        return configs
+
     @property
     def _component_types(self):
         return ['component']
@@ -220,15 +230,9 @@ class System(MutableMapping):
     def _init_component(self, configs, **kwargs):
         return Component(self, configs, **kwargs)
 
-    def _configure(self, configs, **_):
+    def _configure(self, configs, **kwargs): #@UnusedVariable
         if logger.isEnabledFor(logging.DEBUG):
-            text = ''
-            for section in configs.sections():
-                text += '\n    [{}]'.format(section) + '\n'
-                for (k, v) in configs.items(section):
-                    text += '        {} = {}'.format(k, v) + '\n'
-            
-            print('[{}]{}'.format(configs.get('General', 'name'), text))
+            print(self)
 
     def run(self, **kwargs):
         data = self._model.run(weather=self.weather.get(**kwargs), **kwargs)
@@ -257,6 +261,15 @@ class Component:
         self._configs = configs
         self._configure(configs, **kwargs)
 
+    def __repr__(self):
+        configs = '[Component]'
+        for section in self._configs.sections():
+            configs += '\n    [{}]'.format(section) + '\n'
+            for (k, v) in self._configs.items(section):
+                configs += '        {} = {}'.format(k, v) + '\n'
+        
+        return configs
+
     @property
     def id(self):
         return self._id
@@ -269,15 +282,9 @@ class Component:
     def type(self):
         return 'cmpt'
 
-    def _configure(self, configs, **_):
+    def _configure(self, configs, **kwargs): #@UnusedVariable
         if logger.isEnabledFor(logging.DEBUG):
-            text = ''
-            for section in configs.sections():
-                text += '\n        [{}]'.format(section) + '\n'
-                for (k, v) in configs.items(section):
-                    text += '            {} = {}'.format(k, v) + '\n'
-            
-            print('    [Component {}]{}'.format(configs.get('General', 'id'), text))
+            print(self)
 
 
 class ConfigComponent(Component, MutableMapping):
