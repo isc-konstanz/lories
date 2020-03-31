@@ -142,12 +142,10 @@ class CsvDatabase(Database):
             
             self._write_file(os.path.join(path, file), data, **kwargs)
 
-    def _write_file(self, path, data):
-        data = data.tz_convert(tz.utc).astype(float)
-        data.index.name = 'time'
-        
+    def _write_file(self, path, data, encoding='utf-8', **kwargs):
         if self.merge and os.path.isfile(path):
-            csv = pd.read_csv(path, sep=self.separator, decimal=self.decimal, encoding='utf-8', index_col='time', parse_dates=['time'])
+            index = data.index.name
+            csv = pd.read_csv(path, sep=self.separator, decimal=self.decimal, encoding=encoding, index_col=index, parse_dates=[index], **kwargs)
             if not csv.empty:
                 csv.index = csv.index.tz_localize(tz.utc)
                 
@@ -156,7 +154,7 @@ class CsvDatabase(Database):
                 else:
                     data = pd.concat([csv, data], axis=1)
         
-        data.to_csv(path, sep=self.separator, decimal=self.decimal, encoding='utf-8')
+        data.to_csv(path, sep=self.separator, decimal=self.decimal, encoding=encoding, **kwargs)
 
     def _read_file(self, path, **kwargs):
         """

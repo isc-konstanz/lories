@@ -174,6 +174,8 @@ class System(MutableMapping):
                 database_dir = configs['Database']['dir']
                 if not os.path.isabs(database_dir):
                     configs['Database']['dir'] = os.path.join(configs['General']['data_dir'], database_dir)
+            else:
+                configs['Database']['dir'] = configs['General']['data_dir']
             
             self._database = Database.open(configs)
         else:
