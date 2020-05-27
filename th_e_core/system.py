@@ -71,26 +71,26 @@ class System(Configurable, MutableMapping):
         
         self.name = configs['General']['name']
         
-        if not 'Database' in configs:
-            return None
-        
-        if 'dir' in configs['Database']:
-            database_dir = configs['Database']['dir']
-            if not os.path.isabs(database_dir):
-                configs['Database']['dir'] = os.path.join(configs['General']['data_dir'], database_dir)
-        else:
-            configs['Database']['dir'] = self._configs['General']['data_dir']
-        
         self._configs = configs
         self._configure(configs, **kwargs)
-        self._database = Database.open(configs, **kwargs)
         
         components = self._components_read(**kwargs)
         self._components = components
         self._activate(components, **kwargs)
 
-    def _activate(self, components, **kwargs):
-        pass
+    def _activate(self, components, **kwargs): #@UnusedVariable
+        configs = self._configs
+        if configs.has_section('Database'):
+            if 'dir' in configs['Database']:
+                database_dir = configs['Database']['dir']
+                if not os.path.isabs(database_dir):
+                    configs['Database']['dir'] = os.path.join(configs['General']['data_dir'], database_dir)
+            else:
+                configs['Database']['dir'] = configs['General']['data_dir']
+            
+            self._database = Database.open(configs, **kwargs)
+        else:
+            self._database = None
 
     def _components_read(self, **kwargs):
         cmpt_dir = self._configs.get('General', 'cmpt_dir', fallback='cmpt')

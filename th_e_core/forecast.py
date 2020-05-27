@@ -142,7 +142,7 @@ class Forecast(ABC, Configurable):
             
             if self._database is not None:
                 # Store the retrieved forecast
-                self._database.persist(forecast, subdir=self._id)
+                self._database.persist(forecast, time=time, subdir=self._id)
         
         return forecast.loc[time:, :]
 

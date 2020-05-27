@@ -27,7 +27,10 @@ class Database(ABC):
         dbargs = dict(configs.items('Database'))
         
         database_type = dbargs['type'].lower()
-        if database_type == 'csv':
+        if database_type == 'sql':
+            database_tables = dict(configs.items('Tables'))
+            return SqlDatabase(**dbargs, **kwargs, tables=database_tables)
+        elif database_type == 'csv':
             return CsvDatabase(**dbargs, **kwargs)
         else:
             raise ValueError('Invalid database type argument')
@@ -80,6 +83,79 @@ class Database(ABC):
         pass
 
 
+class SqlDatabase(Database):
+
+    def __init__(self, host="127.0.0.1", port=3306, 
+                 user='root', password='', database='emonpv',
+                 tables=dict(), interval=24, 
+                 **kwargs):
+        
+        super().__init__(**kwargs)
+        
+        self.interval = _int(interval)
+        self.tables = tables
+        
+        import mysql.connector
+        self.connector = mysql.connector.connect(
+          host=host,
+          port=_int(port),
+          user=user,
+          passwd=password,
+          database=database
+        )
+
+    def exists(self, **kwargs):
+        data = self.get(**kwargs)
+        return not data.empty
+
+    def get(self, start=None, end=None, resolution=None, **kwargs):
+        epoch = dt.datetime(1970, 1, 1, tzinfo=tz.UTC)
+        data = pd.DataFrame()
+        
+        for column, table in self.tables.items():
+            cursor = self.connector.cursor()
+            select = "SELECT time, data FROM {0} WHERE ".format(table)
+            if end is None:
+                select += "time >= %s ORDER BY time ASC"
+                cursor.execute(select, ((start.astimezone(tz.UTC)-epoch).total_seconds(),))
+            else:
+                select += "time BETWEEN %s AND %s ORDER BY time ASC"
+                cursor.execute(select, 
+                               ((start.astimezone(tz.UTC)-epoch).total_seconds(), 
+                                (end.astimezone(tz.UTC)-epoch).total_seconds()))
+            
+            times = []
+            values = []
+            for timestamp, value in cursor.fetchall():
+                time = tz.utc.localize(dt.datetime.fromtimestamp(timestamp))
+                times.append(time)
+                values.append(value)
+            
+            result = pd.DataFrame(data=values, index=times, columns=[column])
+            data = pd.concat([data, result], axis=1)
+        
+        if resolution is not None and resolution > 900:
+            offset = (start - start.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds() % resolution
+            data = data.resample(str(int(resolution))+'s', base=offset).sum()
+        
+        return data
+
+    def persist(self, data, **_):
+        epoch = dt.datetime(1970, 1, 1, tzinfo=tz.UTC)
+        
+        cursor = self.connector.cursor()
+        for column in data.columns:
+            insert = "INSERT INTO {0} (time,data) VALUES ('%s', '%s') ON DUPLICATE KEY UPDATE data=VALUES(data)".format(self.tables[column])
+            values = []
+            for index, value in data[column].items():
+                time = (index.astimezone(tz.UTC)-epoch).total_seconds()
+                values.append((time, value))
+            
+            cursor.executemany(insert, values)
+        
+        self.connector.commit()
+
+
 class CsvDatabase(Database):
 
     def __init__(self, dir=os.getcwd(), file=None, format='%Y%m%d_%H%M%S', #@ReservedAssignment
@@ -109,24 +185,24 @@ class CsvDatabase(Database):
 
     def get(self, start=None, end=None, resolution=None, subdir='', **kwargs):
         if self.file is not None:
-            return self._read_file(os.path.join(self.dir, subdir, self.file), **kwargs)
+            data = self._read_file(os.path.join(self.dir, subdir, self.file), **kwargs)
         
-        data = pd.DataFrame()
-        if end is None:
-            end = start
-        end += dt.timedelta(hours=self.interval) - dt.timedelta(seconds=1)
-        
-        time = start
-        while time <= end:
-            if self.exists(time, subdir):
-                data = data.combine_first(self._read_file(os.path.join(self.dir, subdir, time.strftime(self.format) + '.csv'), **kwargs))
-            
-            time += dt.timedelta(hours=self.interval)
+        else:
+            data = self._read_file(os.path.join(self.dir, subdir, start.strftime(self.format) + '.csv'), **kwargs)
+            if end is not None:
+                time = start
+                while time <= end:
+                    if self.exists(time, subdir):
+                        data = data.combine_first(self._read_file(os.path.join(self.dir, subdir, time.strftime(self.format) + '.csv'), **kwargs))
+                    
+                    time += dt.timedelta(hours=self.interval)
         
         if resolution is not None and resolution > 900:
             offset = (start - start.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds() % resolution
-            end += dt.timedelta(seconds=resolution)
             data = data.resample(str(int(resolution))+'s', base=offset).sum()
+            
+            if end is not None:
+                end += dt.timedelta(seconds=resolution)
         
         if end is not None:
             if start > end:

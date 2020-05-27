@@ -65,9 +65,9 @@ class Weather(ABC, Configurable):
         super().__init__(configs, **kwargs)
         
         self._context = context
-        self._open(context, **kwargs)
+        self._activate(context, **kwargs)
 
-    def _open(self, context, **kwargs):
+    def _activate(self, context, **kwargs):
         pass
 
     @abstractmethod
@@ -77,10 +77,9 @@ class Weather(ABC, Configurable):
 
 class DatabaseWeather(Weather):
 
-    def _configure(self, configs, **kwargs):
-        super()._configure(configs, **kwargs)
-        
-        self._database = Database.open(configs, **kwargs)
+    def _activate(self, context, **kwargs):
+        super()._activate(context, **kwargs)
+        self._database = Database.open(self._configs, **kwargs)
 
     def get(self, start=None, end=None, format='%d.%m.%Y', **kwargs): #@ReservedAssignment
         if start is None:
@@ -109,7 +108,7 @@ class TMYWeather(Weather):
         self.file = configs.get('TMY', 'file', fallback=None)
         self.year = configs.get('TMY', 'year', fallback=None)
 
-    def _open(self, system, **kwargs): #@UnusedVariable
+    def _activate(self, system, **kwargs): #@UnusedVariable
         from pvlib.iotools import read_tmy2, read_tmy3
         
         if self.version == 3:
@@ -135,7 +134,7 @@ class EPWWeather(Weather):
         self.file = configs.get('EPW', 'file', fallback=None)
         self.year = configs.get('EPW', 'year', fallback=None)
 
-    def _open(self, system, **kwargs): #@UnusedVariable
+    def _activate(self, system, **kwargs): #@UnusedVariable
         from pvlib.iotools import read_epw
         self.data, self.meta = read_epw(filename=self.file, coerce_year=self.year)
 
