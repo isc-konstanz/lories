@@ -18,8 +18,8 @@ from abc import ABC, abstractmethod
 
 class Database(ABC):
 
-    def __init__(self, disabled='false', timezone='UTC', **_):
-        self.disabled = disabled.lower() == 'true'
+    def __init__(self, enabled='true', timezone='UTC', **_):
+        self.enabled = enabled.lower() == 'true'
         self.timezone = tz.timezone(timezone)
 
     @staticmethod
@@ -33,7 +33,7 @@ class Database(ABC):
             raise ValueError('Invalid database type argument')
 
     @abstractmethod
-    def get(self, start, stop=None, **kwargs):
+    def get(self, start, end=None, **kwargs):
         """ 
         Retrieve data for a specified time interval of a set of data feeds
         
@@ -48,9 +48,9 @@ class Database(ABC):
         :type start: 
             :class:`pandas.tslib.Timestamp` or datetime
         
-        :param stop: 
+        :param end: 
             the time until which values will be looked up for.
-        :type stop: 
+        :type end: 
             :class:`pandas.tslib.Timestamp` or datetime
         
         :returns: 
@@ -82,13 +82,15 @@ class Database(ABC):
 
 class CsvDatabase(Database):
 
-    def __init__(self, dir = os.getcwd(), format = '%Y%m%d_%H%M%S',  #@ReservedAssignment
-                 index_column = 'time', index_unix = False, merge = False, 
-                 interval = 24, decimal = '.', separator = ',', **kwargs):
+    def __init__(self, dir=os.getcwd(), file=None, format='%Y%m%d_%H%M%S', #@ReservedAssignment
+                 index_column='time', index_unix=False, merge=False, 
+                 interval=24, timezone='UTC', decimal='.', separator=',', 
+                 **kwargs):
         
         super().__init__(**kwargs)
         
         self.dir = dir
+        self.file = file
         
         self.format = format
         self.index_column = index_column
@@ -97,40 +99,45 @@ class CsvDatabase(Database):
         self.interval = _int(interval)
         self.merge = _bool(merge)
         
+        self.timezone = tz.timezone(timezone)
         self.decimal = decimal
         self.separator = separator
 
-    def exists(self, time, subdir='', *_):
-        return os.path.exists(os.path.join(self.dir, subdir, time.strftime(self.format) + '.csv'))
+    def exists(self, time, subdir='', **_):
+        return os.path.exists(os.path.join(self.dir, subdir, 
+                                           self.file if self.file is not None else time.strftime(self.format) + '.csv'))
 
-    def get(self, start=None, stop=None, interval=None, subdir='', **kwargs):
+    def get(self, start=None, end=None, resolution=None, subdir='', **kwargs):
+        if self.file is not None:
+            return self._read_file(os.path.join(self.dir, subdir, self.file), **kwargs)
+        
         data = pd.DataFrame()
-        if stop is None:
-            stop = start
-        stop += dt.timedelta(hours=self.interval) - dt.timedelta(seconds=1)
+        if end is None:
+            end = start
+        end += dt.timedelta(hours=self.interval) - dt.timedelta(seconds=1)
         
         time = start
-        while time <= stop:
+        while time <= end:
             if self.exists(time, subdir):
                 data = data.combine_first(self._read_file(os.path.join(self.dir, subdir, time.strftime(self.format) + '.csv'), **kwargs))
             
             time += dt.timedelta(hours=self.interval)
         
-        if interval is not None and interval > 900:
-            offset = (start - start.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds() % interval
-            data = data.resample(str(int(interval))+'s', base=offset).sum()
-            stop += dt.timedelta(seconds=interval)
+        if resolution is not None and resolution > 900:
+            offset = (start - start.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds() % resolution
+            end += dt.timedelta(seconds=resolution)
+            data = data.resample(str(int(resolution))+'s', base=offset).sum()
         
-        if stop is not None:
-            if start > stop:
+        if end is not None:
+            if start > end:
                 return data.truncate(before=start).head(1)
             
-            return data.loc[start:stop]
+            return data.loc[start:end]
         
         return data
 
-    def persist(self, data, time=None, file=None, subdir='', **kwargs):
-        if data is not None and not self.disabled:
+    def persist(self, data, time=None, file=None, subdir='', **kwargs): #@UnusedVariable
+        if data is not None and self.enabled:
             if time is None:
                 time = data.index[0]
             if file is None:
@@ -140,12 +147,12 @@ class CsvDatabase(Database):
             if not os.path.exists(path):
                 os.makedirs(path)
             
-            self._write_file(os.path.join(path, file), data, **kwargs)
+            self._write_file(os.path.join(path, file), data)
 
-    def _write_file(self, path, data, encoding='utf-8', **kwargs):
+    def _write_file(self, path, data, encoding='utf-8'):
         if self.merge and os.path.isfile(path):
             index = data.index.name
-            csv = pd.read_csv(path, sep=self.separator, decimal=self.decimal, encoding=encoding, index_col=index, parse_dates=[index], **kwargs)
+            csv = pd.read_csv(path, sep=self.separator, decimal=self.decimal, encoding=encoding, index_col=index, parse_dates=[index])
             if not csv.empty:
                 csv.index = csv.index.tz_localize(tz.utc)
                 
@@ -154,7 +161,7 @@ class CsvDatabase(Database):
                 else:
                     data = pd.concat([csv, data], axis=1)
         
-        data.to_csv(path, sep=self.separator, decimal=self.decimal, encoding=encoding, **kwargs)
+        data.to_csv(path, sep=self.separator, decimal=self.decimal, encoding=encoding)
 
     def _read_file(self, path, **kwargs):
         """
@@ -194,7 +201,7 @@ class CsvDatabase(Database):
         
         csv.index.name = 'time'
         
-        return csv
+        return csv #.tz_convert(self.timezone)
 
 
 def _bool(v):

@@ -15,7 +15,7 @@ except ImportError:
 
 here = path.abspath(path.dirname(__file__))
 info = {}
-with open(path.join("core", "_version.py")) as f: exec(f.read(), info)
+with open(path.join("th_e_core", "_version.py")) as f: exec(f.read(), info)
 
 VERSION = info['__version__']
 
@@ -25,7 +25,7 @@ DESCRIPTION = 'This repository provides a set of core functions for several proj
 with open(path.join(here, 'README.md')) as f:
     README = f.read()
 
-NAME = 'core'
+NAME = 'th-e-core'
 LICENSE = 'LGPLv3'
 AUTHOR = 'ISC Konstanz'
 MAINTAINER_EMAIL = 'adrian.minde@isc-konstanz.de'
@@ -34,7 +34,7 @@ URL = 'https://github.com/isc-konstanz/th-e-core'
 INSTALL_REQUIRES = ['numpy',
                     'pandas']
 
-PACKAGES = ['core']
+PACKAGES = ['th_e_core']
 
 SETUPTOOLS_KWARGS = {
     'zip_safe': False,

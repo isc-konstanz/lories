@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-    th-e-core._version
+    th-e-th_e_core._version
     ~~~~~~~~~~~~~~~~~~
     
     
