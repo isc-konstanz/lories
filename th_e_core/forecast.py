@@ -41,6 +41,7 @@ class Forecast(ABC, Configurable):
         
         return Configurable._read_configs(context._configs.get('General', 'root_dir'), 
                                           context._configs.get('General', 'lib_dir'), 
+                                          context._configs.get('General', 'tmp_dir'), 
                                           context._configs.get('General', 'data_dir'), 
                                           context._configs.get('General', 'config_dir'), 
                                           config_name, **kwargs)

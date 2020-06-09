@@ -6,7 +6,6 @@
     
 """
 import logging
-from pandas._config.config import is_str
 logger = logging.getLogger(__name__)
 
 import os
@@ -208,6 +207,7 @@ class Component(Configurable):
     def _read_configs(context, config_file):
         configs = Configurable._read_configs(context._configs.get('General', 'root_dir'), 
                                              context._configs.get('General', 'lib_dir'), 
+                                             context._configs.get('General', 'tmp_dir'), 
                                              context._configs.get('General', 'data_dir'),  
                                              os.path.dirname(config_file.path), 
                                              config_file.name)

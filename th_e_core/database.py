@@ -97,11 +97,11 @@ class SqlDatabase(Database):
         
         import mysql.connector
         self.connector = mysql.connector.connect(
-          host=host,
-          port=_int(port),
-          user=user,
-          passwd=password,
-          database=database
+            host=host,
+            port=_int(port),
+            user=user,
+            passwd=password,
+            database=database
         )
 
     def exists(self, **kwargs):

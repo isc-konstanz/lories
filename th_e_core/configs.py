@@ -43,6 +43,7 @@ class Configurable:
     def _read(cls, 
              root_dir='.', 
              lib_dir='lib', 
+             tmp_dir='tmp', 
              data_dir='data', 
              config_dir='conf', 
              config_name=None, 
@@ -51,7 +52,7 @@ class Configurable:
         if config_name is None:
             config_name = cls.__name__.lower() + '.cfg'
         
-        configs = cls._read_configs(root_dir, lib_dir, data_dir, config_dir, config_name, **kwargs)
+        configs = cls._read_configs(root_dir, lib_dir, tmp_dir, data_dir, config_dir, config_name, **kwargs)
         
         package = kwargs.get('package') if 'package' in kwargs else '.'.join(cls.__module__.split('.')[:-1])
         module = kwargs.get('module') if 'module' in kwargs else cls.__module__.split('.')[-1]
@@ -59,7 +60,7 @@ class Configurable:
         return cls._from_configs(configs, package, module, cls.__name__)
 
     @staticmethod
-    def _read_configs(root_dir, lib_dir, data_dir, config_dir, config_name, config_require=True, **_):
+    def _read_configs(root_dir, lib_dir, tmp_dir, data_dir, config_dir, config_name, config_require=True, **_):
         if not os.path.isabs(config_dir):
             if os.path.isabs(data_dir):
                 config_dir = os.path.join(data_dir, config_dir)
@@ -70,6 +71,7 @@ class Configurable:
             raise ConfigUnavailableException('Invalid configuration directory: {}'.format(config_dir))
         
         configs = ConfigParser()
+        configs.optionxform = str
         config_file = os.path.join(config_dir, config_name)
         if config_require:
             if not os.path.isfile(config_file):
@@ -84,6 +86,8 @@ class Configurable:
             configs.set('General', 'root_dir', root_dir)
         if not configs.has_option('General', 'lib_dir'):
             configs.set('General', 'lib_dir', lib_dir if os.path.isabs(lib_dir) else os.path.join(root_dir, lib_dir))
+        if not configs.has_option('General', 'tmp_dir'):
+            configs.set('General', 'tmp_dir', tmp_dir if os.path.isabs(tmp_dir) else os.path.join(root_dir, tmp_dir))
         if not configs.has_option('General', 'data_dir'):
             configs.set('General', 'data_dir', data_dir if os.path.isabs(data_dir) else os.path.join(root_dir, data_dir))
         
