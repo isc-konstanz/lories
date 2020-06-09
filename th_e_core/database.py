@@ -179,9 +179,9 @@ class CsvDatabase(Database):
         self.decimal = decimal
         self.separator = separator
 
-    def exists(self, time, subdir='', **_):
+    def exists(self, date, subdir='', **_):
         return os.path.exists(os.path.join(self.dir, subdir, 
-                                           self.file if self.file is not None else time.strftime(self.format) + '.csv'))
+                                           self.file if self.file is not None else date.strftime(self.format) + '.csv'))
 
     def get(self, start=None, end=None, resolution=None, subdir='', **kwargs):
         if self.file is not None:
@@ -212,18 +212,20 @@ class CsvDatabase(Database):
         
         return data
 
-    def persist(self, data, time=None, file=None, subdir='', **kwargs): #@UnusedVariable
+    def persist(self, data, start=None, end=None, file=None, subdir='', **kwargs): #@UnusedVariable
         if data is not None and self.enabled:
-            if time is None:
-                time = data.index[0]
+            if start is None:
+                start = data.index[0]
+            if end is None:
+                end = data.index[-1]
             if file is None:
-                file = time.strftime(self.format) + '.csv'
+                file = start.strftime(self.format) + '.csv'
             
             path = os.path.join(self.dir, subdir)
             if not os.path.exists(path):
                 os.makedirs(path)
             
-            self._write_file(os.path.join(path, file), data)
+            self._write_file(os.path.join(path, file), data.loc[start:end,:])
 
     def _write_file(self, path, data, encoding='utf-8'):
         if self.merge and os.path.isfile(path):

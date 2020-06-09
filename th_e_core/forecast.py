@@ -13,6 +13,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 import os
+import pytz as tz
 import datetime as dt
 import pandas as pd
 from io import StringIO
@@ -77,10 +78,6 @@ class Forecast(ABC, Configurable):
         self._configure(configs, **kwargs)
         self._activate(context, **kwargs)
 
-    def _configure(self, configs, **kwargs): #@UnusedVariable
-        self.interval = configs.getint('General', 'interval', fallback=1440)*3600
-        self.delay = configs.getint('General', 'delay', fallback=0)*3600
-
     def _activate(self, context, **kwargs): #@UnusedVariable
         configs = self._configs
         if configs.has_section('Database'):
@@ -119,14 +116,20 @@ class Forecast(ABC, Configurable):
             variables = self.variables
         return data.rename(columns={y: x for x, y in variables.items()})
 
-    def get(self, time=dt.datetime.now(), **kwargs):
+    def get(self, start=dt.datetime.now(), end=None, **kwargs):
         """ 
         Retrieves the forecasted data for a specified time interval
         
-        :param time: 
-            the time for which forecasted data will be looked up for.
+        :param start: 
+            the start time for which forecasted data will be looked up for.
             For many applications, passing datetime.datetime.now() will suffice.
-        :type time: 
+        :type start: 
+            :class:`pandas.tslib.Timestamp` or datetime
+        
+        :param end: 
+            the end time for which forecasted data will be looked up for.
+            For many applications, passing datetime.datetime.now() will suffice.
+        :type end: 
             :class:`pandas.tslib.Timestamp` or datetime
         
         :returns: 
@@ -135,24 +138,55 @@ class Forecast(ABC, Configurable):
         :rtype: 
             :class:`pandas.DataFrame`
         """
-        if self._database is not None and self._database.exists(time, subdir=self._id):
-            forecast = self._database.get(time, subdir=self._id)
+        if self._database is not None and self._database.exists(start, subdir=self._id):
+            forecast = self._database.get(start, subdir=self._id)
         
         else:
-            forecast = self._get(time, **kwargs)
+            forecast = self._get(start, **kwargs)
             
             if self._database is not None:
                 # Store the retrieved forecast
-                self._database.persist(forecast, time=time, subdir=self._id)
+                self._database.persist(forecast, start=start, subdir=self._id)
         
-        return forecast.loc[time:, :]
+        return self._get_range(forecast, start, end)
 
     @abstractmethod
     def _get(self, *args, **kwargs):
         pass
 
+    def _get_range(self, forecast, start, end):
+        if start is None or start < forecast.index[0]:
+            start = forecast.index[0]
+        elif start is not None:
+            start = start.astimezone(forecast.index.tz)
+        
+        if end is None or end > forecast.index[-1]:
+            end = forecast.index[-1]
+        elif end is not None:
+            end = end.astimezone(forecast.index.tz)
+        
+        return forecast.loc[start:end, :]
 
-class NMM(Forecast, Weather):
+
+class ScheduledForecast(Forecast):
+
+    def _configure(self, configs, **kwargs):
+        super()._configure(configs, **kwargs)
+        
+        self.interval = configs.getint('General', 'interval', fallback=1440)*3600
+        self.delay = configs.getint('General', 'delay', fallback=0)*3600
+
+    def get(self, start=dt.datetime.now(), end=None, **kwargs):
+        # Calculate the available forecast start and end times
+        interval = self.interval/3600
+        start_schedule = start.astimezone(tz.timezone(self._context._location.tz)).replace(minute=0, second=0, microsecond=0)
+        if start_schedule.hour % interval != 0:
+            start_schedule = start_schedule - dt.timedelta(hours=start_schedule.hour % interval)
+        
+        return self._get_range(super().get(start=start_schedule, **kwargs), start, end)
+
+
+class NMM(ScheduledForecast, Weather):
     """
     Subclass of the Forecast class representing the Meteoblue
     NMM (Nonhydrostatic Meso-Scale Modelling) weather forecast model.
