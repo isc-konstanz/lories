@@ -23,6 +23,7 @@ from configparser import ConfigParser
 from th_e_core.configs import Configurable
 from th_e_core.database import Database
 from th_e_core.weather import Weather
+from th_e_core.system import System
 
 
 class Forecast(ABC, Configurable):
@@ -35,21 +36,21 @@ class Forecast(ABC, Configurable):
         configs = cls.read_configs(context, **kwargs)
         return cls.from_configs(context, configs, **kwargs)
 
-    @staticmethod
-    def read_configs(context, config_name='forecast.cfg', **kwargs):
+    @classmethod
+    def read_configs(cls, context, config_name='forecast.cfg', **kwargs):
         if not isinstance(context, Configurable):
             raise TypeError('Invalid context type: {}'.format(type(context)))
         
-        return Configurable._read_configs(context._configs.get('General', 'root_dir'), 
-                                          context._configs.get('General', 'lib_dir'), 
-                                          context._configs.get('General', 'tmp_dir'), 
-                                          context._configs.get('General', 'data_dir'), 
-                                          context._configs.get('General', 'config_dir'), 
-                                          config_name, **kwargs)
+        return cls._read_configs(context._configs.get('General', 'root_dir'), 
+                                 context._configs.get('General', 'lib_dir'), 
+                                 context._configs.get('General', 'tmp_dir'), 
+                                 context._configs.get('General', 'data_dir'), 
+                                 context._configs.get('General', 'config_dir'), 
+                                 config_name, **kwargs)
 
-    @staticmethod
-    def from_configs(context, configs, **kwargs):
-        package = context._configs.get('Import', 'package', fallback='.'.join(context.__module__.split('.')[:-1]))
+    @classmethod
+    def from_configs(cls, context, configs, **kwargs):
+        package = configs.get('Import', 'package', fallback='.'.join(cls.__module__.split('.')[:-1]))
         forecast = Forecast._from_configs(configs, package, 'forecast', 'Forecast', 
                                           context, **kwargs)
         
@@ -62,40 +63,20 @@ class Forecast(ABC, Configurable):
         if not isinstance(configs, ConfigParser):
             raise ValueError('Invalid configuration type: {}'.format(type(configs)))
         
-        if not configs.has_option('General', 'id'):
-            if configs.getboolean('General', 'central', fallback=True):
-                if context is None:
-                    raise ValueError('Invalid configuration, missing specified forecast id')
-            
-                configs.set('General', 'id', 
-                            '{0:06.2f}'.format(float(context._location.latitude)).replace('.', '') + '_' + \
-                            '{0:06.2f}'.format(float(context._location.longitude)).replace('.', ''))
-        
-        self._id = configs.get('General', 'id', fallback='')
-        
         self._context = context
         self._configs = configs
         self._configure(configs, **kwargs)
-        self._activate(context, **kwargs)
+        self._activate(context, configs, **kwargs)
 
-    def _activate(self, context, **kwargs): #@UnusedVariable
-        configs = self._configs
-        if configs.has_section('Database'):
-            if configs.getboolean('General', 'central', fallback=True):
-                data_dir = configs['General']['lib_dir']
-            else:
-                data_dir = configs['General']['data_dir']
-            
-            if 'dir' in configs['Database']:
-                database_dir = configs['Database']['dir']
-                if not os.path.isabs(database_dir):
-                    configs['Database']['dir'] = os.path.join(data_dir, database_dir)
-            else:
-                configs['Database']['dir'] = data_dir
-            
-            self._database = Database.open(configs, **kwargs)
-        else:
-            self._database = None
+    def _activate(self, context, configs, **kwargs):
+        pass
+
+    @property
+    def _system(self):
+        if not isinstance(self._context, System):
+            raise TypeError('Context is not of type System: {}'.format(type(self._context)))
+        
+        return self._context
 
     def _rename(self, data, variables=None):
         """
@@ -138,17 +119,7 @@ class Forecast(ABC, Configurable):
         :rtype: 
             :class:`pandas.DataFrame`
         """
-        if self._database is not None and self._database.exists(start, subdir=self._id):
-            forecast = self._database.get(start, subdir=self._id)
-        
-        else:
-            forecast = self._get(start, **kwargs)
-            
-            if self._database is not None:
-                # Store the retrieved forecast
-                self._database.persist(forecast, start=start, subdir=self._id)
-        
-        return self._get_range(forecast, start, end)
+        return self._get_range(self._get(start, end, **kwargs), start, end)
 
     @abstractmethod
     def _get(self, *args, **kwargs):
@@ -170,20 +141,68 @@ class Forecast(ABC, Configurable):
 
 class ScheduledForecast(Forecast):
 
+    def __init__(self, configs, context, **kwargs):
+        if not isinstance(configs, ConfigParser):
+            raise ValueError('Invalid configuration type: {}'.format(type(configs)))
+        
+        if not configs.has_option('General', 'id'):
+            if configs.getboolean('General', 'central', fallback=True):
+                if context is None:
+                    raise ValueError('Invalid configuration, missing specified forecast id')
+                
+                configs.set('General', 'id', 
+                            '{0:06.2f}'.format(float(context.location.latitude)).replace('.', '') + '_' + \
+                            '{0:06.2f}'.format(float(context.location.longitude)).replace('.', ''))
+        
+        self._id = configs.get('General', 'id', fallback='')
+        
+        self._context = context
+        self._configs = configs
+        self._configure(configs, **kwargs)
+        self._activate(context, configs, **kwargs)
+
     def _configure(self, configs, **kwargs):
         super()._configure(configs, **kwargs)
         
         self.interval = configs.getint('General', 'interval', fallback=1440)*3600
         self.delay = configs.getint('General', 'delay', fallback=0)*3600
 
+    def _activate(self, context, configs, **kwargs): #@UnusedVariable
+        if configs.has_section('Database'):
+            if configs.getboolean('General', 'central', fallback=True):
+                data_dir = configs['General']['lib_dir']
+            else:
+                data_dir = configs['General']['data_dir']
+            
+            if 'dir' in configs['Database']:
+                database_dir = configs['Database']['dir']
+                if not os.path.isabs(database_dir):
+                    configs['Database']['dir'] = os.path.join(data_dir, database_dir)
+            else:
+                configs['Database']['dir'] = data_dir
+            
+            self._database = Database.open(configs, **kwargs)
+        else:
+            self._database = None
+
     def get(self, start=dt.datetime.now(), end=None, **kwargs):
         # Calculate the available forecast start and end times
         interval = self.interval/3600
-        start_schedule = start.astimezone(tz.timezone(self._context._location.tz)).replace(minute=0, second=0, microsecond=0)
+        start_schedule = start.astimezone(tz.timezone(self._system.location.tz)).replace(minute=0, second=0, microsecond=0)
         if start_schedule.hour % interval != 0:
             start_schedule = start_schedule - dt.timedelta(hours=start_schedule.hour % interval)
         
-        return self._get_range(super().get(start=start_schedule, **kwargs), start, end)
+        if self._database is not None and self._database.exists(start, subdir=self._id):
+            forecast = self._database.get(start, end, subdir=self._id)
+        
+        else:
+            forecast = self._get(start, **kwargs)
+            
+            if self._database is not None:
+                # Store the retrieved forecast
+                self._database.persist(forecast, start=start, subdir=self._id)
+        
+        return self._get_range(forecast, start, end)
 
 
 class NMM(ScheduledForecast, Weather):
@@ -259,13 +278,13 @@ class NMM(ScheduledForecast, Weather):
             'snow_fraction'                 # Schneefall [0.0 - 1.0]
         ]
 
-    def _activate(self, context, **kwargs):
-        super()._activate(context, **kwargs)
+    def _activate(self, context, *args, **kwargs):
+        super()._activate(context, *args, **kwargs)
         from pvlib.location import Location
-        if not hasattr(context, '_location') or not isinstance(context._location, Location):
+        if not hasattr(context, 'location') or not isinstance(context.location, Location):
             raise ValueError("Invalid forecast context missing location information")
         
-        self.location = context._location
+        self.location = context.location
 
     def get_meta(self):
         import requests

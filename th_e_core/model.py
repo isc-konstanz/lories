@@ -10,7 +10,8 @@ logger = logging.getLogger(__name__)
 
 from abc import ABC, abstractmethod
 
-from th_e_core.system import Configurable
+from th_e_core.configs import Configurable
+from th_e_core.system import System
 
 
 class Model(ABC, Configurable):
@@ -50,10 +51,17 @@ class Model(ABC, Configurable):
         super().__init__(configs, **kwargs)
         
         self._context = context
-        self._build(context, **kwargs)
+        self._build(context, configs, **kwargs)
 
-    def _build(self, context, **kwargs):
+    def _build(self, context, configs, **kwargs):
         pass
+
+    @property
+    def _system(self):
+        if not isinstance(self._context, System):
+            raise TypeError('Context is not of type System: {}'.format(type(self._context)))
+        
+        return self._context
 
     @abstractmethod
     def run(self, *args, **kwargs):

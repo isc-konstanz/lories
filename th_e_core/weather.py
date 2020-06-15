@@ -19,6 +19,7 @@ from abc import ABC, abstractmethod
 
 from th_e_core.configs import Configurable
 from th_e_core.database import Database
+from th_e_core.system import System
 
 
 class Weather(ABC, Configurable):
@@ -70,6 +71,13 @@ class Weather(ABC, Configurable):
 
     def _activate(self, context, **kwargs):
         pass
+
+    @property
+    def _system(self):
+        if not isinstance(self._context, System):
+            raise TypeError('Context is not of type System: {}'.format(type(self._context)))
+        
+        return self._context
 
     @abstractmethod
     def get(self, **kwargs):

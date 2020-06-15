@@ -73,12 +73,22 @@ class System(Configurable, MutableMapping):
         self._configs = configs
         self._configure(configs, **kwargs)
         
-        components = self._components_read(**kwargs)
-        self._components = components
-        self._activate(components, **kwargs)
+        self._components = self._components_read(**kwargs)
+        self._activate(self._components, configs, **kwargs)
 
-    def _activate(self, components, **kwargs): #@UnusedVariable
-        configs = self._configs
+    def _configure(self, configs, **kwargs):
+        super()._configure(configs, **kwargs)
+        
+        if configs.has_section('Location'):
+            from pvlib.location import Location
+            self.location = Location(configs.getfloat('Location', 'latitude'), 
+                                     configs.getfloat('Location', 'longitude'), 
+                                     tz=configs.get('Location', 'timezone', fallback='UTC'), 
+                                     altitude=configs.getfloat('Location', 'altitude', fallback=0), 
+                                     name=self.name, 
+                                     **kwargs)
+
+    def _activate(self, components, configs, **kwargs): #@UnusedVariable
         if configs.has_section('Database'):
             if 'dir' in configs['Database']:
                 database_dir = configs['Database']['dir']
