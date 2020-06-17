@@ -227,7 +227,7 @@ class CsvDatabase(Database):
             
             self._write_file(os.path.join(path, file), data.loc[start:end,:])
 
-    def _write_file(self, path, data, encoding='utf-8'):
+    def _write_file(self, path, data, encoding='utf-8-sig'):
         if self.merge and os.path.isfile(path):
             index = data.index.name
             csv = pd.read_csv(path, sep=self.separator, decimal=self.decimal, encoding=encoding, index_col=index, parse_dates=[index])
