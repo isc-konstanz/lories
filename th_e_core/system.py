@@ -48,9 +48,9 @@ class Systems(MutableSequence):
         
         self._systems.insert(index, value)
 
-    def run(self, **kwargs):
+    def run(self, *args, **kwargs):
         for system in self:
-            system.run(**kwargs)
+            system.run(*args, **kwargs)
 
 
 class System(Configurable, MutableMapping):
