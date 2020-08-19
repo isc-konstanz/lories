@@ -208,7 +208,7 @@ class CsvDatabase(Database):
             if start > end:
                 return data.truncate(before=start).head(1)
             
-            return data.loc[start:end]
+            return data[(data.index >= start) & (data.index <= end)]
         
         return data
 

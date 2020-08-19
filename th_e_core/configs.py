@@ -64,8 +64,10 @@ class Configurable:
         if not os.path.isabs(config_dir):
             if os.path.isabs(data_dir):
                 config_dir = os.path.join(data_dir, config_dir)
-            else:
+            elif data_dir == 'data':
                 config_dir = os.path.join(root_dir, config_dir)
+            else:
+                config_dir = os.path.join(root_dir, data_dir, config_dir)
                 
         if not os.path.isdir(config_dir):
             raise ConfigUnavailableException('Invalid configuration directory: {}'.format(config_dir))

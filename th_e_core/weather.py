@@ -115,7 +115,7 @@ class TMYWeather(Weather):
                                                   configs['TMY']['file'])
         
         self.file = configs.get('TMY', 'file', fallback=None)
-        self.year = configs.get('TMY', 'year', fallback=None)
+        self.year = configs.getint('TMY', 'year', fallback=None)
 
     def _activate(self, system, **kwargs): #@UnusedVariable
         from pvlib.iotools import read_tmy2, read_tmy3
@@ -141,11 +141,55 @@ class EPWWeather(Weather):
                                                   configs['EPW']['file'])
         
         self.file = configs.get('EPW', 'file', fallback=None)
-        self.year = configs.get('EPW', 'year', fallback=None)
+        self.year = configs.getint('EPW', 'year', fallback=None)
 
     def _activate(self, system, **kwargs): #@UnusedVariable
         from pvlib.iotools import read_epw
+        
+        if not os.path.isfile(self.file):
+            self._download(system)
+        
         self.data, self.meta = read_epw(filename=self.file, coerce_year=self.year)
+
+    def _download(self, system):
+        import numpy as np
+        import pandas as pd
+        import urllib3, requests, re
+        from urllib3.exceptions import InsecureRequestWarning
+        urllib3.disable_warnings(InsecureRequestWarning)
+        
+        headers = {
+            'User-Agent' : "Magic Browser",
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        }
+        
+        response = requests.get('https://github.com/NREL/EnergyPlus/raw/develop/weather/master.geojson', verify=False)
+        data = response.json() #metadata for available files
+        #download lat/lon and url details for each .epw file into a dataframe
+        
+        locations = pd.DataFrame({'url':[],'lat':[],'lon':[],'name':[]})
+        for location in data['features']:
+            match = re.search(r'href=[\'"]?([^\'" >]+)', location['properties']['epw'])
+            if match:
+                url = match.group(1)
+                name = url[url.rfind('/') + 1:]
+                lontemp = location['geometry']['coordinates'][0]
+                lattemp = location['geometry']['coordinates'][1]
+                locations = locations.append(pd.DataFrame({'url':[url],'lat':[lattemp],'lon':[lontemp],'name':[name]}), 
+                                             ignore_index=True)
+        
+        errorvec = np.sqrt(np.square(locations.lat - system.location.latitude) + np.square(locations.lon - system.location.longitude))
+        index = errorvec.idxmin()
+        url = locations['url'][index]
+        #name = locations['name'][index]
+        
+        response = requests.get(url, verify=False, headers=headers)
+        if response.ok:
+            with open(self.file, 'wb') as file:
+                file.write(response.text.encode('ascii', 'ignore'))
+        else:
+            logger.warning('Connection error status code: %s' %( response.status_code) )
+            response.raise_for_status()
 
     def get(self, **_):
         # TODO: implement optional slicing

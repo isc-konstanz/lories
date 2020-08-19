@@ -155,8 +155,11 @@ class System(Configurable, MutableMapping):
     def __getattr__(self, attr):
         if attr in self._component_types:
             return self._components[self.__keytransform__(attr)]
+        try:
+            return super().__getattr__(attr)
         
-        return super().__getattr__(attr)
+        except AttributeError:
+            raise AttributeError("'{0}' object has no attribute '{1}'".format(type(self).__name__, attr))
 
     def __getitem__(self, key):
         return self._components[self.__keytransform__(key)]

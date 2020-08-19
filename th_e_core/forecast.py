@@ -139,6 +139,36 @@ class Forecast(ABC, Configurable):
         return forecast.loc[start:end, :]
 
 
+class DatabaseForecast(Forecast):
+
+    def _activate(self, context, configs, **kwargs):
+        super()._activate(context, configs, **kwargs)
+        
+        data_dir = configs['General']['data_dir']
+        if 'dir' in configs['Database']:
+            database_dir = configs['Database']['dir']
+            if not os.path.isabs(database_dir):
+                configs['Database']['dir'] = os.path.join(data_dir, database_dir)
+        else:
+            configs['Database']['dir'] = data_dir
+            
+        self._database = Database.open(self._configs, **kwargs)
+
+    def _get(self, start=None, end=None, format='%d.%m.%Y', **kwargs): #@ReservedAssignment
+        if start is None:
+            start = tz.utc.localize(dt.datetime.utcnow())
+            start.replace(year=start.year-1, month=1, day=1, hour=0, minute=0, second=0)
+        elif isinstance(start, str):
+            start = tz.utc.localize(dt.datetime.strptime(start, format))
+        
+        if end is None:
+            end = start + dt.timedelta(days=364)
+        elif isinstance(end, str):
+            end = tz.utc.localize(dt.datetime.strptime(end, format))
+        
+        return self._database.get(start=start, end=end, **kwargs)
+
+
 class ScheduledForecast(Forecast):
 
     def __init__(self, configs, context, **kwargs):
