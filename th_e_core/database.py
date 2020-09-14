@@ -225,9 +225,9 @@ class CsvDatabase(Database):
             if not os.path.exists(path):
                 os.makedirs(path)
             
-            self._write_file(os.path.join(path, file), data.loc[start:end,:])
+            self._write_file(os.path.join(path, file), data.loc[start:end,:], **kwargs)
 
-    def _write_file(self, path, data, encoding='utf-8-sig'):
+    def _write_file(self, path, data, encoding='utf-8-sig', **kwargs):
         if self.merge and os.path.isfile(path):
             index = data.index.name
             csv = pd.read_csv(path, sep=self.separator, decimal=self.decimal, encoding=encoding, index_col=index, parse_dates=[index])
@@ -239,7 +239,7 @@ class CsvDatabase(Database):
                 else:
                     data = pd.concat([csv, data], axis=1)
         
-        data.to_csv(path, sep=self.separator, decimal=self.decimal, encoding=encoding)
+        data.to_csv(path, sep=self.separator, decimal=self.decimal, encoding=encoding, **kwargs)
 
     def _read_file(self, path, **kwargs):
         """
