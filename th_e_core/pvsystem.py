@@ -18,10 +18,7 @@ from th_e_core.system import Component
 class PVSystem(Component, pv.pvsystem.PVSystem):
 
     def __init__(self, configs, context, **kwargs):
-        super().__init__(configs, context, 
-                         name = configs.get('General', 'id'), 
-                         **self._init_parameters(configs, context), 
-                         **kwargs)
+        super().__init__(configs, context, name = configs.get('General', 'id'), **kwargs)
 
     def _configure(self, configs, **kwargs):
         super()._configure(configs, **kwargs)
