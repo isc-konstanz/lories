@@ -30,6 +30,8 @@ class PVSystem(Component, pv.pvsystem.PVSystem):
         if self.surface_type is not None:
             from pvlib import irradiance
             self.albedo = irradiance.SURFACE_ALBEDOS.get(self.surface_type, 0.25)
+        else:
+            self.albedo = configs.getfloat('General', 'albedo', fallback=0.25)
         
         self.strings_per_inverter = configs.getint('Inverter', 'strings', fallback=1)
         self.modules_per_string = configs.getint('Module', 'count', fallback=1)
