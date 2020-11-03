@@ -215,22 +215,22 @@ class ScheduledForecast(Forecast):
         else:
             self._database = None
 
-    def get(self, start=dt.datetime.now(), end=None, **kwargs):
+    def get(self, start=dt.datetime.now(tz.utc), end=None, **kwargs):
         # Calculate the available forecast start and end times
         interval = self.interval/3600
         start_schedule = start.astimezone(tz.timezone(self._system.location.tz)).replace(minute=0, second=0, microsecond=0)
         if start_schedule.hour % interval != 0:
             start_schedule = start_schedule - dt.timedelta(hours=start_schedule.hour % interval)
         
-        if self._database is not None and self._database.exists(start, subdir=self._id):
-            forecast = self._database.get(start, end, subdir=self._id)
+        if self._database is not None and self._database.exists(start_schedule, subdir=self._id):
+            forecast = self._database.get(start_schedule, subdir=self._id)
         
         else:
             forecast = self._get(start, **kwargs)
             
             if self._database is not None:
                 # Store the retrieved forecast
-                self._database.persist(forecast, start=start, subdir=self._id)
+                self._database.persist(forecast, start=start_schedule, subdir=self._id)
         
         return self._get_range(forecast, start, end)
 
