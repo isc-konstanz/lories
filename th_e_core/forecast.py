@@ -126,15 +126,15 @@ class Forecast(ABC, Configurable):
         pass
 
     def _get_range(self, forecast, start, end):
+        if start is not None:
+            start = start.astimezone(forecast.index.tz)
         if start is None or start < forecast.index[0]:
             start = forecast.index[0]
-        elif start is not None:
-            start = start.astimezone(forecast.index.tz)
         
+        if end is not None:
+            end = end.astimezone(forecast.index.tz)
         if end is None or end > forecast.index[-1]:
             end = forecast.index[-1]
-        elif end is not None:
-            end = end.astimezone(forecast.index.tz)
         
         return forecast.loc[start:end, :]
 
