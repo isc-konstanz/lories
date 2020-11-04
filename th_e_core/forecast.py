@@ -195,7 +195,6 @@ class ScheduledForecast(Forecast):
         super()._configure(configs, **kwargs)
         
         self.interval = configs.getint('General', 'interval', fallback=1440)*3600
-        self.delay = configs.getint('General', 'delay', fallback=0)*3600
 
     def _activate(self, context, configs, **kwargs): #@UnusedVariable
         if configs.has_section('Database'):
