@@ -217,6 +217,10 @@ class ScheduledForecast(Forecast):
     def get(self, start=dt.datetime.now(tz.utc), end=None, **kwargs):
         # Calculate the available forecast start and end times
         interval = self.interval/3600
+        
+        if start.tzinfo is None or start.tzinfo.utcoffset(start) is None:
+            start = tz.utc.localize(start)
+        
         start_schedule = start.astimezone(tz.timezone(self._system.location.tz)).replace(minute=0, second=0, microsecond=0)
         if start_schedule.hour % interval != 0:
             start_schedule = start_schedule - dt.timedelta(hours=start_schedule.hour % interval)
