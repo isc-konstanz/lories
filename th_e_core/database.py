@@ -179,13 +179,20 @@ class CsvDatabase(Database):
         self.decimal = decimal
         self.separator = separator
 
-    def exists(self, date, subdir='', **_):
-        return os.path.exists(os.path.join(self.dir, subdir, 
-                                           self.file if self.file is not None else date.strftime(self.format) + '.csv'))
+    def exists(self, date=None, subdir='', **_):
+        if self.file is None and \
+                date is None:
+            return False
+        file = os.path.join(self.dir, subdir,
+                            self.file if self.file is not None else date.strftime(self.format) + '.csv')
 
-    def get(self, start=None, end=None, resolution=None, subdir='', **kwargs):
-        if self.file is not None:
-            data = self._read_file(os.path.join(self.dir, subdir, self.file), **kwargs)
+        return os.path.exists(file)
+
+    def get(self, start=None, end=None, resolution=None, file=None, subdir='', **kwargs):
+        if file is None:
+            file = self.file
+        if file is not None:
+            data = self._read_file(os.path.join(self.dir, subdir, file), **kwargs)
         
         else:
             data = self._read_file(os.path.join(self.dir, subdir, start.strftime(self.format) + '.csv'), **kwargs)
@@ -277,7 +284,7 @@ class CsvDatabase(Database):
             if csv.index.tzinfo is None or csv.index.tzinfo.utcoffset(csv.index) is None:
                 csv.index = csv.index.tz_localize(tz.utc)
         
-        csv.index.name = 'time'
+        # csv.index.name = 'time'
         
         return csv #.tz_convert(self.timezone)
 

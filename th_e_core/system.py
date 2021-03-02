@@ -186,7 +186,10 @@ class System(Configurable, MutableMapping):
     def read(cls, data_dir='data', config_scan=False, **kwargs):
         systems = Systems()
         
+        if not isinstance(config_scan, bool):
+            config_scan = str(config_scan).lower() == 'true'
         kwargs['config_scan'] = config_scan
+        
         if config_scan:
             for system_dir in os.scandir(data_dir):
                 if os.path.isdir(system_dir.path):
