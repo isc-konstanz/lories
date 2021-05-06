@@ -28,14 +28,14 @@ def write_excel(settings, summary, validations):
 
         summary_file = os.path.join(settings.get('General', 'data_dir', fallback='data'), 'summary.xlsx')
         summary_book = Workbook()
-        summary_writer = pd.ExcelWriter(summary_file, engine='openpyxl')
+        summary_writer = pd.ExcelWriter(summary_file, engine='openpyxl', options={'encoding': 'utf-8-sig'})
         summary_writer.book = summary_book
-        summary.to_excel(summary_writer, sheet_name='Summary', float_format="%.2f")
+        summary.to_excel(summary_writer, sheet_name='Summary', float_format="%.2f", encoding='utf-8-sig')
         summary_book.remove_sheet(summary_book.active)
         summary_book.active = 0
 
         for validation_key, validation in validations.items():
-            validation.to_excel(summary_writer, sheet_name=validation_key)
+            validation.to_excel(summary_writer, sheet_name=validation_key, encoding='utf-8-sig')
 
         # Set column width and header coloring
         for summary_sheet in summary_book:
@@ -81,7 +81,7 @@ def write_csv(system, data, file):
     data.to_csv(data_file,
                 sep=database.separator,
                 decimal=database.decimal,
-                encoding='utf-8')
+                encoding='utf-8-sig')
 
 
 def print_distributions(features, path=''):

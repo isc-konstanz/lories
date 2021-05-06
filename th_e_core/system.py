@@ -89,7 +89,10 @@ class System(Configurable, MutableMapping):
                                      **kwargs)
 
     def _activate(self, components, configs, **kwargs): #@UnusedVariable
-        if configs.has_section('Database'):
+        if configs.has_section('Database') and \
+                configs.get('Database', 'enabled', fallback='True').lower() == 'true' and \
+                configs.get('Database', 'enable', fallback='True').lower() == 'true':
+
             if 'dir' in configs['Database']:
                 database_dir = configs['Database']['dir']
                 if not os.path.isabs(database_dir):
