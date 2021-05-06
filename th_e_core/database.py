@@ -25,7 +25,7 @@ class Database(ABC):
     @staticmethod
     def open(configs, **kwargs):
         dbargs = dict(configs.items('Database'))
-        
+
         database_type = dbargs['type'].lower()
         if database_type == 'sql':
             database_tables = dict(configs.items('Tables'))
@@ -85,16 +85,16 @@ class Database(ABC):
 
 class SqlDatabase(Database):
 
-    def __init__(self, host="127.0.0.1", port=3306, 
+    def __init__(self, host="127.0.0.1", port=3306,
                  user='root', password='', database='emonpv',
-                 tables=dict(), interval=24, 
+                 tables=dict(), interval=24,
                  **kwargs):
-        
+
         super().__init__(**kwargs)
-        
+
         self.interval = _int(interval)
         self.tables = tables
-        
+
         import mysql.connector
         self.connector = mysql.connector.connect(
             host=host,
@@ -111,7 +111,7 @@ class SqlDatabase(Database):
     def get(self, start=None, end=None, resolution=None, **kwargs):
         epoch = dt.datetime(1970, 1, 1, tzinfo=tz.UTC)
         data = pd.DataFrame()
-        
+
         for column, table in self.tables.items():
             cursor = self.connector.cursor()
             select = "SELECT time, data FROM {0} WHERE ".format(table)
@@ -120,29 +120,29 @@ class SqlDatabase(Database):
                 cursor.execute(select, ((start.astimezone(tz.UTC)-epoch).total_seconds(),))
             else:
                 select += "time BETWEEN %s AND %s ORDER BY time ASC"
-                cursor.execute(select, 
-                               ((start.astimezone(tz.UTC)-epoch).total_seconds(), 
+                cursor.execute(select,
+                               ((start.astimezone(tz.UTC)-epoch).total_seconds(),
                                 (end.astimezone(tz.UTC)-epoch).total_seconds()))
-            
+
             times = []
             values = []
             for timestamp, value in cursor.fetchall():
                 time = tz.utc.localize(dt.datetime.fromtimestamp(timestamp))
                 times.append(time)
                 values.append(value)
-            
+
             result = pd.DataFrame(data=values, index=times, columns=[column])
             data = pd.concat([data, result], axis=1)
-        
+
         if resolution is not None and resolution > 900:
             offset = (start - start.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds() % resolution
             data = data.resample(str(int(resolution))+'s', base=offset).sum()
-        
+
         return data
 
     def persist(self, data, **_):
         epoch = dt.datetime(1970, 1, 1, tzinfo=tz.UTC)
-        
+
         cursor = self.connector.cursor()
         for column in data.columns:
             insert = "INSERT INTO {0} (time,data) VALUES ('%s', '%s') ON DUPLICATE KEY UPDATE data=VALUES(data)".format(self.tables[column])
@@ -150,31 +150,31 @@ class SqlDatabase(Database):
             for index, value in data[column].items():
                 time = (index.astimezone(tz.UTC)-epoch).total_seconds()
                 values.append((time, value))
-            
+
             cursor.executemany(insert, values)
-        
+
         self.connector.commit()
 
 
 class CsvDatabase(Database):
 
     def __init__(self, dir=os.getcwd(), file=None, format='%Y%m%d_%H%M%S', #@ReservedAssignment
-                 index_column='time', index_unix=False, merge=False, 
-                 interval=24, timezone='UTC', decimal='.', separator=',', 
+                 index_column='time', index_unix=False, merge=False,
+                 interval=24, timezone='UTC', decimal='.', separator=',',
                  **kwargs):
-        
+
         super().__init__(**kwargs)
-        
+
         self.dir = dir
         self.file = file
-        
+
         self.format = format
         self.index_column = index_column
         self.index_unix = _bool(index_unix)
-        
+
         self.interval = _int(interval)
         self.merge = _bool(merge)
-        
+
         self.timezone = tz.timezone(timezone)
         self.decimal = decimal
         self.separator = separator
@@ -193,7 +193,7 @@ class CsvDatabase(Database):
             file = self.file
         if file is not None:
             data = self._read_file(os.path.join(self.dir, subdir, file), **kwargs)
-        
+
         else:
             data = self._read_file(os.path.join(self.dir, subdir, start.strftime(self.format) + '.csv'), **kwargs)
             if end is not None:
@@ -201,22 +201,22 @@ class CsvDatabase(Database):
                 while time <= end:
                     if self.exists(time, subdir):
                         data = data.combine_first(self._read_file(os.path.join(self.dir, subdir, time.strftime(self.format) + '.csv'), **kwargs))
-                    
+
                     time += dt.timedelta(hours=self.interval)
-        
+
         if resolution is not None and resolution > 900:
             offset = (start - start.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds() % resolution
             data = data.resample(str(int(resolution))+'s', base=offset).sum()
-            
+
             if end is not None:
                 end += dt.timedelta(seconds=resolution)
-        
+
         if end is not None:
             if start > end:
                 return data.truncate(before=start).head(1)
             
             return data[(data.index >= start) & (data.index <= end)]
-        
+
         return data
 
     def persist(self, data, start=None, end=None, file=None, subdir='', **kwargs): #@UnusedVariable
@@ -227,12 +227,12 @@ class CsvDatabase(Database):
                 end = data.index[-1]
             if file is None:
                 file = start.strftime(self.format) + '.csv'
-            
+
             path = os.path.join(self.dir, subdir)
             if not os.path.exists(path):
                 os.makedirs(path)
-            
-            self._write_file(os.path.join(path, file), data.loc[start:end,:], **kwargs)
+
+            self._write_file(os.path.join(path, file), data.loc[start:end], **kwargs)
 
     def _write_file(self, path, data, encoding='utf-8-sig', **kwargs):
         if self.merge and os.path.isfile(path):
@@ -240,12 +240,12 @@ class CsvDatabase(Database):
             csv = pd.read_csv(path, sep=self.separator, decimal=self.decimal, encoding=encoding, index_col=index, parse_dates=[index])
             if not csv.empty:
                 csv.index = csv.index.tz_localize(tz.utc)
-                
+
                 if all(name in list(csv.columns) for name in list(data.columns)):
                     data = data.combine_first(csv)
                 else:
                     data = pd.concat([csv, data], axis=1)
-        
+
         data.to_csv(path, sep=self.separator, decimal=self.decimal, encoding=encoding, **kwargs)
 
     def _read_file(self, path, **kwargs):
@@ -276,34 +276,34 @@ class CsvDatabase(Database):
         """
         csv = pd.read_csv(path, sep=self.separator, decimal=self.decimal,
                           index_col=self.index_column, parse_dates=[self.index_column], **kwargs)
-        
+
         if not csv.empty:
             if self.index_unix:
                 csv.index = pd.to_datetime(csv.index, unit='ms')
-            
+
             if csv.index.tzinfo is None or csv.index.tzinfo.utcoffset(csv.index) is None:
                 csv.index = csv.index.tz_localize(tz.utc)
-        
+
         # csv.index.name = 'time'
-        
+
         return csv #.tz_convert(self.timezone)
 
 
 def _bool(v):
     if isinstance(v, str):
         return v.lower() == 'true'
-    
+
     return v
 
 def _float(v):
     if isinstance(v, str):
         return float(v)
-    
+
     return v
 
 def _int(v):
     if isinstance(v, str):
         return int(v)
-    
+
     return v
 
