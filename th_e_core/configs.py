@@ -36,6 +36,10 @@ class Configurable:
 #         if logger.isEnabledFor(logging.DEBUG):
 #             print(self)
 
+    @property
+    def configs(self):
+        return self._configs
+
     def _configure(self, configs, **kwargs):
         pass
 

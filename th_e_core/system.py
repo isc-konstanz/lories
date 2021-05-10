@@ -144,6 +144,12 @@ class System(Configurable, MutableMapping):
     def _component_types(self):
         return ['component', 'cmpt', 'pv']
 
+    def contains_type(self, key):
+        return len(self.get_type(key)) > 0
+
+    def get_type(self, key):
+        return [component for component in self._components.values() if component.type in key]
+
     @property
     def id(self):
         return self._id
