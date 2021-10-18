@@ -9,76 +9,50 @@
     effective irradiance on defined, tilted photovoltaic systems.
     
 """
-import logging
-logger = logging.getLogger(__name__)
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from typing import Dict
 
 import os
 import pytz as tz
 import datetime as dt
 import pandas as pd
-from io import StringIO
-from abc import ABC, abstractmethod
+import logging
 
-from configparser import ConfigParser
+from io import StringIO
+from configparser import ConfigParser as Configurations
 from th_e_core.configs import Configurable
-from th_e_core.database import Database
+from th_e_core.iotools import Database
 from th_e_core.weather import Weather
 from th_e_core.system import System
+
+logger = logging.getLogger(__name__)
 
 
 class Forecast(ABC, Configurable):
 
     @classmethod
-    def read(cls, context, **kwargs):
-        if not isinstance(context, Configurable):
-            raise TypeError('Invalid context type: {}'.format(type(context)))
-        
-        configs = cls.read_configs(context, **kwargs)
-        return cls.from_configs(context, configs, **kwargs)
+    def read(cls, system: System, **kwargs) -> Forecast:
+        return cls(system, cls._read_configs(system, **kwargs), **kwargs)
 
-    @classmethod
-    def read_configs(cls, context, config_name='forecast.cfg', **kwargs):
-        if not isinstance(context, Configurable):
-            raise TypeError('Invalid context type: {}'.format(type(context)))
-        
-        return cls._read_configs(context._configs.get('General', 'root_dir'), 
-                                 context._configs.get('General', 'lib_dir'), 
-                                 context._configs.get('General', 'tmp_dir'), 
-                                 context._configs.get('General', 'data_dir'), 
-                                 context._configs.get('General', 'config_dir'), 
-                                 config_name, **kwargs)
+    @staticmethod
+    def _read_configs(system: System, config_name: str = 'forecast.cfg', **kwargs) -> Configurations:
+        return Configurable._read_configs(system.configs.get('General', 'root_dir'),
+                                          system.configs.get('General', 'lib_dir'),
+                                          system.configs.get('General', 'tmp_dir'),
+                                          system.configs.get('General', 'data_dir'),
+                                          system.configs.get('General', 'config_dir'),
+                                          config_name, **kwargs)
 
-    @classmethod
-    def from_configs(cls, context, configs, **kwargs):
-        package = configs.get('Import', 'package', fallback='.'.join(cls.__module__.split('.')[:-1]))
-        forecast = Forecast._from_configs(configs, package, 'forecast', 'Forecast', 
-                                          context, **kwargs)
-        
-        if not isinstance(forecast, Forecast):
-            raise TypeError('Invalid forecast type: {}'.format(type(forecast)))
-        
-        return forecast
+    def __init__(self, system: System, configs: Configurations, **kwargs) -> None:
+        super().__init__(configs, **kwargs)
+        self._system = system
+        self._activate(system, configs, **kwargs)
 
-    def __init__(self, configs, context, **kwargs):
-        if not isinstance(configs, ConfigParser):
-            raise ValueError('Invalid configuration type: {}'.format(type(configs)))
-        
-        self._context = context
-        self._configs = configs
-        self._configure(configs, **kwargs)
-        self._activate(context, configs, **kwargs)
-
-    def _activate(self, context, configs, **kwargs):
+    def _activate(self, system: System, configs: Configurations, **kwargs) -> None:
         pass
 
-    @property
-    def _system(self):
-        if not isinstance(self._context, System):
-            raise TypeError('Context is not of type System: {}'.format(type(self._context)))
-        
-        return self._context
-
-    def _rename(self, data, variables=None):
+    def _rename(self, data: pd.DataFrame, variables: Dict[str, str] = None) -> pd.DataFrame:
         """
         Renames the columns according the variable mapping.
 
@@ -97,21 +71,24 @@ class Forecast(ABC, Configurable):
             variables = self.variables
         return data.rename(columns={y: x for x, y in variables.items()})
 
-    def get(self, start=dt.datetime.now(), end=None, **kwargs):
+    def get(self,
+            start: pd.Timestamp | dt.datetime = dt.datetime.now(),
+            end:   pd.Timestamp | dt.datetime = None,
+            **kwargs) -> pd.DataFrame:
         """ 
         Retrieves the forecasted data for a specified time interval
-        
+
         :param start: 
             the start time for which forecasted data will be looked up for.
             For many applications, passing datetime.datetime.now() will suffice.
         :type start: 
-            :class:`pandas.tslib.Timestamp` or datetime
+            :class:`pandas.Timestamp` or datetime
         
         :param end: 
             the end time for which forecasted data will be looked up for.
             For many applications, passing datetime.datetime.now() will suffice.
         :type end: 
-            :class:`pandas.tslib.Timestamp` or datetime
+            :class:`pandas.Timestamp` or datetime
         
         :returns: 
             the forecasted data, indexed in a specific time interval.
@@ -122,28 +99,32 @@ class Forecast(ABC, Configurable):
         return self._get_range(self._get(start, end, **kwargs), start, end)
 
     @abstractmethod
-    def _get(self, *args, **kwargs):
+    def _get(self, *args, **kwargs) -> pd.DataFrame:
         pass
 
-    def _get_range(self, forecast, start, end):
+    @staticmethod
+    def _get_range(forecast: pd.DataFrame,
+                   start:    pd.Timestamp | dt.datetime,
+                   end:      pd.Timestamp | dt.datetime) -> pd.DataFrame:
+
         if start is not None:
             start = start.astimezone(forecast.index.tz)
         if start is None or start < forecast.index[0]:
             start = forecast.index[0]
-        
+
         if end is not None:
             end = end.astimezone(forecast.index.tz)
         if end is None or end > forecast.index[-1]:
             end = forecast.index[-1]
-        
+
         return forecast.loc[start:end, :]
 
 
 class DatabaseForecast(Forecast):
 
-    def _activate(self, context, configs, **kwargs):
-        super()._activate(context, configs, **kwargs)
-        
+    def _activate(self, system: System, configs: Configurations, **kwargs) -> None:
+        super()._activate(system, configs, **kwargs)
+
         data_dir = configs['General']['data_dir']
         if 'dir' in configs['Database']:
             database_dir = configs['Database']['dir']
@@ -151,52 +132,51 @@ class DatabaseForecast(Forecast):
                 configs['Database']['dir'] = os.path.join(data_dir, database_dir)
         else:
             configs['Database']['dir'] = data_dir
-            
+
         self._database = Database.open(self._configs, **kwargs)
 
-    def _get(self, start=None, end=None, format='%d.%m.%Y', **kwargs): #@ReservedAssignment
+    # noinspection PyShadowingBuiltins
+    def _get(self,
+             start:  pd.Timestamp | dt.datetime = None,
+             end:    pd.Timestamp | dt.datetime = None,
+             format: str = '%d.%m.%Y',
+             **kwargs) -> pd.DataFrame:
+
         if start is None:
             start = tz.utc.localize(dt.datetime.utcnow())
             start.replace(year=start.year-1, month=1, day=1, hour=0, minute=0, second=0)
         elif isinstance(start, str):
             start = tz.utc.localize(dt.datetime.strptime(start, format))
-        
+
         if end is None:
             end = start + dt.timedelta(days=364)
         elif isinstance(end, str):
             end = tz.utc.localize(dt.datetime.strptime(end, format))
-        
-        return self._database.get(start=start, end=end, **kwargs)
+
+        return self._database.read(start=start, end=end, **kwargs)
 
 
 class ScheduledForecast(Forecast):
 
-    def __init__(self, configs, context, **kwargs):
-        if not isinstance(configs, ConfigParser):
-            raise ValueError('Invalid configuration type: {}'.format(type(configs)))
-        
+    def __init__(self, system: System, configs: Configurations, **kwargs) -> None:
         if not configs.has_option('General', 'id'):
             if configs.getboolean('General', 'central', fallback=True):
-                if context is None:
+                if system is None:
                     raise ValueError('Invalid configuration, missing specified forecast id')
                 
                 configs.set('General', 'id', 
-                            '{0:06.2f}'.format(float(context.location.latitude)).replace('.', '') + '_' + \
-                            '{0:06.2f}'.format(float(context.location.longitude)).replace('.', ''))
+                            '{0:06.2f}'.format(float(system.location.latitude)).replace('.', '') + '_' +
+                            '{0:06.2f}'.format(float(system.location.longitude)).replace('.', ''))
         
         self._id = configs.get('General', 'id', fallback='')
-        
-        self._context = context
-        self._configs = configs
-        self._configure(configs, **kwargs)
-        self._activate(context, configs, **kwargs)
+        super().__init__(system, configs, **kwargs)
 
-    def _configure(self, configs, **kwargs):
+    def _configure(self, configs: Configurations, **kwargs) -> None:
         super()._configure(configs, **kwargs)
         
         self.interval = configs.getint('General', 'interval', fallback=1440)*3600
 
-    def _activate(self, context, configs, **kwargs): #@UnusedVariable
+    def _activate(self, system: System, configs: Configurations, **kwargs) -> None:
         if configs.has_section('Database'):
             if configs.getboolean('General', 'central', fallback=True):
                 data_dir = configs['General']['lib_dir']
@@ -214,28 +194,37 @@ class ScheduledForecast(Forecast):
         else:
             self._database = None
 
-    def get(self, start=dt.datetime.now(tz.utc), end=None, **kwargs):
+    def get(self,
+            start: pd.Timestamp | dt.datetime = dt.datetime.now(tz.utc),
+            end:   pd.Timestamp | dt.datetime = None,
+            **kwargs) -> pd.DataFrame:
+
         # Calculate the available forecast start and end times
         interval = self.interval/3600
-        
+        timezone = tz.timezone(self._system.location.tz)
+
         if start.tzinfo is None or start.tzinfo.utcoffset(start) is None:
             start = tz.utc.localize(start)
-        
-        start_schedule = start.astimezone(tz.timezone(self._system.location.tz)).replace(minute=0, second=0, microsecond=0)
+
+        start_schedule = start.astimezone(timezone).replace(minute=0, second=0, microsecond=0)
         if start_schedule.hour % interval != 0:
             start_schedule = start_schedule - dt.timedelta(hours=start_schedule.hour % interval)
-        
+
         if self._database is not None and self._database.exists(start_schedule, subdir=self._id):
-            forecast = self._database.get(start_schedule, subdir=self._id)
-        
+            forecast = self._database.read(start_schedule, subdir=self._id)
+
         else:
             forecast = self._get(start, **kwargs)
-            
+
             if self._database is not None:
                 # Store the retrieved forecast
-                self._database.persist(forecast, start=start_schedule, subdir=self._id)
-        
+                self._database.write(forecast, start=start_schedule, subdir=self._id)
+
         return self._get_range(forecast, start, end)
+
+    def _get(self, *args, **kwargs) -> pd.DataFrame:
+        # Ignore abstract
+        pass
 
 
 class NMM(ScheduledForecast, Weather):
@@ -246,14 +235,14 @@ class NMM(ScheduledForecast, Weather):
     Model data corresponds to 4km resolution forecasts.
     """
 
-    def _configure(self, configs, **kwargs):
-        super()._configure(configs, **kwargs);
-        
-        # TODO: add validity verification
+    def _configure(self, configs: Configurations, **kwargs) -> None:
+        super()._configure(configs, **kwargs)
+
+        # TODO: Add sanity check
         self.name = configs.get('Meteoblue', 'name')
         self.address = configs.get('Meteoblue', 'address')
         self.apikey = configs.get('Meteoblue', 'apikey')
-        
+
         self.variables = {
             'sunshine':                     'sunshinetime',
             'daylight':                     'isdaylight',
@@ -279,7 +268,7 @@ class NMM(ScheduledForecast, Weather):
             'etr':                          'extraterrestrialradiation_backwards',
             'etr_instant':                  'extraterrestrialradiation_instant'
         }
-        
+
         self.variables_output = [
             'sunshine',                     # Sonnenscheindauer [min]
             'daylight',                     # Tageslicht Indikator
@@ -311,18 +300,19 @@ class NMM(ScheduledForecast, Weather):
             'snow_fraction'                 # Schneefall [0.0 - 1.0]
         ]
 
-    def _activate(self, context, *args, **kwargs):
-        super()._activate(context, *args, **kwargs)
+    def _activate(self, system: System, *args, **kwargs) -> None:
+        super()._activate(system, *args, **kwargs)
         from pvlib.location import Location
-        if not hasattr(context, 'location') or not isinstance(context.location, Location):
+        if not hasattr(system, 'location') or not isinstance(system.location, Location):
             raise ValueError("Invalid forecast context missing location information")
-        
-        self.location = context.location
 
-    def get_meta(self):
+        self.location = system.location
+
+    # noinspection PyPackageRequirements
+    def get_meta(self) -> Dict[str, str]:
         import requests
         import json
-        
+
         parameters = {
             'name': self.name,
             'tz': self.location.tz,
@@ -334,18 +324,20 @@ class NMM(ScheduledForecast, Weather):
             'apikey': self.apikey
         }
         response = requests.get(self.address + 'packages/basic-1h_clouds-1h_solar-1h', params=parameters)
-        
+
         if response.status_code != 200:
-            raise requests.HTTPError("Response returned with error " + response.status_code + ": " + response.reason)
-        
+            raise requests.HTTPError("Response returned with error " + str(response.status_code) + ": " +
+                                     response.reason)
+
         data = json.loads(response.text)
         return data.get('metadata')
 
-    def _get(self, *_):
+    def _get(self, *_) -> pd.DataFrame:
         data = self._rename(self._get_data())
         return data[self.variables_output]
 
-    def _get_data(self):
+    # noinspection PyPackageRequirements
+    def _get_data(self) -> pd.DataFrame:
         """
         Submits a query to the meteoblue servers and
         converts the CSV response to a pandas DataFrame.
@@ -356,7 +348,7 @@ class NMM(ScheduledForecast, Weather):
             column names are the weather model's variable names.
         """
         import requests
-        
+
         parameters = {
             'name': self.name,
             'tz': self.location.tz,
@@ -372,15 +364,15 @@ class NMM(ScheduledForecast, Weather):
             'apikey': self.apikey
         }
         response = requests.get(self.address + 'packages/basic-1h_clouds-1h_solar-1h', params=parameters)
-        
+
         if response.status_code != 200:
-            raise requests.HTTPError("Response returned with error " + response.status_code + ": " + response.reason)
-        
+            raise requests.HTTPError("Response returned with error " + str(response.status_code) + ": " +
+                                     response.reason)
+
         data = pd.read_csv(StringIO(response.text), sep=',')
         data['time'] = pd.to_datetime(data['time'])
         data = data.set_index('time')
         data = data.tz_convert(self.location.tz)
         data = data.replace(-999, 0)
-        
-        return data
 
+        return data

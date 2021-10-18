@@ -5,65 +5,44 @@
     
     
 """
-import logging
-logger = logging.getLogger(__name__)
-
+from __future__ import annotations
 from abc import ABC, abstractmethod
 
+import logging
+import pandas as pd
+
+from configparser import ConfigParser as Configurations
 from th_e_core.configs import Configurable
 from th_e_core.system import System
+
+logger = logging.getLogger(__name__)
 
 
 class Model(ABC, Configurable):
 
     @classmethod
-    def read(cls, context, **kwargs):
-        if not isinstance(context, Configurable):
-            raise TypeError('Invalid context type: {}'.format(type(context)))
-        
-        configs = cls.read_configs(context, **kwargs)
-        return cls.from_configs(context, configs, **kwargs)
+    def read(cls, system: System, **kwargs) -> Model:
+        return cls(system, cls._read_configs(system, **kwargs), **kwargs)
 
     @staticmethod
-    def read_configs(context, config_name='model.cfg', **kwargs):
-        if not isinstance(context, Configurable):
-            raise TypeError('Invalid context type: {}'.format(type(context)))
-        
-        return Configurable._read_configs(context._configs.get('General', 'root_dir'), 
-                                          context._configs.get('General', 'lib_dir'), 
-                                          context._configs.get('General', 'tmp_dir'), 
-                                          context._configs.get('General', 'data_dir'), 
-                                          context._configs.get('General', 'config_dir'), 
+    def _read_configs(system: System, config_name: str = 'model.cfg', **kwargs) -> Configurations:
+        return Configurable._read_configs(system.configs.get('General', 'root_dir'),
+                                          system.configs.get('General', 'lib_dir'),
+                                          system.configs.get('General', 'tmp_dir'),
+                                          system.configs.get('General', 'data_dir'),
+                                          system.configs.get('General', 'config_dir'),
                                           config_name, **kwargs)
 
-    @staticmethod
-    def from_configs(context, configs, **kwargs):
-        package = context._configs.get('Import', 'package', fallback='.'.join(context.__module__.split('.')[:-1]))
-        model = Model._from_configs(configs, package, 'model', 'Model', 
-                                    context, **kwargs)
-        
-        if not isinstance(model, Model):
-            raise TypeError('Invalid model type: {}'.format(type(model)))
-        
-        return model
-
-    def __init__(self, configs, context, **kwargs):
+    def __init__(self, system: System, configs: Configurations, **kwargs) -> None:
         super().__init__(configs, **kwargs)
-        
-        self._context = context
-        self._build(context, configs, **kwargs)
 
-    def _build(self, context, configs, **kwargs):
+        self._system = system
+        self._build(system, configs, **kwargs)
+
+    def _build(self, system, configs, **kwargs) -> None:
         pass
 
-    @property
-    def _system(self):
-        if not isinstance(self._context, System):
-            raise TypeError('Context is not of type System: {}'.format(type(self._context)))
-        
-        return self._context
-
     @abstractmethod
-    def run(self, *args, **kwargs):
+    def run(self, *args, **kwargs) -> pd.DataFrame:
         pass
 

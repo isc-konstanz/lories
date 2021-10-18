@@ -28,7 +28,7 @@ def write_excel(settings, summary, validations):
 
         summary_file = os.path.join(settings.get('General', 'data_dir', fallback='data'), 'summary.xlsx')
         summary_book = Workbook()
-        summary_writer = pd.ExcelWriter(summary_file, engine='openpyxl', options={'encoding': 'utf-8-sig'})
+        summary_writer = pd.ExcelWriter(summary_file, engine='openpyxl', engine_kwargs={'encoding': 'utf-8-sig'})
         summary_writer.book = summary_book
         summary.to_excel(summary_writer, sheet_name='Summary', float_format="%.2f", encoding='utf-8-sig')
         summary_book.remove_sheet(summary_book.active)
