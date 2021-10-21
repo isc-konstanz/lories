@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import logging
 from configparser import ConfigParser as Configurations
+from th_e_core.tools import _path
 
 logger = logging.getLogger(__name__)
 
@@ -111,11 +112,10 @@ class Configurable:
         if 'General' not in configs.sections():
             configs.add_section('General')
 
-        Configurable._set_configs_path(configs, 'root_dir', root_dir)
-        Configurable._set_configs_path(configs, 'lib_dir', lib_dir, path_root=root_dir)
-        Configurable._set_configs_path(configs, 'tmp_dir', tmp_dir, path_root=root_dir)
-        Configurable._set_configs_path(configs, 'data_dir', data_dir, path_root=root_dir)
-
+        configs.set('General', 'root_dir', _path(configs, 'root_dir', root_dir))
+        configs.set('General', 'lib_dir', _path(configs, 'lib_dir', lib_dir))
+        configs.set('General', 'tmp_dir', _path(configs, 'tmp_dir', tmp_dir))
+        configs.set('General', 'data_dir', _path(configs, 'data_dir', data_dir))
         configs.set('General', 'config_dir', config_dir)
         configs.set('General', 'config_file', config_file)
 
@@ -146,24 +146,6 @@ class Configurable:
             obj = __import__('th_e_core.'+configs['Import']['module'], fromlist=[configs['Import']['class']])
 
         return getattr(obj, configs['Import']['class'])(configs, *args, **kwargs)
-
-    @staticmethod
-    def _set_configs_path(configs: Configurations,
-                          key: str,
-                          path: str,
-                          path_root: str = None,
-                          section: str = 'General') -> None:
-
-        if configs.has_option(section, key):
-            path = configs.get(section, key)
-
-        if "~" in path:
-            path = os.path.expanduser(path)
-
-        if not os.path.isabs(path) and path_root is not None:
-            path = os.path.join(path_root, path)
-
-        configs.set(section, key, path)
 
     @property
     def _class_name(self) -> str:

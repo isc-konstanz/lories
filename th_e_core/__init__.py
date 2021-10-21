@@ -25,4 +25,4 @@ from th_e_core.model import Model
 from th_e_core import system
 from th_e_core.system import System, Component
 
-from th_e_core import pvsystem
+from th_e_core import pvsystem, pvtools
