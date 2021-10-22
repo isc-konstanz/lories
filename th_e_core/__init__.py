@@ -8,7 +8,7 @@
 from th_e_core._version import __version__
 
 from th_e_core import configs
-from th_e_core.configs import Configurable, ConfigUnavailableException
+from th_e_core.configs import Configurable, ConfigurationException, ConfigurationUnavailableException
 
 from th_e_core import iotools
 from th_e_core.iotools import Database

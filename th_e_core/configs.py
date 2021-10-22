@@ -98,14 +98,14 @@ class Configurable:
                 config_dir = os.path.join(root_dir, data_dir, config_dir)
 
         if not os.path.isdir(config_dir):
-            raise ConfigUnavailableException('Invalid configuration directory: {}'.format(config_dir))
+            raise ConfigurationUnavailableException('Invalid configuration directory: {}'.format(config_dir))
 
         configs = Configurations()
         configs.optionxform = str
         config_file = os.path.join(config_dir, config_name)
         if config_require:
             if not os.path.isfile(config_file):
-                raise ConfigUnavailableException('Unable to find configuration file "{}"'.format(config_file))
+                raise ConfigurationUnavailableException('Unable to find configuration file "{}"'.format(config_file))
             
             configs.read(config_file)
 
@@ -152,7 +152,15 @@ class Configurable:
         return type(self).__name__
 
 
-class ConfigUnavailableException(Exception):
+class ConfigurationException(Exception):
+    """
+    Raise if a configuration is invalid.
+
+    """
+    pass
+
+
+class ConfigurationUnavailableException(ConfigurationException):
     """
     Raise if a configuration file can not be found.
     
