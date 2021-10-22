@@ -12,7 +12,7 @@ import logging
 import pvlib
 
 from th_e_core.pvtools import ModuleDatabase, InverterDatabase
-from th_e_core.system import System, Component
+from th_e_core import System, Component, ConfigurationException
 from configparser import ConfigParser as Configurations
 
 logger = logging.getLogger(__name__)
@@ -38,9 +38,9 @@ class PVSystem(Component, pvlib.pvsystem.PVSystem):
             self.albedo = configs.getfloat('General', 'albedo', fallback=0.25)
 
         self.module_type = configs.get('Module', 'construct_type', fallback=None)
-        self.module_parameters = self._configure_module(configs)
+        self.module_parameters = self._load_module(configs)
 
-        self.inverter_parameters = self._configure_inverter(configs)
+        self.inverter_parameters = self._load_inverter(configs)
         self.inverters_per_system = configs.getfloat('Inverter', 'count', fallback=1)
 
         self.strings_per_inverter = configs.getint('Inverter', 'strings', fallback=1)
@@ -56,26 +56,32 @@ class PVSystem(Component, pvlib.pvsystem.PVSystem):
         else:
             self.temperature_model_parameters = temperature_model_parameters
 
-    def _configure_module(self, configs):
+    def _load_module(self, configs: Configurations):
         module = {}
 
-        if 'type' in configs['Module']:
-            module_type = configs['Module']['type']
-            modules = ModuleDatabase(configs)
-            module = modules.read(module_type)
+        self._read_module_database(module)
+        self._read_module_override(module)
+        if len(module.keys()) < 1:
+            raise ConfigurationException("Unable to find module parameters")
 
-        def module_update(items):
-            for key, value in items:
-                try:
-                    module[key] = float(value)
-                except ValueError:
-                    module[key] = value
+        if 'pdc0' not in module and all(p in module for p in ['I_mp_ref', 'V_mp_ref']):
+            module['pdc0'] = module['I_mp_ref'] \
+                           * module['V_mp_ref']
 
-        if configs.has_section('Parameters'):
-            module_update(configs.items('Parameters'))
+        return module
 
-        module_file = os.path.join(configs['General']['config_dir'],
-                                   configs['General']['id'] + '.d', 'module.cfg')
+    def _read_module_database(self, module: dict) -> bool:
+        if 'type' in self.configs['Module']:
+            module_type = self.configs['Module']['type']
+            modules = ModuleDatabase(self.configs)
+            self._update_parameters(module, modules.read(module_type))
+            logger.debug('Read module "%s" from database of %s', module_type, self.name)
+            return True
+        return False
+
+    def _read_module_override(self, module: dict) -> bool:
+        module_file = os.path.join(self.configs['General']['config_dir'],
+                                   self.configs['General']['id'] + '.d', 'module.cfg')
 
         if os.path.exists(module_file):
             with open(module_file) as f:
@@ -84,32 +90,38 @@ class PVSystem(Component, pvlib.pvsystem.PVSystem):
             module_configs = Configurations()
             module_configs.optionxform = str
             module_configs.read_string(module_str)
-            module_update(module_configs.items('Module'))
+            self._update_parameters(module, module_configs.items('Module'))
+            logger.debug('Read module override file of component %s: %s', self.name, module_file)
+            return True
+        return False
 
-        if 'pdc0' not in module and all(p in module for p in ['I_mp_ref', 'V_mp_ref']):
-            module['pdc0'] = module['I_mp_ref'] \
-                           * module['V_mp_ref']
-
-        return module
-
-    def _configure_inverter(self, configs):
+    def _load_inverter(self, configs: Configurations):
         inverter = {}
 
-        if 'type' in configs['Inverter']:
-            # TODO: Test and verify inverter CEC parameters
-            inverter_type = configs['Inverter']['type']
-            inverters = InverterDatabase(configs)
-            inverter = inverters.read(inverter_type)
+        self._read_inverter_database(inverter)
+        self._read_inverter_override(inverter)
 
-        def inverter_update(items):
-            for key, value in items:
-                try:
-                    inverter[key] = float(value)
-                except ValueError:
-                    inverter[key] = value
+        if 'pdc0' not in inverter and 'pdc0' in self.module_parameters:
+            inverter['pdc0'] = self.module_parameters['pdc0'] *\
+                               self.strings_per_inverter * self.modules_per_string
 
-        inverter_file = os.path.join(configs['General']['config_dir'],
-                                     configs['General']['id'] + '.d', 'inverter.cfg')
+        if len(inverter.keys()) < 1:
+            raise ConfigurationException("Unable to find inverter parameters")
+
+        return inverter
+
+    def _read_inverter_database(self, inverter: dict) -> bool:
+        if 'type' in self.configs['Inverter']:
+            inverter_type = self.configs['Inverter']['type']
+            inverters = InverterDatabase(self.configs)
+            self._update_parameters(inverter, inverters.read(inverter_type))
+            logger.debug('Read inverter "%s" from database of %s', inverter_type, self.name)
+            return True
+        return False
+
+    def _read_inverter_override(self, inverter: dict) -> bool:
+        inverter_file = os.path.join(self.configs['General']['config_dir'],
+                                     self.configs['General']['id'] + '.d', 'inverter.cfg')
 
         if os.path.exists(inverter_file):
             with open(inverter_file) as f:
@@ -118,15 +130,20 @@ class PVSystem(Component, pvlib.pvsystem.PVSystem):
             inverter_configs = Configurations()
             inverter_configs.optionxform = str
             inverter_configs.read_string(inverter_str)
-            inverter_update(inverter_configs.items('Inverter'))
+            self._update_parameters(inverter, inverter_configs.items('Inverter'))
+            logger.debug('Read inverter override file of component %s: %s', self.name, inverter_file)
+            return True
+        return False
 
-        if 'pdc0' not in inverter and \
-                configs.has_section('Inverter'):
-            total = configs.getfloat('Inverter', 'strings') \
-                    * configs.getfloat('Module', 'count')
-            inverter['pdc0'] = self.module_parameters['pdc0'] * total
+    @staticmethod
+    def _update_parameters(parameters: dict, update: dict):
+        for key, value in update.items():
+            try:
+                parameters[key] = float(value)
+            except ValueError:
+                parameters[key] = value
 
-        return inverter
+        return parameters
 
     @property
     def type(self) -> str:
