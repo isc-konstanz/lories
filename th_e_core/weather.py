@@ -74,20 +74,15 @@ class DatabaseWeather(Weather):
 
     # noinspection PyShadowingBuiltins
     def get(self,
-            start:  pd.Timestamp | dt.datetime = None,
-            end:    pd.Timestamp | dt.datetime = None,
+            start:  pd.Timestamp | dt.datetime | str = None,
+            end:    pd.Timestamp | dt.datetime | str = None,
             format: str = '%d.%m.%Y',
             **kwargs) -> pd.DataFrame:
 
-        if start is None:
-            start = tz.utc.localize(dt.datetime.utcnow())
-            start.replace(year=start.year-1, month=1, day=1, hour=0, minute=0, second=0)
-        elif isinstance(start, str):
+        if isinstance(start, str):
             start = tz.utc.localize(dt.datetime.strptime(start, format))
 
-        if end is None:
-            end = start + dt.timedelta(days=364)
-        elif isinstance(end, str):
+        if isinstance(end, str):
             end = tz.utc.localize(dt.datetime.strptime(end, format))
 
         return self._database.read(start=start, end=end, **kwargs)

@@ -26,7 +26,12 @@ class CsvDatabase(Database):
 
         super().__init__(**kwargs)
 
+        if "~" in dir:
+            dir = os.path.expanduser(dir)
         self.dir = dir
+
+        if file is not None and not os.path.isabs(file):
+            file = os.path.join(dir, file)
         self.file = file
 
         self.format = format
