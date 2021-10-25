@@ -7,11 +7,7 @@
     
 """
 from os import path
-
-try:
-    from setuptools import setup
-except ImportError:
-    from distutils.core import setup
+from setuptools import setup, find_namespace_packages
 
 here = path.abspath(path.dirname(__file__))
 info = {}
@@ -34,7 +30,7 @@ URL = 'https://github.com/isc-konstanz/th-e-core'
 INSTALL_REQUIRES = ['numpy',
                     'pandas']
 
-PACKAGES = ['th_e_core']
+PACKAGES = find_namespace_packages(include=['th_e_core*'])
 
 SETUPTOOLS_KWARGS = {
     'zip_safe': False,
@@ -42,15 +38,15 @@ SETUPTOOLS_KWARGS = {
 }
 
 setup(
-    name = NAME,
-    version = VERSION,
-    license = LICENSE,
-    description = DESCRIPTION,
+    name=NAME,
+    version=VERSION,
+    license=LICENSE,
+    description=DESCRIPTION,
     long_description=README,
-    author = AUTHOR,
-    author_email = MAINTAINER_EMAIL,
-    url = URL,
-    packages = PACKAGES,
-    install_requires = INSTALL_REQUIRES,
+    author=AUTHOR,
+    author_email=MAINTAINER_EMAIL,
+    url=URL,
+    packages=PACKAGES,
+    install_requires=INSTALL_REQUIRES,
     **SETUPTOOLS_KWARGS
 )

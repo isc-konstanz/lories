@@ -5,4 +5,4 @@
     
     
 """
-from th_e_core.pvtools.cec import ModuleDatabase, InverterDatabase
+from th_e_core.pvtools.cec import ModuleDatabase, InverterDatabase  # noqa: F401
