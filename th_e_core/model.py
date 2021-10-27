@@ -41,8 +41,3 @@ class Model(ABC, Configurable):
 
     def _build(self, system, configs, **kwargs) -> None:
         pass
-
-    @abstractmethod
-    def run(self, *args, **kwargs) -> pd.DataFrame:
-        pass
-
