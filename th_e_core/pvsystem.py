@@ -90,7 +90,7 @@ class PVSystem(Component, pvlib.pvsystem.PVSystem):
             module_configs = Configurations()
             module_configs.optionxform = str
             module_configs.read_string(module_str)
-            self._update_parameters(module, module_configs.items('Module'))
+            self._update_parameters(module, module_configs['Module'])
             logger.debug('Read module override file of component %s: %s', self.name, module_file)
             return True
         return False
@@ -130,7 +130,7 @@ class PVSystem(Component, pvlib.pvsystem.PVSystem):
             inverter_configs = Configurations()
             inverter_configs.optionxform = str
             inverter_configs.read_string(inverter_str)
-            self._update_parameters(inverter, inverter_configs.items('Inverter'))
+            self._update_parameters(inverter, inverter_configs['Inverter'])
             logger.debug('Read inverter override file of component %s: %s', self.name, inverter_file)
             return True
         return False
