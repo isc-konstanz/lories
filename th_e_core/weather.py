@@ -54,7 +54,7 @@ class Weather(ABC, Configurable):
                                           config_name, **kwargs)
 
     def __init__(self, system: System, configs: Configurations, **kwargs) -> None:
-        super().__init__(configs, **kwargs)
+        Configurable.__init__(self, configs, **kwargs)
         self._system = system
         self._activate(system, **kwargs)
 

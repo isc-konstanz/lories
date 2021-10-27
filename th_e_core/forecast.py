@@ -31,9 +31,15 @@ logger = logging.getLogger(__name__)
 
 class Forecast(ABC, Configurable):
 
+    # noinspection PyShadowingBuiltins
     @classmethod
-    def read(cls, system: System, **kwargs) -> Forecast:
-        return cls(system, cls._read_configs(system, **kwargs), **kwargs)
+    def read(cls, system: System, **kwargs) -> Weather:
+        configs = cls._read_configs(system, **kwargs)
+        type = configs.get('General', 'type', fallback='default')
+        if type.lower() in ['default', 'nmm']:
+            return NMM(system, configs, **kwargs)
+
+        return cls(system, configs, **kwargs)
 
     @staticmethod
     def _read_configs(system: System, config_name: str = 'forecast.cfg', **kwargs) -> Configurations:
@@ -45,7 +51,7 @@ class Forecast(ABC, Configurable):
                                           config_name, **kwargs)
 
     def __init__(self, system: System, configs: Configurations, **kwargs) -> None:
-        super().__init__(configs, **kwargs)
+        Configurable.__init__(self, configs, **kwargs)
         self._system = system
         self._activate(system, configs, **kwargs)
 

@@ -6,10 +6,9 @@
     
 """
 from __future__ import annotations
-from abc import ABC, abstractmethod
+from abc import ABC
 
 import logging
-import pandas as pd
 
 from configparser import ConfigParser as Configurations
 from th_e_core.configs import Configurable
@@ -34,8 +33,7 @@ class Model(ABC, Configurable):
                                           config_name, **kwargs)
 
     def __init__(self, system: System, configs: Configurations, **kwargs) -> None:
-        super().__init__(configs, **kwargs)
-
+        Configurable.__init__(self, configs, **kwargs)
         self._system = system
         self._build(system, configs, **kwargs)
 
