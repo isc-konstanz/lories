@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import logging
 from configparser import ConfigParser as Configurations
-from th_e_core.tools import _path
+from th_e_core.tools import join_path
 
 logger = logging.getLogger(__name__)
 
@@ -112,10 +112,10 @@ class Configurable:
         if 'General' not in configs.sections():
             configs.add_section('General')
 
-        configs.set('General', 'root_dir', _path(configs, 'root_dir', root_dir))
-        configs.set('General', 'lib_dir', _path(configs, 'lib_dir', lib_dir))
-        configs.set('General', 'tmp_dir', _path(configs, 'tmp_dir', tmp_dir))
-        configs.set('General', 'data_dir', _path(configs, 'data_dir', data_dir))
+        configs.set('General', 'root_dir', join_path(configs, 'root_dir', root_dir))
+        configs.set('General', 'lib_dir', join_path(configs, 'lib_dir', lib_dir))
+        configs.set('General', 'tmp_dir', join_path(configs, 'tmp_dir', tmp_dir))
+        configs.set('General', 'data_dir', join_path(configs, 'data_dir', data_dir))
         configs.set('General', 'config_dir', config_dir)
         configs.set('General', 'config_file', config_file)
 

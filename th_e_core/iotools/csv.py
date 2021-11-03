@@ -13,7 +13,7 @@ import datetime as dt
 import pandas as pd
 
 from th_e_core.iotools import Database
-from th_e_core.tools import _bool, _int
+from th_e_core.tools import to_bool, to_int
 
 
 class CsvDatabase(Database):
@@ -36,10 +36,10 @@ class CsvDatabase(Database):
 
         self.format = format
         self.index_column = index_column
-        self.index_unix = _bool(index_unix)
+        self.index_unix = to_bool(index_unix)
 
-        self.interval = _int(interval)
-        self.merge = _bool(merge)
+        self.interval = to_int(interval)
+        self.merge = to_bool(merge)
 
         self.timezone = tz.timezone(timezone)
         self.decimal = decimal

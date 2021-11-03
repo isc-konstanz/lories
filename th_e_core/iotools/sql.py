@@ -12,7 +12,7 @@ import datetime as dt
 import pandas as pd
 
 from th_e_core.iotools import Database
-from th_e_core.tools import _int
+from th_e_core.tools import to_int
 from mysql import connector
 
 
@@ -25,14 +25,14 @@ class SqlDatabase(Database):
 
         super().__init__(**kwargs)
 
-        self.interval = _int(interval)
+        self.interval = to_int(interval)
         self.tables = tables
         if self.tables is None:
             self.tables = {}
 
         self.connector = connector.connect(
             host=host,
-            port=_int(port),
+            port=to_int(port),
             user=user,
             passwd=password,
             database=database
