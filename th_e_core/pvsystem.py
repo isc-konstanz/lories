@@ -37,16 +37,15 @@ class PVSystem(Component, pvlib.pvsystem.PVSystem):
         else:
             self.albedo = configs.getfloat('General', 'albedo', fallback=0.25)
 
+        self.strings_per_inverter = configs.getint('Inverter', 'strings', fallback=1)
+        self.modules_per_string = configs.getint('Module', 'count', fallback=1)
+        self.modules_per_inverter = self.strings_per_inverter * self.modules_per_string
+
         self.module_type = configs.get('Module', 'construct_type', fallback=None)
         self.module_parameters = self._load_module(configs)
 
         self.inverter_parameters = self._load_inverter(configs)
         self.inverters_per_system = configs.getfloat('Inverter', 'count', fallback=1)
-
-        self.strings_per_inverter = configs.getint('Inverter', 'strings', fallback=1)
-
-        self.modules_per_string = configs.getint('Module', 'count', fallback=1)
-        self.modules_per_inverter = self.strings_per_inverter * self.modules_per_string
 
         # TODO: implement temperature model parameters via configurations
         temperature_model_parameters = None
@@ -103,7 +102,7 @@ class PVSystem(Component, pvlib.pvsystem.PVSystem):
 
         if 'pdc0' not in inverter and 'pdc0' in self.module_parameters:
             inverter['pdc0'] = self.module_parameters['pdc0'] *\
-                               self.strings_per_inverter * self.modules_per_string
+                               self.modules_per_inverter
 
         if len(inverter.keys()) < 1:
             raise ConfigurationException("Unable to find inverter parameters")
