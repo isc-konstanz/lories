@@ -101,8 +101,7 @@ def print_distributions(features, path=''):
         # Add the last value of the counter
         bins.append(counter)
 
-        plt_info = plt.hist(features[feature], bins=bins)
-        bin_values, bins = plt_info[0], plt_info[1]
+        bin_values, bins, patches = plt.hist(features[feature], bins=bins)
         count_range = max(bin_values) - min(bin_values)
         sorted_values = list(bin_values)
         sorted_values.sort(reverse=True)
@@ -121,6 +120,7 @@ def print_distributions(features, path=''):
         if not os.path.isdir(path_dist):
             os.makedirs(path_dist, exist_ok=True)
 
+        plt.title(r'Histogram of '+feature)
         plt.savefig(path_file)
         plt.clf()
 
