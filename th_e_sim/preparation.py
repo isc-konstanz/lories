@@ -197,14 +197,14 @@ def process_system(system, opsd_libs='OPSD'):
         pv_cons = data['pv_energy'] - data['export_energy']
         data['el_energy'] += pv_cons
 
-    data['el_power'] = _process_power(data['el_energy'])
-
     if 'heat_pump_energy' in data.columns:
         columns_power += ['th_power', 'hp_power']
         columns_energy += ['th_energy', 'hp_energy']
 
         data['hp_energy'] = _process_energy(data['heat_pump_energy'])
         data['hp_power'] = _process_power(data['heat_pump_energy'])
+
+        data['el_energy'] -= data['hp_energy']
 
         # TODO: Make COP more sophisticated
         # Maybe try to differentiate between heating and warm water
@@ -217,12 +217,13 @@ def process_system(system, opsd_libs='OPSD'):
         data_front = data_back.rolling(window=50, win_type="gaussian", center=True).mean(std=15).iloc[::-1]
         data['th_power'] = data_front.rolling(window=150).mean().ffill().bfill()
 
-        data['th_energy'] = 0
-        for i in range(1, len(data.index)):
-            index = data.index[i]
-            hours = (index - data.index[i-1])/np.timedelta64(1, 'h')
-            data.loc[index, 'th_energy'] = data['th_energy'][i - 1] + \
-                                           data['th_power'][i] / 1000 * hours
+        data_time = pd.DataFrame(index=data.index, data=data.index)
+        data_time.columns = ['date']
+        data_time['hours'] = (data_time['date'] - data_time['date'].shift(1))/np.timedelta64(1, 'h')
+
+        data['th_energy'] = (data['th_power']/1000 * data_time['hours']).fillna(0).cumsum()
+
+    data['el_power'] = _process_power(data['el_energy'])
 
     data = data[columns_power + columns_energy]
     time = data.index[0]
