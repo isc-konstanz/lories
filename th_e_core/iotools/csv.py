@@ -47,15 +47,17 @@ class CsvDatabase(Database):
 
     def exists(self,
                start: pd.tslib.Timestamp | dt.datetime = None,
+               file: str = None,
                subdir: str = '', **_):
 
-        if self.file is None and \
-                start is None:
+        if file is None:
+            file = self.file
+        if file is None and start is not None:
+            file = start.strftime(self.format) + '.csv'
+        if file is None:
             return False
-        file = os.path.join(self.dir, subdir,
-                            self.file if self.file is not None else start.strftime(self.format) + '.csv')
 
-        return os.path.exists(file)
+        return os.path.isfile(os.path.join(self.dir, subdir, file))
 
     def read(self,
              start: pd.Timestamp | dt.datetime = None,
@@ -110,6 +112,8 @@ class CsvDatabase(Database):
                 start = data.index[0]
             if end is None:
                 end = data.index[-1]
+            if file is None:
+                file = self.file
             if file is None:
                 file = start.strftime(self.format) + '.csv'
 

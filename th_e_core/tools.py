@@ -6,8 +6,6 @@
     
 """
 import os
-from unittest.mock import _patch_dict
-
 import pytz as tz
 import datetime as dt
 import pandas as pd
@@ -34,15 +32,17 @@ def join_path(configs: ConfigParser,
 
 
 def floor_date(date: Union[dt.datetime, pd.Timestamp],
-               timezone: dt.tzinfo = tz.utc) -> dt.datetime:
+               timezone: dt.tzinfo = tz.utc) -> Union[dt.datetime,
+                                                      pd.Timestamp]:
 
     # TODO: verify if localized and if timezone differs
     date = date.tz_convert(timezone)
     return date.replace(hour=0, minute=0, second=0, microsecond=0, nanosecond=0)
 
 
-def ceil_date(date: dt.datetime,
-              timezone: dt.tzinfo = tz.utc) -> dt.datetime:
+def ceil_date(date: Union[dt.datetime, pd.Timestamp],
+              timezone: dt.tzinfo = tz.utc) -> Union[dt.datetime,
+                                                     pd.Timestamp]:
 
     # TODO: verify if localized and if timezone differs
     date = date.tz_convert(timezone)
