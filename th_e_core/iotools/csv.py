@@ -75,14 +75,14 @@ class CsvDatabase(Database):
         else:
             data = self._read_file(os.path.join(self.dir, subdir, start.strftime(self.format) + '.csv'), **kwargs)
             if end is not None:
-                time = start
-                while time <= end:
-                    if self.exists(time, subdir):
-                        time_str = time.strftime(self.format)
-                        data_file = time_str + '.csv'
+                date = start
+                while date <= end:
+                    if self.exists(date, subdir=subdir):
+                        date_str = date.strftime(self.format)
+                        data_file = date_str + '.csv'
                         data = data.combine_first(self._read_file(os.path.join(self.dir, subdir, data_file), **kwargs))
 
-                    time += dt.timedelta(hours=self.interval)
+                    date += dt.timedelta(hours=self.interval)
 
         if resolution is not None and resolution > 900:
             offset = (start - start.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds() % resolution
