@@ -209,7 +209,7 @@ class System(Configurable, MutableMapping):
 class Component(Configurable):
 
     def __init__(self, configs, context, **kwargs):
-        super().__init__(configs, **kwargs);
+        super().__init__(configs, **kwargs)
         
         if not configs.has_option('General', 'id'):
             raise ValueError('Invalid configuration, missing specified component id')
@@ -224,7 +224,7 @@ class Component(Configurable):
 
     @staticmethod
     def _read_configs(context, config_file):
-        configs = Configurable._read_configs(context._configs.get('General', 'root_dir'), 
+        configs = Configurable._read_configs(context._configs.get('General', 'root_dir'),
                                              context._configs.get('General', 'lib_dir'), 
                                              context._configs.get('General', 'tmp_dir'), 
                                              context._configs.get('General', 'data_dir'),  

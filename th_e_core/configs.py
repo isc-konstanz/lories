@@ -9,13 +9,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 import os
+import pvlib
 from configparser import ConfigParser
 
 
 class Configurable:
 
     def __init__(self, configs, *_, **kwargs):
-        super().__init__(**kwargs)
+        # issubclass(super, pvlib.pvsystem.PVSystem)
+        if not (self._class_name == 'ElectricVehicle' or self._class_name == 'ElectricalEnergyStorage'):
+            super().__init__(**kwargs)
         
         if not isinstance(configs, ConfigParser):
             raise ValueError('Invalid configuration type: {}'.format(type(configs)))
