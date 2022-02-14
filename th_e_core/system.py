@@ -85,13 +85,23 @@ class System(Configurable, MutableMapping):
         if configs.has_section('Database') and \
                 configs.get('Database', 'enabled', fallback='True').lower() == 'true' and \
                 configs.get('Database', 'enable', fallback='True').lower() == 'true':
+            if configs.get('Database', 'type').lower() == 'csv':
+                database_dir = configs.get('Database', 'dir')
+                database_central = configs.getboolean('Database', 'central', fallback=False)
+                if database_central:
+                    data_dir = configs['General']['lib_dir']
+                else:
+                    data_dir = configs['General']['data_dir']
 
-            if 'dir' in configs['Database']:
-                database_dir = configs['Database']['dir']
                 if not os.path.isabs(database_dir):
-                    configs['Database']['dir'] = os.path.join(configs['General']['data_dir'], database_dir)
-            else:
-                configs['Database']['dir'] = configs['General']['data_dir']
+                    database_dir = os.path.join(data_dir, database_dir)
+                if database_central:
+                    database_dir = os.path.join(
+                        database_dir,
+                        '{0:08.4f}'.format(float(self.location.latitude)).replace('.', '') + '_' +
+                        '{0:08.4f}'.format(float(self.location.longitude)).replace('.', '')
+                    )
+                configs.set('Database', 'dir', database_dir)
 
             self._database = Database.open(configs, **kwargs)
         else:

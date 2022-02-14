@@ -129,17 +129,33 @@ class Forecast(ABC, Configurable):
 class DatabaseForecast(Forecast):
 
     def _activate(self, system: System, configs: Configurations, **kwargs) -> None:
-        super()._activate(system, configs, **kwargs)
+        if configs.has_section('Database') and \
+                configs.get('Database', 'enabled', fallback='True').lower() == 'true' and \
+                configs.get('Database', 'enable', fallback='True').lower() == 'true':
+            if configs.get('Database', 'type').lower() == 'csv':
+                database_dir = configs.get('Database', 'dir')
+                database_central = configs.getboolean('Database', 'central', fallback=False)
+                if database_central:
+                    if system is None:
+                        raise ValueError('Invalid configuration, missing specified forecast id')
 
-        data_dir = configs['General']['data_dir']
-        if 'dir' in configs['Database']:
-            database_dir = configs['Database']['dir']
-            if not os.path.isabs(database_dir):
-                configs['Database']['dir'] = os.path.join(data_dir, database_dir)
+                    data_dir = configs['General']['lib_dir']
+                else:
+                    data_dir = configs['General']['data_dir']
+
+                if not os.path.isabs(database_dir):
+                    database_dir = os.path.join(data_dir, database_dir)
+                if database_central:
+                    database_dir = os.path.join(
+                        database_dir,
+                        '{0:06.2f}'.format(float(system.location.latitude)).replace('.', '') + '_' +
+                        '{0:06.2f}'.format(float(system.location.longitude)).replace('.', '')
+                    )
+                configs.set('Database', 'dir', database_dir)
+
+            self._database = Database.open(configs, **kwargs)
         else:
-            configs['Database']['dir'] = data_dir
-
-        self._database = Database.open(self._configs, **kwargs)
+            self._database = None
 
     # noinspection PyShadowingBuiltins
     def _get(self,
@@ -162,43 +178,11 @@ class DatabaseForecast(Forecast):
         return self._database.read(start=start, end=end, **kwargs)
 
 
-class ScheduledForecast(Forecast):
-
-    def __init__(self, system: System, configs: Configurations, **kwargs) -> None:
-        if not configs.has_option('General', 'id'):
-            if configs.getboolean('General', 'central', fallback=True):
-                if system is None:
-                    raise ValueError('Invalid configuration, missing specified forecast id')
-                
-                configs.set('General', 'id', 
-                            '{0:06.2f}'.format(float(system.location.latitude)).replace('.', '') + '_' +
-                            '{0:06.2f}'.format(float(system.location.longitude)).replace('.', ''))
-        
-        self._id = configs.get('General', 'id', fallback='')
-        super().__init__(system, configs, **kwargs)
+class ScheduledForecast(DatabaseForecast):
 
     def _configure(self, configs: Configurations, **kwargs) -> None:
         super()._configure(configs, **kwargs)
-        
         self.interval = configs.getint('General', 'interval', fallback=1440)*3600
-
-    def _activate(self, system: System, configs: Configurations, **kwargs) -> None:
-        if configs.has_section('Database'):
-            if configs.getboolean('General', 'central', fallback=True):
-                data_dir = configs['General']['lib_dir']
-            else:
-                data_dir = configs['General']['data_dir']
-            
-            if 'dir' in configs['Database']:
-                database_dir = configs['Database']['dir']
-                if not os.path.isabs(database_dir):
-                    configs['Database']['dir'] = os.path.join(data_dir, database_dir)
-            else:
-                configs['Database']['dir'] = data_dir
-            
-            self._database = Database.open(configs, **kwargs)
-        else:
-            self._database = None
 
     def get(self,
             start: pd.Timestamp | dt.datetime = dt.datetime.now(tz.utc),
@@ -216,21 +200,18 @@ class ScheduledForecast(Forecast):
         if start_schedule.hour % interval != 0:
             start_schedule = start_schedule - dt.timedelta(hours=start_schedule.hour % interval)
 
-        if self._database is not None and self._database.exists(start_schedule, subdir=self._id):
-            forecast = self._database.read(start_schedule, subdir=self._id)
+        if self._database is not None \
+                and self._database.exists(start_schedule):
+            forecast = self._database.read(start_schedule)
 
         else:
             forecast = self._get(start, **kwargs)
 
             if self._database is not None:
                 # Store the retrieved forecast
-                self._database.write(forecast, start=start_schedule, subdir=self._id)
+                self._database.write(forecast, start=start_schedule)
 
         return self._get_range(forecast, start, end)
-
-    def _get(self, *args, **kwargs) -> pd.DataFrame:
-        # Ignore abstract
-        pass
 
 
 class NMM(ScheduledForecast, Weather):
