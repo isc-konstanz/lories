@@ -17,9 +17,15 @@ from configparser import ConfigParser as Configurations
 
 class Database(ABC):
 
-    def __init__(self, enabled: str = 'true', timezone: str = 'UTC', **_) -> None:
+    def __init__(self,
+                 enabled: str = 'true',
+                 timezone: str | tz.tzinfo = 'UTC',
+                 **_) -> None:
+
         self.enabled = enabled.lower() == 'true'
-        self.timezone = tz.timezone(timezone)
+        if isinstance(timezone, str):
+            timezone = tz.timezone(timezone)
+        self.timezone = timezone
 
     @staticmethod
     def open(configs: Configurations, **kwargs) -> Database:
