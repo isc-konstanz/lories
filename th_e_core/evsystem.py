@@ -16,7 +16,7 @@ from th_e_core.system import Component
 class ElectricVehicle(Component):
 
     def __init__(self, configs, context, **kwargs):
-        super().__init__(configs, context, name=configs.get('General', 'id'), **kwargs)
+        super().__init__(configs, context, **kwargs)
 
     def _configure(self, configs, **kwargs):
         #TODO: correct implementation missing

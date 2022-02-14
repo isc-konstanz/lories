@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 logger = logging.getLogger(__name__)
 
 
+# noinspection PyPackageRequirements
 def write_excel(settings, summary, validations):
     try:
         from openpyxl import Workbook
@@ -28,7 +29,7 @@ def write_excel(settings, summary, validations):
 
         summary_file = os.path.join(settings.get('General', 'data_dir', fallback='data'), 'summary.xlsx')
         summary_book = Workbook()
-        summary_writer = pd.ExcelWriter(summary_file, engine='openpyxl', options={'encoding': 'utf-8-sig'})
+        summary_writer = pd.ExcelWriter(summary_file, engine='openpyxl', engine_kwargs={'encoding': 'utf-8-sig'})
         summary_writer.book = summary_book
         summary.to_excel(summary_writer, sheet_name='Summary', float_format="%.2f", encoding='utf-8-sig')
         summary_book.remove_sheet(summary_book.active)
@@ -67,7 +68,7 @@ def write_excel(settings, summary, validations):
 
 
 def write_csv(system, data, file):
-    system_dir = system._configs['General']['data_dir']
+    system_dir = system.configs['General']['data_dir']
     database = copy.deepcopy(system._database)
     database.dir = system_dir
     # database.format = '%Y%m%d'
@@ -100,8 +101,7 @@ def print_distributions(features, path=''):
         # Add the last value of the counter
         bins.append(counter)
 
-        plt_info = plt.hist(features[feature], bins=bins)
-        bin_values, bins = plt_info[0], plt_info[1]
+        bin_values, bins, patches = plt.hist(features[feature], bins=bins)
         count_range = max(bin_values) - min(bin_values)
         sorted_values = list(bin_values)
         sorted_values.sort(reverse=True)
@@ -120,10 +120,12 @@ def print_distributions(features, path=''):
         if not os.path.isdir(path_dist):
             os.makedirs(path_dist, exist_ok=True)
 
+        plt.title(r'Histogram of '+feature)
         plt.savefig(path_file)
         plt.clf()
 
 
+# noinspection PyPackageRequirements
 def print_boxplot(system, data, index, column, file, label='', title='', colors=None, **kwargs):
     import seaborn as sns
 
@@ -131,15 +133,19 @@ def print_boxplot(system, data, index, column, file, label='', title='', colors=
     plot_fliers = dict(marker='o', markersize=3, markerfacecolor='none', markeredgecolor='lightgrey')
     plot_colors = colors if colors is not None else index.nunique()
     plot_palette = sns.light_palette('#0069B4', n_colors=plot_colors, reverse=True)
-    plot = sns.boxplot(x=index, y=column, data=data, palette=plot_palette, flierprops=plot_fliers, **kwargs)  # , showfliers=False)
+    plot = sns.boxplot(x=index, y=column,
+                       data=data,
+                       palette=plot_palette,
+                       flierprops=plot_fliers,
+                       # showfliers=False,
+                       **kwargs)
     plot.set(xlabel=label, ylabel='Error [W]', title=title)
     plt.show(block=False)
 
-    plot_file = os.path.join(system._configs['General']['data_dir'], file + '.png')
+    plot_file = os.path.join(system.configs['General']['data_dir'], file + '.png')
     plot_dir = os.path.dirname(plot_file)
 
     if not os.path.isdir(plot_dir):
         os.makedirs(plot_dir, exist_ok=True)
 
     plot.figure.savefig(plot_file)
-

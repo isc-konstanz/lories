@@ -8,15 +8,17 @@
     
 """
 import logging
-logger = logging.getLogger(__name__)
 
-from th_e_core.system import Component
+from configparser import ConfigParser as Configurations
+from th_e_core import Component, System
+
+logger = logging.getLogger(__name__)
 
 
 class ElectricalEnergyStorage(Component):
 
-    def __init__(self, configs, context, **kwargs):
-        super().__init__(configs, context, name=configs.get('General', 'id'), **kwargs)
+    def __init__(self, system: System, configs: Configurations, **kwargs) -> None:
+        super().__init__(system, configs, **kwargs)
 
     def _configure(self, configs, **kwargs):
         self.name = 'ees'
@@ -28,4 +30,3 @@ class ElectricalEnergyStorage(Component):
     @property
     def type(self):
         return 'ees'
-
