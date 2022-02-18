@@ -40,7 +40,13 @@ def write_excel(settings, summary, validations):
 
         # Set column width and header coloring
         for summary_sheet in summary_book:
-            summary_sheet.delete_rows(3, 1)
+
+            if summary_sheet.title == 'Summary':
+                summary_sheet.delete_rows(3, 1)
+            else:
+                summary_sheet.cell(3, 1).value = summary_sheet.cell(4, 1).value
+                summary_sheet.delete_rows(4, 1)
+
             summary_index_width = 0
             for summary_row in summary_sheet:
                 summary_row[0].border = border
