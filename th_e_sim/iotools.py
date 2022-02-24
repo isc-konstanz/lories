@@ -44,11 +44,6 @@ def write_excel(settings, summary, validations):
             if summary_sheet.title == 'Summary':
                 summary_sheet.delete_rows(3, 1)
 
-            #ToDo: Decide between deleting this or stashed changes
-            #else:
-            #    summary_sheet.cell(3, 1).value = summary_sheet.cell(4, 1).value
-            #    summary_sheet.delete_rows(4, 1)
-
             summary_index_width = 0
             for summary_row in summary_sheet:
                 summary_row[0].border = border
