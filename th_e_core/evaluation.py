@@ -322,7 +322,12 @@ class Evaluation(Configurable):
 
     def load_results(self):
 
-        datastore = pd.HDFStore(os.path.join(self._database.dir, 'results.h5'))
+        data_path = os.path.join(self._database.dir, 'results.h5')
+
+        if not os.path.isfile(data_path):
+            raise FileExistsError("The requisite file {} does not exist.".format(data_path))
+
+        datastore = pd.HDFStore(data_path)
         results = pd.DataFrame()
 
         for date_path in datastore:
