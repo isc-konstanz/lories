@@ -79,6 +79,7 @@ class Evaluation(Configurable):
         self.summaries = configs[self.name]['summaries']
 
         self._activate(configs, **kwargs)
+        self.results = None
 
     @property
     def targets(self):
@@ -318,6 +319,20 @@ class Evaluation(Configurable):
             raise ValueError("Invalid configuration, missing subsection names in section 'General'.")
 
         return evaluations
+
+    def load_results(self):
+
+        datastore = pd.HDFStore(os.path.join(self._database.dir, 'results.h5'))
+        results = pd.DataFrame()
+
+        for date_path in datastore:
+
+            if date_path.endswith('outputs'):
+                result = datastore.get(date_path)
+                results = pd.concat([results, result], axis=0)
+
+        results = results.sort_index()
+        self.results = results
 
     def run(self, *args, **kwargs) -> pd.DataFrame:
         raise NotImplementedError
