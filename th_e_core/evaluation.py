@@ -92,6 +92,10 @@ class Evaluation(Configurable):
         self._activate(configs, **kwargs)
         self.results = None
 
+        # Outputs
+        self.evaluation = pd.DataFrame()
+        self.kpi = pd.DataFrame()
+
     @property
     def targets(self):
         return self._targets
@@ -349,6 +353,34 @@ class Evaluation(Configurable):
 
         return evaluations
 
+    def load_results(self):
+
+        data_path = os.path.join(self._database.dir, 'results.h5')
+
+        if not os.path.isfile(data_path):
+            raise FileExistsError("The requisite file {} does not exist.".format(data_path))
+
+        datastore = pd.HDFStore(data_path)
+        results = pd.DataFrame()
+
+        for date_path in datastore:
+
+            if date_path.endswith('outputs'):
+                result = datastore.get(date_path)
+                results = pd.concat([results, result], axis=0)
+
+        results = results.sort_index()
+
+        results['day_hour'] = [t.hour for t in results.index]
+        results['weekday'] = [t.weekday for t in results.index]
+        results['month'] = [t.month for t in results.index]
+
+        results.index = [i for i in range(len(results))]
+        self.results = results
+
+        self._database.close()
+        datastore.close()
+
     def _extract_labels(self):
 
         def _gitterize(data: pd.Series, steps):
@@ -395,27 +427,224 @@ class Evaluation(Configurable):
 
         return gitterized
 
-    def load_results(self):
+    def _discrete_metrics(self, target, boxplot=False, **kwargs):
 
-        data_path = os.path.join(self._database.dir, 'results.h5')
+        #ToDo: Move this prepatory code to appropriate location.
+        from copy import deepcopy
+        data = deepcopy(self.results)
 
-        if not os.path.isfile(data_path):
-            raise FileExistsError("The requisite file {} does not exist.".format(data_path))
+        # replace continuous groups with discretized equivalents generated in _extract_labels
+        gitter = list()
+        if self._configs.has_option(self.name, 'group_bins'):
+            gitter = self._extract_labels()
 
-        datastore = pd.HDFStore(data_path)
-        results = pd.DataFrame()
+        _groups = list()
+        for group in self.groups:
+            if group in gitter:
+                _groups.append(group + '_d')
+            else:
+                _groups.append(group)
 
-        for date_path in datastore:
+        req_cols = list()
+        req_cols.append(target)
+        req_cols = req_cols + _groups
 
-            if date_path.endswith('outputs'):
-                result = datastore.get(date_path)
-                results = pd.concat([results, result], axis=0)
+        if self._configs.has_option(self.name, 'conditions'):
 
-        results = results.sort_index()
-        self.results = results
+            for i in range(len(self.conditions)):
+                req_cols.append(self.conditions[i][0])
 
-        self._database.close()
-        datastore.close()
+        req_cols = set(req_cols)
+
+        if not req_cols.issubset(set(self.results.columns)):
+            raise ValueError("The data does not contain the necessary columns for the "
+                             "evaluation as configured in the config. Please ensure that "
+                             "the following configured columns are as intended: {}".format(req_cols))
+
+        def perform_metrics(name, data, err_col, groups, metrics, boxplot):
+
+            data = deepcopy(data)
+            _metrics = []
+            for metric in metrics:
+
+                if 'mae' == metric:
+
+                    data[err_col] = data[err_col].abs()
+                    mae = data.groupby(groups).mean()
+                    ae_std = data.groupby(groups).std()
+                    _metrics.append(mae)
+                    _metrics.append(ae_std)
+
+                elif 'mse' == metric:
+
+                    data[err_col] = (data[err_col] ** 2)
+                    mse = data.groupby(groups).mean()
+                    se_std = data.groupby(groups).std()
+                    _metrics.append(mse)
+                    _metrics.append(se_std)
+
+                elif 'rmse' == metric:
+
+                    data[err_col] = (data[err_col] ** 2)
+                    rmse = data.groupby(groups).mean() ** 0.5
+                    rse_std = data.groupby(groups).std() ** 0.5
+                    _metrics.append(rmse)
+                    _metrics.append(rse_std)
+
+                elif 'mbe' == metric:
+
+                    mbe = data.groupby(groups).mean()
+                    be_std = data.groupby(groups).std()
+                    _metrics.append(mbe)
+                    _metrics.append(be_std)
+
+                else:
+                    raise ValueError("The chosen metric {} has not yet been implemented".format(metric))
+
+                #if boxplot and len(groups) == 1:
+                    #_print_boxplot(system, data[groups[0]], data[err_col].values, os.path.join("evaluation", name, metric))
+
+            # introduce count to data
+            n = [1 for x in range(len(data))]
+            n = pd.Series(n, index=data.index, name='count')
+            data = pd.concat([data, n], axis=1)
+
+            # count points in each group
+            n = data[groups + ['count']].groupby(groups).sum()
+
+            _metrics.append(n)
+
+            # concatenate results
+            metric_data = pd.concat(_metrics, axis=1)
+
+            # Generate appropriate column names
+            metrics_c1 = [metric for metric in metrics]
+            metrics_c2 = [metric + '_std' for metric in metrics]
+            metric_cols = list()
+
+            for metric, std in zip(metrics_c1, metrics_c2):
+
+                metric_cols.append(metric)
+                metric_cols.append(std)
+
+            metric_cols.append('count')
+            metric_data.columns = metric_cols
+
+            return metric_data
+
+        def select_data(data, conditions):
+
+            def select_rows(data, feature, operator, value, *args):
+
+                series = data[feature]
+
+                if operator.lower() in ['lt', '<']:
+                    rows = (series < value)
+
+                elif operator.lower() in ['gt', '>']:
+                    rows = (series > value)
+
+                elif operator.lower() in ['leq', '<=']:
+                    rows = (series <= value)
+
+                elif operator.lower() in ['geq', '>=']:
+                    rows = (series >= value)
+
+                elif operator.lower() in ['eq', '=', '==']:
+                    rows = (series == value)
+
+                else:
+                    raise ValueError('An improper condition is present in the dict defining the kpi.')
+
+                return rows
+
+            _ps = pd.Series([True] * len(data), index=data.index)
+
+
+            for c in conditions:
+
+                if not c:
+                    continue
+
+                rows = select_rows(data, *c)
+                _ps = _ps & rows
+
+            selected = data.iloc[_ps.values]
+
+            return selected
+
+        def summarize(evaluation, metric, groups, option=None):
+
+            options = ['horizon_weighted', 'mean', 'high_load_bias',
+                       'err_per_load', 'optimist', 'fullest_bin']
+
+            w = pd.Series([4 / 7, 2 / 7, 1 / 7], name='weights')
+
+            if option == 'mean':
+
+                return evaluation[metric].mean()
+
+            elif option == 'horizon_weighted':
+
+                if not 'horizon' in groups:
+                    raise ValueError("This summary is not compatible with your "
+                                     "chosen group index {}".format(groups))
+                ri = [1, 3, 6]
+                w.index = ri
+                weighted_sum = evaluation.loc[ri, metric].dot(w)
+                return weighted_sum
+
+            elif option == 'high_load_bias':
+
+                # This calculation only works as long as the following assumption
+                # is true: The error scales with target load
+                qs = evaluation[metric].quantile([0.75, 0.5, 0.25])
+                qs.index = w.index
+                weighted_sum = qs.dot(w)
+
+                return weighted_sum
+
+            elif option == 'err_per_load':
+
+                watt_series = pd.Series(evaluation.index, index=evaluation.index)
+                watt_series = watt_series.iloc[(watt_series != 0).values]
+                err_watt = evaluation.loc[watt_series.index, metric].div(watt_series)
+                err_watt = err_watt.mean()
+                return err_watt
+
+            elif option == 'optimist':
+
+                return evaluation[metric].min()
+
+            elif option == 'fullest_bin':
+
+                if isinstance(evaluation.index, pd.MultiIndex):
+                    raise AttributeError("This summary has not yet been implemented for multiindexed bins.")
+
+                candidate = evaluation['count'].idxmax()
+                return candidate
+
+            else:
+
+                raise ValueError('The current option is not yet available for metric summarization '
+                                  'please choose one of the following options: {}'.format(options))
+
+        #select data pertaining to the desired feature space to be examined
+        if self._configs.has_option(self.name, 'conditions'):
+            data = select_data(data, self.conditions)
+
+        # select err data pertaining to desired target
+        err_col = target + '_err'
+
+        eval_cols = [err_col] + _groups
+        data = data[eval_cols]
+
+        # calculate metrics
+        evaluation = perform_metrics(self.name, data, err_col, _groups, self.metrics, boxplot)
+        kpi = summarize(evaluation, self.metrics[0], _groups, option=self.summaries[0][0])
+        kpi = pd.DataFrame([kpi], index=[0], columns=[self.summaries[0][0]])
+        self.evaluation = pd.concat([self.evaluation, evaluation], axis=0)
+        self.kpi = pd.concat([self.kpi, kpi], axis=0)
 
     def run(self, *args, **kwargs) -> pd.DataFrame:
         raise NotImplementedError
