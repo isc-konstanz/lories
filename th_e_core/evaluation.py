@@ -349,6 +349,52 @@ class Evaluation(Configurable):
 
         return evaluations
 
+    def _extract_labels(self):
+
+        def _gitterize(data: pd.Series, steps):
+            from math import floor, ceil
+
+            total_steps = steps
+            f_max = ceil(data.max())
+            f_min = floor(data.min())
+            big_delta = f_max - f_min
+
+            # Round step_size down
+            small_delta = floor(big_delta / total_steps * 10) / 10
+
+            if small_delta == 0:
+                raise ValueError("The axis {} cannot be analyzed with the regular grid spacing of {} between"
+                                 "grid points. Please choose a smaller number of steps".format(feature, small_delta))
+
+            to_edge = big_delta - small_delta * total_steps
+            extra_steps = ceil(to_edge / small_delta)
+            total_steps = total_steps + extra_steps
+
+            discrete_axis = [round(f_min + small_delta * x, 2) for x in range(total_steps + 1)]
+
+            return discrete_axis, small_delta
+
+        if len(self.groups) != len(self.group_bins):
+            groups = self.groups[:len(self.group_bins)]
+        else:
+            groups = self.groups
+
+        d_axis = zip(groups, self.group_bins)
+        gitterized = list()
+
+        for feature, steps in d_axis:
+
+            self.results[feature + '_d'] = self.results[feature]
+            discrete_feature, step_size = _gitterize(self.results[feature], int(steps))
+            gitterized.append(feature)
+
+            for i in discrete_feature:
+                i_loc = self.results[feature + '_d'] - i
+                i_loc = (i_loc >= 0) & (i_loc < step_size)
+                self.results.loc[i_loc, feature + '_d'] = i
+
+        return gitterized
+
     def load_results(self):
 
         data_path = os.path.join(self._database.dir, 'results.h5')
