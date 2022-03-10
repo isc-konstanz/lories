@@ -368,6 +368,9 @@ class Evaluation(Configurable):
         results = results.sort_index()
         self.results = results
 
+        self._database.close()
+        datastore.close()
+
     def run(self, *args, **kwargs) -> pd.DataFrame:
         raise NotImplementedError
 
