@@ -77,6 +77,9 @@ class Evaluation(Configurable):
         self.groups = configs[self.name]['groups']
 
         # optional
+        if configs.has_option(self.name, 'group_bins'):
+            self.group_bins = configs[self.name]['group_bins']
+
         if configs.has_option(self.name, 'boxplots'):
             self.boxplots = configs[self.name]['boxplots']
 
@@ -156,6 +159,24 @@ class Evaluation(Configurable):
             new_values.append(t)
 
         self._groups = new_values
+
+    @property
+    def group_bins(self):
+        return self._group_bins
+
+    @group_bins.setter
+    def group_bins(self, value):
+
+        values = value.split(', ')
+        new_values = list()
+
+        while values:
+
+            t = values.pop().lower()
+            t = int(t)
+            new_values.append(t)
+
+        self._group_bins = new_values
 
     @property
     def boxplots(self):
