@@ -64,19 +64,27 @@ class Evaluation(Configurable):
 
         super().__init__(configs, **kwargs)
 
-        attr_names = {'targets', 'metrics', 'groups', 'summaries', 'conditions', 'boxplots'}
+        req = {'targets', 'metrics', 'groups'}
+        opt = {'conditions', 'summaries', 'boxplots'}
 
-        if not attr_names.issubset(set(configs[self.name].keys())):
+        if not req.issubset(set(configs[self.name].keys())):
             raise ValueError('Invalid configuration, missing attribute in configs.'
-                             ' Check that the following are present {}'.format(attr_names))
+                             ' Check that the following are present {}'.format(req))
 
-        # Properties
+        # necessary
         self.targets = configs[self.name]['targets']
         self.metrics = configs[self.name]['metrics']
         self.groups = configs[self.name]['groups']
-        self.boxplots = configs[self.name]['boxplots']
-        self.conditions = configs[self.name]['conditions']
-        self.summaries = configs[self.name]['summaries']
+
+        # optional
+        if configs.has_option(self.name, 'boxplots'):
+            self.boxplots = configs[self.name]['boxplots']
+
+        if configs.has_option(self.name, 'conditions'):
+            self.conditions = configs[self.name]['conditions']
+
+        if configs.has_option(self.name, 'summaries'):
+            self.summaries = configs[self.name]['summaries']
 
         self._activate(configs, **kwargs)
         self.results = None
