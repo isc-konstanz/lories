@@ -90,7 +90,9 @@ class Evaluation(Configurable):
             self.summaries = configs[self.name]['summaries']
 
         self._activate(configs, **kwargs)
-        self.results = None
+
+        self._data = None
+        self.data = None
 
         # Outputs
         self.evaluation = pd.DataFrame()
@@ -394,7 +396,9 @@ class Evaluation(Configurable):
         results['month'] = [t.month for t in results.index]
 
         results.index = [i for i in range(len(results))]
-        self.results = results
+
+        # The private attribute data will/shall not be mutated
+        self._data = results
 
         self._database.close()
         datastore.close()
@@ -437,14 +441,62 @@ class Evaluation(Configurable):
 
         for feature, steps in d_axis:
 
-            self.results[feature + '_bins'] = self.results[feature]
-            discrete_feature, step_size = _gitterize(self.results[feature], int(steps))
+            self.data[feature + '_bins'] = self.data[feature]
+            discrete_feature, step_size = _gitterize(self.data[feature], int(steps))
             gitterized.append(feature)
 
             for i in discrete_feature:
-                i_loc = self.results[feature + '_bins'] - i
+                i_loc = self.data[feature + '_bins'] - i
                 i_loc = (i_loc >= 0) & (i_loc < step_size)
-                self.results.loc[i_loc, feature + '_bins'] = i
+                self.data.loc[i_loc, feature + '_bins'] = i
+
+    def _select_data(self):
+
+        def select_rows(data, feature, operator, value, *args):
+
+            series = data[feature]
+
+            if operator.lower() in ['lt', '<']:
+                rows = (series < value)
+
+            elif operator.lower() in ['gt', '>']:
+                rows = (series > value)
+
+            elif operator.lower() in ['leq', '<=']:
+                rows = (series <= value)
+
+            elif operator.lower() in ['geq', '>=']:
+                rows = (series >= value)
+
+            elif operator.lower() in ['eq', '=', '==']:
+                rows = (series == value)
+
+            else:
+                raise ValueError('An improper condition is present in the dict defining the kpi.')
+
+            return rows
+
+        _ps = pd.Series([True] * len(self.data), index=self.data.index)
+
+        for c in self.conditions:
+
+            if not c:
+                continue
+
+            rows = select_rows(self.data, *c)
+            _ps = _ps & rows
+
+        self.data = self.data.iloc[_ps.values]
+
+    def prepare_data(self):
+
+        self.data = self._data[self._cols]
+
+        if self._configs.has_option(self.name, 'group_bins'):
+            self._extract_labels()
+
+        if self._configs.has_option(self.name, 'conditions'):
+            self._select_data()
 
     def _discrete_metrics(self, target, boxplot=False, **kwargs):
 
@@ -520,47 +572,6 @@ class Evaluation(Configurable):
 
             return metric_data
 
-        def select_data(data, conditions):
-
-            def select_rows(data, feature, operator, value, *args):
-
-                series = data[feature]
-
-                if operator.lower() in ['lt', '<']:
-                    rows = (series < value)
-
-                elif operator.lower() in ['gt', '>']:
-                    rows = (series > value)
-
-                elif operator.lower() in ['leq', '<=']:
-                    rows = (series <= value)
-
-                elif operator.lower() in ['geq', '>=']:
-                    rows = (series >= value)
-
-                elif operator.lower() in ['eq', '=', '==']:
-                    rows = (series == value)
-
-                else:
-                    raise ValueError('An improper condition is present in the dict defining the kpi.')
-
-                return rows
-
-            _ps = pd.Series([True] * len(data), index=data.index)
-
-
-            for c in conditions:
-
-                if not c:
-                    continue
-
-                rows = select_rows(data, *c)
-                _ps = _ps & rows
-
-            selected = data.iloc[_ps.values]
-
-            return selected
-
         def summarize(evaluation, metric, groups, option=None):
 
             options = ['horizon_weighted', 'mean', 'high_load_bias',
@@ -621,13 +632,7 @@ class Evaluation(Configurable):
         err_col = target + '_err'
         eval_cols = [err_col] + self.groups
 
-        #select data pertaining to the desired feature space to be examined
-        if self._configs.has_option(self.name, 'conditions'):
-            data = select_data(self.results, self.conditions)
-        else:
-            data = self.results
-
-        data = data[eval_cols]
+        data = self.data[eval_cols]
 
         # calculate metrics
         evaluation = perform_metrics(self.name, data, err_col, self.groups, self.metrics, boxplot)
@@ -640,9 +645,7 @@ class Evaluation(Configurable):
     def run(self, *args, **kwargs):
 
         self.load_results()
-
-        if self._configs.has_option(self.name, 'group_bins'):
-            self._extract_labels()
+        self.prepare_data()
 
         for target in self.targets:
             self._discrete_metrics(target)
