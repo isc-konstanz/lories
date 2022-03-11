@@ -424,46 +424,38 @@ class Evaluation(Configurable):
             return discrete_axis, small_delta
 
         if len(self.groups) != len(self.group_bins):
-            groups = self.groups[:len(self.group_bins)]
+            _groups = self.groups[:len(self.group_bins)].copy()
         else:
-            groups = self.groups
+            _groups = self.groups.copy()
 
-        d_axis = zip(groups, self.group_bins)
+        # Update self.groups to appropriate bin identifier
+        self.groups[:len(_groups)] = [group + '_bins' for group in _groups]
+
+        d_axis = zip(_groups, self.group_bins)
         gitterized = list()
 
         for feature, steps in d_axis:
 
-            self.results[feature + '_d'] = self.results[feature]
+            self.results[feature + '_bins'] = self.results[feature]
             discrete_feature, step_size = _gitterize(self.results[feature], int(steps))
             gitterized.append(feature)
 
             for i in discrete_feature:
-                i_loc = self.results[feature + '_d'] - i
+                i_loc = self.results[feature + '_bins'] - i
                 i_loc = (i_loc >= 0) & (i_loc < step_size)
-                self.results.loc[i_loc, feature + '_d'] = i
-
-        return gitterized
+                self.results.loc[i_loc, feature + '_bins'] = i
 
     def _discrete_metrics(self, target, boxplot=False, **kwargs):
 
         #ToDo: Move this prepatory code to appropriate location.
-        from copy import deepcopy
-        data = deepcopy(self.results)
 
         # replace continuous groups with discretized equivalents generated in _extract_labels
-        gitter = list()
         if self._configs.has_option(self.name, 'group_bins'):
-            gitter = self._extract_labels()
-
-        _groups = list()
-        for group in self.groups:
-            if group in gitter:
-                _groups.append(group + '_d')
-            else:
-                _groups.append(group)
+            self._extract_labels()
 
         def perform_metrics(name, data, err_col, groups, metrics, boxplot):
 
+            from copy import deepcopy
             data = deepcopy(data)
             _metrics = []
             for metric in metrics:
@@ -630,20 +622,23 @@ class Evaluation(Configurable):
                 raise ValueError('The current option is not yet available for metric summarization '
                                   'please choose one of the following options: {}'.format(options))
 
-        #select data pertaining to the desired feature space to be examined
-        if self._configs.has_option(self.name, 'conditions'):
-            data = select_data(data, self.conditions)
-
         # select err data pertaining to desired target
         err_col = target + '_err'
+        eval_cols = [err_col] + self.groups
 
-        eval_cols = [err_col] + _groups
+        #select data pertaining to the desired feature space to be examined
+        if self._configs.has_option(self.name, 'conditions'):
+            data = select_data(self.results, self.conditions)
+        else:
+            data = self.results
+
         data = data[eval_cols]
 
         # calculate metrics
-        evaluation = perform_metrics(self.name, data, err_col, _groups, self.metrics, boxplot)
-        kpi = summarize(evaluation, self.metrics[0], _groups, option=self.summaries[0][0])
+        evaluation = perform_metrics(self.name, data, err_col, self.groups, self.metrics, boxplot)
+        kpi = summarize(evaluation, self.metrics[0], self.groups, option=self.summaries[0][0])
         kpi = pd.DataFrame([kpi], index=[0], columns=[self.summaries[0][0]])
+
         self.evaluation = pd.concat([self.evaluation, evaluation], axis=0)
         self.kpi = pd.concat([self.kpi, kpi], axis=0)
 
