@@ -65,7 +65,7 @@ class Evaluation(Configurable):
         super().__init__(configs, **kwargs)
 
         req = {'targets', 'metrics', 'groups'}
-        opt = {'conditions', 'summaries', 'boxplots'}
+        #opt = {'conditions', 'summaries', 'boxplots'}
 
         if not req.issubset(set(configs[self.name].keys())):
             raise ValueError('Invalid configuration, missing attribute in configs.'
@@ -95,6 +95,15 @@ class Evaluation(Configurable):
         # Outputs
         self.evaluation = pd.DataFrame()
         self.kpi = pd.DataFrame()
+
+        # private
+        _cols = list()
+        if self.configs.has_option(self.name, 'conditions'):
+            for condition in self.conditions:
+                _cols.append(condition[0])
+
+        _cols = _cols + self.targets + self.groups
+        self._cols = set(_cols)
 
     @property
     def targets(self):
@@ -354,7 +363,7 @@ class Evaluation(Configurable):
         return evaluations
 
     def load_results(self):
-
+        from warnings import warn
         data_path = os.path.join(self._database.dir, 'results.h5')
 
         if not os.path.isfile(data_path):
@@ -366,8 +375,16 @@ class Evaluation(Configurable):
         for date_path in datastore:
 
             if date_path.endswith('outputs'):
+
                 result = datastore.get(date_path)
-                results = pd.concat([results, result], axis=0)
+                if self._cols.issubset(set(result.columns)):
+                    results = pd.concat([results, result], axis=0)
+                else:
+                    _na = self._cols.difference(set(result.columns))
+                    warn("Unable to load data corresponding to the path {}, as the"
+                         " columns {} required for the evaluation {} were not present"
+                         ".".format(data_path, _na, self.name))
+                    continue
 
         results = results.sort_index()
 
@@ -444,22 +461,6 @@ class Evaluation(Configurable):
                 _groups.append(group + '_d')
             else:
                 _groups.append(group)
-
-        req_cols = list()
-        req_cols.append(target)
-        req_cols = req_cols + _groups
-
-        if self._configs.has_option(self.name, 'conditions'):
-
-            for i in range(len(self.conditions)):
-                req_cols.append(self.conditions[i][0])
-
-        req_cols = set(req_cols)
-
-        if not req_cols.issubset(set(self.results.columns)):
-            raise ValueError("The data does not contain the necessary columns for the "
-                             "evaluation as configured in the config. Please ensure that "
-                             "the following configured columns are as intended: {}".format(req_cols))
 
         def perform_metrics(name, data, err_col, groups, metrics, boxplot):
 
