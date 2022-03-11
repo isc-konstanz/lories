@@ -448,12 +448,6 @@ class Evaluation(Configurable):
 
     def _discrete_metrics(self, target, boxplot=False, **kwargs):
 
-        #ToDo: Move this prepatory code to appropriate location.
-
-        # replace continuous groups with discretized equivalents generated in _extract_labels
-        if self._configs.has_option(self.name, 'group_bins'):
-            self._extract_labels()
-
         def perform_metrics(name, data, err_col, groups, metrics, boxplot):
 
             from copy import deepcopy
@@ -643,6 +637,13 @@ class Evaluation(Configurable):
         self.evaluation = pd.concat([self.evaluation, evaluation], axis=0)
         self.kpi = pd.concat([self.kpi, kpi], axis=0)
 
-    def run(self, *args, **kwargs) -> pd.DataFrame:
-        raise NotImplementedError
+    def run(self, *args, **kwargs):
+
+        self.load_results()
+
+        if self._configs.has_option(self.name, 'group_bins'):
+            self._extract_labels()
+
+        for target in self.targets:
+            self._discrete_metrics(target)
 
