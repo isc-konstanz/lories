@@ -102,7 +102,8 @@ class Evaluation(Configurable):
             for condition in self.conditions:
                 _cols.append(condition[0])
 
-        _cols = _cols + self.targets + self.groups
+        _err_cols = [t + '_err' for t in self.targets]
+        _cols = _cols + _err_cols + self.groups
         self._cols = set(_cols)
 
     @property
