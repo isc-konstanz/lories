@@ -450,6 +450,9 @@ class Evaluation(Configurable):
                 i_loc = (i_loc >= 0) & (i_loc < step_size)
                 self.data.loc[i_loc, feature + '_bins'] = i
 
+            # drop unbinned data
+            self.data.drop(feature, 1)
+
     def _select_data(self):
 
         def select_rows(data, feature, operator, value, *args):
