@@ -552,9 +552,6 @@ class Evaluation(Configurable):
                 else:
                     raise ValueError("The chosen metric {} has not yet been implemented".format(metric))
 
-                # if boxplot and len(groups) == 1:
-                # _print_boxplot(system, data[groups[0]], data[err_col].values, os.path.join("evaluation", name, metric))
-
             # introduce count to data
             n = [1 for x in range(len(data))]
             n = pd.Series(n, index=data.index, name='count')
