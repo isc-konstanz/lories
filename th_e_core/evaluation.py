@@ -451,7 +451,7 @@ class Evaluation(Configurable):
                 self.data.loc[i_loc, feature + '_bins'] = i
 
             # drop unbinned data
-            self.data.drop(feature, 1)
+            self.data = self.data.drop(feature, 1)
 
     def _select_data(self):
 
@@ -489,63 +489,71 @@ class Evaluation(Configurable):
             rows = select_rows(self.data, *c)
             _ps = _ps & rows
 
+            if not c[0] in self.groups:
+                self.data = self.data.drop(c[0], 1)
+
         self.data = self.data.iloc[_ps.values]
 
     def prepare_data(self):
 
         self.data = self._data[self._cols]
 
-        if self._configs.has_option(self.name, 'group_bins'):
-            self._extract_labels()
-
         if self._configs.has_option(self.name, 'conditions'):
             self._select_data()
 
-    def _discrete_metrics(self, target, boxplot=False, **kwargs):
+        if self._configs.has_option(self.name, 'group_bins'):
+            self._extract_labels()
 
-        def perform_metrics(name, data, err_col, groups, metrics, boxplot):
 
-            from copy import deepcopy
-            data = deepcopy(data)
+
+    def perform_metrics(self):
+
+        from copy import deepcopy
+        data = deepcopy(self.data)
+
+        for target in self.targets:
+
+            err_col = target + '_err'
             _metrics = []
-            for metric in metrics:
+
+            for metric in self.metrics:
 
                 if 'mae' == metric:
 
                     data[err_col] = data[err_col].abs()
-                    mae = data.groupby(groups).mean()
-                    ae_std = data.groupby(groups).std()
+                    mae = data.groupby(self.groups).mean()
+                    ae_std = data.groupby(self.groups).std()
                     _metrics.append(mae)
                     _metrics.append(ae_std)
 
                 elif 'mse' == metric:
 
                     data[err_col] = (data[err_col] ** 2)
-                    mse = data.groupby(groups).mean()
-                    se_std = data.groupby(groups).std()
+                    mse = data.groupby(self.groups).mean()
+                    se_std = data.groupby(self.groups).std()
                     _metrics.append(mse)
                     _metrics.append(se_std)
 
                 elif 'rmse' == metric:
 
                     data[err_col] = (data[err_col] ** 2)
-                    rmse = data.groupby(groups).mean() ** 0.5
-                    rse_std = data.groupby(groups).std() ** 0.5
+                    rmse = data.groupby(self.groups).mean() ** 0.5
+                    rse_std = data.groupby(self.groups).std() ** 0.5
                     _metrics.append(rmse)
                     _metrics.append(rse_std)
 
                 elif 'mbe' == metric:
 
-                    mbe = data.groupby(groups).mean()
-                    be_std = data.groupby(groups).std()
+                    mbe = data.groupby(self.groups).mean()
+                    be_std = data.groupby(self.groups).std()
                     _metrics.append(mbe)
                     _metrics.append(be_std)
 
                 else:
                     raise ValueError("The chosen metric {} has not yet been implemented".format(metric))
 
-                #if boxplot and len(groups) == 1:
-                    #_print_boxplot(system, data[groups[0]], data[err_col].values, os.path.join("evaluation", name, metric))
+                # if boxplot and len(groups) == 1:
+                # _print_boxplot(system, data[groups[0]], data[err_col].values, os.path.join("evaluation", name, metric))
 
             # introduce count to data
             n = [1 for x in range(len(data))]
@@ -553,7 +561,7 @@ class Evaluation(Configurable):
             data = pd.concat([data, n], axis=1)
 
             # count points in each group
-            n = data[groups + ['count']].groupby(groups).sum()
+            n = data[self.groups + ['count']].groupby(self.groups).sum()
 
             _metrics.append(n)
 
@@ -561,95 +569,106 @@ class Evaluation(Configurable):
             metric_data = pd.concat(_metrics, axis=1)
 
             # Generate appropriate column names
-            metrics_c1 = [metric for metric in metrics]
-            metrics_c2 = [metric + '_std' for metric in metrics]
+            metrics_c1 = self.metrics
+            metrics_c2 = [metric + '_std' for metric in self.metrics]
             metric_cols = list()
 
             for metric, std in zip(metrics_c1, metrics_c2):
-
                 metric_cols.append(metric)
                 metric_cols.append(std)
 
             metric_cols.append('count')
             metric_data.columns = metric_cols
 
-            return metric_data
+            self.evaluation = pd.concat([self.evaluation, metric_data], axis=1)
 
-        def summarize(evaluation, metric, groups, option=None):
+    def summarize(self):
 
-            options = ['horizon_weighted', 'mean', 'high_load_bias',
-                       'err_per_load', 'optimist', 'fullest_bin']
+        options = ['horizon_weighted', 'mean', 'high_load_bias',
+                   'err_per_load', 'optimist', 'fullest_bin']
 
-            w = pd.Series([4 / 7, 2 / 7, 1 / 7], name='weights')
+        w = pd.Series([4 / 7, 2 / 7, 1 / 7], name='weights')
+        metrics = self.metrics
+        i = 0
 
-            if option == 'mean':
+        for metric_summaries in self.summaries:
 
-                return evaluation[metric].mean()
+            while metric_summaries:
 
-            elif option == 'horizon_weighted':
+                summary = metric_summaries.pop()
 
-                if not 'horizon' in groups:
-                    raise ValueError("This summary is not compatible with your "
-                                     "chosen group index {}".format(groups))
-                ri = [1, 3, 6]
-                w.index = ri
-                weighted_sum = evaluation.loc[ri, metric].dot(w)
-                return weighted_sum
+                if summary == 'mean':
 
-            elif option == 'high_load_bias':
+                    kpi = self.evaluation[metrics[i]].mean()
 
-                # This calculation only works as long as the following assumption
-                # is true: The error scales with target load
-                qs = evaluation[metric].quantile([0.75, 0.5, 0.25])
-                qs.index = w.index
-                weighted_sum = qs.dot(w)
+                    name = metrics[i] + '_' + summary
+                    kpi = pd.Series([kpi], index=[0], name=name)
+                    self.kpi = pd.concat([self.kpi, kpi], axis=1)
 
-                return weighted_sum
+                elif summary == 'horizon_weighted':
 
-            elif option == 'err_per_load':
+                    if 'horizon' not in self.groups:
+                        raise ValueError("This summary is not compatible with your "
+                                         "chosen group index {}".format(self.groups))
+                    ri = [1, 3, 6]
+                    w.index = ri
+                    kpi = self.evaluation.loc[ri, metrics[i]].dot(w)
 
-                watt_series = pd.Series(evaluation.index, index=evaluation.index)
-                watt_series = watt_series.iloc[(watt_series != 0).values]
-                err_watt = evaluation.loc[watt_series.index, metric].div(watt_series)
-                err_watt = err_watt.mean()
-                return err_watt
+                    name = metrics[i] + '_' + summary
+                    kpi = pd.Series([kpi], index=[0], name=name)
+                    self.kpi = pd.concat([self.kpi, kpi], axis=1)
 
-            elif option == 'optimist':
+                elif summary == 'high_load_bias':
 
-                return evaluation[metric].min()
+                    # This calculation only works as long as the following assumption
+                    # is true: The error scales with target load
+                    qs = self.evaluation[metrics[i]].quantile([0.75, 0.5, 0.25])
+                    qs.index = w.index
+                    kpi = qs.dot(w)
 
-            elif option == 'fullest_bin':
+                    name = metrics[i] + '_' + summary
+                    kpi = pd.Series([kpi], index=[0], name=name)
+                    self.kpi = pd.concat([self.kpi, kpi], axis=1)
 
-                if isinstance(evaluation.index, pd.MultiIndex):
-                    raise AttributeError("This summary has not yet been implemented for multiindexed bins.")
+                elif summary == 'err_per_load':
 
-                candidate = evaluation['count'].idxmax()
-                return candidate
+                    watt_series = pd.Series(self.evaluation.index, index=self.evaluation.index)
+                    watt_series = watt_series.iloc[(watt_series != 0).values]
+                    err_watt = self.evaluation.loc[watt_series.index, summary].div(watt_series)
+                    kpi = err_watt.mean()
 
-            else:
+                    name = metrics[i] + '_' + summary
+                    kpi = pd.Series([kpi], index=[0], name=name)
+                    self.kpi = pd.concat([self.kpi, kpi], axis=1)
 
-                raise ValueError('The current option is not yet available for metric summarization '
-                                  'please choose one of the following options: {}'.format(options))
+                elif summary == 'optimist':
 
-        # select err data pertaining to desired target
-        err_col = target + '_err'
-        eval_cols = [err_col] + self.groups
+                    kpi = self.evaluation[metrics[i]].min()
 
-        data = self.data[eval_cols]
+                    name = metrics[i] + '_' + summary
+                    kpi = pd.Series([kpi], index=[0], name=name)
+                    self.kpi = pd.concat([self.kpi, kpi], axis=1)
 
-        # calculate metrics
-        evaluation = perform_metrics(self.name, data, err_col, self.groups, self.metrics, boxplot)
-        kpi = summarize(evaluation, self.metrics[0], self.groups, option=self.summaries[0][0])
-        kpi = pd.DataFrame([kpi], index=[0], columns=[self.summaries[0][0]])
+                elif summary == 'fullest_bin':
 
-        self.evaluation = pd.concat([self.evaluation, evaluation], axis=0)
-        self.kpi = pd.concat([self.kpi, kpi], axis=0)
+                    if isinstance(self.evaluation.index, pd.MultiIndex):
+                        raise AttributeError("This summary has not yet been implemented for multiindexed bins.")
 
-    def run(self, *args, **kwargs):
+                    kpi = self.evaluation['count'].idxmax()
+
+                    name = metrics[i] + '_' + summary
+                    kpi = pd.Series([kpi], index=[0], name=name)
+                    self.kpi = pd.concat([self.kpi, kpi], axis=1)
+
+                else:
+                    raise ValueError('The current option is not yet available for metric summarization '
+                                     'please choose one of the following options: {}'.format(options))
+
+            i += 1
+
+    def run(self):
 
         self.load_results()
         self.prepare_data()
-
-        for target in self.targets:
-            self._discrete_metrics(target)
-
+        self.perform_metrics()
+        self.summarize()
