@@ -97,6 +97,7 @@ class Evaluation(Configurable):
         # Outputs
         self.evaluation = pd.DataFrame()
         self.kpi = pd.DataFrame()
+        self.n = None
 
         # private
         _cols = list()
@@ -541,20 +542,8 @@ class Evaluation(Configurable):
         else:
             raise ValueError("The chosen metric {} has not yet been implemented".format(metric))
 
-        # introduce count to data
-        #n = [1 for x in range(len(data))]
-        #n = pd.Series(n, index=data.index, name='count')
-        #data = pd.concat([data, n], axis=1)
-
-        ## count points in each group
-        #n = data[self.groups + ['count']].groupby(self.groups).sum()
-
-        #_metrics.append(n)
-
         # concatenate results
         metric_data = pd.concat(_metrics, axis=1)
-
-        #metric_cols.append('count')
         metric_data.columns = [metric, metric + '_std']
 
         return metric_data
@@ -638,9 +627,16 @@ class Evaluation(Configurable):
         self.load_results()
         self.prepare_data()
 
+        cols = [col for col in self.data.columns if not col.endswith('_err')]
+
+        # introduce count
+        n = [1 for x in range(len(self.data))]
+        n = pd.Series(n, index=self.data.index, name='count')
+        n = pd.concat([self.data[self.groups], n], axis=1)
+        self.n = n.groupby(self.groups).sum()
+
         for target in self.targets:
 
-            cols = [col for col in self.data.columns if not col.endswith('_err')]
             cols.append(target + '_err')
             data = deepcopy(self.data[cols])
 
