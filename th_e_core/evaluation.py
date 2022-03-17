@@ -648,7 +648,7 @@ class Evaluation(Configurable):
             for metric in self.metrics:
 
                 summary = self.summaries[i]
-                metric_data = self.perform_metrics(data, target, metric)
+                metric_data = self.perform_metric(data, target, metric)
                 kpi = self.summarize(metric_data[metric], summary)
 
                 metric_data.columns = pd.MultiIndex.from_product([[target], metric_data.columns],
@@ -658,12 +658,14 @@ class Evaluation(Configurable):
                 self.kpi = pd.concat([self.kpi, kpi], axis=1)
                 i += 1
 
-            # Create MultiIndex for self.kpi
-            _ = [[target] * len(self.metrics) for target in self.targets]
-            mi = list()
-            while _:
-                mi.extend(_.pop(0))
+            cols.pop()
 
-            mi = pd.MultiIndex.from_arrays([mi, self.kpi.columns], names=['targets', 'summaries'])
-            self.kpi.columns = mi
+        # Create MultiIndex for self.kpi
+        _ = [[target] * len(self.metrics) for target in self.targets]
+        mi = list()
+        while _:
+            mi.extend(_.pop(0))
+
+        mi = pd.MultiIndex.from_arrays([mi, self.kpi.columns], names=['targets', 'summaries'])
+        self.kpi.columns = mi
 
