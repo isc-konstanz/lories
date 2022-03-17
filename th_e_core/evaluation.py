@@ -565,7 +565,7 @@ class Evaluation(Configurable):
                                  "chosen group index {}".format(self.groups))
             ri = [1, 3, 6]
             w.index = ri
-            kpi = data.dot(w)
+            kpi = (data.loc[ri]).dot(w)
 
             name = data.name + '_' + summary
             kpi = pd.Series([kpi], index=[0], name=name)
