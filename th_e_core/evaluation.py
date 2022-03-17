@@ -365,7 +365,7 @@ class Evaluation(Configurable):
         return evaluations
 
     def load_results(self):
-        from warnings import warn
+
         data_path = os.path.join(self._database.dir, 'results.h5')
 
         if not os.path.isfile(data_path):
@@ -379,24 +379,20 @@ class Evaluation(Configurable):
             if date_path.endswith('outputs'):
 
                 result = datastore.get(date_path)
-                if self._cols.issubset(set(result.columns)):
-                    results = pd.concat([results, result], axis=0)
-                else:
-                    _na = self._cols.difference(set(result.columns))
-                    warn("Unable to load data corresponding to the path {}, as the"
-                         " columns {} required for the evaluation {} were not present"
-                         ".".format(data_path, _na, self.name))
-                    continue
+                results = pd.concat([results, result], axis=0)
 
         results = results.sort_index()
-
         results['day_hour'] = [t.hour for t in results.index]
         results['weekday'] = [t.weekday for t in results.index]
         results['month'] = [t.month for t in results.index]
 
-        results.index = [i for i in range(len(results))]
+        if not self._cols.issubset(set(results.columns)):
+            _na = self._cols.difference(set(results.columns))
+            raise ValueError("Unable to load data corresponding to the path {}, as the"
+                             " columns {} required for the evaluation {} were not present"
+                             ".".format(data_path, _na, self.name))
 
-        # The private attribute data will/shall not be mutated
+        results.index = [i for i in range(len(results))]
         self._data = results
 
         self._database.close()
