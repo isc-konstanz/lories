@@ -6,7 +6,7 @@
 
 """
 from __future__ import annotations
-from collections.abc import MutableSequence, MutableMapping
+from collections.abc import MutableMapping
 from typing import Dict, List, Tuple, Iterator
 
 import os
@@ -23,14 +23,14 @@ logger = logging.getLogger(__name__)
 INVALID_CHARS = "'!@#$%^&?*;:,./\|`´+~=- "
 
 
-class Evaluations(MutableSequence, Configurable):
+class Evaluations(MutableMapping, Configurable):
 
     def __init__(self, configs: Configurations, *evaluations, **kwargs) -> None:
 
         Configurable.__init__(self, configs, **kwargs)
 
         # set in _from_configs
-        self.names = None
+        # self.names = None
 
         # set in _activate
         self._database = None
@@ -41,8 +41,9 @@ class Evaluations(MutableSequence, Configurable):
         # if self.name not in configs.sections():
         #     raise ValueError('The requested evaluation {} is not present in the configs.'.format(self.name))
 
-        self._evaluations = list()
-        self._evaluations.extend(evaluations)
+        self._evaluations = dict()
+        for eval in evaluations:
+            self._evaluations[eval.name] = eval
 
     def __iter__(self) -> Iterator[Evaluation]:
         return iter(self._evaluations)
@@ -50,21 +51,18 @@ class Evaluations(MutableSequence, Configurable):
     def __len__(self) -> int:
         return len(self._evaluations)
 
-    def __getitem__(self, index: int) -> Evaluation:
-        return self._evaluations[index]
+    def __getitem__(self, key: str) -> Evaluation:
+        return self._evaluations[key]
 
-    def __delitem__(self, index: int) -> None:
-        del self._evaluations[index]
+    def __delitem__(self, key: str) -> None:
+        del self._evaluations[key]
 
-    def __setitem__(self, index: int, system: Evaluation) -> None:
-        self._evaluations[index] = system
+    def __setitem__(self, key: str, evaluation: Evaluation) -> None:
+        self._evaluations[key] = evaluation
 
     def _configure(self, configs: Configurations, **kwargs) -> None:
         # super()._configure(configs, **kwargs)
         pass
-
-    def insert(self, index: int, system) -> None:
-        self._evaluations.insert(index, system)
 
     def _activate(self, configs: Configurations, **kwargs) -> None:
 
