@@ -29,13 +29,15 @@ class Evaluations(MutableMapping, Configurable):
 
         Configurable.__init__(self, configs, **kwargs)
 
-        # set in _from_configs
-        # self.names = None
+        # ToDo: Datapaths and items and their corresponding system contained
+        # in eval_map are currently connected solely by index position. This
+        # is not very reliable and should be changed.
+        self.data_paths = self._configs['Database']['dirs']
+        self.eval_map = dict(self._configs['Evaluation Map'].items())
 
-        # set in _activate
+        # set in load_results
         self._database = None
-        self._activate(configs, **kwargs)
-        self.load_results()
+        #self.load_results()
 
         # ToDo: check each name is present
         # if self.name not in configs.sections():
@@ -64,39 +66,43 @@ class Evaluations(MutableMapping, Configurable):
         # super()._configure(configs, **kwargs)
         pass
 
-    def _activate(self, configs: Configurations, **kwargs) -> None:
+    @property
+    def data_paths(self):
+        return self._data_paths
 
-        if configs.has_section('Database') and \
-                configs.get('Database', 'enabled', fallback='True').lower() == 'true' and \
-                configs.get('Database', 'enable', fallback='True').lower() == 'true':
+    @data_paths.setter
+    def data_paths(self, value):
 
-            if 'dir' in configs['Database']:
-                database_dir = configs['Database']['dir']
-                if not os.path.isabs(database_dir):
-                    configs['Database']['dir'] = os.path.join(configs['General']['data_dir'], database_dir)
-            else:
-                configs['Database']['dir'] = configs['General']['data_dir']
+        _paths = list()
+        paths = value.split(', ')
 
-            self._database = Database.open(configs, **kwargs)
+        # ToDo: Allow for relative paths, as in configs.py
+        for path in paths:
+            if not os.path.isdir(path) or not os.path.isabs(path):
+                raise OSError('Path {} not found. Relative paths are currently not supported.'.format(path))
 
-        else:
-            return
+        _paths.extend(paths)
+        self._data_paths = _paths
+
+    @property
+    def eval_map(self):
+        return self._eval_map
+
+    @eval_map.setter
+    def eval_map(self, value: dict):
+        #ToDo: Consider restricting inputs further
+        map = dict()
+        for sys_id, evals in value.items():
+            evals = evals.split(', ')
+            map[sys_id] = evals
+
+        self._eval_map = map
 
     @classmethod
-    def read(cls, data_dir: str = 'data', config_scan: bool = False, **kwargs) -> Evaluations:
+    def read(cls, conf_dir: str, **kwargs) -> Evaluations:
 
-        if not isinstance(config_scan, bool):
-            config_scan = str(config_scan).lower() == 'true'
-        kwargs['config_scan'] = config_scan
-
-        if config_scan:
-            for system_dir in os.scandir(data_dir):
-                if os.path.isdir(system_dir.path):
-                    configs = cls._read(data_dir=system_dir.path, **kwargs)
-                    evaluations = Evaluations(configs, *cls._from_configs(configs, **kwargs))
-        else:
-            configs = cls._read(data_dir=data_dir, **kwargs)
-            evaluations = Evaluations(configs, *cls._from_configs(configs))
+        configs = cls._read(config_dir=conf_dir, data_dir='data', **kwargs)
+        evaluations = Evaluations(configs, *cls._from_configs(configs))
 
         return evaluations
 
@@ -147,10 +153,16 @@ class Evaluations(MutableMapping, Configurable):
             configs.set('Import', 'package', 'th_e_core')
             obj = __import__('th_e_core.'+configs['Import']['module'], fromlist=[configs['Import']['class']])
 
-        if configs.has_option('General', 'names'):
+        if configs.has_section('Evaluation Map'):
 
-            names = configs['General']['names'].split(', ')
+            names = list()
+            for dir, eval_name in configs['Evaluation Map'].items():
+
+                names.extend(eval_name.split(', '))
+
+            names = list(set(names))
             for name in names:
+
                 eval_configs = dict(configs[name].items())
                 evaluations.append(getattr(obj, configs['Import']['class'])(name,  **eval_configs))
 
@@ -159,9 +171,9 @@ class Evaluations(MutableMapping, Configurable):
 
         return evaluations
 
-    def load_results(self):
+    def load_results(self, path):
 
-        data_path = os.path.join(self._database.dir, 'results.h5')
+        data_path = os.path.join(path, 'results.h5')
 
         if not os.path.isfile(data_path):
             raise FileExistsError("The requisite file {} does not exist.".format(data_path))
@@ -190,44 +202,52 @@ class Evaluations(MutableMapping, Configurable):
 
         results.index = [i for i in range(len(results))]
 
-        self._database.close()
         self._database = results
         datastore.close()
 
     def run(self) -> None:
         from copy import deepcopy
 
-        for evaluation in self:
-            evaluation._data = deepcopy(self._database)
-            evaluation.run()
+        i = 0
+        for sys_id, evaluations in self.eval_map.items():
+
+            self.load_results(self.data_paths[i])
+            for e_id in evaluations:
+
+                data = deepcopy(self._database)
+                self[e_id].run(sys_id, data)
+
+            i += 1
 
 
 class Evaluation:
 
-    def __init__(self, name, targets, metrics, groups, group_bins=None, conditions=None, summaries=None, data=None, boxplots=None, **kwargs) -> None:
+    def __init__(self, eval_name, targets, metrics, groups, group_bins=None, conditions=None, summaries=None, boxplots=None, **kwargs) -> None:
 
-        self.name = name
-        self._data = data
-        self.data = None
-
-        # necessary
+        # Run invariant, necessary
+        self.name = eval_name
         self.targets = targets
         self.metrics = metrics
         self.groups = groups
 
-        # optional
+        # Run invariant, optional
         self.group_bins = group_bins
         self.boxplots = boxplots
         self.conditions = conditions
         self.summaries = summaries
 
-
-        # Outputs
+        # Outputs, cumulative: Multiple runs will concatenate
+        # their outputs to these attributes
+        self.systems = list()
         self.evaluation = pd.DataFrame()
         self.kpi = pd.DataFrame()
-        self.n = None
+        self.n = pd.DataFrame()  # Count the points in each group, as defined in groups
 
-        # private
+        # Run specific variables
+        self._data = None
+        self.data = None
+        self.system = None  # To assess current state of run specific variable
+
         _cols = list()
         if conditions:
             for condition in self.conditions:
@@ -504,8 +524,9 @@ class Evaluation:
 
         self.data = self.data.iloc[_ps.values]
 
-    def prepare_data(self):
+    def prepare_data(self, data):
 
+        self._data = data
         self.data = self._data[self._cols]
 
         if self.conditions:
@@ -578,7 +599,8 @@ class Evaluation:
             if 'horizon' not in data.index.names or isinstance(data.index, pd.MultiIndex):
                 raise ValueError("This summary is not compatible with your "
                                  "chosen group index {}".format(self.groups))
-            ri = [1, 3, 6]
+            ri = [9, 12, 16]
+
             w.index = ri
             kpi = (data.loc[ri]).dot(w)
 
@@ -632,18 +654,21 @@ class Evaluation:
 
         return kpi
 
-    def run(self):
+    def run(self, eval_id: str, data: pd.DataFrame):
         from copy import deepcopy
 
-        self.prepare_data()
+        self.system = eval_id
+        self.systems.append(eval_id)
+        self.prepare_data(data)
 
         cols = [col for col in self.data.columns if not col.endswith('_err')]
 
-        # introduce count
+        # calculate count
         n = [1 for x in range(len(self.data))]
-        n = pd.Series(n, index=self.data.index, name='count')
+        n = pd.Series(n, index=self.data.index, name=self.system)
         n = pd.concat([self.data[self.groups], n], axis=1)
-        self.n = n.groupby(self.groups).sum()
+        n = n.groupby(self.groups).sum()
+        self.n = pd.concat([self.n, n], axis=1)
 
         for target in self.targets:
 
@@ -653,25 +678,21 @@ class Evaluation:
             i = 0
             for metric in self.metrics:
 
+                # calculate output
                 summary = self.summaries[i]
                 metric_data = self.perform_metric(data, target, metric)
                 kpi = self.summarize(metric_data[metric], summary)
 
-                metric_data.columns = pd.MultiIndex.from_product([[target], metric_data.columns],
-                                                                 names=['targets', 'metrics'])
+                # Format output
+                metric_data.columns = pd.MultiIndex.from_product([[target], metric_data.columns, [self.system]],
+                                                                 names=['targets', 'metrics', 'systems'])
+                kpi = pd.DataFrame(kpi)
+                kpi.columns = pd.MultiIndex.from_tuples([(target, summary, self.system)],
+                                                        names=['targets', 'summaries', 'systems'])
 
+                # Save output
                 self.evaluation = pd.concat([self.evaluation, metric_data], axis=1)
                 self.kpi = pd.concat([self.kpi, kpi], axis=1)
                 i += 1
 
             cols.pop()
-
-        # Create MultiIndex for self.kpi
-        _ = [[target] * len(self.metrics) for target in self.targets]
-        mi = list()
-        while _:
-            mi.extend(_.pop(0))
-
-        mi = pd.MultiIndex.from_arrays([mi, self.kpi.columns], names=['targets', 'summaries'])
-        self.kpi.columns = mi
-
