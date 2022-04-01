@@ -525,6 +525,7 @@ class Evaluation:
     def prepare_data(self, data):
 
         self._data = data
+
         self.data = self._data[self._cols]
 
         if self.conditions:
@@ -620,7 +621,7 @@ class Evaluation:
 
             watt_series = pd.Series(data.index, index=data.index)
             watt_series = watt_series.iloc[(watt_series != 0).values]
-            err_watt = data.loc[watt_series.index, :].div(watt_series)
+            err_watt = data.loc[watt_series.index].div(watt_series)
             kpi = err_watt.mean()
 
             name = data.name + '_' + summary
