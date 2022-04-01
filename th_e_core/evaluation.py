@@ -448,7 +448,7 @@ class Evaluation:
 
             if small_delta == 0:
                 raise ValueError("The axis {} cannot be analyzed with the regular grid spacing of {} between"
-                                 "grid points. Please choose a smaller number of steps".format(feature, small_delta))
+                                 "grid points. Please choose a smaller number of steps".format(data.name, small_delta))
 
             to_edge = big_delta - small_delta * total_steps
             extra_steps = ceil(to_edge / small_delta)
@@ -458,27 +458,25 @@ class Evaluation:
 
             return discrete_axis, small_delta
 
-        if len(self.groups) != len(self.group_bins):
-            _groups = self.groups[:len(self.group_bins)].copy()
-        else:
-            _groups = self.groups.copy()
-
         # Update self.groups to appropriate bin identifier
-        self.groups[:len(_groups)] = [group + '_bins' for group in _groups]
+        if len(self.systems) == 0:
+            bin_groups = self.groups[:len(self.group_bins)]
+            self.groups[:len(self.group_bins)] = [group + '_bins' for group in bin_groups]
 
-        d_axis = zip(_groups, self.group_bins)
+        d_axis = zip(self.groups[:len(self.group_bins)], self.group_bins)
         gitterized = list()
 
-        for feature, steps in d_axis:
+        for bin_feature, steps in d_axis:
 
-            self.data[feature + '_bins'] = self.data[feature]
+            feature = '_'.join(bin_feature.split('_')[:-1])
+            self.data[bin_feature] = self.data[feature]
             discrete_feature, step_size = _gitterize(self.data[feature], int(steps))
-            gitterized.append(feature)
+            gitterized.append(bin_feature)
 
             for i in discrete_feature:
-                i_loc = self.data[feature + '_bins'] - i
+                i_loc = self.data[bin_feature] - i
                 i_loc = (i_loc >= 0) & (i_loc < step_size)
-                self.data.loc[i_loc, feature + '_bins'] = i
+                self.data.loc[i_loc, bin_feature] = i
 
             # drop unbinned data
             self.data = self.data.drop(feature, 1)
@@ -658,7 +656,6 @@ class Evaluation:
         from copy import deepcopy
 
         self.system = eval_id
-        self.systems.append(eval_id)
         self.prepare_data(data)
 
         cols = [col for col in self.data.columns if not col.endswith('_err')]
@@ -696,3 +693,6 @@ class Evaluation:
                 i += 1
 
             cols.pop()
+
+        # Record evaluation in history
+        self.systems.append(eval_id)
