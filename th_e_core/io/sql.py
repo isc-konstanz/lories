@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-    th-e-core.iotools.sql
-    ~~~~~~~~~~~~~~~~~~~~~
+    th-e-core.io.sql
+    ~~~~~~~~~~~~~~~~
     
     
 """
@@ -11,7 +11,7 @@ import pytz as tz
 import datetime as dt
 import pandas as pd
 
-from th_e_core.iotools import Database
+from th_e_core.io import Database
 from th_e_core.tools import to_int
 from mysql import connector
 
@@ -19,7 +19,7 @@ from mysql import connector
 class SqlDatabase(Database):
 
     def __init__(self, host="127.0.0.1", port=3306,
-                 user='root', password='', database='emonpv',
+                 user='root', password='', database='emondata',
                  tables=None, interval=24,
                  **kwargs):
 
@@ -48,36 +48,49 @@ class SqlDatabase(Database):
              resolution: int = None,
              **kwargs):
 
-        epoch = dt.datetime(1970, 1, 1, tzinfo=tz.UTC)
-        data = pd.DataFrame()
-
+        results = list()
         for column, table in self.tables.items():
-            cursor = self.connector.cursor()
-            select = "SELECT time, data FROM {0} WHERE ".format(table)
-            if end is None:
-                select += "time >= %s ORDER BY time ASC"
-                cursor.execute(select, ((start.astimezone(tz.UTC)-epoch).total_seconds(),))
-            else:
-                select += "time BETWEEN %s AND %s ORDER BY time ASC"
-                cursor.execute(select,
-                               ((start.astimezone(tz.UTC)-epoch).total_seconds(),
-                                (end.astimezone(tz.UTC)-epoch).total_seconds()))
+            results.append(self._select(column, table, start, end))
 
-            times = []
-            values = []
-            for timestamp, value in cursor.fetchall():
-                time = tz.utc.localize(dt.datetime.fromtimestamp(timestamp))
-                times.append(time)
-                values.append(value)
-
-            result = pd.DataFrame(data=values, index=times, columns=[column])
-            data = pd.concat([data, result], axis=1)
+        try:
+            data = pd.concat(results, axis=1)
+        except TypeError as e:
+            print(e)
 
         if resolution is not None and resolution > 900:
             offset = (start - start.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds() % resolution
             data = data.resample(str(int(resolution))+'s', base=offset).sum()
 
         return data
+
+    def _select(self,
+                column: str,
+                table: str,
+                start: pd.Timestamp | dt.datetime,
+                end:   pd.Timestamp | dt.datetime) -> pd.DataFrame:
+
+        epoch = dt.datetime(1970, 1, 1, tzinfo=tz.UTC)
+
+        cursor = self.connector.cursor()
+        select = "SELECT time, data FROM {0} WHERE ".format(table)
+        if end is None:
+            select += "time >= %s ORDER BY time ASC"
+            cursor.execute(select, ((start.astimezone(tz.UTC)-epoch).total_seconds(),))
+        else:
+            select += "time BETWEEN %s AND %s ORDER BY time ASC"
+            cursor.execute(select,
+                           ((start.astimezone(tz.UTC)-epoch).total_seconds(),
+                            (end.astimezone(tz.UTC)-epoch).total_seconds()))
+
+        times = []
+        values = []
+        for timestamp, value in cursor.fetchall():
+            time = dt.datetime.fromtimestamp(timestamp, tz=self.timezone)
+            times.append(time)
+            values.append(value)
+
+        result = pd.DataFrame(data=values, index=times, columns=[column])
+        return result.tz_convert(self.timezone)
 
     def write(self, data: pd.DataFrame, **_):
         epoch = dt.datetime(1970, 1, 1, tzinfo=tz.UTC)

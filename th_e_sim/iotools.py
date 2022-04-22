@@ -129,6 +129,9 @@ def print_distributions(features, path=''):
 def print_boxplot(system, data, index, column, file, label='', title='', colors=None, **kwargs):
     import seaborn as sns
 
+    logging.getLogger('PIL.PngImagePlugin')\
+           .setLevel(logging.WARN)
+
     plt.figure()
     plot_fliers = dict(marker='o', markersize=3, markerfacecolor='none', markeredgecolor='lightgrey')
     plot_colors = colors if colors is not None else index.nunique()
