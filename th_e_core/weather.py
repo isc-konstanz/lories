@@ -22,7 +22,7 @@ import logging
 from abc import ABC, abstractmethod
 from configparser import ConfigParser as Configurations
 from th_e_core.configs import Configurable
-from th_e_core.iotools import Database
+from th_e_core.io import Database
 from th_e_core.system import System
 
 logger = logging.getLogger(__name__)

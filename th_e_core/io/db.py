@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-    th-e-core.database
-    ~~~~~~~~~~~~~~~~~~
+    th-e-core.io.db
+    ~~~~~~~~~~~~~~~
     
     
 """
@@ -30,16 +30,17 @@ class Database(ABC):
     @staticmethod
     def open(configs: Configurations, **kwargs) -> Database:
         dbargs = dict(configs.items('Database'))
+        kwargs.update(dbargs)
 
         database_type = dbargs['type'].lower()
         if database_type == 'sql':
             database_tables = dict(configs.items('Tables'))
-            from th_e_core.iotools.sql import SqlDatabase
-            return SqlDatabase(**dbargs, **kwargs, tables=database_tables)
+            from th_e_core.io.sql import SqlDatabase
+            return SqlDatabase(**kwargs, tables=database_tables)
 
         elif database_type == 'csv':
-            from th_e_core.iotools.csv import CsvDatabase
-            return CsvDatabase(**dbargs, **kwargs)
+            from th_e_core.io.csv import CsvDatabase
+            return CsvDatabase(**kwargs)
         else:
             raise ValueError('Invalid database type argument')
 

@@ -11,7 +11,7 @@ import os
 import logging
 import pvlib
 
-from th_e_core.pvtools import ModuleDatabase, InverterDatabase
+from th_e_core.pv import ModuleDatabase, InverterDatabase
 from th_e_core import System, Component, ConfigurationException
 from configparser import ConfigParser as Configurations
 
@@ -19,6 +19,12 @@ logger = logging.getLogger(__name__)
 
 
 class PVSystem(Component, pvlib.pvsystem.PVSystem):
+
+    POWER = 'pv_power'
+    POWER_EXP = 'pv_exp_power'
+
+    ENERGY = 'pv_energy'
+    ENERGY_EXP = 'pv_exp_energy'
 
     def __init__(self, system: System, configs: Configurations, **kwargs) -> None:
         super().__init__(system, configs, name=configs.get('General', 'id'), **kwargs)

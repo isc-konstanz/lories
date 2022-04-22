@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-    th-e-core.iotools.sql
-    ~~~~~~~~~~~~~~~~~~~~~
+    th-e-core.io.sql
+    ~~~~~~~~~~~~~~~~
     
     
 """
@@ -11,7 +11,7 @@ import pytz as tz
 import datetime as dt
 import pandas as pd
 
-from th_e_core.iotools import Database
+from th_e_core.io import Database
 from th_e_core.tools import to_int
 from mysql import connector
 

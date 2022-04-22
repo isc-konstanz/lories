@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import logging
+from shutil import copytree, ignore_patterns
 from configparser import ConfigParser as Configurations
 from th_e_core.tools import join_path
 
@@ -20,40 +21,40 @@ class Configurable:
     def __init__(self, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(**kwargs)
         self._configs = configs
-        self._configure(configs, **kwargs)
+        self._configure(configs)
 
-#    def __repr__(self) -> str:
-#        configs = '[{}]'.format(self._class_name)
-#        for section in self._configs.sections():
-#            if section == 'Import':
-#                continue
-#
-#            configs += '\n    [{}]'.format(section) + '\n'
-#
-#            if section == 'General':
-#                if self._configs.has_option(section, 'id'):
-#                    configs_id = self._configs.get(section, 'id')
-#                    configs += '        id = ' + configs_id + '\n'
-#                if self._configs.has_option(section, 'name'):
-#                    configs_name = self._configs.get(section, 'name')
-#                    configs += '        name = ' + configs_name + '\n'
-#
-#            for (k, v) in self._configs.items(section):
-#                if section == 'General' and \
-#                        k in ['id', 'name', 'root_dir', 'lib_dir', 'tmp_dir', 'data_dir', 'config_dir', 'config_file']:
-#                    continue
-#
-#                configs += '        {} = {}'.format(k, v) + '\n'
-#
-#        return configs
+    # def __repr__(self) -> str:
+    #     configs = '[{}]'.format(self._class_name)
+    #     for section in self._configs.sections():
+    #         if section == 'Import':
+    #             continue
+    #
+    #         configs += '\n    [{}]'.format(section) + '\n'
+    #
+    #         if section == 'General':
+    #             if self._configs.has_option(section, 'id'):
+    #                 configs_id = self._configs.get(section, 'id')
+    #                 configs += '        id = ' + configs_id + '\n'
+    #             if self._configs.has_option(section, 'name'):
+    #                 configs_name = self._configs.get(section, 'name')
+    #                 configs += '        name = ' + configs_name + '\n'
+    #
+    #         for (k, v) in self._configs.items(section):
+    #             if section == 'General' and \
+    #                     k in ['id', 'name', 'root_dir', 'lib_dir', 'tmp_dir', 'data_dir', 'config_dir', 'config_file']:
+    #                 continue
+    #
+    #             configs += '        {} = {}'.format(k, v) + '\n'
+    #
+    #     return configs
 
     @property
     def configs(self) -> Configurations:
         return self._configs
 
-    def _configure(self, configs: Configurations, **kwargs) -> None:
+    def _configure(self, configs: Configurations) -> None:
         # if logger.isEnabledFor(logging.DEBUG):
-        #     print(self)
+        #    print(self)
         pass
 
     @classmethod
@@ -70,11 +71,7 @@ class Configurable:
             config_name = cls.__name__.lower() + '.cfg'
 
         configs = cls._read_configs(root_dir, lib_dir, tmp_dir, data_dir, config_dir, config_name, **kwargs)
-
-        package = kwargs.get('package') if 'package' in kwargs else '.'.join(cls.__module__.split('.')[:-1])
-        module = kwargs.get('module') if 'module' in kwargs else cls.__module__.split('.')[-1]
-
-        return cls._from_configs(configs, package, module, cls.__name__)
+        return cls._from_class(configs)
 
     @staticmethod
     def _read_configs(root_dir: str,
@@ -83,22 +80,33 @@ class Configurable:
                       data_dir: str,
                       config_dir: str,
                       config_name: str,
+                      config_scan: bool = False,
+                      config_copy: bool = False,
                       config_require: bool = True, **_) -> Configurations:
+
+        if "~" in data_dir:
+            data_dir = os.path.expanduser(data_dir)
+        if not os.path.isabs(data_dir):
+            if data_dir == 'data':
+                config_copy = False
+            data_dir = os.path.join(root_dir, data_dir)
 
         if "~" in config_dir:
             config_dir = os.path.expanduser(config_dir)
         if not os.path.isabs(config_dir):
-            if data_dir == 'data':
+            if data_dir == os.path.join(root_dir, 'data'):
                 config_dir = os.path.join(root_dir, config_dir)
-            elif os.path.isabs(data_dir):
-                config_dir = os.path.join(data_dir, config_dir)
-            elif "~" in data_dir:
-                config_dir = os.path.join(os.path.expanduser(data_dir), config_dir)
             else:
-                config_dir = os.path.join(root_dir, data_dir, config_dir)
+                config_dir = os.path.join(data_dir, config_dir)
 
         if not os.path.isdir(config_dir):
-            raise ConfigurationUnavailableException('Invalid configuration directory: {}'.format(config_dir))
+            if config_copy and not config_scan:
+                if not os.path.exists(data_dir):
+                    os.makedirs(data_dir)
+                config_defaults = os.path.join(root_dir, 'conf')
+                copytree(config_defaults, config_dir, ignore=ignore_patterns('*.default.cfg', 'settings*', 'logging*'))
+            else:
+                raise ConfigurationUnavailableException('Invalid configuration directory: {}'.format(config_dir))
 
         configs = Configurations()
         configs.optionxform = str
@@ -121,19 +129,24 @@ class Configurable:
 
         return configs
 
+    # noinspection PyShadowingBuiltins
     @staticmethod
-    def _from_configs(configs: Configurations, pkg: str, mdl: str, cls: str, *args, **kwargs) -> Configurable:
+    def _from_configs(configs: Configurations,
+                      package: str = None,
+                      module: str = None,
+                      type: str = None,
+                      *args, **kwargs) -> Configurable:
         if 'Import' not in configs.sections():
             configs.add_section('Import')
 
         if configs.has_option('General', 'type') and not configs.get('General', 'type').lower() == 'default':
             configs.set('Import', 'class', configs.get('General', 'type'))
         elif not configs.has_option('Import', 'class'):
-            configs.set('Import', 'class', cls)
+            configs.set('Import', 'class', type)
         if not configs.has_option('Import', 'module'):
-            configs.set('Import', 'module', mdl)
+            configs.set('Import', 'module', module)
         if not configs.has_option('Import', 'package'):
-            configs.set('Import', 'package', pkg)
+            configs.set('Import', 'package', package)
 
         try:
             obj = __import__(configs['Import']['package']+'.'+configs['Import']['module'], 
@@ -146,6 +159,15 @@ class Configurable:
             obj = __import__('th_e_core.'+configs['Import']['module'], fromlist=[configs['Import']['class']])
 
         return getattr(obj, configs['Import']['class'])(configs, *args, **kwargs)
+
+    # noinspection PyShadowingBuiltins
+    @classmethod
+    def _from_class(cls, configs: Configurations, *args, **kwargs) -> Configurable:
+        package = kwargs.get('package') if 'package' in kwargs else '.'.join(cls.__module__.split('.')[:-1])
+        module = kwargs.get('module') if 'module' in kwargs else cls.__module__.split('.')[-1]
+        type = cls.__name__
+
+        return cls._from_configs(configs, package, module, type)
 
     @property
     def _class_name(self) -> str:

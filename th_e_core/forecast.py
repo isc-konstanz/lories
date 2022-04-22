@@ -21,8 +21,7 @@ import logging
 
 from io import StringIO
 from configparser import ConfigParser as Configurations
-from th_e_core.configs import Configurable
-from th_e_core.iotools import Database
+from th_e_core import Configurable, Database
 from th_e_core.weather import Weather
 from th_e_core.system import System
 
@@ -33,30 +32,37 @@ class Forecast(ABC, Configurable):
 
     # noinspection PyShadowingBuiltins
     @classmethod
-    def read(cls, system: System, **kwargs) -> Weather:
-        configs = cls._read_configs(system, **kwargs)
-        type = configs.get('General', 'type', fallback='default')
-        if type.lower() in ['default', 'nmm']:
-            return NMM(system, configs, **kwargs)
+    def read(cls, system: System) -> Weather:
+        configs = cls._read_configs(system)
+        type = configs.get('General', 'type', fallback='default').lower()
+        if type in ['default', 'nmm']:
+            return NMM(system, configs)
+        elif type == 'database':
+            return DatabaseForecast(system, configs)
 
-        return cls(system, configs, **kwargs)
+        return cls(system, configs)
 
     @staticmethod
-    def _read_configs(system: System, config_name: str = 'forecast.cfg', **kwargs) -> Configurations:
+    def _read_configs(system: System, config_name: str = 'forecast.cfg') -> Configurations:
         return Configurable._read_configs(system.configs.get('General', 'root_dir'),
                                           system.configs.get('General', 'lib_dir'),
                                           system.configs.get('General', 'tmp_dir'),
                                           system.configs.get('General', 'data_dir'),
                                           system.configs.get('General', 'config_dir'),
-                                          config_name, **kwargs)
+                                          config_name)
 
-    def __init__(self, system: System, configs: Configurations, **kwargs) -> None:
-        Configurable.__init__(self, configs, **kwargs)
+    def __init__(self, system: System, configs: Configurations) -> None:
+        Configurable.__init__(self, configs)
         self._system = system
-        self._activate(system, configs, **kwargs)
+        self._activate(system, configs)
 
-    def _activate(self, system: System, configs: Configurations, **kwargs) -> None:
+    def _activate(self, system: System, configs: Configurations) -> None:
         pass
+
+    # noinspection PyProtectedMember
+    def build(self, **kwargs) -> pd.Dataframe:
+        from th_e_data import build
+        return build(self.configs, self._database, location=self._system.location, **kwargs)
 
     def _rename(self, data: pd.DataFrame, variables: Dict[str, str] = None) -> pd.DataFrame:
         """
@@ -153,6 +159,9 @@ class DatabaseForecast(Forecast):
                     )
                 configs.set('Database', 'dir', database_dir)
 
+                if not configs.has_option('Database', 'timezone'):
+                    configs.set('Database', 'timezone', self._system.location.tz)
+
             self._database = Database.open(configs, **kwargs)
         else:
             self._database = None
@@ -222,8 +231,8 @@ class NMM(ScheduledForecast, Weather):
     Model data corresponds to 4km resolution forecasts.
     """
 
-    def _configure(self, configs: Configurations, **kwargs) -> None:
-        super()._configure(configs, **kwargs)
+    def _configure(self, configs: Configurations) -> None:
+        super()._configure(configs)
 
         # TODO: Add sanity check
         self.name = configs.get('Meteoblue', 'name')
@@ -287,8 +296,8 @@ class NMM(ScheduledForecast, Weather):
             'snow_fraction'                 # Schneefall [0.0 - 1.0]
         ]
 
-    def _activate(self, system: System, *args, **kwargs) -> None:
-        super()._activate(system, *args, **kwargs)
+    def _activate(self, system: System) -> None:
+        super()._activate(system)
         from pvlib.location import Location
         if not hasattr(system, 'location') or not isinstance(system.location, Location):
             raise ValueError("Invalid forecast context missing location information")
