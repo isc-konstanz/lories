@@ -77,16 +77,19 @@ class CsvDatabase(Database):
             data = self._read_file(os.path.join(self.dir, subdir, file), **kwargs)
 
         else:
-            start = convert_timezone(start, self.timezone)
-            end = convert_timezone(end, self.timezone)
+            end = pd.Timestamp(convert_timezone(end, self.timezone))
+            start = pd.Timestamp(convert_timezone(start, self.timezone))
+            date = start.round('{hours}h'.format(hours=self.interval))
+            if date > start:
+                date -= relativedelta(hours=self.interval)
 
             path = os.path.join(self.dir, subdir)
-            data = self._read_file(os.path.join(path, start.strftime(self.format) + '.csv'), **kwargs)
+            data = self._read_file(os.path.join(path, date.strftime(self.format) + '.csv'), **kwargs)
             if end is not None:
-                def next_date(d: dt.datetime) -> dt.datetime:
-                    return (d + relativedelta(hours=self.interval)).round('{hours}h'.format(hours=self.interval))
+                def next_date() -> dt.datetime:
+                    return (date + relativedelta(hours=self.interval)).round('{hours}h'.format(hours=self.interval))
 
-                date = next_date(start)
+                date = next_date()
                 while date <= end:
                     if self.exists(date, subdir=subdir):
                         file = date.strftime(self.format) + '.csv'
@@ -94,14 +97,12 @@ class CsvDatabase(Database):
                         file_data = self._read_file(file_path, **kwargs)
 
                         columns_energy = [column for column in ENERGY.keys() if column in file_data.columns]
-                        if len(columns_energy) > 0:
-                            for column in columns_energy:
-                                # TODO: verify if the energy values are continuously integrated or timestep deltas
-                                file_data.loc[:, column] += data.loc[data.index[-1], column]
+                        for column in columns_energy:
+                            # TODO: verify if the energy values are continuously integrated or timestep deltas
+                            file_data.loc[:, column] += data.loc[data.index[-1], column]
 
                         data = data.combine_first(file_data)
-
-                    date = next_date(date)
+                    date = next_date()
 
         if resolution is not None and resolution > 900:
             offset = (start - start.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds() % resolution
