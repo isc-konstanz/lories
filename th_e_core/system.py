@@ -47,6 +47,10 @@ class Systems(MutableSequence):
     def insert(self, index: int, system) -> None:
         self._systems.insert(index, system)
 
+    def build(self, **kwargs) -> None:
+        for system in self:
+            system.build(**kwargs)
+
     def run(self, *args, **kwargs) -> None:
         for system in self:
             system.run(*args, **kwargs)
