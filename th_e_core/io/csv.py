@@ -6,6 +6,7 @@
     
 """
 from __future__ import annotations
+from typing import List
 
 import os
 import copy
@@ -15,7 +16,7 @@ import pandas as pd
 
 # noinspection PyProtectedMember
 import th_e_core.io._var as var
-from th_e_core.io import Database
+from th_e_core.io import Database, DatabaseException
 from th_e_core.tools import to_bool, to_int, convert_timezone
 from dateutil.relativedelta import relativedelta
 
@@ -52,19 +53,13 @@ class CsvDatabase(Database):
         self.columns = var.COLUMNS
 
     def exists(self,
-               start: pd.tslib.Timestamp | dt.datetime = None,
+               start: pd.Timestamp | dt.datetime = None,
+               end: pd.Timestamp | dt.datetime = None,
                file: str = None,
                subdir: str = '', **_):
 
-        if file is None:
-            file = self.file
-        if file is None and start is not None:
-            start = convert_timezone(start, self.timezone)
-            file = start.strftime(self.format) + '.csv'
-        if file is None:
-            return False
-
-        return os.path.isfile(os.path.join(self.dir, subdir, file))
+        files = self._get_files(start, end, file, subdir)
+        return all([os.path.isfile(f) for f in files])
 
     def read(self,
              start: pd.Timestamp | dt.datetime = None,
@@ -74,38 +69,21 @@ class CsvDatabase(Database):
              subdir: str = '',
              **kwargs) -> pd.DataFrame:
 
-        if file is None:
-            file = self.file
-        if file is not None:
-            data = self._read_file(os.path.join(self.dir, subdir, file), **kwargs)
+        data = pd.DataFrame()
+        for file in self._get_files(start, end, file, subdir):
+            if not os.path.isfile(file):
+                raise DatabaseException('Unable to find file: ' + file)
 
-        else:
-            end = pd.Timestamp(convert_timezone(end, self.timezone))
-            start = pd.Timestamp(convert_timezone(start, self.timezone))
-            date = start.round('{hours}h'.format(hours=self.interval))
-            if date > start:
-                date -= relativedelta(hours=self.interval)
+            file_data = self._read_file(file, **kwargs)
 
-            path = os.path.join(self.dir, subdir)
-            data = self._read_file(os.path.join(path, date.strftime(self.format) + '.csv'), **kwargs)
-            if end is not None:
-                def next_date() -> dt.datetime:
-                    return (date + relativedelta(hours=self.interval)).round('{hours}h'.format(hours=self.interval))
+            if not data.empty:
+                columns_energy = [column for column in self.columns.keys()
+                                  if '_energy' in column and column in file_data.columns]
+                for column in columns_energy:
+                    # TODO: verify if the energy values are continuously integrated or timestep deltas
+                    file_data.loc[:, column] = file_data[column] + data.loc[data.index[-1], column]
 
-                date = next_date()
-                while date <= end:
-                    if self.exists(date, subdir=subdir):
-                        file = date.strftime(self.format) + '.csv'
-                        file_path = os.path.join(path, file)
-                        file_data = self._read_file(file_path, **kwargs)
-
-                        columns_energy = [column for column in var.ENERGY.keys() if column in file_data.columns]
-                        for column in columns_energy:
-                            # TODO: verify if the energy values are continuously integrated or timestep deltas
-                            file_data.loc[:, column] += data.loc[data.index[-1], column]
-
-                        data = data.combine_first(file_data)
-                    date = next_date()
+            data = data.combine_first(file_data)
 
         if resolution is not None and resolution > 900:
             offset = (start - start.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds() % resolution
@@ -183,7 +161,7 @@ class CsvDatabase(Database):
               end:   pd.Timestamp | dt.datetime = None,
               file: str = None,
               subdir: str = '',
-              split_days: bool = False,
+              split_data: bool = False,
               **kwargs) -> None:
         if data is not None and not data.empty and self.enabled:
             path = os.path.join(self.dir, subdir)
@@ -211,30 +189,30 @@ class CsvDatabase(Database):
                 file = start.strftime(self.format) + '.csv'
             file_path = os.path.join(path, file)
 
-            if split_days:
-                delta_day = dt.timedelta(hours=23, minutes=59, seconds=59, microseconds=999999)
-                time_day = start.replace(hour=0, minute=0, second=0, microsecond=0)
-                if time_day < start and time_day.day != start.day:
-                    time_day += relativedelta(days=1)
-                while time_day < end:
-                    file = time_day.strftime(self.format) + '.csv'
-                    file_path = os.path.join(path, file)
-                    file_data = data[time_day:time_day + delta_day]
+            if split_data:
+                time_step = start.replace(hour=0, minute=0, second=0, microsecond=0)
 
-                    columns_energy = [column for column in var.ENERGY.keys() if column in file_data.columns]
-                    if len(columns_energy) > 0:
-                        for column in columns_energy:
-                            # TODO: verify if the energy values are continuously integrated or timestep deltas
-                            file_data.loc[:, column] -= file_data.loc[file_data.index[0], column]
+                def next_step() -> pd.Timestamp:
+                    return (time_step + relativedelta(hours=self.interval)).round('{}h'.format(self.interval))
+
+                if time_step < start and time_step.day != start.day:
+                    time_step = next_step()
+                while time_step < end:
+                    time_next = next_step()
+
+                    file = time_step.strftime(self.format) + '.csv'
+                    file_path = os.path.join(path, file)
+                    file_data = data[(data.index >= time_step) & (data.index < time_next)].copy()
+
+                    columns_energy = [column for column in self.columns.keys()
+                                      if '_energy' in column and column in file_data.columns]
+                    for column in columns_energy:
+                        # TODO: verify if the energy values are continuously integrated or timestep deltas
+                        file_data.loc[:, column] = file_data[column] - file_data.loc[file_data.index[0], column]
 
                     self._write_file(file_path, file_data, **kwargs)
 
-                    time_next = time_day + relativedelta(days=1)
-                    time_next = time_next.replace(hour=0, minute=0, second=0, microsecond=0)
-                    if time_next <= time_day:
-                        time_next = time_day + relativedelta(days=2)
-                        time_next = time_next.replace(hour=0, minute=0, second=0, microsecond=0)
-                    time_day = time_next
+                    time_step = time_next
             else:
                 self._write_file(file_path, data.loc[start:end], **kwargs)
 
@@ -272,6 +250,46 @@ class CsvDatabase(Database):
         data = data.rename(columns=self.columns)
         data.index.name = 'Time'
         data.to_csv(path, sep=self.separator, decimal=self.decimal, encoding=encoding)
+
+    def _get_files(self,
+                   start: pd.Timestamp | dt.datetime,
+                   end:   pd.Timestamp | dt.datetime,
+                   file: str,
+                   subdir: str) -> List[str]:
+
+        files = []
+        if file is None:
+            file = self.file
+        if file is not None:
+            if os.path.isabs(file):
+                file_path = file
+            else:
+                file_path = os.path.join(self.dir, subdir, file)
+
+            files.append(file_path)
+        else:
+            end = pd.Timestamp(convert_timezone(end, self.timezone))
+            start = pd.Timestamp(convert_timezone(start, self.timezone))
+            date = start.round('{hours}h'.format(hours=self.interval))
+            if date > start:
+                date = (date - relativedelta(hours=self.interval)).round('{hours}h'.format(hours=self.interval))
+
+            def next_date() -> pd.Timestamp:
+                return (date + relativedelta(hours=self.interval)).round('{hours}h'.format(hours=self.interval))
+
+            path = os.path.join(self.dir, subdir)
+            file = date.strftime(self.format) + '.csv'
+            file_path = os.path.join(path, file)
+            files.append(file_path)
+            if end is not None:
+                date = next_date()
+                while date <= end:
+                    file = date.strftime(self.format) + '.csv'
+                    file_path = os.path.join(path, file)
+                    files.append(file_path)
+                    date = next_date()
+
+        return files
 
 
 # noinspection PyProtectedMember
