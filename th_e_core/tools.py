@@ -56,7 +56,7 @@ def floor_date(date: Union[dt.datetime, pd.Timestamp, str],
                                                       pd.Timestamp]:
 
     date = convert_timezone(date, timezone)
-    return date.replace(hour=0, minute=0, second=0, microsecond=0)  # , nanosecond=0)
+    return date.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 def ceil_date(date: Union[dt.datetime, pd.Timestamp, str],
@@ -64,7 +64,7 @@ def ceil_date(date: Union[dt.datetime, pd.Timestamp, str],
                                                      pd.Timestamp]:
 
     date = convert_timezone(date, timezone)
-    return date.replace(hour=23, minute=59, second=59, microsecond=999)  # , nanosecond=999)
+    return date.replace(hour=23, minute=59, second=59, microsecond=999999)
 
 
 def to_bool(v: Union[str, bool]) -> bool:

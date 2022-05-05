@@ -45,13 +45,13 @@ class Weather(ABC, Configurable):
         raise TypeError('Invalid weather type: {}'.format(type))
 
     @staticmethod
-    def _read_configs(system: System, config_name: str = 'weather.cfg', **kwargs) -> Configurations:
+    def _read_configs(system: System, config_file: str = 'weather.cfg', **kwargs) -> Configurations:
         return Configurable._read_configs(system.configs.get('General', 'root_dir'),
                                           system.configs.get('General', 'lib_dir'),
                                           system.configs.get('General', 'tmp_dir'),
                                           system.configs.get('General', 'data_dir'),
                                           system.configs.get('General', 'config_dir'),
-                                          config_name, **kwargs)
+                                          config_file, **kwargs)
 
     def __init__(self, system: System, configs: Configurations, **kwargs) -> None:
         Configurable.__init__(self, configs, **kwargs)

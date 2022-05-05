@@ -43,13 +43,13 @@ class Forecast(ABC, Configurable):
         return cls(system, configs)
 
     @staticmethod
-    def _read_configs(system: System, config_name: str = 'forecast.cfg') -> Configurations:
+    def _read_configs(system: System, config_file: str = 'forecast.cfg') -> Configurations:
         return Configurable._read_configs(system.configs.get('General', 'root_dir'),
                                           system.configs.get('General', 'lib_dir'),
                                           system.configs.get('General', 'tmp_dir'),
                                           system.configs.get('General', 'data_dir'),
                                           system.configs.get('General', 'config_dir'),
-                                          config_name)
+                                          config_file)
 
     def __init__(self, system: System, configs: Configurations) -> None:
         Configurable.__init__(self, configs)
@@ -296,8 +296,8 @@ class NMM(ScheduledForecast, Weather):
             'snow_fraction'                 # Schneefall [0.0 - 1.0]
         ]
 
-    def _activate(self, system: System) -> None:
-        super()._activate(system)
+    def _activate(self, system: System, configs: Configurations) -> None:
+        super()._activate(system, configs)
         from pvlib.location import Location
         if not hasattr(system, 'location') or not isinstance(system.location, Location):
             raise ValueError("Invalid forecast context missing location information")

@@ -19,7 +19,8 @@ from th_e_core import Configurable, Database
 
 logger = logging.getLogger(__name__)
 
-INVALID_CHARS = "'!@#$%^&?*;:,./\|`´+~=- "
+# noinspection SpellCheckingInspection
+INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
 
 
 class Systems(MutableSequence):
@@ -93,17 +94,17 @@ class System(Configurable, MutableMapping):
               data_dir:    str = 'data',
               cmpt_dir:    str = 'cmpt',
               config_dir:  str = 'conf',
-              config_name: str = 'system.cfg',
+              config_file: str = 'system.cfg',
               **kwargs) -> System:
 
-        configs = cls._read_configs(root_dir, lib_dir, tmp_dir, data_dir, config_dir, config_name, **kwargs)
+        configs = cls._read_configs(root_dir, lib_dir, tmp_dir, data_dir, config_dir, config_file, **kwargs)
         config_dir = configs.get('General', 'config_dir')
         cmpt_dir = configs.get('General', 'cmpt_dir', fallback=cmpt_dir)
         if "~" in cmpt_dir:
             cmpt_dir = os.path.expanduser(cmpt_dir)
         if not os.path.isabs(cmpt_dir):
             cmpt_dir = os.path.join(config_dir, cmpt_dir)
-        if cmpt_dir == os.path.join(config_dir, 'ems') and not os.path.isdir(cmpt_dir):
+        if cmpt_dir == os.path.join(config_dir, 'cmpt') and not os.path.isdir(cmpt_dir):
             cmpt_dir = config_dir
 
         configs.set('General', 'cmpt_dir', cmpt_dir)
@@ -120,7 +121,7 @@ class System(Configurable, MutableMapping):
             self.id = configs['General']['name']
             configs['General']['id'] = self.id
 
-        self.name = configs['General']['name']
+        self._name = configs['General']['name']
 
         super().__init__(configs, **kwargs)
         self._components = self._components_read()
@@ -173,6 +174,7 @@ class System(Configurable, MutableMapping):
         for entry in os.scandir(cmpt_dir):
             if entry.is_file() and entry.path.endswith('.cfg') and not entry.path.endswith('default.cfg') \
                     and entry.name.startswith(tuple(self._component_types)):
+                # noinspection PyTypeChecker
                 component = self._component_read(entry)
                 components[component.id] = component
 

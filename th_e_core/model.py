@@ -24,13 +24,13 @@ class Model(ABC, Configurable):
         return cls(system, cls._read_configs(system))
 
     @staticmethod
-    def _read_configs(system: System, config_name: str = 'model.cfg') -> Configurations:
+    def _read_configs(system: System, config_file: str = 'model.cfg') -> Configurations:
         return Configurable._read_configs(system.configs.get('General', 'root_dir'),
                                           system.configs.get('General', 'lib_dir'),
                                           system.configs.get('General', 'tmp_dir'),
                                           system.configs.get('General', 'data_dir'),
                                           system.configs.get('General', 'config_dir'),
-                                          config_name)
+                                          config_file)
 
     def __init__(self, system: System, configs: Configurations) -> None:
         Configurable.__init__(self, configs)
