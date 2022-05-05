@@ -201,14 +201,17 @@ class System(Configurable, MutableMapping):
     def _component(self, configs: Configurations, type: str) -> Component:
         if type == 'pv':
             # noinspection PyUnresolvedReferences
-            from th_e_core.pv import PVSystem
-            return PVSystem(self, configs)
+            from th_e_core.cmpt import Photovoltaics
+            return Photovoltaics(self, configs)
         elif type == 'ev':
-            from th_e_core.evsystem import ElectricVehicle
+            from th_e_core.cmpt import ElectricVehicle
             return ElectricVehicle(self, configs)
         elif type == 'ees':
-            from th_e_core.storage import ElectricalEnergyStorage
+            from th_e_core.cmpt import ElectricalEnergyStorage
             return ElectricalEnergyStorage(self, configs)
+        elif type == 'tes':
+            from th_e_core.cmpt import ThermalEnergyStorage
+            return ThermalEnergyStorage(self, configs)
 
         return ConfigComponent(self, configs)
 
@@ -233,10 +236,15 @@ class System(Configurable, MutableMapping):
 
         self._id = re.sub('[^A-Za-z0-9_]+', '', s).lower()
 
+    @property
+    def name(self):
+        return self._name
+
     def __getattr__(self, attr):
         if attr in self._component_types:
             return self._components[self.__keytransform__(attr)]
         try:
+            # noinspection PyUnresolvedReferences
             return super().__getattr__(attr)
 
         except AttributeError:
@@ -261,6 +269,10 @@ class System(Configurable, MutableMapping):
     def __keytransform__(key):
         return key
 
+    def build(self, **kwargs) -> None:
+        from th_e_data import build
+        build(self._configs,
+              self._database, **kwargs)
 
     def run(self, *args, **kwargs) -> pd.DataFrame:
         raise NotImplementedError
@@ -275,6 +287,7 @@ class Component(Configurable):
             raise ValueError('Invalid configuration, missing specified component id')
 
         self.id = configs.get('General', 'id')
+        self.name = configs.get('General', 'name', fallback=configs.get('General', 'id'))
         self._system = system
 
         self._activate(system, **kwargs)
@@ -283,15 +296,23 @@ class Component(Configurable):
         pass
 
     @property
-    def id(self):
+    def id(self) -> str:
         return self._id
 
     @id.setter
-    def id(self, s):
-        self._id = re.sub('[^A-Za-z0-9]+', '', s.translate({ord(c): "_" for c in INVALID_CHARS}))
+    def id(self, s: str) -> None:
+        self._id = re.sub('[^A-Za-z0-9_]+', '', s.translate({ord(c): "_" for c in INVALID_CHARS}))
 
     @property
-    def type(self):
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, s: str) -> None:
+        self._name = re.sub('[^A-Za-z0-9 ]+', '', s.translate({ord(c): " " for c in INVALID_CHARS+'_'}))
+
+    @property
+    def type(self) -> str:
         return 'cmpt'
 
 
@@ -313,5 +334,5 @@ class ConfigComponent(Component, MutableMapping):
         return len(self._configs.items('General'))
 
     @property
-    def type(self):
+    def type(self) -> str:
         return 'cfg'

@@ -6,7 +6,7 @@
     
 """
 from th_e_core.system import System
-from th_e_core.pv.system import PVSystem
+from th_e_core.cmpt import ElectricalEnergyStorage, ThermalEnergyStorage, Photovoltaics
 
 
 _DEPRECATION = {
@@ -39,19 +39,33 @@ SYSTEM = {
     **_SYSTEM_ENERGY
 }
 
+_COMPONENTS_POWER = {
+    ElectricalEnergyStorage.POWER_CHARGE: 'EES charging power [W]'
+}
+
+_COMPONENTS_ENERGY = {
+    ElectricalEnergyStorage.ENERGY_CHARGE:    'EES charged energy [kWh]',
+    ElectricalEnergyStorage.ENERGY_DISCHARGE: 'EES discharged energy [kWh]'
+}
+
 _PV_POWER = {
-    PVSystem.POWER:     'Generated Photovoltaic Power [W]',
-    PVSystem.POWER_EXP: 'Exported Photovoltaic Power [W]'
+    Photovoltaics.POWER: 'Generated PV Power [W]',
+    Photovoltaics.POWER_EXP: 'Exported PV Power [W]'
 }
 
 _PV_ENERGY = {
-    PVSystem.ENERGY:     'Generated Photovoltaic Energy [kWh]',
-    PVSystem.ENERGY_EXP: 'Exported Photovoltaic Energy [kWh]'
+    Photovoltaics.ENERGY: 'Generated PV Energy [kWh]',
+    Photovoltaics.ENERGY_EXP: 'Exported PV Energy [kWh]'
 }
 
 PV = {
     **_PV_POWER,
     **_PV_ENERGY
+}
+
+STATES = {
+    ElectricalEnergyStorage.STATE_OF_CHARGE: 'EES State of Charge [%]',
+    ThermalEnergyStorage.TEMPERATURE:        'TES temperature [°C]'
 }
 
 WEATHER = {
@@ -75,16 +89,19 @@ WEATHER = {
 }
 
 POWER = {
+    **_COMPONENTS_POWER,
     **_SYSTEM_POWER,
     **_PV_POWER
 }
 
 ENERGY = {
+    **_COMPONENTS_ENERGY,
     **_SYSTEM_ENERGY,
     **_PV_ENERGY
 }
 
 COLUMNS = {
+    **STATES,
     **POWER,
     **ENERGY,
     **WEATHER

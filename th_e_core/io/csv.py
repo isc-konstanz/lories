@@ -13,6 +13,8 @@ import pytz as tz
 import datetime as dt
 import pandas as pd
 
+# noinspection PyProtectedMember
+import th_e_core.io._var as var
 from th_e_core.io import Database
 from th_e_core.tools import to_bool, to_int, convert_timezone
 from dateutil.relativedelta import relativedelta
@@ -47,6 +49,8 @@ class CsvDatabase(Database):
         self.decimal = decimal
         self.separator = separator
 
+        self.columns = var.COLUMNS
+
     def exists(self,
                start: pd.tslib.Timestamp | dt.datetime = None,
                file: str = None,
@@ -69,7 +73,6 @@ class CsvDatabase(Database):
              file: str = None,
              subdir: str = '',
              **kwargs) -> pd.DataFrame:
-        from th_e_core.io._var import ENERGY
 
         if file is None:
             file = self.file
@@ -96,7 +99,7 @@ class CsvDatabase(Database):
                         file_path = os.path.join(path, file)
                         file_data = self._read_file(file_path, **kwargs)
 
-                        columns_energy = [column for column in ENERGY.keys() if column in file_data.columns]
+                        columns_energy = [column for column in var.ENERGY.keys() if column in file_data.columns]
                         for column in columns_energy:
                             # TODO: verify if the energy values are continuously integrated or timestep deltas
                             file_data.loc[:, column] += data.loc[data.index[-1], column]
@@ -140,8 +143,6 @@ class CsvDatabase(Database):
         :rtype:
             :class:`pandas.DataFrame`
         """
-        from th_e_core.io._var import COLUMNS, _DEPRECATION
-
         data = pd.read_csv(path, sep=self.separator, decimal=self.decimal)
         if not data.empty:
             index_column = self.index_column
@@ -168,9 +169,10 @@ class CsvDatabase(Database):
             elif data.index.tzinfo != self.timezone:
                 data.index = data.index.tz_convert(self.timezone)
 
-            data = data.rename(columns=_DEPRECATION)
+            # noinspection PyProtectedMember
+            data = data.rename(columns=var._DEPRECATION)
             data = data.rename(columns=dict(
-                [(value, key) for key, value in COLUMNS.items()]
+                [(value, key) for key, value in self.columns.items()]
             ))
 
         return data
@@ -183,8 +185,6 @@ class CsvDatabase(Database):
               subdir: str = '',
               split_days: bool = False,
               **kwargs) -> None:
-        from th_e_core.io._var import ENERGY
-
         if data is not None and not data.empty and self.enabled:
             path = os.path.join(self.dir, subdir)
             if not os.path.exists(path):
@@ -221,7 +221,7 @@ class CsvDatabase(Database):
                     file_path = os.path.join(path, file)
                     file_data = data[time_day:time_day + delta_day]
 
-                    columns_energy = [column for column in ENERGY.keys() if column in file_data.columns]
+                    columns_energy = [column for column in var.ENERGY.keys() if column in file_data.columns]
                     if len(columns_energy) > 0:
                         for column in columns_energy:
                             # TODO: verify if the energy values are continuously integrated or timestep deltas
@@ -243,8 +243,6 @@ class CsvDatabase(Database):
                     data: pd.DataFrame,
                     encoding: str = 'utf-8-sig',
                     **_):
-        from th_e_core.io._var import COLUMNS
-
         if data.index.tzinfo is None or data.index.tzinfo.utcoffset(data.index) is None:
             data.index = data.index.tz_localize(self.timezone, ambiguous="infer")
         elif data.index.tzinfo != self.timezone:
@@ -270,8 +268,8 @@ class CsvDatabase(Database):
                 else:
                     data = pd.concat([csv, data], axis=1)
 
-        data = data[[column for column in COLUMNS.keys() if column in data.columns]]
-        data = data.rename(columns=COLUMNS)
+        data = data[[column for column in self.columns.keys() if column in data.columns]]
+        data = data.rename(columns=self.columns)
         data.index.name = 'Time'
         data.to_csv(path, sep=self.separator, decimal=self.decimal, encoding=encoding)
 
