@@ -29,7 +29,7 @@ def write_excel(settings, summary, validations):
 
     summary_file = os.path.join(settings.get('General', 'data_dir', fallback='data'), 'summary.xlsx')
     summary_book = Workbook()
-    summary_writer = pd.ExcelWriter(summary_file, engine='openpyxl')  # , engine_kwargs={'encoding': 'utf-8-sig'})
+    summary_writer = pd.ExcelWriter(summary_file, engine='openpyxl')
     summary_writer.book = summary_book
     summary.to_excel(summary_writer, sheet_name='Summary', float_format="%.2f", encoding='utf-8-sig')
     summary_book.remove_sheet(summary_book.active)
@@ -39,8 +39,11 @@ def write_excel(settings, summary, validations):
         validation.to_excel(summary_writer, sheet_name=validation_key, encoding='utf-8-sig')
         validation_sheet = summary_book[validation_key]
         for validation_column in range(1, len(validation_sheet[1])):
-            validation_column_width = len(validation_sheet[1][validation_column].value) + 2
-            validation_sheet.column_dimensions[get_column_letter(validation_column + 1)].width = validation_column_width
+            validation_column_value = validation_sheet[1][validation_column].value
+            if validation_column_value is not None:
+                validation_column_width = len(validation_column_value) + 2
+                validation_sheet.column_dimensions[get_column_letter(validation_column + 1)].width = \
+                    validation_column_width
             validation_sheet[1][validation_column].border = border
 
     # Set column width and header coloring

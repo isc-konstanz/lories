@@ -28,6 +28,7 @@ def print_lineplot(system, data, index, column, file, label='', title='', colors
     plot.legend_.set_title(None)
     plot.set(xlabel=label, ylabel='Power [W]', title=title)
     plt.show(block=False)
+    fig = plot.figure
 
     plot_file = os.path.join(system.configs['General']['data_dir'], file + '.png')
     plot_dir = os.path.dirname(plot_file)
@@ -35,8 +36,8 @@ def print_lineplot(system, data, index, column, file, label='', title='', colors
     if not os.path.isdir(plot_dir):
         os.makedirs(plot_dir, exist_ok=True)
 
-    plot.figure.savefig(plot_file)
-    plot.figure.close()
+    fig.savefig(plot_file)
+    plt.close(fig)
 
 
 def print_boxplot(system, data, index, column, file, label='', title='', colors=None, **kwargs):
@@ -52,6 +53,7 @@ def print_boxplot(system, data, index, column, file, label='', title='', colors=
                        **kwargs)
     plot.set(xlabel=label, ylabel='Error [W]', title=title)
     plt.show(block=False)
+    fig = plot.figure
 
     plot_file = os.path.join(system.configs['General']['data_dir'], file + '.png')
     plot_dir = os.path.dirname(plot_file)
@@ -59,5 +61,5 @@ def print_boxplot(system, data, index, column, file, label='', title='', colors=
     if not os.path.isdir(plot_dir):
         os.makedirs(plot_dir, exist_ok=True)
 
-    plot.figure.savefig(plot_file)
-    plot.figure.close()
+    fig.savefig(plot_file)
+    plt.close(fig)
