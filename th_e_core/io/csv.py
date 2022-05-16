@@ -219,6 +219,7 @@ class CsvDatabase(Database):
     def _write_file(self,
                     path: str,
                     data: pd.DataFrame,
+                    rename: bool = True,
                     encoding: str = 'utf-8-sig',
                     **_):
         if data.index.tzinfo is None or data.index.tzinfo.utcoffset(data.index) is None:
@@ -246,9 +247,10 @@ class CsvDatabase(Database):
                 else:
                     data = pd.concat([csv, data], axis=1)
 
-        data = data[[column for column in self.columns.keys() if column in data.columns]]
-        data = data.rename(columns=self.columns)
-        data.index.name = 'Time'
+        if rename:
+            data = data[[column for column in self.columns.keys() if column in data.columns]]
+            data = data.rename(columns=self.columns)
+            data.index.name = 'Time'
         data.to_csv(path, sep=self.separator, decimal=self.decimal, encoding=encoding)
 
     def _get_files(self,
