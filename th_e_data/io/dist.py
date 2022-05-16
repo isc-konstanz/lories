@@ -49,4 +49,5 @@ def print_distributions(data, path=''):
 
         plt.title(r'Histogram of '+column)
         plt.savefig(path_file)
+        plt.close()
         plt.clf()

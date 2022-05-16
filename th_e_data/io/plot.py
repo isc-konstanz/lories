@@ -25,7 +25,6 @@ def print_lineplot(system, data, index, column, file, label='', title='', colors
                         data=data,
                         palette=colors,
                         **kwargs)
-    plot.legend_.set_title(None)
     plot.set(xlabel=label, ylabel='Power [W]', title=title)
     plt.show(block=False)
     fig = plot.figure
