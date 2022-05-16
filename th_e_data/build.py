@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import datetime as dt
 from pvlib.location import Location
-from th_e_core.io.csv import Database, CsvDatabase
+from th_e_core.io.csv import Database
 from configparser import ConfigParser as Configurations
 
 logger = logging.getLogger(__name__)

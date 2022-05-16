@@ -32,17 +32,12 @@ def join_path(configs: ConfigParser,
 
 
 def convert_timezone(date: Union[dt.datetime, pd.Timestamp, str],
-                     timezone: dt.tzinfo = tz.utc) -> Union[dt.datetime,
-                                                            pd.Timestamp]:
+                     timezone: dt.tzinfo = tz.utc) -> pd.Timestamp:
     if isinstance(date, str):
         import dateutil.parser
         date = dateutil.parser.parse(date)
-
     if isinstance(date, dt.datetime):
-        if date.tzinfo is None or date.tzinfo.utcoffset(date) is None:
-            return timezone.localize(date)
-        elif date.tzinfo != timezone:
-            return date.astimezone(timezone)
+        date = pd.Timestamp(date)
 
     if isinstance(date, pd.Timestamp):
         if date.tzinfo is None or date.tzinfo.utcoffset(date) is None:
@@ -52,18 +47,18 @@ def convert_timezone(date: Union[dt.datetime, pd.Timestamp, str],
 
 
 def floor_date(date: Union[dt.datetime, pd.Timestamp, str],
-               timezone: dt.tzinfo = tz.utc) -> Union[dt.datetime,
-                                                      pd.Timestamp]:
-
-    date = convert_timezone(date, timezone)
+               timezone: dt.tzinfo = None) -> Union[dt.datetime,
+                                                    pd.Timestamp]:
+    if timezone is not None:
+        date = convert_timezone(date, timezone)
     return date.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 def ceil_date(date: Union[dt.datetime, pd.Timestamp, str],
-              timezone: dt.tzinfo = tz.utc) -> Union[dt.datetime,
-                                                     pd.Timestamp]:
-
-    date = convert_timezone(date, timezone)
+              timezone: dt.tzinfo = None) -> Union[dt.datetime,
+                                                   pd.Timestamp]:
+    if timezone is not None:
+        date = convert_timezone(date, timezone)
     return date.replace(hour=23, minute=59, second=59, microsecond=999999)
 
 
