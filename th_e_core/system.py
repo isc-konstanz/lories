@@ -142,6 +142,10 @@ class System(Configurable, MutableMapping):
                                      altitude=configs.getfloat('Location', 'altitude', fallback=0),
                                      name=self.name)
 
+            # TODO: deduct country and state from latitude and longitude with geopy and save config file
+            self.location.country = configs.get('Location', 'country', fallback=None)
+            self.location.state = configs.get('Location', 'state', fallback=None)
+
     def _activate(self, components: Dict[str, Component], configs: Configurations) -> None:
         if configs.has_section('Database') and \
                 configs.get('Database', 'enabled', fallback='True').lower() == 'true' and \
