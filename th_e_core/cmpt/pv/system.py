@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-    th-e-core.pvsystem
-    ~~~~~~~~~~~~~~~~~~
+    th-e-core.cmpt.pv.system
+    ~~~~~~~~~~~~~~~~~~~~~~~~
     
     This module provides the :class:`th_e_core.PVSystem`, containing information about location,
     orientation and datasheet parameters of a specific photovoltaic installation.
@@ -11,20 +11,26 @@ import os
 import logging
 import pvlib
 
-from th_e_core.pvtools import ModuleDatabase, InverterDatabase
-from th_e_core import System, Component, ConfigurationException
 from configparser import ConfigParser as Configurations
+from th_e_core import System, Component, ConfigurationException
+from th_e_core.cmpt.pv import ModuleDatabase, InverterDatabase
 
 logger = logging.getLogger(__name__)
 
 
-class PVSystem(Component, pvlib.pvsystem.PVSystem):
+class Photovoltaics(Component, pvlib.pvsystem.PVSystem):
+
+    POWER = 'pv_power'
+    POWER_EXP = 'pv_exp_power'
+
+    ENERGY = 'pv_energy'
+    ENERGY_EXP = 'pv_exp_energy'
 
     def __init__(self, system: System, configs: Configurations, **kwargs) -> None:
         super().__init__(system, configs, name=configs.get('General', 'id'), **kwargs)
 
-    def _configure(self, configs: Configurations, **kwargs) -> None:
-        super()._configure(configs, **kwargs)
+    def _configure(self, configs: Configurations) -> None:
+        super()._configure(configs)
 
         self.racking_model = configs.get('Mounting', 'type', fallback=None)
         self.surface_tilt = configs.getfloat('Mounting', 'tilt', fallback=0)
@@ -55,7 +61,7 @@ class PVSystem(Component, pvlib.pvsystem.PVSystem):
         else:
             self.temperature_model_parameters = temperature_model_parameters
 
-    def _load_module(self, configs: Configurations):
+    def _load_module(self, _):
         module = {}
 
         self._read_module_database(module)
@@ -89,12 +95,12 @@ class PVSystem(Component, pvlib.pvsystem.PVSystem):
             module_configs = Configurations()
             module_configs.optionxform = str
             module_configs.read_string(module_str)
-            self._update_parameters(module, module_configs['Module'])
+            self._update_parameters(module, dict(module_configs['Module']))
             logger.debug('Read module override file of component %s: %s', self.name, module_file)
             return True
         return False
 
-    def _load_inverter(self, configs: Configurations):
+    def _load_inverter(self, _):
         inverter = {}
 
         self._read_inverter_database(inverter)
@@ -129,7 +135,7 @@ class PVSystem(Component, pvlib.pvsystem.PVSystem):
             inverter_configs = Configurations()
             inverter_configs.optionxform = str
             inverter_configs.read_string(inverter_str)
-            self._update_parameters(inverter, inverter_configs['Inverter'])
+            self._update_parameters(inverter, dict(inverter_configs['Inverter']))
             logger.debug('Read inverter override file of component %s: %s', self.name, inverter_file)
             return True
         return False

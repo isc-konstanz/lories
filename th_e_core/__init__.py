@@ -7,8 +7,8 @@
 """
 from th_e_core._version import __version__  # noqa: F401
 
-from th_e_core import iotools  # noqa: F401
-from th_e_core.iotools import (  # noqa: F401
+from th_e_core import io  # noqa: F401
+from th_e_core.io import (  # noqa: F401
     Database,
     DatabaseException
 )
@@ -30,12 +30,6 @@ from th_e_core import model  # noqa: F401
 from th_e_core.model import Model  # noqa: F401
 
 from th_e_core import system  # noqa: F401
-from th_e_core.system import (  # noqa: F401
-    System,
-    Component
-)
+from th_e_core.system import System, Component  # noqa: F401
 
-from th_e_core import (  # noqa: F401
-    pvtools,
-    pvsystem
-)
+from th_e_core import cmpt  # noqa: F401

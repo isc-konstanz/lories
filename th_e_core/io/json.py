@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-    th-e-core.pvtools
+    th-e-core.io.json
     ~~~~~~~~~~~~~~~~~
     
     
@@ -10,7 +10,7 @@ import json
 import shutil
 import time
 
-from th_e_core.iotools import Database, DatabaseException
+from th_e_core.io import Database, DatabaseException
 from configparser import ConfigParser as Configurations
 from collections import OrderedDict
 

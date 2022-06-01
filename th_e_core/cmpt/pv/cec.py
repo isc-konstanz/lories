@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-    th-e-core.pvtools.module
+    th-e-core.pv.module
     ~~~~~~~~~~~~~~~~~~~~~~~~
     
     
@@ -12,7 +12,7 @@ import numpy as np
 
 from pvlib import pvsystem
 from collections import OrderedDict
-from th_e_core.iotools.json import JsonDatabase
+from th_e_core.io.json import JsonDatabase
 
 logger = logging.getLogger(__name__)
 

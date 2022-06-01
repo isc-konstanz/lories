@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-    th-e-core.database
-    ~~~~~~~~~~~~~~~~~~
+    th-e-core.io.db
+    ~~~~~~~~~~~~~~~
     
     
 """
@@ -17,23 +17,30 @@ from configparser import ConfigParser as Configurations
 
 class Database(ABC):
 
-    def __init__(self, enabled: str = 'true', timezone: str = 'UTC', **_) -> None:
+    def __init__(self,
+                 enabled: str = 'true',
+                 timezone: str | tz.tzinfo = 'UTC',
+                 **_) -> None:
+
         self.enabled = enabled.lower() == 'true'
-        self.timezone = tz.timezone(timezone)
+        if isinstance(timezone, str):
+            timezone = tz.timezone(timezone)
+        self.timezone = timezone
 
     @staticmethod
     def open(configs: Configurations, **kwargs) -> Database:
         dbargs = dict(configs.items('Database'))
+        kwargs.update(dbargs)
 
         database_type = dbargs['type'].lower()
         if database_type == 'sql':
             database_tables = dict(configs.items('Tables'))
-            from th_e_core.iotools.sql import SqlDatabase
-            return SqlDatabase(**dbargs, **kwargs, tables=database_tables)
+            from th_e_core.io.sql import SqlDatabase
+            return SqlDatabase(**kwargs, tables=database_tables)
 
         elif database_type == 'csv':
-            from th_e_core.iotools.csv import CsvDatabase
-            return CsvDatabase(**dbargs, **kwargs)
+            from th_e_core.io.csv import CsvDatabase
+            return CsvDatabase(**kwargs)
         else:
             raise ValueError('Invalid database type argument')
 

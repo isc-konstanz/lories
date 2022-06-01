@@ -22,7 +22,7 @@ import logging
 from abc import ABC, abstractmethod
 from configparser import ConfigParser as Configurations
 from th_e_core.configs import Configurable
-from th_e_core.iotools import Database
+from th_e_core.io import Database
 from th_e_core.system import System
 
 logger = logging.getLogger(__name__)
@@ -45,13 +45,13 @@ class Weather(ABC, Configurable):
         raise TypeError('Invalid weather type: {}'.format(type))
 
     @staticmethod
-    def _read_configs(system: System, config_name: str = 'weather.cfg', **kwargs) -> Configurations:
+    def _read_configs(system: System, config_file: str = 'weather.cfg', **kwargs) -> Configurations:
         return Configurable._read_configs(system.configs.get('General', 'root_dir'),
                                           system.configs.get('General', 'lib_dir'),
                                           system.configs.get('General', 'tmp_dir'),
                                           system.configs.get('General', 'data_dir'),
                                           system.configs.get('General', 'config_dir'),
-                                          config_name, **kwargs)
+                                          config_file, **kwargs)
 
     def __init__(self, system: System, configs: Configurations, **kwargs) -> None:
         Configurable.__init__(self, configs, **kwargs)

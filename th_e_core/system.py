@@ -19,7 +19,8 @@ from th_e_core import Configurable, Database
 
 logger = logging.getLogger(__name__)
 
-INVALID_CHARS = "'!@#$%^&?*;:,./\|`´+~=- "
+# noinspection SpellCheckingInspection
+INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
 
 
 class Systems(MutableSequence):
@@ -46,12 +47,73 @@ class Systems(MutableSequence):
     def insert(self, index: int, system) -> None:
         self._systems.insert(index, system)
 
+    def build(self, **kwargs) -> None:
+        for system in self:
+            system.build(**kwargs)
+
     def run(self, *args, **kwargs) -> None:
         for system in self:
             system.run(*args, **kwargs)
 
 
 class System(Configurable, MutableMapping):
+
+    POWER_EL = 'el_power'
+    POWER_EL_IMP = 'el_imp_power'
+    POWER_EL_EXP = 'el_exp_power'
+    POWER_TH = 'th_power'
+    POWER_TH_HT = 'th_ht_power'
+    POWER_TH_DOM = 'th_dom_power'
+
+    ENERGY_EL = 'el_energy'
+    ENERGY_EL_IMP = 'el_import_energy'
+    ENERGY_EL_EXP = 'el_export_energy'
+    ENERGY_TH = 'th_energy'
+    ENERGY_TH_HT = 'th_ht_energy'
+    ENERGY_TH_DOM = 'th_dom_energy'
+
+    @classmethod
+    def read(cls, data_dir: str = 'data', config_scan: bool = False, **kwargs) -> Systems:
+        systems = Systems()
+
+        if not isinstance(config_scan, bool):
+            config_scan = str(config_scan).lower() == 'true'
+        kwargs['config_scan'] = config_scan
+        kwargs['config_copy'] = True
+
+        if config_scan:
+            for system_dir in os.scandir(data_dir):
+                if os.path.isdir(system_dir.path):
+                    systems.append(cls._read(data_dir=system_dir.path, **kwargs))
+        else:
+            systems.append(cls._read(data_dir=data_dir, **kwargs))
+
+        return systems
+
+    @classmethod
+    def _read(cls,
+              root_dir:    str = '.',
+              lib_dir:     str = 'lib',
+              tmp_dir:     str = 'tmp',
+              data_dir:    str = 'data',
+              cmpt_dir:    str = 'cmpt',
+              config_dir:  str = 'conf',
+              config_file: str = 'system.cfg',
+              **kwargs) -> System:
+
+        configs = cls._read_configs(root_dir, lib_dir, tmp_dir, data_dir, config_dir, config_file, **kwargs)
+        config_dir = configs.get('General', 'config_dir')
+        cmpt_dir = configs.get('General', 'cmpt_dir', fallback=cmpt_dir)
+        if "~" in cmpt_dir:
+            cmpt_dir = os.path.expanduser(cmpt_dir)
+        if not os.path.isabs(cmpt_dir):
+            cmpt_dir = os.path.join(config_dir, cmpt_dir)
+        if cmpt_dir == os.path.join(config_dir, 'cmpt') and not os.path.isdir(cmpt_dir):
+            cmpt_dir = config_dir
+
+        configs.set('General', 'cmpt_dir', cmpt_dir)
+
+        return cls._from_class(configs)
 
     def __init__(self, configs: Configurations, **kwargs) -> None:
         if not configs.has_option('General', 'name'):
@@ -63,14 +125,14 @@ class System(Configurable, MutableMapping):
             self.id = configs['General']['name']
             configs['General']['id'] = self.id
 
-        self.name = configs['General']['name']
+        self._name = configs['General']['name']
 
         super().__init__(configs, **kwargs)
-        self._components = self._components_read(**kwargs)
-        self._activate(self._components, configs, **kwargs)
+        self._components = self._components_read()
+        self._activate(self._components, configs)
 
-    def _configure(self, configs: Configurations, **kwargs) -> None:
-        super()._configure(configs, **kwargs)
+    def _configure(self, configs: Configurations) -> None:
+        super()._configure(configs)
 
         if configs.has_section('Location'):
             from pvlib.location import Location
@@ -78,43 +140,55 @@ class System(Configurable, MutableMapping):
                                      configs.getfloat('Location', 'longitude'),
                                      tz=configs.get('Location', 'timezone', fallback='UTC'),
                                      altitude=configs.getfloat('Location', 'altitude', fallback=0),
-                                     name=self.name,
-                                     **kwargs)
+                                     name=self.name)
 
-    def _activate(self, components: Dict[str, Component], configs: Configurations, **kwargs) -> None:
+            # TODO: deduct country and state from latitude and longitude with geopy and save config file
+            self.location.country = configs.get('Location', 'country', fallback=None)
+            self.location.state = configs.get('Location', 'state', fallback=None)
+
+    def _activate(self, components: Dict[str, Component], configs: Configurations) -> None:
         if configs.has_section('Database') and \
                 configs.get('Database', 'enabled', fallback='True').lower() == 'true' and \
                 configs.get('Database', 'enable', fallback='True').lower() == 'true':
+            if configs.get('Database', 'type').lower() == 'csv':
+                database_dir = configs.get('Database', 'dir')
+                database_central = configs.getboolean('Database', 'central', fallback=False)
+                if database_central:
+                    data_dir = configs['General']['lib_dir']
+                else:
+                    data_dir = configs['General']['data_dir']
 
-            if 'dir' in configs['Database']:
-                database_dir = configs['Database']['dir']
                 if not os.path.isabs(database_dir):
-                    configs['Database']['dir'] = os.path.join(configs['General']['data_dir'], database_dir)
-            else:
-                configs['Database']['dir'] = configs['General']['data_dir']
+                    database_dir = os.path.join(data_dir, database_dir)
+                if database_central:
+                    database_dir = os.path.join(
+                        database_dir,
+                        '{0:08.4f}'.format(float(self.location.latitude)).replace('.', '') + '_' +
+                        '{0:08.4f}'.format(float(self.location.longitude)).replace('.', '')
+                    )
+                configs.set('Database', 'dir', database_dir)
 
-            self._database = Database.open(configs, **kwargs)
+                if not configs.has_option('Database', 'timezone'):
+                    configs.set('Database', 'timezone', self.location.tz)
+
+            self._database = Database.open(configs)
         else:
             self._database = None
 
-    def _components_read(self, **kwargs) -> Dict[str, Component]:
+    def _components_read(self) -> Dict[str, Component]:
         cmpt_dir = self._configs.get('General', 'cmpt_dir', fallback='cmpt')
-        if not os.path.isabs(cmpt_dir):
-            cmpt_dir = os.path.join(self._configs['General']['config_dir'], cmpt_dir)
-
-        if not os.path.isdir(cmpt_dir):
-            cmpt_dir = self._configs['General']['config_dir']
 
         components = dict()
         for entry in os.scandir(cmpt_dir):
             if entry.is_file() and entry.path.endswith('.cfg') and not entry.path.endswith('default.cfg') \
                     and entry.name.startswith(tuple(self._component_types)):
-                component = self._component_read(entry, **kwargs)
+                # noinspection PyTypeChecker
+                component = self._component_read(entry)
                 components[component.id] = component
 
         return components
 
-    def _component_read(self, config_file: os.DirEntry, **kwargs) -> Component:
+    def _component_read(self, config_file: os.DirEntry) -> Component:
         component_configs = Configurable._read_configs(self.configs.get('General', 'root_dir'),
                                                        self.configs.get('General', 'lib_dir'),
                                                        self.configs.get('General', 'tmp_dir'),
@@ -126,7 +200,7 @@ class System(Configurable, MutableMapping):
             component_configs.set('General', 'id', os.path.splitext(config_file.name)[0])
 
         component_type = [t for t in self._component_types if config_file.name.startswith(t)][0]
-        component = self._component(component_configs, component_type, **kwargs)
+        component = self._component(component_configs, component_type)
 
         if not isinstance(component, Component):
             raise TypeError('Invalid component type: {}'.format(type(component)))
@@ -134,16 +208,26 @@ class System(Configurable, MutableMapping):
         return component
 
     # noinspection PyShadowingBuiltins
-    def _component(self, configs: Configurations, type: str, **kwargs) -> Component:
+    def _component(self, configs: Configurations, type: str) -> Component:
         if type == 'pv':
-            from th_e_core.pvsystem import PVSystem
-            return PVSystem(self, configs, **kwargs)
+            # noinspection PyUnresolvedReferences
+            from th_e_core.cmpt import Photovoltaics
+            return Photovoltaics(self, configs)
+        elif type == 'ev':
+            from th_e_core.cmpt import ElectricVehicle
+            return ElectricVehicle(self, configs)
+        elif type == 'ees':
+            from th_e_core.cmpt import ElectricalEnergyStorage
+            return ElectricalEnergyStorage(self, configs)
+        elif type == 'tes':
+            from th_e_core.cmpt import ThermalEnergyStorage
+            return ThermalEnergyStorage(self, configs)
 
-        return ConfigComponent(self, configs, **kwargs)
+        return ConfigComponent(self, configs)
 
     @property
     def _component_types(self) -> List[str]:
-        return ['component', 'cmpt', 'pv']
+        return ['component', 'cmpt', 'pv', 'ees', 'ev']
 
     def contains_type(self, key):
         return len(self.get_type(key)) > 0
@@ -162,10 +246,15 @@ class System(Configurable, MutableMapping):
 
         self._id = re.sub('[^A-Za-z0-9_]+', '', s).lower()
 
+    @property
+    def name(self):
+        return self._name
+
     def __getattr__(self, attr):
         if attr in self._component_types:
             return self._components[self.__keytransform__(attr)]
         try:
+            # noinspection PyUnresolvedReferences
             return super().__getattr__(attr)
 
         except AttributeError:
@@ -186,25 +275,14 @@ class System(Configurable, MutableMapping):
     def __len__(self) -> int:
         return len(self._components)
 
-    def __keytransform__(self, key):
+    @staticmethod
+    def __keytransform__(key):
         return key
 
-    @classmethod
-    def read(cls, data_dir: str = 'data', config_scan: bool = False, **kwargs) -> Systems:
-        systems = Systems()
-
-        if not isinstance(config_scan, bool):
-            config_scan = str(config_scan).lower() == 'true'
-        kwargs['config_scan'] = config_scan
-
-        if config_scan:
-            for system_dir in os.scandir(data_dir):
-                if os.path.isdir(system_dir.path):
-                    systems.append(cls._read(data_dir=system_dir.path, **kwargs))
-        else:
-            systems.append(cls._read(data_dir=data_dir, **kwargs))
-
-        return systems
+    def build(self, **kwargs) -> None:
+        from th_e_data import build
+        build(self._configs,
+              self._database, **kwargs)
 
     def run(self, *args, **kwargs) -> pd.DataFrame:
         raise NotImplementedError
@@ -219,6 +297,7 @@ class Component(Configurable):
             raise ValueError('Invalid configuration, missing specified component id')
 
         self.id = configs.get('General', 'id')
+        self.name = configs.get('General', 'name', fallback=configs.get('General', 'id'))
         self._system = system
 
         self._activate(system, **kwargs)
@@ -227,15 +306,23 @@ class Component(Configurable):
         pass
 
     @property
-    def id(self):
+    def id(self) -> str:
         return self._id
 
     @id.setter
-    def id(self, s):
-        self._id = re.sub('[^A-Za-z0-9]+', '', s.translate({ord(c): "_" for c in INVALID_CHARS}))
+    def id(self, s: str) -> None:
+        self._id = re.sub('[^A-Za-z0-9_]+', '', s.translate({ord(c): "_" for c in INVALID_CHARS}))
 
     @property
-    def type(self):
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, s: str) -> None:
+        self._name = re.sub('[^A-Za-z0-9 ]+', '', s.translate({ord(c): " " for c in INVALID_CHARS+'_'}))
+
+    @property
+    def type(self) -> str:
         return 'cmpt'
 
 
@@ -257,5 +344,5 @@ class ConfigComponent(Component, MutableMapping):
         return len(self._configs.items('General'))
 
     @property
-    def type(self):
+    def type(self) -> str:
         return 'cfg'
