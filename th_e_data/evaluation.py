@@ -1,51 +1,37 @@
 # -*- coding: utf-8 -*-
 """
-    th-e-core.system
-    ~~~~~~~~~~~~~~~~
+    th-e-data.evaluation
+    ~~~~~~~~~~~~~~~~~~~~
 
 
 """
 from __future__ import annotations
-from collections.abc import MutableMapping
-from typing import Dict, List, Tuple, Iterator
+from collections.abc import Mapping, MutableMapping
+from typing import List, Iterator
 
 import os
 import re
+import json
+import shutil
 import logging
 import pandas as pd
+import datetime as dt
 
-from configparser import ConfigParser as Configurations
-from configparser import SectionProxy
-from th_e_core import Configurable, Database
+from django.utils.datetime_safe import date
+
+import th_e_data.io as io
+from th_e_core import configs, System, ConfigurationUnavailableException
+from copy import deepcopy
 
 logger = logging.getLogger(__name__)
 
-INVALID_CHARS = "'!@#$%^&?*;:,./\|`´+~=- "
 
+class Evaluations(Mapping):
 
-class Evaluations(MutableMapping, Configurable):
-
-    def __init__(self, configs: Configurations, *evaluations, **kwargs) -> None:
-
-        Configurable.__init__(self, configs, **kwargs)
-
-        # ToDo: Datapaths and items and their corresponding system contained
-        # in eval_map are currently connected solely by index position. This
-        # is not very reliable and should be changed.
-        self.data_paths = self._configs['Database']['dirs']
-        self.eval_map = dict(self._configs['Evaluation Map'].items())
-
-        # set in load_results
-        self._database = None
-        #self.load_results()
-
-        # ToDo: check each name is present
-        # if self.name not in configs.sections():
-        #     raise ValueError('The requested evaluation {} is not present in the configs.'.format(self.name))
-
+    def __init__(self, *evaluations) -> None:
         self._evaluations = dict()
-        for eval in evaluations:
-            self._evaluations[eval.name] = eval
+        for evaluation in evaluations:
+            self._evaluations[evaluation.id] = evaluation
 
     def __iter__(self) -> Iterator[Evaluation]:
         return iter(self._evaluations)
@@ -56,189 +42,56 @@ class Evaluations(MutableMapping, Configurable):
     def __getitem__(self, key: str) -> Evaluation:
         return self._evaluations[key]
 
-    def __delitem__(self, key: str) -> None:
-        del self._evaluations[key]
-
-    def __setitem__(self, key: str, evaluation: Evaluation) -> None:
-        self._evaluations[key] = evaluation
-
-    def _configure(self, configs: Configurations, **kwargs) -> None:
-        # super()._configure(configs, **kwargs)
-        pass
-
-    @property
-    def data_paths(self):
-        return self._data_paths
-
-    @data_paths.setter
-    def data_paths(self, value):
-
-        _paths = list()
-        paths = value.split(', ')
-
-        # ToDo: Allow for relative paths, as in configs.py
-        for path in paths:
-            if not os.path.isdir(path) or not os.path.isabs(path):
-                raise OSError('Path {} not found. Relative paths are currently not supported.'.format(path))
-
-        _paths.extend(paths)
-        self._data_paths = _paths
-
-    @property
-    def eval_map(self):
-        return self._eval_map
-
-    @eval_map.setter
-    def eval_map(self, value: dict):
-        #ToDo: Consider restricting inputs further
-        map = dict()
-        for sys_id, evals in value.items():
-            evals = evals.split(', ')
-            map[sys_id] = evals
-
-        self._eval_map = map
-
-    @classmethod
-    def read(cls, conf_dir: str, **kwargs) -> Evaluations:
-
-        configs = cls._read(config_dir=conf_dir, data_dir='data', **kwargs)
-        evaluations = Evaluations(configs, *cls._from_configs(configs))
-
-        return evaluations
-
-    @classmethod
-    def _read(cls,
-              root_dir:    str = '.',
-              lib_dir:     str = 'lib',
-              tmp_dir:     str = 'tmp',
-              data_dir:    str = 'data',
-              config_dir:  str = 'conf',
-              config_name: str = None,
-              **kwargs) -> Configurations:
-
-        if config_name is None:
-            config_name = cls.__name__.lower() + '.cfg'
-
-        configs = cls._read_configs(root_dir, lib_dir, tmp_dir, data_dir, config_dir, config_name, **kwargs)
-
-        package = kwargs.get('package') if 'package' in kwargs else '.'.join(cls.__module__.split('.')[:-1])
-        module = kwargs.get('module') if 'module' in kwargs else cls.__module__.split('.')[-1]
-
-        if 'Import' not in configs.sections():
-            configs.add_section('Import')
-
-        if configs.has_option('General', 'type') and not configs.get('General', 'type').lower() == 'default':
-            configs.set('Import', 'class', configs.get('General', 'type'))
-        elif not configs.has_option('Import', 'class'):
-            configs.set('Import', 'class', cls.__name__)
-        if not configs.has_option('Import', 'module'):
-            configs.set('Import', 'module', module)
-        if not configs.has_option('Import', 'package'):
-            configs.set('Import', 'package', package)
-
-        return configs
-
-    @staticmethod
-    def _from_configs(configs: Configurations, *args, **kwargs) -> List[Evaluation]:
-
-        evaluations = list()
-
-        try:
-            obj = __import__(configs['Import']['package']+'.'+configs['Import']['module'],
-                             fromlist=[configs['Import']['class']])
-
-        except ModuleNotFoundError as error:
-            logger.debug(error)
-
-            configs.set('Import', 'package', 'th_e_core')
-            obj = __import__('th_e_core.'+configs['Import']['module'], fromlist=[configs['Import']['class']])
-
-        if configs.has_section('Evaluation Map'):
-
-            names = list()
-            for dir, eval_name in configs['Evaluation Map'].items():
-
-                names.extend(eval_name.split(', '))
-
-            names = list(set(names))
-            for name in names:
-
-                eval_configs = dict(configs[name].items())
-                evaluations.append(getattr(obj, configs['Import']['class'])(name,  **eval_configs))
-
-        else:
-            raise ValueError("Invalid configuration, missing subsection names in section 'General'.")
-
-        return evaluations
-
-    def load_results(self, path):
-
-        data_path = os.path.join(path, 'results.h5')
-
-        if not os.path.isfile(data_path):
-            raise FileExistsError("The requisite file {} does not exist.".format(data_path))
-
-        datastore = pd.HDFStore(data_path)
-        results = pd.DataFrame()
-
-        for date_path in datastore:
-
-            if date_path.endswith('outputs'):
-
-                result = datastore.get(date_path)
-                results = pd.concat([results, result], axis=0)
-
-        results = results.sort_index()
-        results['day_hour'] = [t.hour for t in results.index]
-        results['weekday'] = [t.weekday for t in results.index]
-        results['month'] = [t.month for t in results.index]
-
-        # ToDo: Move check to appropriate location in Evaluation class
-        #if not self._cols.issubset(set(results.columns)):
-        #    _na = self._cols.difference(set(results.columns))
-        #    raise ValueError("Unable to load data corresponding to the path {}, as the"
-        #                     " columns {} required for the evaluation {} were not present"
-        #                     ".".format(data_path, _na, self.name))
-
-        results.index = [i for i in range(len(results))]
-
-        self._database = results
-        datastore.close()
-
-    def run(self) -> None:
-        from copy import deepcopy
-
-        i = 0
-        for sys_id, evaluations in self.eval_map.items():
-
-            self.load_results(self.data_paths[i])
-            for e_id in evaluations:
-
-                data = deepcopy(self._database)
-                self[e_id].run(sys_id, data)
-
-            i += 1
+    def run(self, results: List[Results]) -> None:
+        for result in results:
+            for evaluation in self._evaluations.values():
+                evaluation.run(result)
 
 
 class Evaluation:
 
-    def __init__(self, eval_name, targets, metrics, groups, group_bins=None, conditions=None, summaries=None, boxplots=None, **kwargs) -> None:
+    @classmethod
+    def read(cls, **kwargs) -> Evaluations:
+        evaluations = []
+        evaluation_configs = configs.read('evaluation.cfg', **kwargs)
+        if not os.path.isfile(evaluation_configs):
+            config_default = evaluation_configs.replace('.cfg', '.default.cfg')
+            if os.path.isfile(config_default):
+                shutil.copy(config_default, evaluation_configs)
+            else:
+                raise ConfigurationUnavailableException('Unable to find configuration file "{}"'
+                                                        .format(evaluation_configs))
+
+        for evaluation in evaluation_configs.sections():
+            evaluations.append(cls(evaluation, **dict(evaluation_configs[evaluation].items())))
+
+        return Evaluations(evaluations)
+
+    def __init__(self,
+                 name,
+                 column,
+                 metrics,
+                 groups,
+                 group_bins=None,
+                 conditions=None,
+                 summaries=None,
+                 boxplots=None, **_) -> None:
 
         # Run invariant, necessary
-        self.name = eval_name
-        self.targets = targets
+        self.name = name
+        self.columns = column
         self.metrics = metrics
         self.groups = groups
 
         # Run invariant, optional
         self.group_bins = group_bins
-        self.boxplots = boxplots
         self.conditions = conditions
         self.summaries = summaries
 
+        self.boxplots = boxplots
+
         # Outputs, cumulative: Multiple runs will concatenate
         # their outputs to these attributes
-        self.systems = list()
         self.evaluation = pd.DataFrame()
         self.kpi = pd.DataFrame()
         self.n = pd.DataFrame()  # Count the points in each group, as defined in groups
@@ -253,32 +106,37 @@ class Evaluation:
             for condition in self.conditions:
                 _cols.append(condition[0])
 
-        _err_cols = [t + '_err' for t in self.targets]
+        _err_cols = [t + '_err' for t in self.columns]
         _cols = _cols + _err_cols + self.groups
         self._cols = set(_cols)
 
     @property
-    def targets(self):
-        return self._targets
+    def id(self):
+        return self._id
 
-    @targets.setter
-    def targets(self, value):
+    @property
+    def name(self):
+        return self._name
 
-        values = value.split(', ')
-        new_values = list()
+    @name.setter
+    def name(self, name):
+        self._name = name
+        self._id = name.lower()
 
-        while values:
+    @property
+    def columns(self):
+        return self._columns
 
-            t = values.pop().lower()
+    @columns.setter
+    def columns(self, columns):
+        self._columns = list()
 
-            # Ensure proper formatting of target string (no special signs or spaces)
-            # ToDo: Ensure that name is still a valid variable in the future
-            if re.match('[^a-zA-Z0-9-_]+', t):
-                raise ValueError('An improper target name was passed for the evaluation {}'.format(self.name))
+        for column in columns.split(', '):
+            # Ensure proper formatting of column string (no special signs)
+            if re.match('[^a-zA-Z0-9-_ ]+', column):
+                raise ValueError('An improper column name was passed for the evaluation {}'.format(column))
 
-            new_values.append(t)
-
-        self._targets = new_values
+            self._columns.append(column.trim())
 
     @property
     def metrics(self):
@@ -668,7 +526,7 @@ class Evaluation:
         n = n.groupby(self.groups).sum()
         self.n = pd.concat([self.n, n], axis=1)
 
-        for target in self.targets:
+        for target in self.columns:
 
             cols.append(target + '_err')
             data = deepcopy(self.data[cols])
@@ -697,3 +555,138 @@ class Evaluation:
 
         # Record evaluation in history
         self.systems.append(eval_id)
+
+
+class Durations(Mapping):
+
+    def __init__(self, system: System) -> None:
+        self._file = os.path.join(system.configs['General']['data_dir'], 'results', 'results.json')
+        if os.path.isfile(self._file):
+            with open(self._file, 'r', encoding='utf-8') as f:
+                self._durations = json.load(f)
+                for duration in self._durations.values():
+                    def _datetime(key):
+                        return dt.datetime.strptime(duration[key], '%Y-%m-%d %H:%M:%S.%f')
+
+                    if 'start' in duration:
+                        duration['start'] = _datetime('start')
+                    if 'end' in duration:
+                        duration['end'] = _datetime('end')
+        else:
+            self._durations = {}
+
+    def __repr__(self) -> str:
+        return str(self._durations)
+
+    def __iter__(self) -> Iterator[Evaluation]:
+        return iter(self._durations)
+
+    def __len__(self) -> int:
+        return len(self._durations)
+
+    def __getitem__(self, key: str) -> Evaluation:
+        return self._durations[key]['minutes']
+
+    def start(self, key: str) -> None:
+        if key not in self._durations:
+            self._durations[key] = {}
+        if 'minutes' not in self._durations[key]:
+            self._durations[key]['minutes'] = 0
+        if 'end' in self._durations[key]:
+            del self._durations[key]['end']
+
+        self._durations[key]['start'] = dt.datetime.now()
+
+    def stop(self, key: str = None) -> None:
+        if key is None:
+            for key in self.keys():
+                self._stop(key)
+        else:
+            self._stop(key)
+
+        self._write()
+
+    def _stop(self, key: str = None) -> None:
+        if key not in self._durations:
+            raise ValueError("No duration found for key: \"{}\"".format(key))
+        if 'start' not in self._durations[key]:
+            raise ValueError("Timer for key \"{}\" not started yet".format(key))
+
+        self._durations[key]['end'] = dt.datetime.now()
+
+        minutes = self._durations[key]['minutes'] if 'minutes' in self._durations[key] else 0
+        minutes += round((self._durations[key]['end'] - self._durations[key]['start']).total_seconds() / 60.0, 6)
+        self._durations[key]['minutes'] = minutes
+
+    def _write(self) -> None:
+        with open(self._file, 'w', encoding='utf-8') as f:
+            json.encoder.FLOAT_REPR = lambda o: format(o, '.3f')
+            json.dump(self._durations, f, indent=4, default=str, ensure_ascii=False)
+
+
+class Results(MutableMapping):
+
+    def __init__(self, system: System, verbose: bool = False) -> None:
+        self._system = system
+        system_dir = system.configs['General']['data_dir']
+
+        # noinspection PyProtectedMember
+        self._database = deepcopy(system._database)
+        self._database.dir = os.path.join(system_dir, 'results')
+        self._database.enabled = True
+        self._datastore = pd.HDFStore(os.path.join(system_dir, 'results', 'results.h5'))
+
+        self.data = pd.DataFrame()
+        self.durations = Durations(system)
+
+        self.verbose = verbose
+
+    def __setitem__(self, key: str, data: pd.DataFrame) -> None:
+        self.set(key, data)
+
+    def __getitem__(self, key: str) -> pd.DataFrame:
+        return self.get(key)
+
+    def __delitem__(self, key: str) -> None:
+        del self._datastore[key]
+
+    def __iter__(self):
+        return iter(self._datastore)
+
+    def __len__(self) -> int:
+        return len(self._datastore)
+
+    def __contains__(self, key: str) -> bool:
+        return '/{}'.format(key) in self._datastore
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+
+    def close(self):
+        self.durations.stop()
+        self._database.close()
+        self._datastore.close()
+        if self.verbose:
+            for results_err in [c for c in self.data.columns if c.endswith('_err')]:
+                results_file = os.path.join('results',
+                                            'results_' + results_err.replace('_err', '').replace('_power', ''))
+                results_data = self.data.reset_index().drop_duplicates(subset='time', keep='last')\
+                                        .set_index('time').sort_index()
+
+                io.write_csv(self._system, results_data, results_file)
+
+    def set(self, key: str, data: pd.DataFrame) -> None:
+        data.to_hdf(self._datastore, '/{}'.format(key))
+        self.data = pd.concat([self.data, data], axis=0)
+        if self.verbose:
+            self._database.write(data, file='{}.csv'.format(key), rename=False)
+
+    def load(self, key: str) -> pd.DataFrame:
+        data = self.get(key)
+
+        self.data = pd.concat([self.data, data], axis=0)
+        return data
+
+    # noinspection PyTypeChecker
+    def get(self, key: str) -> pd.DataFrame:
+        return self._datastore.get('/{}'.format(key))
