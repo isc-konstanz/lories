@@ -17,8 +17,6 @@ import logging
 import pandas as pd
 import datetime as dt
 
-from django.utils.datetime_safe import date
-
 import th_e_data.io as io
 from th_e_core import configs, System, ConfigurationUnavailableException
 from copy import deepcopy
