@@ -3,8 +3,8 @@
 """
     th-e-core
     ~~~~~~~~~
-    
-    
+
+
 """
 from os import path
 from setuptools import setup, find_namespace_packages
@@ -27,10 +27,12 @@ AUTHOR = 'ISC Konstanz'
 MAINTAINER_EMAIL = 'adrian.minde@isc-konstanz.de'
 URL = 'https://github.com/isc-konstanz/th-e-core'
 
-INSTALL_REQUIRES = ['numpy',
-                    'pandas']
+INSTALL_REQUIRES = ['numpy >= 1.16',
+                    'pandas >= 0.23']
 
-PACKAGES = find_namespace_packages(include=['th_e_core*'])
+SCRIPTS = ['bin/th-e-data']
+
+PACKAGES = find_namespace_packages(include=['th_e_core*', 'th_e_data*'])
 
 SETUPTOOLS_KWARGS = {
     'zip_safe': False,
@@ -48,5 +50,6 @@ setup(
     url=URL,
     packages=PACKAGES,
     install_requires=INSTALL_REQUIRES,
+    scripts=SCRIPTS,
     **SETUPTOOLS_KWARGS
 )

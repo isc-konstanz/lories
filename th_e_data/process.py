@@ -10,9 +10,12 @@ import pytz as tz
 import numpy as np
 import pandas as pd
 import datetime as dt
+import warnings
 import logging
 
 from typing import Union
+from copy import deepcopy
+from pandas.tseries.frequencies import to_offset
 
 from th_e_core.system import System
 from th_e_core.cmpt.pv import Photovoltaics
@@ -257,6 +260,46 @@ def process_meteoblue(dir: str = 'Meteoblue',
     return data
 
 
+def process(data: pd.DataFrame, resolution: int = 1, fill_gaps: bool = False, **kwargs) -> pd.DataFrame:
+    # Find measurement outages longer than the resolution
+    gaps = _locate_gaps(data, resolution)
+
+    # Extend index to have a regular frequency
+    minute = data.index[0].minute + (resolution - data.index[0].minute % resolution)
+    hour = data.index[0].hour
+    if minute > 59:
+        minute = 0
+        hour += 1
+    start = data.index[0].replace(hour=hour, minute=minute, second=0)
+
+    minute = data.index[-1].minute - (data.index[-1].minute % resolution)
+    hour = data.index[-1].hour
+    if minute > 59:
+        minute = 0
+        hour += 1
+    end = data.index[-1].replace(hour=hour, minute=minute, second=0)
+
+    timezone = data.index.tzinfo
+    index = pd.date_range(start=start, end=end, tz=timezone, freq='{}min'.format(resolution))
+    data = data.combine_first(pd.DataFrame(index=index, columns=data.columns))
+    data.index.name = 'time'
+
+    # Drop rows with outages longer than the resolution
+    for _, gap in gaps.iterrows():
+        error = data[(data.index > gap['start']) & (data.index < gap['end'])]
+        data = data.drop(error.index)
+
+    # Interpolate the values between the irregular data points and drop them afterwards,
+    # to receive a regular index that is sure to be continuous, in order to later expose
+    # remaining gaps in the data. Use the advanced Akima interpolator for best results
+    data = data.interpolate(method='akima')
+    data = resample(data, resolution)
+
+    if fill_gaps:
+        data = _impute(data, gaps, **kwargs)
+    return data
+
+
 def _process_energy(energy):
     energy = energy.fillna(0)
     return energy - energy[0]
@@ -280,33 +323,49 @@ def _process_power(energy, filter=True):
 
 
 def _process_gaps(data: pd.DataFrame, **kwargs) -> pd.DataFrame:
-    # Get the frequency/length of one period of data
-    data_res = data.index[1] - data.index[0]
+    res = (data.index[1] - data.index[0]).total_seconds()/60
+    gaps = _locate_gaps(data, res)
+    data = _impute(data, gaps, **kwargs)
+
+    return data
+
+
+def _locate_gaps(data: pd.DataFrame, resolution) -> pd.DataFrame:
+    # Create DataFrame to hold info about each NaN block
+    gaps = pd.DataFrame()
 
     # Tag all occurrences of NaN in the data with True
     # (but not before first or after last actual entry)
-    data.loc[:, 'NaN'] = data.isna().any(axis=1)
+    data_nan = deepcopy(data)
+    data_nan.loc[:, 'NaN'] = data_nan.isna().any(axis=1)
 
-    # Create DataFrame to hold info about each NaN block
-    data_nan = pd.DataFrame()
-
-    # First row of consecutive region is a True preceded by a False in NaN data
-    data_nan['index_start'] = data.index[data['NaN'] & ~data['NaN'].shift(1).fillna(False)]
+    # First row of consecutive region is a True preceded by a False in NaN data_nan
+    gaps['start'] = data_nan.index[data_nan['NaN'] & ~data_nan['NaN'].shift(1).fillna(False)]
 
     # Last row of consecutive region is a False preceded by a True
-    data_nan['index_end'] = data.index[data['NaN'] & ~data['NaN'].shift(-1).fillna(False)]
+    gaps['end'] = data_nan.index[data_nan['NaN'] & ~data_nan['NaN'].shift(-1).fillna(False)]
 
-    data_nan = data_nan.sort_values('index_end').reset_index()
+    with warnings.catch_warnings():
+        warnings.simplefilter(action='ignore', category=FutureWarning)
 
-    if data['NaN'].any():
-        # How long is each region
-        data_nan['span'] = (data_nan['index_end'] - data_nan['index_start'] + data_res)
-        data_nan['count'] = (data_nan['span'] / data_res)
+        # Find measurement outages longer than the resolution
+        index_delta = pd.Series(data.index, index=data.index)
+        index_delta = (index_delta - index_delta.shift(1))/np.timedelta64(1, 'm')
+        for index in index_delta.loc[index_delta > resolution].index:
+            gaps = gaps.append({'start': data.index[data.index.get_loc(index) - 1], 'end': index}, ignore_index=True)
 
-        data.drop('NaN', axis=1, inplace=True)
-        data = _impute(data, data_nan, **kwargs)
+    gaps = gaps.sort_values('end').reset_index()
+    gaps.drop('index', axis=1, inplace=True)
+    if gaps['start'].dt.tz is None:
+        gaps['start'] = gaps['start'].dt.tz_localize(data.index.tzinfo)
+    if gaps['end'].dt.tz is None:
+        gaps['end'] = gaps['end'].dt.tz_localize(data.index.tzinfo)
 
-    return data
+    # How long is each region
+    gaps['span'] = gaps['end'] - gaps['start'] + dt.timedelta(minutes=resolution)
+    gaps['count'] = gaps['span'] / dt.timedelta(minutes=resolution)
+
+    return gaps[gaps['count'] > resolution]
 
 
 def _impute(data: pd.DataFrame,
@@ -326,12 +385,12 @@ def _impute_by_day(data: pd.DataFrame,
     # Get the frequency/length of one period of data
     data_res = data.index[1] - data.index[0]
 
-    start = data_nan['index_start']
-    end = data_nan['index_end']
+    start = data_nan['start']
+    end = data_nan['end']
     if (end - start).days > days_prior:
         end = start + dt.timedelta(days=days_prior) - data_res
 
-    while end <= data_nan['index_end']:
+    while end <= data_nan['end']:
         days_offset = days_prior
         while data.loc[start:end].isnull().values.any():
             if start - dt.timedelta(days=days_offset) < data.index[0]:
@@ -348,7 +407,7 @@ def _impute_by_day(data: pd.DataFrame,
 
                 break
 
-            elif end - dt.timedelta(days=days_offset) > data_nan['index_start']:
+            elif end - dt.timedelta(days=days_offset) > data_nan['start']:
                 days_offset += days_prior
                 continue
 
@@ -366,16 +425,31 @@ def _impute_by_day(data: pd.DataFrame,
 
             days_offset += days_prior
 
-        if end == data_nan['index_end']:
+        if end == data_nan['end']:
             break
 
         start += dt.timedelta(days=days_prior)
         end += dt.timedelta(days=days_prior)
-        if end > data_nan['index_end']:
-            end = data_nan['index_end']
+        if end > data_nan['end']:
+            end = data_nan['end']
 
-    if data.loc[data_nan['index_start']:data_nan['index_end']].isnull().values.any():
+    if data.loc[data_nan['start']:data_nan['end']].isnull().values.any():
         logger.warning("Unable to fill %i. gap from %s to %s", i + 1,
-                       data_nan['index_start'], data_nan['index_end'])
+                       data_nan['start'], data_nan['end'])
 
     return data
+
+
+def resample(data: pd.DataFrame, minutes: int) -> pd.DataFrame:
+    resampled = pd.DataFrame()
+    resampled.index.name = 'time'
+    for column, series in deepcopy(data).iteritems():
+        resampler = series.resample('{}min'.format(minutes), closed='right')
+        if column.endswith('_energy'):
+            series = resampler.last()
+        else:
+            series = resampler.mean()
+        series.index += to_offset('{}min'.format(minutes))
+
+        resampled = pd.concat([resampled, series.to_frame()], axis=1)
+    return resampled.dropna(how='all')

@@ -1,22 +1,26 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 """
-    th-e-fcst
+    th-e-data
     ~~~~~~~~~
-    
-    To learn how to configure the prediction of timeseries, see "th-e-fcst --help"
+
+    To learn how to configure the processing of timeseries, see "th-e-data --help"
 
 """
+from __future__ import annotations
+
 import os
 import shutil
+import pytz as tz
+import pandas as pd
+import datetime as dt
 
+from typing import Any, List
 from argparse import ArgumentParser, RawTextHelpFormatter
-from configparser import ConfigParser
+from th_e_core import configs, System, Database
 
 
-def main(args):
-    from th_e_core import System, configs
-
+def main(args: List[Any]) -> None:
     settings = configs.read('settings.cfg', **vars(args))
 
     kwargs = vars(args)
@@ -25,38 +29,83 @@ def main(args):
     systems = System.read(**kwargs)
     if args.action == 'build':
         systems.build(**kwargs)
+    elif args.action == 'process':
+        for system in systems:
+            process(system, **kwargs)
 
 
-def _get_parser(root_dir):
+def process(system: System,
+            data_dir: str = 'data',
+            start: str | dt.datetime = dt.datetime(1970, 1, 1, tzinfo=tz.UTC),
+            end: str | dt.datetime = None, **kwargs) -> None:
+    from th_e_core.io.csv import CsvDatabase
+    from th_e_data.process import process, resample
+
+    start = _get_date(start, system.location.pytz)
+    end = _get_date(end, system.location.pytz)
+
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+    data_file = os.path.join(data_dir, system.id)
+    data = system.database.read(start, end)
+
+    try:
+        import sqlite3 as sqlite
+        data.to_sql(system.name, sqlite.connect(data_file + '_raw.sqlite'), if_exists='replace')
+
+    except Exception as e:
+        logger.warning("unable to write data as SQLite file: " + str(e))
+
+    database = CsvDatabase(timezone=system.location.tz)
+    database.write(data, file=data_file + '_raw.csv')
+
+    resolution = int(kwargs.pop('resolution', '1'))
+    processed = process(data, resolution, **kwargs)
+    database.write(processed, file=data_file + '_{}m.csv'.format(resolution))
+    for resolution in [15, 60]:
+        resampled = resample(processed, resolution)
+        database.write(resampled, file=data_file + '_{}m.csv'.format(resolution))
+
+
+def _get_date(time: str | dt.datetime, timezone: tz.timezone) -> pd.Timestamp:
+    if isinstance(time, str):
+        return pd.Timestamp(timezone.localize(dt.datetime.strptime(time, '%d.%m.%Y')))
+    if time is not None and time.tzinfo is not None and time.tzinfo.utcoffset(time) is not None:
+        time = time.astimezone(timezone)
+    return time
+
+
+def _get_parser(root_dir: str) -> ArgumentParser:
     from th_e_core import __version__
-    
+
     parser = ArgumentParser(description=__doc__, formatter_class=RawTextHelpFormatter)
     parser.add_argument('-v', '--version',
                         action='version',
                         version='%(prog)s {version}'.format(version=__version__))
-    
+
     subparsers = parser.add_subparsers(dest='action')
     subparsers.required = True
     subparsers.add_parser('build', help='Build data for the configured set of systems')
-    
+    subparsers.add_parser('process', help='Processes data for the configured set of systems')
+
     parser.add_argument('-r', '--root-directory',
                         dest='root_dir',
                         help="directory where the package and related libraries are located",
                         default=root_dir,
                         metavar='DIR')
-    
+
     parser.add_argument('-c', '--config-directory',
                         dest='config_dir',
                         help="directory to expect configuration files",
                         default='conf',
                         metavar='DIR')
-    
+
     parser.add_argument('-d', '--data-directory',
                         dest='data_dir',
                         help="directory to expect and write result files to",
                         default='data',
                         metavar='DIR')
-    
+
     return parser
 
 
@@ -84,6 +133,7 @@ if __name__ == "__main__":
     # Load the logging configuration
     import logging
     import logging.config
+
     logging.config.fileConfig(logging_file)
     logger = logging.getLogger('th-e-data')
 
