@@ -10,7 +10,8 @@ from th_e_core._version import __version__  # noqa: F401
 from th_e_core import io  # noqa: F401
 from th_e_core.io import (  # noqa: F401
     Database,
-    DatabaseException
+    DatabaseException,
+    DatabaseUnavailableException
 )
 
 from th_e_core import configs  # noqa: F401

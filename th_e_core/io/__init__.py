@@ -6,4 +6,4 @@
     
 """
 from th_e_core.io import db  # noqa: F401
-from th_e_core.io.db import Database, DatabaseException  # noqa: F401
+from th_e_core.io.db import Database, DatabaseException, DatabaseUnavailableException  # noqa: F401

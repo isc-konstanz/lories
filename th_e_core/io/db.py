@@ -121,3 +121,11 @@ class DatabaseException(Exception):
 
     """
     pass
+
+
+class DatabaseUnavailableException(DatabaseException):
+    """
+    Raise if a configured database can not be found.
+
+    """
+    pass
