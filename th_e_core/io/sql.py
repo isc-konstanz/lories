@@ -54,6 +54,8 @@ class SqlDatabase(Database):
 
         try:
             data = pd.concat(results, axis=1)
+            data.index.name = 'time'
+
         except TypeError as e:
             print(e)
 
@@ -67,7 +69,7 @@ class SqlDatabase(Database):
                 column: str,
                 table: str,
                 start: pd.Timestamp | dt.datetime,
-                end:   pd.Timestamp | dt.datetime) -> pd.DataFrame:
+                end:   pd.Timestamp | dt.datetime = None) -> pd.DataFrame:
 
         epoch = dt.datetime(1970, 1, 1, tzinfo=tz.UTC)
 

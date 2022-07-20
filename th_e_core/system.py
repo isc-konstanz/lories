@@ -15,7 +15,7 @@ import logging
 import pandas as pd
 
 from configparser import ConfigParser as Configurations
-from th_e_core import Configurable, Database
+from th_e_core import Configurable, Database, DatabaseUnavailableException
 
 logger = logging.getLogger(__name__)
 
@@ -168,8 +168,8 @@ class System(Configurable, MutableMapping):
                     )
                 configs.set('Database', 'dir', database_dir)
 
-                if not configs.has_option('Database', 'timezone'):
-                    configs.set('Database', 'timezone', self.location.tz)
+            if not configs.has_option('Database', 'timezone'):
+                configs.set('Database', 'timezone', self.location.tz)
 
             self._database = Database.open(configs)
         else:
@@ -249,6 +249,13 @@ class System(Configurable, MutableMapping):
     @property
     def name(self):
         return self._name
+
+    @property
+    def database(self):
+        if self._database is None:
+            raise DatabaseUnavailableException("System '{}' has no database configured".format(self.name))
+
+        return self._database
 
     def __getattr__(self, attr):
         if attr in self._component_types:
