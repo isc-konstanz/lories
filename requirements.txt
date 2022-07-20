@@ -1,0 +1,9 @@
+python-dateutil==2.8.*
+pytz==2021.*
+scipy==1.7.*
+pandas==1.4.*
+numpy==1.22.*
+openpyxl==3.0.9
+setuptools==61.*
+matplotlib==3.5.*
+seaborn==0.11.*
