@@ -40,12 +40,12 @@ SYSTEM = {
 }
 
 _COMPONENTS_POWER = {
-    ElectricalEnergyStorage.POWER_CHARGE: 'EES charging power [W]'
+    ElectricalEnergyStorage.POWER_CHARGE: 'EES Charging Power [W]'
 }
 
 _COMPONENTS_ENERGY = {
-    ElectricalEnergyStorage.ENERGY_CHARGE:    'EES charged energy [kWh]',
-    ElectricalEnergyStorage.ENERGY_DISCHARGE: 'EES discharged energy [kWh]'
+    ElectricalEnergyStorage.ENERGY_CHARGE:    'EES Charged Energy [kWh]',
+    ElectricalEnergyStorage.ENERGY_DISCHARGE: 'EES Discharged Energy [kWh]'
 }
 
 _PV_POWER = {
@@ -65,7 +65,7 @@ PV = {
 
 STATES = {
     ElectricalEnergyStorage.STATE_OF_CHARGE: 'EES State of Charge [%]',
-    ThermalEnergyStorage.TEMPERATURE:        'TES temperature [°C]'
+    ThermalEnergyStorage.TEMPERATURE:        'TES Temperature [°C]'
 }
 
 WEATHER = {
@@ -88,21 +88,80 @@ WEATHER = {
     'snow_fraction':             'Snow Fraction [1/0]'
 }
 
+_AC_POWER = {
+    'active_power':    'Total Active Power [W]',
+    'l1_active_power': 'Phase 1 Active Power [W]',
+    'l2_active_power': 'Phase 2 Active Power [W]',
+    'l3_active_power': 'Phase 3 Active Power [W]',
+    'reactive_power':    'Total Reactive Power [W]',
+    'l1_reactive_power': 'Phase 1 Reactive Power [W]',
+    'l2_reactive_power': 'Phase 2 Reactive Power [W]',
+    'l3_reactive_power': 'Phase 3 Reactive Power [W]',
+    'apparent_power':    'Total Apparent Power [W]',
+    'l1_apparent_power': 'Phase 1 Apparent Power [W]',
+    'l2_apparent_power': 'Phase 2 Apparent Power [W]',
+    'l3_apparent_power': 'Phase 3 Apparent Power [W]',
+    'import_power':    'Total Imported Power [W]',
+    'l1_import_power': 'Phase 1 Imported Power [W]',
+    'l2_import_power': 'Phase 2 Imported Power [W]',
+    'l3_import_power': 'Phase 3 Imported Power [W]',
+    'export_power': 'Total Exported Power [W]',
+    'l1_export_power': 'Phase 1 Exported Power [W]',
+    'l2_export_power': 'Phase 2 Exported Power [W]',
+    'l3_export_power': 'Phase 3 Exported Power [W]'
+}
+
+_AC_ENERGY = {
+    'active_energy':    'Total Active Power [kWh]',
+    'l1_active_energy': 'Phase 1 Active Power [kWh]',
+    'l2_active_energy': 'Phase 2 Active Power [kWh]',
+    'l3_active_energy': 'Phase 3 Active Power [kWh]',
+    'reactive_energy':    'Total Reactive Power [kWh]',
+    'l1_reactive_energy': 'Phase 1 Reactive Power [kWh]',
+    'l2_reactive_energy': 'Phase 2 Reactive Power [kWh]',
+    'l3_reactive_energy': 'Phase 3 Reactive Power [kWh]',
+    'apparent_energy':    'Total Apparent Power [kWh]',
+    'l1_apparent_energy': 'Phase 1 Apparent Power [kWh]',
+    'l2_apparent_energy': 'Phase 2 Apparent Power [kWh]',
+    'l3_apparent_energy': 'Phase 3 Apparent Power [kWh]',
+    'import_energy':    'Total Imported Power [kWh]',
+    'l1_import_energy': 'Phase 1 Imported Power [kWh]',
+    'l2_import_energy': 'Phase 2 Imported Power [kWh]',
+    'l3_import_energy': 'Phase 3 Imported Power [kWh]',
+    'export_energy': 'Total Exported Power [kWh]',
+    'l1_export_energy': 'Phase 1 Exported Power [kWh]',
+    'l2_export_energy': 'Phase 2 Exported Power [kWh]',
+    'l3_export_energy': 'Phase 3 Exported Power [kWh]'
+}
+
+AC = {
+    'l1_voltage': 'Phase 1 Voltage [V]',
+    'l2_voltage': 'Phase 2 Voltage [V]',
+    'l3_voltage': 'Phase 3 Voltage [V]',
+    'l1_current': 'Phase 1 Current [A]',
+    'l2_current': 'Phase 2 Current [A]',
+    'l3_current': 'Phase 3 Current [A]',
+    'frequency':  'Frequency [Hz]'
+}
+
 POWER = {
     **_COMPONENTS_POWER,
     **_SYSTEM_POWER,
-    **_PV_POWER
+    **_PV_POWER,
+    **_AC_POWER
 }
 
 ENERGY = {
     **_COMPONENTS_ENERGY,
     **_SYSTEM_ENERGY,
-    **_PV_ENERGY
+    **_PV_ENERGY,
+    **_AC_ENERGY
 }
 
 COLUMNS = {
     **STATES,
     **POWER,
     **ENERGY,
+    **AC,
     **WEATHER
 }
