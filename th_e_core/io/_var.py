@@ -68,26 +68,6 @@ STATES = {
     ThermalEnergyStorage.TEMPERATURE:        'TES Temperature [°C]'
 }
 
-WEATHER = {
-    'ghi':                       'Global Horizontal Irradiance [W/m2]',
-    'dni':                       'Direct Normal Irradiance [W/m2]',
-    'dhi':                       'Diffuse Horizontal Irradiance [W/m2]',
-    'temp_air':                  'Air Temperature [°C]',
-    'humidity_rel':              'Relative Humidity [%]',
-    'pressure_sea':              'Atmospheric Pressure [hPa]',
-    'wind_speed':                'Wind Speed [km/h]',
-    'wind_gust':                 'Wind Gust [km/h]',
-    'wind_direction':            'Wind Direction [°]',
-    'total_clouds':              'Total Cloud Cover [%]',
-    'low_clouds':                'Low Cloud Cover [%]',
-    'mid_clouds':                'Medium Cloud Cover [%]',
-    'high_clouds':               'High Cloud Cover [%]',
-    'precipitation':             'Precipitation [mm]',
-    'precipitation_convective':  'Precipitation Convective [mm]',
-    'precipitation_probability': 'Precipitation Probability [%]',
-    'snow_fraction':             'Snow Fraction [1/0]'
-}
-
 _AC_POWER = {
     'active_power':    'Total Active Power [W]',
     'l1_active_power': 'Phase 1 Active Power [W]',
@@ -144,6 +124,40 @@ AC = {
     'frequency':  'Frequency [Hz]'
 }
 
+WEATHER = {
+    'ghi':                       'Global Horizontal Irradiance [W/m2]',
+    'dni':                       'Direct Normal Irradiance [W/m2]',
+    'dhi':                       'Diffuse Horizontal Irradiance [W/m2]',
+    'temp_air':                  'Air Temperature [°C]',
+    'humidity_rel':              'Relative Humidity [%]',
+    'pressure_sea':              'Atmospheric Pressure [hPa]',
+    'wind_speed':                'Wind Speed [km/h]',
+    'wind_gust':                 'Wind Gust [km/h]',
+    'wind_direction':            'Wind Direction [°]',
+    'total_clouds':              'Total Cloud Cover [%]',
+    'low_clouds':                'Low Cloud Cover [%]',
+    'mid_clouds':                'Medium Cloud Cover [%]',
+    'high_clouds':               'High Cloud Cover [%]',
+    'precipitation':             'Precipitation [mm]',
+    'precipitation_convective':  'Precipitation Convective [mm]',
+    'precipitation_probability': 'Precipitation Probability [%]',
+    'snow_fraction':             'Snow Fraction [1/0]'
+}
+
+SOLAR = {
+    'solar_elevation': 'Solar Elevation [°]',
+    'solar_zenith': 'Solar Zenith [°]',
+    'solar_azimuth': 'Solar Azimuth [°]'
+}
+
+TIME = {
+    'hour': 'Hour',
+    'day_of_week': 'Day of the Week',
+    'day_of_year': 'Day of the Year',
+    'month': 'Month',
+    'year': 'Year'
+}
+
 POWER = {
     **_COMPONENTS_POWER,
     **_SYSTEM_POWER,
@@ -163,5 +177,13 @@ COLUMNS = {
     **POWER,
     **ENERGY,
     **AC,
-    **WEATHER
+    **WEATHER,
+    **SOLAR,
+    **TIME
 }
+
+
+def rename(name: str) -> str:
+    if name in COLUMNS:
+        return COLUMNS[name]
+    return name.title()

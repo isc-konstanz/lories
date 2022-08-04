@@ -6,30 +6,40 @@
 
 """
 from __future__ import annotations
-from collections.abc import Mapping, MutableMapping
-from typing import List, Iterator
+from collections.abc import Sequence, Mapping, MutableMapping
+from typing import Tuple, List, Dict, Iterator
 
 import os
 import re
 import json
 import shutil
 import logging
+import numpy as np
 import pandas as pd
 import datetime as dt
 
 import th_e_data.io as io
+# noinspection PyProtectedMember
+from th_e_core.io._var import rename
 from th_e_core import configs, System, ConfigurationUnavailableException
+from configparser import ConfigParser as Configurations
+from math import floor, ceil
 from copy import deepcopy
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('th-e-evaluation')
+
+TARGETS = {
+    'pv': 'Photovoltaics',
+    'el': 'Electrical',
+    'th': 'Thermal'
+}
 
 
-class Evaluations(Mapping):
+class Evaluations(Sequence):
 
-    def __init__(self, *evaluations) -> None:
-        self._evaluations = dict()
-        for evaluation in evaluations:
-            self._evaluations[evaluation.id] = evaluation
+    def __init__(self, evaluations: List[Evaluation], dir: str = 'data') -> None:
+        self._evaluations = evaluations
+        self._evaluation_dir = dir
 
     def __iter__(self) -> Iterator[Evaluation]:
         return iter(self._evaluations)
@@ -37,76 +47,105 @@ class Evaluations(Mapping):
     def __len__(self) -> int:
         return len(self._evaluations)
 
-    def __getitem__(self, key: str) -> Evaluation:
-        return self._evaluations[key]
+    def __getitem__(self, index: int) -> Evaluation:
+        return self._evaluations[index]
+
+    def _get_valid(self, results: Results) -> List[Evaluation]:
+        return [e for e in self._evaluations if e.is_valid(results)]
 
     def run(self, results: List[Results]) -> None:
+        # Prepare the DataFrames, to ensure corrent
+        index = []
+        duration_columns = []
+        evaluation_columns = []
+        evaluations = {}
         for result in results:
-            for evaluation in self._evaluations.values():
-                evaluation.run(result)
+            if result.name not in index:
+                index.append(result.name)
+            for duration in result.durations:
+                duration_column = ('Durations [min]', str(duration))
+                if duration_column not in duration_columns:
+                    duration_columns.append(duration_column)
+            for evaluation in self._get_valid(result):
+                evaluation_columns.append((evaluation.header, evaluation.name))
+                evaluations[evaluation.name] = pd.DataFrame()
+        columns = duration_columns + [('Total', 'Weighted')]
+        for column in list(dict.fromkeys([c for c, _ in evaluation_columns])):
+            columns += [c for c in evaluation_columns if c[0] == column]
+        summary = pd.DataFrame(index=index, columns=pd.MultiIndex.from_tuples(columns))
+
+        for result in results:
+            for duration in result.durations.keys():
+                summary.loc[result.name, ('Durations [min]', duration)] = round(result.durations[duration], 2)
+
+            kpi_total_weights = 0
+            kpi_total_sum = 0
+            for evaluation in self._get_valid(result):
+                kpi, kpi_data = evaluation.run(result)
+                kpi_data = kpi_data.to_frame()
+                kpi_data.columns = [evaluation.header]
+                kpi_data.index.name = rename(evaluation.group)
+                evaluations[evaluation.name] = pd.concat([evaluations[evaluation.name], kpi_data], axis=1)
+                if kpi:
+                    summary.loc[result.name, (evaluation.header, evaluation.name)] = kpi
+
+                # TODO: Add meaningful debugging
+                kpi_total_weights += evaluation.weight
+                kpi_total_sum += kpi*evaluation.weight
+            kpi_total = kpi_total_sum/kpi_total_weights
+
+            summary.loc[result.name, ('Total', 'Weighted')] = kpi_total
+
+        io.write_excel(summary, evaluations, self._evaluation_dir)
 
 
 class Evaluation:
 
     @classmethod
-    def read(cls, **kwargs) -> Evaluations:
+    def read(cls, config_dir:  str = 'conf', data_dir:  str = 'conf', **kwargs) -> Evaluations:
         evaluations = []
-        evaluation_configs = configs.read('evaluation.cfg', **kwargs)
-        if not os.path.isfile(evaluation_configs):
-            config_default = evaluation_configs.replace('.cfg', '.default.cfg')
+        evaluation_file = os.path.join(config_dir, 'evaluations.cfg')
+        if not os.path.isfile(evaluation_file):
+            config_default = evaluation_file.replace('.cfg', '.default.cfg')
             if os.path.isfile(config_default):
-                shutil.copy(config_default, evaluation_configs)
+                shutil.copy(config_default, evaluation_file)
             else:
-                raise ConfigurationUnavailableException('Unable to find configuration file "{}"'
-                                                        .format(evaluation_configs))
+                raise ConfigurationUnavailableException('Unable to find evaluation file "{}"'.format(evaluation_file))
 
-        for evaluation in evaluation_configs.sections():
-            evaluations.append(cls(evaluation, **dict(evaluation_configs[evaluation].items())))
+        evaluation_configs = configs.read(evaluation_file, config_dir, data_dir, **kwargs)
+        for evaluation in [s for s in evaluation_configs.sections() if s.lower() != 'general']:
+            evaluation_args = dict(evaluation_configs[evaluation].items())
+            evaluations += cls._init(evaluation, **evaluation_args)
 
-        return Evaluations(evaluations)
+        return Evaluations(evaluations, data_dir)
+
+    @classmethod
+    def _init(cls, name: str, target: str, group: str, **kwargs) -> List[Evaluation]:
+        evaluations = []
+        for evaluation_target in target.split(','):
+            evaluations.append(cls(name, evaluation_target.strip(), group, **kwargs))
+        return evaluations
 
     def __init__(self,
-                 name,
-                 column,
-                 metrics,
-                 groups,
-                 group_bins=None,
-                 conditions=None,
-                 summaries=None,
-                 boxplots=None, **_) -> None:
+                 name: str,
+                 target: str,
+                 group: str,
+                 group_bins: int = None,
+                 condition: str = None,
+                 summary: str = 'mbe',
+                 metric: str = 'mbe',
+                 weight: float = 1,
+                 plot: str = None, **_) -> None:
 
-        # Run invariant, necessary
         self.name = name
-        self.columns = column
-        self.metrics = metrics
-        self.groups = groups
-
-        # Run invariant, optional
+        self.target = target
+        self.group = group
         self.group_bins = group_bins
-        self.conditions = conditions
-        self.summaries = summaries
-
-        self.boxplots = boxplots
-
-        # Outputs, cumulative: Multiple runs will concatenate
-        # their outputs to these attributes
-        self.evaluation = pd.DataFrame()
-        self.kpi = pd.DataFrame()
-        self.n = pd.DataFrame()  # Count the points in each group, as defined in groups
-
-        # Run specific variables
-        self._data = None
-        self.data = None
-        self.system = None  # To assess current state of run specific variable
-
-        _cols = list()
-        if conditions:
-            for condition in self.conditions:
-                _cols.append(condition[0])
-
-        _err_cols = [t + '_err' for t in self.columns]
-        _cols = _cols + _err_cols + self.groups
-        self._cols = set(_cols)
+        self.condition = condition
+        self.weight = float(weight)
+        self.summary = summary
+        self.metric = metric
+        self.plot = plot
 
     @property
     def id(self):
@@ -117,442 +156,300 @@ class Evaluation:
         return self._name
 
     @name.setter
-    def name(self, name):
+    def name(self, name: str):
         self._name = name
-        self._id = name.lower()
+        self._id = re.sub('[^a-zA-Z0-9-_ ]+', '', name).replace(' ', '_').lower()
 
     @property
     def columns(self):
-        return self._columns
-
-    @columns.setter
-    def columns(self, columns):
-        self._columns = list()
-
-        for column in columns.split(', '):
-            # Ensure proper formatting of column string (no special signs)
-            if re.match('[^a-zA-Z0-9-_ ]+', column):
-                raise ValueError('An improper column name was passed for the evaluation {}'.format(column))
-
-            self._columns.append(column.trim())
+        return [self._target,
+                self._target+'_est',
+                self._target+'_err',
+                self.group]
 
     @property
-    def metrics(self):
-        return self._metrics
-
-    @metrics.setter
-    def metrics(self, value):
-
-        values = value.split(', ')
-        new_values = list()
-
-        while values:
-
-            t = values.pop().lower()
-
-            # ToDo: Ensure that name is still a valid variable in the future
-            if re.match('[^a-zA-Z0-9-_]+', t):
-                raise ValueError('An improper metric name was passed for the evaluation {}'.format(self.name))
-
-            new_values.append(t)
-
-        self._metrics = new_values
+    def header(self) -> str:
+        target = self._target.lower().replace('_power', '')
+        if target in TARGETS:
+            return TARGETS[target]
+        return target.title()
 
     @property
-    def groups(self):
-        return self._groups
+    def target(self):
+        return self._target+'_err'
 
-    @groups.setter
-    def groups(self, value):
+    @target.setter
+    def target(self, target: str) -> None:
+        # Ensure proper formatting of string (no special signs)
+        if re.match('[^a-zA-Z0-9-_ ]+', target):
+            raise ValueError('An improper target name was passed for evaluation {}'.format(t))
 
-        values = value.split(', ')
-        new_values = list()
-
-        while values:
-
-            t = values.pop().lower()
-
-            # Ensure proper formatting of target string (no special signs or spaces)
-            # ToDo: Ensure that name is still a valid variable in the future
-            if re.match('[^a-zA-Z0-9-_]+', t):
-                raise ValueError('An improper target name was passed for the evaluation {}'.format(self.name))
-
-            new_values.append(t)
-
-        self._groups = new_values
+        self._target = target.strip()
 
     @property
-    def group_bins(self):
+    def group(self) -> str:
+        group = self._group
+        if group == 'histogram':
+            group = self.target
+        return group
+
+    @group.setter
+    def group(self, group: str):
+        # Ensure proper formatting of string (no special signs)
+        if re.match('[^a-zA-Z0-9-_ ]+', group):
+            raise ValueError('An improper group name was passed for evaluation {}'.format(group))
+
+        self._group = group.strip()
+
+    @property
+    def group_bins(self) -> int:
         return self._group_bins
 
     @group_bins.setter
-    def group_bins(self, value):
-
-        if not value:
-            self._group_bins = None
-
-        else:
-            values = value.split(', ')
-            new_values = list()
-
-            while values:
-
-                t = values.pop().lower()
-                t = int(t)
-                new_values.append(t)
-
-            self._group_bins = new_values
+    def group_bins(self, bins: int | str):
+        if not bins:
+            bins = None
+        elif not isinstance(bins, int):
+            bins = int(bins)
+        self._group_bins = bins
 
     @property
-    def boxplots(self):
-        return self._boxplots
+    def condition(self):
+        return self._condition
 
-    @boxplots.setter
-    def boxplots(self, value):
+    @condition.setter
+    def condition(self, condition: str) -> None:
+        self._condition = list()
+        if not condition:
+            return
+        for c in condition.split(','):
+            # Ensure proper formatting of string (no special signs or spaces)
+            # TODO: Ensure that name is still a valid variable in the future
+            if re.match('[^a-zA-Z0-9-_><=., ]+', c) or len(re.split('!=|==|>=|<=|<|>', c)) > 2:
+                raise ValueError('The condition {} in the evaluation {} contains unsupported characters or operations'
+                                 .format(c, self.name))
 
-        if not value:
-            self._boxplots = None
+            self._condition.append(c.strip())
 
-        else:
+    @property
+    def summary(self):
+        return self._summary
 
-            values = value.split(', ')
-            new_values = list()
+    @summary.setter
+    def summary(self, summary) -> None:
+        self._summary = list()
+        # Ensure proper formatting of string (no special signs)
+        if re.match('[^a-zA-Z0-9-_ ]+', summary):
+            raise ValueError('An improper summary name was passed for evaluation {}'.format(summary))
 
-            while values:
+        whitelist = ['mbe',
+                     'mae',
+                     'rmse',
+                     'weight_by_group',
+                     'weight_by_bins',
+                     'fullest_bin']
 
-                t = values.pop().lower()
-                truth = ['1', 'true', 'yes']
+        summary = summary.lower().strip()
+        if summary not in whitelist:
+            raise ValueError('Summary type {} not of available options: {}'.format(summary, whitelist))
 
-                if t in truth:
-                    new_values.append(True)
+        self._summary = summary
+
+    @property
+    def metric(self):
+        return self._metric
+
+    @metric.setter
+    def metric(self, metric: str) -> None:
+        # Ensure proper formatting of string (no special signs)
+        if re.match('[^a-zA-Z0-9-_ ]+', metric):
+            raise ValueError('An improper metric name was passed for evaluation {}'.format(metric))
+
+        whitelist = ['mbe',
+                     'mae',
+                     'rmse']
+
+        metric = metric.lower().strip()
+        if metric not in whitelist:
+            raise ValueError('Metric type {} not of available options: {}'.format(metric, whitelist))
+
+        # TODO: verify allowed metrics
+        self._metric = metric
+
+    @property
+    def plot(self):
+        return self._plots
+
+    @plot.setter
+    def plot(self, plots: str) -> None:
+        self._plots = list()
+        if not plots:
+            return
+        for p in plots.split(','):
+            # Ensure proper formatting of string (no special signs)
+            if re.match('[^a-zA-Z0-9-_ ]+', p):
+                raise ValueError('An improper plot name was passed for evaluation {}'.format(p))
+
+            whitelist = ['line', 'bar']
+            p = p.lower().strip()
+            if p not in whitelist:
+                raise ValueError('Plot type {} not of available options: {}'.format(p, whitelist))
+
+            self._plots.append(p)
+
+    def _plot(self, results: Results, data: pd.DataFrame, evaluation: pd.DataFrame) -> None:
+        if len(self.plot) < 1:
+            return
+
+        plot_name = '{0}_{1}'.format(self._target.replace('_power', '').lower(), self.id)
+        plot_dir = os.path.join(results.system.configs['General']['data_dir'], 'results', 'plots')
+        if not os.path.isdir(plot_dir):
+            os.makedirs(plot_dir, exist_ok=True)
+
+        for plot in self.plot:
+            plot_title = '{0} {1}'.format(self.header, self.name)
+            plot_file = os.path.join(plot_dir, '{0}_{1}.png'.format(plot_name, plot))
+            plot_args = {'xlabel': rename(self.group), 'title': plot_title}
+            if plot == 'line':
+                plot_args['hue'] = 'Results'
+                plot_args['style'] = 'Results'
+                plot_args['ylabel'] = 'Power [W]'
+                plot_data = data.rename(columns={
+                    self._target+'_est': 'Prediction',
+                    self._target:        'Measurement'
+                })
+                plot_data = plot_data[[self.group, 'Prediction', 'Measurement']]
+                plot_melt = pd.melt(plot_data, self.group, value_name='values', var_name='Results')
+                io.print_lineplot(plot_melt, self.group, 'values', plot_file, **plot_args)
+            elif plot == 'bar':
+                if self.group_bins and self.group_bins > 1:
+                    if self._group == 'histogram':
+                        plot_args['ylabel'] = 'Occurrences'
+                        plot_args['xlabel'] = 'Error [W]'
+                    plot_data = evaluation.to_frame()
+                    plot_index = evaluation.index.values.round(2)
+                    io.print_barplot(plot_data, plot_index, self.target, plot_file, **plot_args)
                 else:
-                    new_values.append(False)
+                    plot_args['showfliers'] = False
+                    plot_data = data[[self.group, self.target]]
+                    io.print_boxplot(plot_data, self.group, self.target, plot_file, **plot_args)
 
-            self._boxplots = new_values
+    def _select(self, results: Results) -> pd.DataFrame:
+        data = deepcopy(results.data)
+        for condition in self.condition:
+            if 'hour' in self.group:
+                data['hour'] = data.index.hour
+            elif 'day_of_week' in self.group:
+                data['day_of_week'] = data.index.day_of_week
+            elif 'day_of_year' in self.group:
+                data['day_of_year'] = data.index.day_of_year
+            elif 'month' in self.group:
+                data['month'] = data.index.month
 
-    @property
-    def conditions(self):
-        return self._conditions
+            data.query(condition, inplace=True)
+        return data[self.columns]
 
-    @conditions.setter
-    def conditions(self, value):
-
-        if not value:
-            self.conditions = None
-
+    def _process(self, data: pd.DataFrame) -> pd.Series:
+        data = deepcopy(data)
+        if self.group_bins and self.group_bins > 1:
+            data = self._process_bins(data)
         else:
-            values = value.split(', ')
-            new_values = list()
+            data = getattr(self, '_process_{method}'.format(method=self.metric))(data)
 
-            while values:
+        data.index.name = self.group
+        data.name = self.target
+        return data
 
-                t = values.pop().lower()
+    # noinspection SpellCheckingInspection
+    def _process_bins(self, data: pd.DataFrame) -> pd.Series:
+        if not self.group_bins or self.group_bins <= 1:
+            raise ValueError("Unable to process bins for invalid value: " + str(bins))
 
-                # Ensure proper formatting of target string (no special signs or spaces)
-                # ToDo: Ensure that name is still a valid variable in the future
-                if re.match('[^a-zA-Z0-9-_><=.,]+', t):
-                    raise ValueError('The condition {} in the evaluation {} contains unsupported characters'.format(t, self.name))
-
-                t = t.split(' ')
-                t[2] = int(t[2])
-                new_values.append(t)
-
-            self._conditions = new_values
-
-    @property
-    def summaries(self):
-        return self._summaries
-
-    @summaries.setter
-    def summaries(self, value):
-
-        if not value:
-            self._summaries = None
-
+        if self.target == self.group:
+            bin_data, bin_edges = np.histogram(data[self.target], bins=self.group_bins)
+            bin_vals = 0.5*(bin_edges[1:]+bin_edges[:-1])
         else:
-            valid_sum = ['horizon_weighted', 'mean', 'high_load_bias',
-                         'err_per_load', 'optimist', 'fullest_bin']
-
-            values = value.split(', ')
-            new_values = list()
-
-            while values:
-
-                t = values.pop().lower()
-
-                if t not in valid_sum:
-                    raise ValueError('The summary {} passed for the evaluation {} is not valid. Please ensure'
-                                     ' that all chosen summaries are present in the following list:'
-                                     ' {}'.format(t, self.name, valid_sum))
-
-                new_values.append(t)
-
-            self._summaries = new_values
-
-    def _extract_labels(self):
-
-        def _gitterize(data: pd.Series, steps):
-            from math import floor, ceil
-
-            total_steps = steps
-            f_max = ceil(data.max())
-            f_min = floor(data.min())
-            big_delta = f_max - f_min
-
-            # Round step_size down
-            small_delta = floor(big_delta / total_steps * 10) / 10
-
-            if small_delta == 0:
-                raise ValueError("The axis {} cannot be analyzed with the regular grid spacing of {} between"
-                                 "grid points. Please choose a smaller number of steps".format(data.name, small_delta))
-
-            to_edge = big_delta - small_delta * total_steps
-            extra_steps = ceil(to_edge / small_delta)
-            total_steps = total_steps + extra_steps
-
-            discrete_axis = [round(f_min + small_delta * x, 2) for x in range(total_steps + 1)]
-
-            return discrete_axis, small_delta
-
-        # Update self.groups to appropriate bin identifier
-        if len(self.systems) == 0:
-            bin_groups = self.groups[:len(self.group_bins)]
-            self.groups[:len(self.group_bins)] = [group + '_bins' for group in bin_groups]
-
-        d_axis = zip(self.groups[:len(self.group_bins)], self.group_bins)
-        gitterized = list()
-
-        for bin_feature, steps in d_axis:
-
-            feature = '_'.join(bin_feature.split('_')[:-1])
-            self.data[bin_feature] = self.data[feature]
-            discrete_feature, step_size = _gitterize(self.data[feature], int(steps))
-            gitterized.append(bin_feature)
-
-            for i in discrete_feature:
-                i_loc = self.data[bin_feature] - i
-                i_loc = (i_loc >= 0) & (i_loc < step_size)
-                self.data.loc[i_loc, bin_feature] = i
-
-            # drop unbinned data
-            self.data = self.data.drop(feature, 1)
-
-    def _select_data(self):
-
-        def select_rows(data, feature, operator, value, *args):
-
-            series = data[feature]
-
-            if operator.lower() in ['lt', '<']:
-                rows = (series < value)
-
-            elif operator.lower() in ['gt', '>']:
-                rows = (series > value)
-
-            elif operator.lower() in ['leq', '<=']:
-                rows = (series <= value)
-
-            elif operator.lower() in ['geq', '>=']:
-                rows = (series >= value)
-
-            elif operator.lower() in ['eq', '=', '==']:
-                rows = (series == value)
-
-            else:
-                raise ValueError('An improper condition is present in the dict defining the kpi.')
-
-            return rows
-
-        _ps = pd.Series([True] * len(self.data), index=self.data.index)
-
-        for c in self.conditions:
-
-            if not c:
-                continue
-
-            rows = select_rows(self.data, *c)
-            _ps = _ps & rows
-
-            if not c[0] in self.groups:
-                self.data = self.data.drop(c[0], 1)
-
-        self.data = self.data.iloc[_ps.values]
-
-    def prepare_data(self, data):
-
-        self._data = data
-
-        self.data = self._data[self._cols]
-
-        if self.conditions:
-            self._select_data()
-
-        if self.group_bins:
-            self._extract_labels()
-
-    def perform_metric(self, data, target, metric):
-
-        err_col = target + '_err'
-        _metrics = []
-
-        if 'mae' == metric:
-
-            data[err_col] = data[err_col].abs()
-            mae = data.groupby(self.groups).mean()
-            ae_std = data.groupby(self.groups).std()
-            _metrics.append(mae)
-            _metrics.append(ae_std)
-
-        elif 'mse' == metric:
-
-            data[err_col] = (data[err_col] ** 2)
-            mse = data.groupby(self.groups).mean()
-            se_std = data.groupby(self.groups).std()
-            _metrics.append(mse)
-            _metrics.append(se_std)
-
-        elif 'rmse' == metric:
-
-            data[err_col] = (data[err_col] ** 2)
-            rmse = data.groupby(self.groups).mean() ** 0.5
-            rse_std = data.groupby(self.groups).std() ** 0.5
-            _metrics.append(rmse)
-            _metrics.append(rse_std)
-
-        elif 'mbe' == metric:
-
-            mbe = data.groupby(self.groups).mean()
-            be_std = data.groupby(self.groups).std()
-            _metrics.append(mbe)
-            _metrics.append(be_std)
-
-        else:
-            raise ValueError("The chosen metric {} has not yet been implemented".format(metric))
-
-        # concatenate results
-        metric_data = pd.concat(_metrics, axis=1)
-        metric_data.columns = [metric, metric + '_std']
-
-        return metric_data
-
-    def summarize(self, data: pd.Series, summary):
-
-        options = ['horizon_weighted', 'mean', 'high_load_bias',
-                   'err_per_load', 'optimist', 'fullest_bin']
-
-        w = pd.Series([4 / 7, 2 / 7, 1 / 7], name='weights')
-
-        if summary == 'mean':
-
-            kpi = data.mean()
-            name = data.name + '_' + summary
-            kpi = pd.Series([kpi], index=[0], name=name)
-
-        elif summary == 'horizon_weighted':
-
-            # ToDo: This can be implemented for MultiIndexed series by 'integrating' over other levels
-            if 'horizon' not in data.index.names or isinstance(data.index, pd.MultiIndex):
-                raise ValueError("This summary is not compatible with your "
-                                 "chosen group index {}".format(self.groups))
-            ri = [9, 12, 16]
-
-            w.index = ri
-            kpi = (data.loc[ri]).dot(w)
-
-            name = data.name + '_' + summary
-            kpi = pd.Series([kpi], index=[0], name=name)
-
-        elif summary == 'high_load_bias':
-
-            # This calculation only works as long as the following assumption
-            # is true: The error scales with target load
-            qs = data.quantile([0.75, 0.5, 0.25])
-            qs.index = w.index
-            kpi = qs.dot(w)
-
-            name = data.name + '_' + summary
-            kpi = pd.Series([kpi], index=[0], name=name)
-
-        elif summary == 'err_per_load':
-
-            watt_series = pd.Series(data.index, index=data.index)
-            watt_series = watt_series.iloc[(watt_series != 0).values]
-            err_watt = data.loc[watt_series.index].div(watt_series)
-            kpi = err_watt.mean()
-
-            name = data.name + '_' + summary
-            kpi = pd.Series([kpi], index=[0], name=name)
-
-        elif summary == 'optimist':
-
-            kpi = data.min()
-
-            name = data.name + '_' + summary
-            kpi = pd.Series([kpi], index=[0], name=name)
-
-        elif summary == 'fullest_bin':
-
-            if isinstance(data.index, pd.MultiIndex) or data.name != 'count':
-                raise AttributeError("This summary has not yet been implemented for multiindexed bins.")
-
-            if data.name != 'count':
-                raise ValueError("This summary is only appropriate for count data.")
-
-            kpi = data.idxmax()
-
-            name = summary
-            kpi = pd.Series([kpi], index=[0], name=name)
-
-        else:
-            raise ValueError('The current option is not yet available for metric summarization '
-                             'please choose one of the following options: {}'.format(options))
-
-        return kpi
-
-    def run(self, eval_id: str, data: pd.DataFrame):
-        from copy import deepcopy
-
-        self.system = eval_id
-        self.prepare_data(data)
-
-        cols = [col for col in self.data.columns if not col.endswith('_err')]
-
-        # calculate count
-        n = [1 for x in range(len(self.data))]
-        n = pd.Series(n, index=self.data.index, name=self.system)
-        n = pd.concat([self.data[self.groups], n], axis=1)
-        n = n.groupby(self.groups).sum()
-        self.n = pd.concat([self.n, n], axis=1)
-
-        for target in self.columns:
-
-            cols.append(target + '_err')
-            data = deepcopy(self.data[cols])
-
-            i = 0
-            for metric in self.metrics:
-
-                # calculate output
-                summary = self.summaries[i]
-                metric_data = self.perform_metric(data, target, metric)
-                kpi = self.summarize(metric_data[metric], summary)
-
-                # Format output
-                metric_data.columns = pd.MultiIndex.from_product([[target], metric_data.columns, [self.system]],
-                                                                 names=['targets', 'metrics', 'systems'])
-                kpi = pd.DataFrame(kpi)
-                kpi.columns = pd.MultiIndex.from_tuples([(target, summary, self.system)],
-                                                        names=['targets', 'summaries', 'systems'])
-
-                # Save output
-                self.evaluation = pd.concat([self.evaluation, metric_data], axis=1)
-                self.kpi = pd.concat([self.kpi, kpi], axis=1)
-                i += 1
-
-            cols.pop()
-
-        # Record evaluation in history
-        self.systems.append(eval_id)
+            bin_data = []
+            bin_vals = []
+            _, bin_edges = np.histogram(data[self.group], bins=self.group_bins)
+            for bin_left, bin_right in [(bin_edges[i], bin_edges[i+1]) for i in range(self.group_bins)]:
+                bin_step = data.loc[(data[self.group] > bin_left) & (data[self.group] <= bin_right), self.target]
+                bin_data.append(getattr(self, '_summarize_{method}'.format(method=self.metric))(bin_step))
+                bin_vals.append(0.5*(bin_left + bin_right))
+
+        return pd.Series(index=bin_vals, data=bin_data, name=self.target)
+
+    def _process_mbe(self, data: pd.DataFrame) -> pd.Series:
+        data = data.groupby(self.group)
+        data = data.mean()
+        return data[self.target]
+
+    def _process_mae(self, data: pd.DataFrame) -> pd.Series:
+        data[self.target] = data[self.target].abs()
+        data = data.groupby(self.group)
+        data = data.mean()
+        return data[self.target]
+
+    def _process_rmse(self, data: pd.DataFrame) -> pd.Series:
+        data[self.target] = (data[self.target] ** 2)
+        data = data.groupby(self.group)
+        data = data.mean() ** .5
+        return data[self.target]
+
+    def _summarize(self, data: pd.Series) -> float:
+        return getattr(self, '_summarize_{method}'.format(method=self.summary))(data)
+
+    @staticmethod
+    def _summarize_mbe(data: pd.Series) -> float:
+        return data.mean()
+
+    @staticmethod
+    def _summarize_mae(data: pd.Series) -> float:
+        return data.abs().mean()
+
+    @staticmethod
+    def _summarize_rmse(data: pd.Series) -> float:
+        return (data ** 2).mean() ** .5
+
+    @staticmethod
+    def _summarize_weight_by_group(data: pd.Series) -> float:
+        group_max = data.idxmax()
+        group_scaling = np.array([(group_max - i)/group_max for i in data.index])
+        group_weight = group_scaling/group_scaling.sum()
+        return ((data ** 2) * group_weight).sum() ** .5
+
+    @staticmethod
+    def _summarize_weight_by_bins(data: pd.Series) -> float:
+        bins_weight = data/data.sum()
+        return ((data.index ** 2) * bins_weight).sum() ** .5
+
+    @staticmethod
+    def _summarize_fullest_bin(data: pd.Series) -> float | pd.Index:
+        return data.idxmax()
+
+    def is_valid(self, results: Results) -> boolean:
+        # TODO: Implement calculating error from target and reference instead of expecting column to exist
+        if self.target not in results.data.columns:
+            return False
+        if self.group not in results.data.columns and self.group not in \
+                ['hour',
+                'day_of_week',
+                'day_of_year',
+                'day_of_year',
+                'month']:
+            return False
+        return True
+
+    def run(self, results: Results) -> Tuple[float, pd.DataFrame]:
+        # Prepare the data to contain only necessary columns and rows
+        data = self._select(results)
+
+        evaluation = self._process(data)
+        summary = self._summarize(evaluation)
+
+        self._plot(results, data, evaluation)
+
+        return summary, evaluation
 
 
 class Durations(Mapping):
@@ -576,13 +473,13 @@ class Durations(Mapping):
     def __repr__(self) -> str:
         return str(self._durations)
 
-    def __iter__(self) -> Iterator[Evaluation]:
+    def __iter__(self) -> Iterator:
         return iter(self._durations)
 
     def __len__(self) -> int:
         return len(self._durations)
 
-    def __getitem__(self, key: str) -> Evaluation:
+    def __getitem__(self, key: str) -> float:
         return self._durations[key]['minutes']
 
     def start(self, key: str) -> None:
@@ -625,14 +522,17 @@ class Durations(Mapping):
 class Results(MutableMapping):
 
     def __init__(self, system: System, verbose: bool = False) -> None:
-        self._system = system
+        self.system = system
         system_dir = system.configs['General']['data_dir']
+        data_dir = os.path.join(system_dir, 'results')
+        if not os.path.isdir(data_dir):
+            os.makedirs(data_dir, exist_ok=True)
 
         # noinspection PyProtectedMember
         self._database = deepcopy(system._database)
-        self._database.dir = os.path.join(system_dir, 'results')
+        self._database.dir = data_dir
         self._database.enabled = True
-        self._datastore = pd.HDFStore(os.path.join(system_dir, 'results', 'results.h5'))
+        self._datastore = pd.HDFStore(os.path.join(data_dir, 'results.h5'))
 
         self.data = pd.DataFrame()
         self.durations = Durations(system)
@@ -671,7 +571,7 @@ class Results(MutableMapping):
                 results_data = self.data.reset_index().drop_duplicates(subset='time', keep='last')\
                                         .set_index('time').sort_index()
 
-                io.write_csv(self._system, results_data, results_file)
+                io.write_csv(self.system, results_data, results_file)
 
     def set(self, key: str, data: pd.DataFrame) -> None:
         data.to_hdf(self._datastore, '/{}'.format(key))
@@ -688,3 +588,7 @@ class Results(MutableMapping):
     # noinspection PyTypeChecker
     def get(self, key: str) -> pd.DataFrame:
         return self._datastore.get('/{}'.format(key))
+
+    @property
+    def name(self):
+        return self.system.name

@@ -33,7 +33,7 @@ def print_distributions(data, path=''):
         sorted_values = list(bin_values)
         sorted_values.sort(reverse=True)
 
-        # Scale plots by step through sorted bins
+        # Scale plots by stepping through sorted bins
         for i in range(len(sorted_values) - 1):
             if abs(sorted_values[i] - sorted_values[i + 1]) / count_range < 0.80:
                 continue
