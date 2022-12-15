@@ -180,7 +180,9 @@ class System(Configurable, MutableMapping):
 
         components = dict()
         for entry in os.scandir(cmpt_dir):
-            if entry.is_file() and entry.path.endswith('.cfg') and not entry.path.endswith('default.cfg') \
+            if entry.is_file() and entry.path.endswith('.cfg') \
+                    and not entry.path.endswith('default.cfg') \
+                    and not (entry.path.endswith('evaluation.cfg') or entry.path.endswith('evaluations.cfg')) \
                     and entry.name.startswith(tuple(self._component_types)):
                 # noinspection PyTypeChecker
                 component = self._component_read(entry)

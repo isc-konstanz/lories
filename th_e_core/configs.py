@@ -155,7 +155,8 @@ class Configurable:
                 if not os.path.exists(data_dir):
                     os.makedirs(data_dir)
                 config_defaults = os.path.join(root_dir, 'conf')
-                copytree(config_defaults, config_dir, ignore=ignore_patterns('*.default.cfg', 'settings*', 'logging*'))
+                copytree(config_defaults, config_dir,
+                         ignore=ignore_patterns('*.default.cfg', 'evaluation*', 'settings*', 'logging*'))
             else:
                 raise ConfigurationUnavailableException('Invalid configuration directory: {}'.format(config_dir))
 
