@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 """
     th-e-core.weather
-    ~~~~~
+    ~~~~~~~~~~~~~~~~~
     
-    This module provides the :class:`th-e-core.Weather`, used as reference to calculate e.g.
+    This module provides the :class:`th_e_core.Weather`, used as reference to calculate e.g.
     photovoltaic installations' generated power. The provided environmental data contains 
     temperatures and horizontal solar irradiation, which can be used, to calculate the 
     effective irradiance on defined, tilted photovoltaic systems.
     
 """
 from __future__ import annotations
+from abc import ABC, abstractmethod
 
 import os
 import re
@@ -19,11 +20,9 @@ import numpy as np
 import pandas as pd
 import logging
 
-from abc import ABC, abstractmethod
-from configparser import ConfigParser as Configurations
-from th_e_core.configs import Configurable
-from th_e_core.io import Database
-from th_e_core.system import System
+from .configs import Configurations, Configurable
+from .system import System
+from .io import Database
 
 logger = logging.getLogger(__name__)
 
@@ -54,11 +53,11 @@ class Weather(ABC, Configurable):
                                           config_file, **kwargs)
 
     def __init__(self, system: System, configs: Configurations, **kwargs) -> None:
-        Configurable.__init__(self, configs, **kwargs)
-        self._system = system
-        self._activate(system, **kwargs)
+        super().__init__(configs, **kwargs)
+        self._context = system
+        self.__activate__(system, **kwargs)
 
-    def _activate(self, system: System, **kwargs) -> None:
+    def __activate__(self, system: System, **kwargs) -> None:
         pass
 
     @abstractmethod
@@ -68,8 +67,8 @@ class Weather(ABC, Configurable):
 
 class DatabaseWeather(Weather):
 
-    def _activate(self, system: System, **kwargs) -> None:
-        super()._activate(system, **kwargs)
+    def __activate__(self, system: System, **kwargs) -> None:
+        super().__activate__(system, **kwargs)
         self._database = Database.open(self._configs, **kwargs)
 
     # noinspection PyShadowingBuiltins
@@ -90,7 +89,7 @@ class DatabaseWeather(Weather):
 
 class TMYWeather(Weather):
 
-    def _configure(self, configs: Configurations, **_) -> None:
+    def __configure__(self, configs: Configurations, **_) -> None:
         self.version = int(configs.get('General', 'version', fallback='3'))
 
         if 'file' in configs['TMY'] and not os.path.isabs(configs['TMY']['file']):
@@ -101,7 +100,7 @@ class TMYWeather(Weather):
         self.year = configs.getint('TMY', 'year', fallback=None)
 
     # noinspection PyShadowingBuiltins
-    def _activate(self, system: System, **kwargs) -> None:
+    def __activate__(self, system: System, **kwargs) -> None:
         from pvlib.iotools import read_tmy2, read_tmy3
 
         dir = os.path.dirname(self.file)
@@ -123,7 +122,7 @@ class TMYWeather(Weather):
 
 class EPWWeather(Weather):
 
-    def _configure(self, configs: Configurations, **_) -> None:
+    def __configure__(self, configs: Configurations, **_) -> None:
         if 'file' in configs['EPW'] and not os.path.isabs(configs['EPW']['file']):
             configs['EPW']['file'] = os.path.join(configs['General']['data_dir'], 
                                                   configs['EPW']['file'])
@@ -132,7 +131,7 @@ class EPWWeather(Weather):
         self.year = configs.getint('EPW', 'year', fallback=None)
 
     # noinspection PyShadowingBuiltins
-    def _activate(self, system: System, **kwargs) -> None:
+    def __activate__(self, system: System, **kwargs) -> None:
         from pvlib.iotools import read_epw
 
         dir = os.path.dirname(self.file)

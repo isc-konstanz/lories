@@ -12,15 +12,14 @@ import pytz as tz
 import datetime as dt
 import pandas as pd
 
-from configparser import ConfigParser as Configurations
+from ..configs import Configurations
 
 
 class Database(ABC):
 
     def __init__(self,
                  enabled: str = 'true',
-                 timezone: str | tz.tzinfo = 'UTC',
-                 **_) -> None:
+                 timezone: str | tz.BaseTzInfo = tz.UTC) -> None:
 
         self.enabled = enabled.lower() == 'true'
         if isinstance(timezone, str):

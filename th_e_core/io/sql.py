@@ -7,13 +7,16 @@
 """
 from __future__ import annotations
 
+import logging
 import pytz as tz
 import datetime as dt
 import pandas as pd
 
-from th_e_core.io import Database
-from th_e_core.tools import to_int
+from . import Database
+from ..tools import to_int, resample_data
 from mysql import connector
+
+logger = logging.getLogger(__name__)
 
 
 class SqlDatabase(Database):
@@ -56,22 +59,25 @@ class SqlDatabase(Database):
             data = pd.concat(results, axis=1)
             data.index.name = 'time'
 
+            if resolution is not None:
+                data = resample_data(data, resolution)
+
+            return data
+
         except TypeError as e:
-            print(e)
+            logger.exception(str(e))
 
-        if resolution is not None and resolution > 900:
-            offset = (start - start.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds() % resolution
-            data = data.resample(str(int(resolution))+'s', base=offset).sum()
-
-        return data
+        return pd.DataFrame()
 
     def _select(self,
                 column: str,
                 table: str,
-                start: pd.Timestamp | dt.datetime,
+                start: pd.Timestamp | dt.datetime = None,
                 end:   pd.Timestamp | dt.datetime = None) -> pd.DataFrame:
 
         epoch = dt.datetime(1970, 1, 1, tzinfo=tz.UTC)
+        if start is None:
+            start = epoch
 
         cursor = self.connector.cursor()
         select = "SELECT time, data FROM {0} WHERE ".format(table)

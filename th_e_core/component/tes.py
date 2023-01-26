@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-    th-e-core.cmpt.tes
-    ~~~~~~~~~~~~~~~~~~
+    th-e-core.component.tes
+    ~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
-from configparser import ConfigParser as Configurations
-from th_e_core.system import Component
+from ..configs import Configurations
+from . import Component
 
 
 class ThermalEnergyStorage(Component):
@@ -15,8 +15,9 @@ class ThermalEnergyStorage(Component):
     TEMPERATURE_HEATING = 'tes_ht_temp'
     TEMPERATURE_DOMESTIC = 'tes_dom_temp'
 
-    def _configure(self, configs: Configurations) -> None:
-        super()._configure(configs)
+    # noinspection PyProtectedMember
+    def __configure__(self, configs: Configurations) -> None:
+        super().__configure__(configs)
         self._volume = configs.getfloat('General', 'volume')
 
         # For the thermal storage capacity in kWh/K, it will be assumed to be filled with water,

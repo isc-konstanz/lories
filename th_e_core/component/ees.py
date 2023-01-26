@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-    th-e-core.cmpt.ees
-    ~~~~~~~~~~~~~~~~~~
+    th-e-core.component.ees
+    ~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
-from configparser import ConfigParser as Configurations
-from th_e_core.system import Component
+from ..configs import Configurations
+from . import Component
 
 
 class ElectricalEnergyStorage(Component):
@@ -18,15 +18,12 @@ class ElectricalEnergyStorage(Component):
     ENERGY_CHARGE = 'ees_charge_energy'
     ENERGY_DISCHARGE = 'ees_discharge_energy'
 
-    def _configure(self, configs: Configurations) -> None:
-        super()._configure(configs)
+    # noinspection PyProtectedMember
+    def __configure__(self, configs: Configurations) -> None:
+        super().__configure__(configs)
         self._capacity = configs.getfloat('General', 'capacity')
 
         self._power_max = configs.getfloat('General', 'power_max')
-
-        # self.energy_price = configs.getfloat('Evaluation', 'energy_price', fallback=30)
-        # self.feed_in_tariff_pv = configs.getfloat('Evaluation', 'feed_in_tariff_pv', fallback=0.075)
-        # self.data_path = configs.get('Evaluation', 'data_path')
 
     @property
     def type(self) -> str:

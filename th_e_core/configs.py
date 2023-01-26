@@ -11,66 +11,75 @@ import os
 import shutil
 import logging
 from shutil import copytree, ignore_patterns
-from configparser import ConfigParser as Configurations
-from th_e_core.tools import join_path
+from configparser import ConfigParser
+from .tools import join_path
 
 logger = logging.getLogger(__name__)
 
 
-def read(config_file: str,
-         config_dir:  str = 'conf',
-         data_dir: str = 'data',
-         tmp_dir: str = 'tmp',
-         lib_dir: str = 'lib',
-         root_dir: str = '.', **_) -> Configurations:
+class Configurations(ConfigParser):
 
-    if "~" in data_dir:
-        data_dir = os.path.expanduser(data_dir)
-    if not os.path.isabs(data_dir):
-        data_dir = os.path.join(root_dir, data_dir)
+    @classmethod
+    def read(cls,
+             config_file: str,
+             config_dir:  str = 'conf',
+             data_dir: str = 'data',
+             tmp_dir: str = 'tmp',
+             lib_dir: str = 'lib',
+             root_dir: str = '.', **_) -> Configurations:
 
-    if "~" in config_dir:
-        config_dir = os.path.expanduser(config_dir)
-    if not os.path.isabs(config_dir):
-        if data_dir == os.path.join(root_dir, 'data'):
-            config_dir = os.path.join(root_dir, config_dir)
-        else:
-            config_dir = os.path.join(data_dir, config_dir)
+        if "~" in data_dir:
+            data_dir = os.path.expanduser(data_dir)
+        if not os.path.isabs(data_dir):
+            data_dir = os.path.join(root_dir, data_dir)
 
-    if not os.path.isdir(config_dir):
-        raise ConfigurationUnavailableException('Invalid configuration directory: {}'.format(config_dir))
+        if "~" in config_dir:
+            config_dir = os.path.expanduser(config_dir)
+        if not os.path.isabs(config_dir):
+            if data_dir == os.path.join(root_dir, 'data'):
+                config_dir = os.path.join(root_dir, config_dir)
+            else:
+                config_dir = os.path.join(data_dir, config_dir)
 
-    configs = Configurations()
-    configs.optionxform = str
-    config_file = os.path.join(config_dir, config_file)
-    if not os.path.isfile(config_file):
-        config_default = config_file.replace('.cfg', '.default.cfg')
-        if os.path.isfile(config_default):
-            shutil.copy(config_default, config_file)
-        else:
-            raise ConfigurationUnavailableException('Unable to find configuration file "{}"'.format(config_file))
+        if not os.path.isdir(config_dir):
+            raise ConfigurationUnavailableException('Invalid configuration directory: {}'.format(config_dir))
 
-    configs.read(config_file)
+        configs = cls()
+        configs.optionxform = str
+        config_file = os.path.join(config_dir, config_file)
+        if not os.path.isfile(config_file):
+            config_default = config_file.replace('.cfg', '.default.cfg')
+            if os.path.isfile(config_default):
+                shutil.copy(config_default, config_file)
+            else:
+                raise ConfigurationUnavailableException('Unable to find configuration file "{}"'.format(config_file))
 
-    if 'General' not in configs.sections():
-        configs.add_section('General')
+        configs.read(config_file)
 
-    configs.set('General', 'root_dir', join_path(configs, 'root_dir', root_dir))
-    configs.set('General', 'lib_dir', join_path(configs, 'lib_dir', lib_dir))
-    configs.set('General', 'tmp_dir', join_path(configs, 'tmp_dir', tmp_dir))
-    configs.set('General', 'data_dir', join_path(configs, 'data_dir', data_dir))
-    configs.set('General', 'config_dir', config_dir)
-    # configs.set('General', 'config_file', config_file)
+        if 'General' not in configs.sections():
+            configs.add_section('General')
 
-    return configs
+        configs.set('General', 'root_dir', join_path(configs, 'root_dir', root_dir))
+        configs.set('General', 'lib_dir', join_path(configs, 'lib_dir', lib_dir))
+        configs.set('General', 'tmp_dir', join_path(configs, 'tmp_dir', tmp_dir))
+        configs.set('General', 'data_dir', join_path(configs, 'data_dir', data_dir))
+        configs.set('General', 'config_dir', config_dir)
+        # configs.set('General', 'config_file', config_file)
+
+        return configs
 
 
 class Configurable:
 
     def __init__(self, configs: Configurations, *args, **kwargs) -> None:
-        super().__init__(**kwargs)
+        super().__init__(*args, **kwargs)
         self._configs = configs
-        self._configure(configs)
+        self.__configure__(configs)
+
+    def __configure__(self, configs: Configurations) -> None:
+        # if logger.isEnabledFor(logging.DEBUG):
+        #    print(self)
+        pass
 
     # def __repr__(self) -> str:
     #     configs = '[{}]'.format(self._class_name)
@@ -100,11 +109,6 @@ class Configurable:
     @property
     def configs(self) -> Configurations:
         return self._configs
-
-    def _configure(self, configs: Configurations) -> None:
-        # if logger.isEnabledFor(logging.DEBUG):
-        #    print(self)
-        pass
 
     @classmethod
     def _read(cls, 
@@ -167,7 +171,7 @@ class Configurable:
             if not os.path.isfile(config_file):
                 raise ConfigurationUnavailableException('Unable to find configuration file "{}"'.format(config_file))
             
-            configs.read(config_file)
+            configs.read(config_file, encoding='utf-8')
 
         if 'General' not in configs.sections():
             configs.add_section('General')

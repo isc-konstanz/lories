@@ -7,19 +7,18 @@
 """
 from __future__ import annotations
 
-from configparser import ConfigParser as Configurations
-from th_e_core.configs import Configurable, ConfigurationException, ConfigurationUnavailableException
-from th_e_core.system import System
+from .configs import Configurations, Configurable, ConfigurationException, ConfigurationUnavailableException
+from .system import System
 
 
 class Cost(Configurable):
 
-    def __init__(self, system: System, configs: Configurations) -> None:
-        Configurable.__init__(self, configs)
-        self._system = system
-        self._build(system, configs)
+    def __init__(self, system: System, configs: Configurations, *args, **kwargs) -> None:
+        super().__init__(configs, *args, **kwargs)
+        self._context = system
+        self.__build__(system, configs)
 
-    def _build(self, system: System, configs: Configurations) -> None:
+    def __build__(self, system: System, configs: Configurations) -> None:
         pass
 
 

@@ -10,8 +10,8 @@ import json
 import shutil
 import time
 
-from th_e_core.io import Database, DatabaseException
-from configparser import ConfigParser as Configurations
+from . import Database, DatabaseException
+from ..configs import Configurations
 from collections import OrderedDict
 
 

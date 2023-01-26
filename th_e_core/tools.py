@@ -9,8 +9,10 @@ import os
 import pytz as tz
 import datetime as dt
 import pandas as pd
+from copy import deepcopy
 from typing import Union
 from configparser import ConfigParser
+from pandas.tseries.frequencies import to_offset
 
 
 def join_path(configs: ConfigParser,
@@ -60,6 +62,26 @@ def ceil_date(date: Union[dt.datetime, pd.Timestamp, str],
     if timezone is not None:
         date = convert_timezone(date, timezone)
     return date.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+
+def resample_data(data: pd.DataFrame, seconds: int) -> pd.DataFrame:
+    resampled = pd.DataFrame()
+    resampled.index.name = 'time'
+    for column, series in deepcopy(data).iteritems():
+        series = _resample_series(series, seconds)
+
+        resampled = pd.concat([resampled, series.to_frame()], axis=1)
+    return resampled.dropna(how='all')
+
+
+def _resample_series(data: pd.Series, seconds: int) -> pd.Series:
+    resampled = data.resample('{}s'.format(seconds), closed='right')
+    if data.name.endswith('_energy'):
+        data = resampled.last()
+    else:
+        data = resampled.mean()
+    data.index += to_offset('{}s'.format(seconds))
+    return data
 
 
 def to_bool(v: Union[str, bool]) -> bool:

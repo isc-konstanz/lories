@@ -15,9 +15,9 @@ import datetime as dt
 import pandas as pd
 
 # noinspection PyProtectedMember
-import th_e_core.io._var as var
-from th_e_core.io import Database, DatabaseException
-from th_e_core.tools import to_bool, to_int, convert_timezone
+from . import _var as var
+from . import Database, DatabaseException
+from ..tools import to_bool, to_int, convert_timezone, resample_data
 from dateutil.relativedelta import relativedelta
 
 
@@ -85,10 +85,10 @@ class CsvDatabase(Database):
 
             data = data.combine_first(file_data)
 
-        if resolution is not None and resolution > 900:
-            offset = (start - start.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds() % resolution
-            data = data.resample(str(int(resolution))+'s', base=offset).sum()
+        if resolution is not None:
+            data = resample_data(data, resolution)
 
+            # TODO: verify if this works as intended
             if end is not None:
                 end += dt.timedelta(seconds=resolution)
 

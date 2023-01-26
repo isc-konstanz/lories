@@ -9,15 +9,13 @@ from __future__ import annotations
 from abc import ABC
 
 import logging
-
-from configparser import ConfigParser as Configurations
-from th_e_core.configs import Configurable
-from th_e_core.system import System
+import pandas as pd
+from . import Configurations, Configurable, System
 
 logger = logging.getLogger(__name__)
 
 
-class Model(ABC, Configurable):
+class Model(Configurable, ABC):
 
     @classmethod
     def read(cls, system: System) -> Model:
@@ -32,10 +30,13 @@ class Model(ABC, Configurable):
                                           system.configs.get('General', 'config_dir'),
                                           config_file)
 
-    def __init__(self, system: System, configs: Configurations) -> None:
-        Configurable.__init__(self, configs)
-        self._system = system
-        self._build(system, configs)
+    def __init__(self, system: System, configs: Configurations, *args, **kwargs) -> None:
+        super().__init__(configs, *args, **kwargs)
+        self._context = system
+        self.__build__(system, configs)
 
-    def _build(self, system: System, configs: Configurations) -> None:
+    def __build__(self, system: System, configs: Configurations) -> None:
         pass
+
+    def __call__(self, *args, **kwargs) -> pd.DataFrame:
+        raise NotImplementedError

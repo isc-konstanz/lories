@@ -5,5 +5,9 @@
     
     
 """
-from th_e_core.io import db  # noqa: F401
-from th_e_core.io.db import Database, DatabaseException, DatabaseUnavailableException  # noqa: F401
+from . import db   # noqa: F401
+from .db import (  # noqa: F401
+    Database,
+    DatabaseException,
+    DatabaseUnavailableException
+)

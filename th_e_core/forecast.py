@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
     th-e-core.forecast
-    ~~~~~
+    ~~~~~~~~~~~~~~~~~~
     
-    This module provides the :class:`pvsyst.Weather`, used as reference to calculate a 
+    This module provides the :class:`th-e-core.Forecast`, used as reference to calculate a
     photovoltaic installations' generated power. The provided environmental data contains 
     temperatures and horizontal solar irradiation, which can be used, to calculate the 
     effective irradiance on defined, tilted photovoltaic systems.
@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from io import StringIO
 from typing import Dict
 
 import os
@@ -19,20 +20,19 @@ import datetime as dt
 import pandas as pd
 import logging
 
-from io import StringIO
-from configparser import ConfigParser as Configurations
-from th_e_core import Configurable, Database
-from th_e_core.weather import Weather
-from th_e_core.system import System
+from .configs import Configurations, Configurable
+from .system import System
+from .weather import Weather
+from .io import Database
 
 logger = logging.getLogger(__name__)
 
 
-class Forecast(ABC, Configurable):
+class Forecast(Configurable, ABC):
 
     # noinspection PyShadowingBuiltins
     @classmethod
-    def read(cls, system: System) -> Weather:
+    def read(cls, system: System) -> Forecast:
         configs = cls._read_configs(system)
         type = configs.get('General', 'type', fallback='default').lower()
         if type in ['default', 'nmm']:
@@ -51,18 +51,13 @@ class Forecast(ABC, Configurable):
                                           system.configs.get('General', 'config_dir'),
                                           config_file)
 
-    def __init__(self, system: System, configs: Configurations) -> None:
-        Configurable.__init__(self, configs)
-        self._system = system
-        self._activate(system, configs)
+    def __init__(self, system: System, configs: Configurations, *args, **kwargs) -> None:
+        super().__init__(configs, *args, **kwargs)
+        self._context = system
+        self.__activate__(system, configs)
 
-    def _activate(self, system: System, configs: Configurations) -> None:
+    def __activate__(self, system: System, configs: Configurations) -> None:
         pass
-
-    # noinspection PyProtectedMember
-    def build(self, **kwargs) -> pd.Dataframe:
-        from th_e_data import build
-        return build(self.configs, self._database, location=self._system.location, **kwargs)
 
     def _rename(self, data: pd.DataFrame, variables: Dict[str, str] = None) -> pd.DataFrame:
         """
@@ -134,7 +129,7 @@ class Forecast(ABC, Configurable):
 
 class DatabaseForecast(Forecast):
 
-    def _activate(self, system: System, configs: Configurations, **kwargs) -> None:
+    def __activate__(self, system: System, configs: Configurations) -> None:
         if configs.has_section('Database') and \
                 configs.get('Database', 'enabled', fallback='True').lower() == 'true' and \
                 configs.get('Database', 'enable', fallback='True').lower() == 'true':
@@ -160,11 +155,16 @@ class DatabaseForecast(Forecast):
                 configs.set('Database', 'dir', database_dir)
 
                 if not configs.has_option('Database', 'timezone'):
-                    configs.set('Database', 'timezone', self._system.location.tz)
+                    configs.set('Database', 'timezone', self._context.location.timezone.zone)
 
-            self._database = Database.open(configs, **kwargs)
+            self._database = Database.open(configs)
         else:
             self._database = None
+
+    # noinspection PyProtectedMember
+    def build(self, **kwargs) -> pd.Dataframe:
+        from th_e_data import build
+        return build(self.configs, self._database, location=self._context.location, **kwargs)
 
     # noinspection PyShadowingBuiltins
     def _get(self,
@@ -189,8 +189,8 @@ class DatabaseForecast(Forecast):
 
 class ScheduledForecast(DatabaseForecast):
 
-    def _configure(self, configs: Configurations, **kwargs) -> None:
-        super()._configure(configs, **kwargs)
+    def __configure__(self, configs: Configurations) -> None:
+        super().__configure__(configs)
         self.interval = configs.getint('General', 'interval', fallback=1440)*3600
 
     def get(self,
@@ -200,7 +200,7 @@ class ScheduledForecast(DatabaseForecast):
 
         # Calculate the available forecast start and end times
         interval = self.interval/3600
-        timezone = tz.timezone(self._system.location.tz)
+        timezone = self._context.location.timezone
 
         if start.tzinfo is None or start.tzinfo.utcoffset(start) is None:
             start = tz.utc.localize(start)
@@ -231,8 +231,8 @@ class NMM(ScheduledForecast, Weather):
     Model data corresponds to 4km resolution forecasts.
     """
 
-    def _configure(self, configs: Configurations) -> None:
-        super()._configure(configs)
+    def __configure__(self, configs: Configurations) -> None:
+        super().__configure__(configs)
 
         # TODO: Add sanity check
         self.name = configs.get('Meteoblue', 'name')
@@ -296,8 +296,8 @@ class NMM(ScheduledForecast, Weather):
             'snow_fraction'                 # Schneefall [0.0 - 1.0]
         ]
 
-    def _activate(self, system: System, configs: Configurations) -> None:
-        super()._activate(system, configs)
+    def __activate__(self, system: System, configs: Configurations) -> None:
+        super().__activate__(system, configs)
         from pvlib.location import Location
         if not hasattr(system, 'location') or not isinstance(system.location, Location):
             raise ValueError("Invalid forecast context missing location information")
