@@ -136,10 +136,3 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-
-# Configurations except for default files
-conf/*
-!conf/*.default.cfg
-
-# Generated output and optional input
-data*
