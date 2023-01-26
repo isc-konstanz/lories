@@ -6,7 +6,7 @@
     
 """
 from ..system import System
-from ..component import ElectricalEnergyStorage, ThermalEnergyStorage, Photovoltaics
+from ..cmpt import ElectricalEnergyStorage, ThermalEnergyStorage, Photovoltaics
 
 
 _DEPRECATION = {

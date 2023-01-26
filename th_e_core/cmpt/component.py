@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-    th-e-core.component.component
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    th-e-core.cmpt.component
+    ~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -138,16 +138,16 @@ class Context(Configurable, Mapping):
     # noinspection SpellCheckingInspection, PyShadowingBuiltins
     def __cmpt__(self, configs: Configurations, type: str) -> Component:
         if type == 'pv':
-            from th_e_core.component import Photovoltaics
+            from th_e_core.cmpt import Photovoltaics
             return Photovoltaics(self, configs)
         elif type == 'ev':
-            from th_e_core.component import ElectricVehicle
+            from th_e_core.cmpt import ElectricVehicle
             return ElectricVehicle(self, configs)
         elif type == 'ees':
-            from th_e_core.component import ElectricalEnergyStorage
+            from th_e_core.cmpt import ElectricalEnergyStorage
             return ElectricalEnergyStorage(self, configs)
         elif type == 'tes':
-            from th_e_core.component import ThermalEnergyStorage
+            from th_e_core.cmpt import ThermalEnergyStorage
             return ThermalEnergyStorage(self, configs)
 
         raise ValueError(f"Invalid component type: {type}")

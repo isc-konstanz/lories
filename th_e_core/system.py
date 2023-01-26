@@ -15,9 +15,9 @@ import logging
 import pandas as pd
 
 from .io import Database, DatabaseUnavailableException
-from .configs import Configurations
-from .component import Component, Context
 from .location import Location
+from .configs import Configurations
+from .cmpt import Component, Context
 
 # noinspection SpellCheckingInspection
 INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "

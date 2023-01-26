@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-    th-e-core.component.pv
-    ~~~~~~~~~~~~~~~~~~~~~~
+    th-e-core.cmpt.pv
+    ~~~~~~~~~~~~~~~~~
     
     This module provides the :class:`th_e_core.Photovoltaics`, containing information about orientation
     and datasheet parameters of a specific photovoltaic installation.

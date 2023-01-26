@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-    th-e-core.component.tes
-    ~~~~~~~~~~~~~~~~~~~~~~~
+    th-e-core.cmpt.tes
+    ~~~~~~~~~~~~~~~~~~
 
 
 """

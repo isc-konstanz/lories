@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    th-e-core.component
+    th-e-core.cmpt
     ~~~~~~~~~~~~~~
 
 
 """
-from .cmpt import (  # noqa: F401
+from .component import (  # noqa: F401
     Component,
     Context
 )

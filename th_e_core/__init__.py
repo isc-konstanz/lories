@@ -16,8 +16,8 @@ from . import model  # noqa: F401
 from . import location  # noqa: F401
 from .location import Location  # noqa: F401
 
-from . import component  # noqa: F401
-from .component import Component  # noqa: F401
+from . import cmpt  # noqa: F401
+from .cmpt import Component  # noqa: F401
 
 from . import system  # noqa: F401
 from .system import System  # noqa: F401
