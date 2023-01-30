@@ -24,9 +24,17 @@ from dateutil.relativedelta import relativedelta
 class CsvDatabase(Database):
 
     # noinspection PyShadowingBuiltins
-    def __init__(self, dir=os.getcwd(), file=None, format='%Y%m%d_%H%M%S',
-                 index_column='Time', index_unix=False, merge=False,
-                 interval=24, timezone='UTC', decimal='.', separator=',',
+    def __init__(self,
+                 dir=os.getcwd(),
+                 file=None,
+                 format='%Y%m%d_%H%M%S',
+                 index_column='Time',
+                 index_unix=False,
+                 merge=False,
+                 interval=24,
+                 timezone=tz.UTC,
+                 decimal='.',
+                 separator=',',
                  **kwargs):
 
         super().__init__(**kwargs)
@@ -46,7 +54,9 @@ class CsvDatabase(Database):
         self.interval = to_int(interval)
         self.merge = to_bool(merge)
 
-        self.timezone = tz.timezone(timezone)
+        if isinstance(timezone, str):
+            timezone = tz.timezone(timezone)
+        self.timezone = timezone
         self.decimal = decimal
         self.separator = separator
 

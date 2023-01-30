@@ -31,11 +31,16 @@ class Database(ABC):
         dbargs = dict(configs.items('Database'))
         kwargs.update(dbargs)
 
-        database_type = dbargs['type'].lower()
+        database_type = kwargs.pop('type').lower()
         if database_type == 'sql':
             database_tables = dict(configs.items('Tables'))
             from th_e_core.io.sql import SqlDatabase
             return SqlDatabase(**kwargs, tables=database_tables)
+
+        elif database_type == 'oem':
+            database_feeds = dict(configs.items('Feeds'))
+            from th_e_core.io.oem import EmonDatabase
+            return EmonDatabase(**kwargs, feeds=database_feeds)
 
         elif database_type == 'csv':
             from th_e_core.io.csv import CsvDatabase
@@ -45,7 +50,7 @@ class Database(ABC):
 
     @abstractmethod
     def exists(self,
-               start: pd.Timestamp | dt.datetime,
+               start: pd.Timestamp | dt.datetime = None,
                end:   pd.Timestamp | dt.datetime = None,
                **kwargs) -> bool:
         """
@@ -53,7 +58,6 @@ class Database(ABC):
 
         :param start:
             the time from which on values will be looked up for.
-            For many applications, passing datetime.datetime.now() will suffice.
         :type start:
             :class:`pandas.Timestamp` or datetime
 
@@ -70,7 +74,7 @@ class Database(ABC):
 
     @abstractmethod
     def read(self,
-             start: pd.Timestamp | dt.datetime,
+             start: pd.Timestamp | dt.datetime = None,
              end:   pd.Timestamp | dt.datetime = None,
              **kwargs) -> pd.DataFrame:
         """ 
@@ -78,7 +82,6 @@ class Database(ABC):
         
         :param start: 
             the time from which on values will be looked up for.
-            For many applications, passing datetime.datetime.now() will suffice.
         :type start: 
             :class:`pandas.Timestamp` or datetime
         
