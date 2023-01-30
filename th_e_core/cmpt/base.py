@@ -18,6 +18,10 @@ INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
 
 class Component(Configurable):
 
+    @classmethod
+    def read(cls, context: Context, config_file: str = None) -> Component:
+        return cls(context, Configurations.from_configs(context.configs, config_file=config_file))
+
     def __init__(self, context: Context, configs: Configurations, **kwargs) -> None:
         super().__init__(configs, **kwargs)
 
@@ -56,52 +60,30 @@ class Component(Configurable):
     def type(self) -> str:
         return 'component'
 
+    @property
+    def context(self) -> Context:
+        return self.context
+
 
 class Context(Configurable, Mapping):
 
     @classmethod
-    def _read(cls,
-              root_dir:    str = '.',
-              lib_dir:     str = 'lib',
-              tmp_dir:     str = 'tmp',
-              data_dir:    str = 'data',
-              cmpt_dir:    str = 'component',
-              config_dir:  str = 'conf',
-              config_file: str = 'system.cfg',
-              **kwargs) -> Context:
+    def _read(cls, **kwargs) -> Context:
+        return cls(cls._read_configs(**kwargs))
 
-        configs = cls._read_configs(root_dir, lib_dir, tmp_dir, data_dir, config_dir, config_file, **kwargs)
-        config_dir = configs.get('General', 'config_dir')
-        cmpt_dir = configs.get('General', 'cmpt_dir', fallback=cmpt_dir)
-        if "~" in cmpt_dir:
-            cmpt_dir = os.path.expanduser(cmpt_dir)
-        if not os.path.isabs(cmpt_dir):
-            cmpt_dir = os.path.join(config_dir, cmpt_dir)
-        if cmpt_dir == os.path.join(config_dir, 'component') and not os.path.isdir(cmpt_dir):
-            cmpt_dir = config_dir
-
-        configs.set('General', 'cmpt_dir', cmpt_dir)
-
-        return cls._from_class(configs)
+    @classmethod
+    def _read_configs(cls, config_file: str = None, **kwargs) -> Configurations:
+        if config_file is None:
+            config_file = cls.__name__.lower() + '.cfg'
+        return Configurations(config_file, **kwargs)
 
     def __init__(self, configs: Configurations, **kwargs) -> None:
-        if not configs.has_option('General', 'name'):
-            raise ValueError("Invalid configuration, missing specified system name")
-
-        if configs.has_option('General', 'id'):
-            self.id = configs['General']['id']
-        else:
-            self.id = configs['General']['name']
-            configs['General']['id'] = self.id
-
-        self._name = configs['General']['name']
-
         super().__init__(configs, **kwargs)
         self._components = self.__readcmpts__()
 
     # noinspection SpellCheckingInspection
     def __readcmpts__(self) -> Dict[str, Component]:
-        cmpt_dir = self._configs.get('General', 'cmpt_dir', fallback='component')
+        cmpt_dir = self.configs.get('General', 'cmpt_dir', fallback='cmpt')
 
         components = dict()
         for entry in os.scandir(cmpt_dir):
@@ -117,12 +99,9 @@ class Context(Configurable, Mapping):
 
     # noinspection SpellCheckingInspection
     def __readcmpt__(self, config_file: os.DirEntry) -> Component:
-        component_configs = Configurable._read_configs(self.configs.get('General', 'root_dir'),
-                                                       self.configs.get('General', 'lib_dir'),
-                                                       self.configs.get('General', 'tmp_dir'),
-                                                       self.configs.get('General', 'data_dir'),
-                                                       os.path.dirname(config_file.path),
-                                                       config_file.name)
+        component_configs = Configurations.from_configs(self.configs,
+                                                        config_file=config_file.name,
+                                                        config_dir=os.path.dirname(config_file.path))
 
         if not component_configs.has_option('General', 'id'):
             component_configs.set('General', 'id', os.path.splitext(config_file.name)[0])
@@ -153,17 +132,17 @@ class Context(Configurable, Mapping):
         raise ValueError(f"Invalid component type: {type}")
 
     def __cmpt_types__(self, *args: str) -> List[str]:
-        return ['component', 'component', 'pv', 'ev', 'ees', 'tes', *args]
+        return ['component', 'cmpt', 'pv', 'ev', 'ees', 'tes', *args]
 
-    # def __getattr__(self, attr):
-    #     if attr in self._components.keys():
-    #         return self._components[attr]
-    #     try:
-    #         # noinspection PyUnresolvedReferences
-    #         return super().__getattr__(attr)
-    #
-    #     except AttributeError:
-    #         raise AttributeError("'{0}' object has no attribute '{1}'".format(type(self).__name__, attr))
+    def __getattr__(self, attr):
+        if attr in self._components.keys():
+            return self._components[attr]
+        try:
+            # noinspection PyUnresolvedReferences
+            return super().__getattr__(attr)
+
+        except AttributeError:
+            raise AttributeError("'{0}' object has no attribute '{1}'".format(type(self).__name__, attr))
 
     def __getitem__(self, key: str) -> Component:
         return self._components[key]
@@ -182,4 +161,3 @@ class Context(Configurable, Mapping):
 
     def contains_type(self, key):
         return len(self.get_type(key)) > 0
-

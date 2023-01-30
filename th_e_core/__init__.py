@@ -8,7 +8,15 @@
 from ._version import __version__  # noqa: F401
 
 from . import io  # noqa: F401
-from . import configs  # noqa: F401
+
+from . import configs   # noqa: F401
+from .configs import (  # noqa: F401
+    Configurations,
+    Configurable,
+    ConfigurationException,
+    ConfigurationUnavailableException
+)
+
 from . import weather  # noqa: F401
 from . import forecast  # noqa: F401
 from . import model  # noqa: F401

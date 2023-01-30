@@ -5,7 +5,7 @@
 
 
 """
-from .component import (  # noqa: F401
+from .base import (  # noqa: F401
     Component,
     Context
 )
