@@ -9,7 +9,7 @@ import os
 import pytz as tz
 import datetime as dt
 import pandas as pd
-from copy import deepcopy
+from copy import copy, deepcopy
 from typing import Union
 from configparser import ConfigParser
 from pandas.tseries.frequencies import to_offset
@@ -75,13 +75,15 @@ def resample_data(data: pd.DataFrame, seconds: int) -> pd.DataFrame:
 
 
 def _resample_series(data: pd.Series, seconds: int) -> pd.Series:
+    index = copy(data.index)
     resampled = data.resample('{}s'.format(seconds), closed='right')
     if data.name.endswith('_energy'):
         data = resampled.last()
     else:
         data = resampled.mean()
     data.index += to_offset('{}s'.format(seconds))
-    return data
+
+    return data[(data.index >= index[0]) & (data.index <= index[-1])]
 
 
 def to_bool(v: Union[str, bool]) -> bool:
