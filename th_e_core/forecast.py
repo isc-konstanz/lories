@@ -28,28 +28,19 @@ from .io import Database
 logger = logging.getLogger(__name__)
 
 
-class Forecast(Configurable, ABC):
+class Forecast(ABC, Configurable):
 
     # noinspection PyShadowingBuiltins
     @classmethod
-    def read(cls, system: System) -> Forecast:
-        configs = cls._read_configs(system)
+    def read(cls, system: System, config_file: str = 'forecast.cfg') -> Forecast:
+        configs = Configurations.from_configs(system.configs, config_file)
         type = configs.get('General', 'type', fallback='default').lower()
         if type in ['default', 'nmm']:
             return NMM(system, configs)
         elif type == 'database':
             return DatabaseForecast(system, configs)
 
-        return cls(system, configs)
-
-    @staticmethod
-    def _read_configs(system: System, config_file: str = 'forecast.cfg') -> Configurations:
-        return Configurable._read_configs(system.configs.get('General', 'root_dir'),
-                                          system.configs.get('General', 'lib_dir'),
-                                          system.configs.get('General', 'tmp_dir'),
-                                          system.configs.get('General', 'data_dir'),
-                                          system.configs.get('General', 'config_dir'),
-                                          config_file)
+        raise TypeError('Invalid forecast type: {}'.format(type))
 
     def __init__(self, system: System, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(configs, *args, **kwargs)

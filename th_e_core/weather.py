@@ -31,26 +31,17 @@ class Weather(ABC, Configurable):
 
     # noinspection PyShadowingBuiltins
     @classmethod
-    def read(cls, system: System, **kwargs) -> Weather:
-        configs = cls._read_configs(system, **kwargs)
+    def read(cls, system: System, config_file: str = 'weather.cfg') -> Weather:
+        configs = Configurations.from_configs(system.configs, config_file)
         type = configs.get('General', 'type', fallback='default')
         if type.lower() in ['default', 'database']:
-            return DatabaseWeather(system, configs, **kwargs)
+            return DatabaseWeather(system, configs)
         elif type.lower() == 'tmy':
-            return TMYWeather(system, configs, **kwargs)
+            return TMYWeather(system, configs)
         elif type.lower() == 'epw':
-            return EPWWeather(system, configs, **kwargs)
+            return EPWWeather(system, configs)
 
         raise TypeError('Invalid weather type: {}'.format(type))
-
-    @staticmethod
-    def _read_configs(system: System, config_file: str = 'weather.cfg', **kwargs) -> Configurations:
-        return Configurable._read_configs(system.configs.get('General', 'root_dir'),
-                                          system.configs.get('General', 'lib_dir'),
-                                          system.configs.get('General', 'tmp_dir'),
-                                          system.configs.get('General', 'data_dir'),
-                                          system.configs.get('General', 'config_dir'),
-                                          config_file, **kwargs)
 
     def __init__(self, system: System, configs: Configurations, **kwargs) -> None:
         super().__init__(configs, **kwargs)
