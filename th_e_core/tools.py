@@ -6,8 +6,10 @@
     
 """
 import os
+import time
 import pytz as tz
 import datetime as dt
+import numpy as np
 import pandas as pd
 from copy import copy, deepcopy
 from typing import Union
@@ -105,3 +107,37 @@ def to_int(v: Union[str, int]) -> int:
         return int(v)
 
     return v
+
+
+def to_datetime(date):
+    return dt.fromtimestamp(date)
+
+
+def to_unixtime(date: Union[dt.datetime, pd.Timestamp]) -> int:
+    return time.mktime(date.timetuple())
+
+
+def derive_power(data: pd.Series) -> pd.Series:
+    """
+    Derive the power from energy for a Series.
+
+    Parameters
+    ----------
+    data : pd.Series
+        Series with the energy data
+
+    Returns
+    ----------
+    fixed: pd.Series
+        Series with the derived power data
+
+    """
+    delta_energy = data.iloc[:].astype('float64').diff()
+
+    delta_index = pd.Series(delta_energy.index, index=delta_energy.index)
+    delta_index = (delta_index - delta_index.shift(1)) / np.timedelta64(1, 'h')
+
+    data_power = pd.Series(delta_energy / delta_index, index=data.index)
+    data_power.name = data.name.replace("_energy", "_power")
+
+    return data_power.dropna()
