@@ -21,6 +21,10 @@ class Cost(Configurable):
     def __build__(self, system: System, configs: Configurations) -> None:
         pass
 
+    @property
+    def context(self) -> System:
+        return self._context
+
 
 class CostException(ConfigurationException):
     """

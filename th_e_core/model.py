@@ -32,3 +32,7 @@ class Model(ABC, Configurable):
 
     def __call__(self, *args, **kwargs) -> pd.DataFrame:
         raise NotImplementedError
+
+    @property
+    def context(self) -> System:
+        return self._context
