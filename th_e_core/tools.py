@@ -102,7 +102,7 @@ def to_date(date: Union[str, int, dt.datetime, pd.Timestamp],
         return date
 
     if isinstance(time, str):
-        date = pd.Timestamp(dt.datetime.strptime(time, format))
+        date = pd.Timestamp(dt.datetime.strptime(date, format))
     if isinstance(time, int):
         date = pd.Timestamp(dt.datetime.fromtimestamp(date))
     if timezone is not None:
