@@ -306,7 +306,7 @@ class CsvDatabase(Database):
 
 # noinspection PyProtectedMember
 def write_csv(system, data, file):
-    system_dir = system.configs['General']['data_dir']
+    system_dir = system.configs.dirs.data
     database = copy.deepcopy(system._database)
     database.dir = system_dir
     # database.format = '%Y%m%d'

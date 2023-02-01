@@ -32,8 +32,8 @@ class Forecast(ABC, Configurable):
 
     # noinspection PyShadowingBuiltins
     @classmethod
-    def read(cls, system: System, config_file: str = 'forecast.cfg') -> Forecast:
-        configs = Configurations.from_configs(system.configs, config_file)
+    def read(cls, system: System, conf_file: str = 'forecast.cfg') -> Forecast:
+        configs = Configurations.from_configs(system.configs, conf_file)
         type = configs.get('General', 'type', fallback='default').lower()
         if type in ['default', 'nmm']:
             return NMM(system, configs)
@@ -131,9 +131,9 @@ class DatabaseForecast(Forecast):
                     if system is None:
                         raise ValueError('Invalid configuration, missing specified forecast id')
 
-                    data_dir = configs['General']['lib_dir']
+                    data_dir = configs.dirs.lib
                 else:
-                    data_dir = configs['General']['data_dir']
+                    data_dir = configs.dirs.data
 
                 if not os.path.isabs(database_dir):
                     database_dir = os.path.join(data_dir, database_dir)

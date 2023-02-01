@@ -17,15 +17,6 @@ from ..configs import Configurations
 
 class Database(ABC):
 
-    def __init__(self,
-                 enabled: str = 'true',
-                 timezone: str | tz.BaseTzInfo = tz.UTC) -> None:
-
-        self.enabled = enabled.lower() == 'true'
-        if isinstance(timezone, str):
-            timezone = tz.timezone(timezone)
-        self.timezone = timezone
-
     @staticmethod
     def open(configs: Configurations, **kwargs) -> Database:
         dbargs = dict(configs.items('Database'))
@@ -47,6 +38,15 @@ class Database(ABC):
             return CsvDatabase(**kwargs)
         else:
             raise ValueError('Invalid database type argument')
+
+    def __init__(self,
+                 enabled: str = 'true',
+                 timezone: str | tz.BaseTzInfo = tz.UTC) -> None:
+
+        self.enabled = enabled.lower() == 'true'
+        if isinstance(timezone, str):
+            timezone = tz.timezone(timezone)
+        self.timezone = timezone
 
     @abstractmethod
     def exists(self,

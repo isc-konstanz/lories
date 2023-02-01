@@ -13,11 +13,14 @@ import os
 import re
 import logging
 import pandas as pd
+from shutil import copytree, ignore_patterns
 
 from .io import Database, DatabaseUnavailableException
+from .settings import Settings
 from .location import Location
 from .configs import Configurations
 from .cmpt import Component, Context
+from .tools import to_bool
 
 # noinspection SpellCheckingInspection
 INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
@@ -43,25 +46,64 @@ class System(Context):
 
     # noinspection PyProtectedMember
     @classmethod
-    def read(cls, data_dir: str = 'data', config_scan: bool = False, **kwargs) -> Systems:
+    def read(cls, settings: Settings) -> Systems:
         systems = Systems()
+        system_dirs = settings.dirs.encode()
+        system_scan = to_bool(settings.get(Configurations.GENERAL, 'system_scan', fallback=False))
+        system_copy = to_bool(settings.get(Configurations.GENERAL, 'system_copy', fallback=False))
 
-        if not isinstance(config_scan, bool):
-            config_scan = str(config_scan).lower() == 'true'
-        kwargs['config_scan'] = config_scan
-        kwargs['config_copy'] = True
+        if system_scan:
+            if system_copy:
+                cls._copy_system(settings)
 
-        if config_scan:
-            for system_dir in os.scandir(data_dir):
+            for system_dir in os.scandir(settings.dirs.data):
                 if os.path.isdir(system_dir.path):
-                    systems._systems.append(cls._read(data_dir=system_dir.path, **kwargs))
+                    system_dirs['data_dir'] = system_dir.path
+                    systems._systems.append(cls._read(**system_dirs))
         else:
-            systems._systems.append(cls._read(data_dir=data_dir, **kwargs))
+            systems._systems.append(cls._read(**system_dirs))
 
         return systems
 
+    @classmethod
+    def _copy_system(cls, settings: Settings) -> bool:
+        configs = super(System, cls)._read_configs(**settings.dirs.encode())
+
+        if configs.has_option('General', 'id'):
+            system_id = cls._parse_id(configs[Configurations.GENERAL]['id'])
+        elif configs.has_option(Configurations.GENERAL, 'name'):
+            system_id = cls._parse_id(configs[Configurations.GENERAL]['name'])
+            configs[Configurations.GENERAL]['id'] = system_id
+        else:
+            raise ValueError("Invalid configuration, missing specified system name")
+
+        configs.dirs._data = os.path.join(configs.dirs.data, system_id)
+
+        if os.path.isdir(configs.dirs.data):
+            return False
+        os.makedirs(configs.dirs.data, exist_ok=True)
+
+        copytree(settings.dirs.conf,
+                 configs.dirs.conf,
+                 ignore=ignore_patterns('*.default.cfg',
+                                        'evaluation*',
+                                        'evaluations*',
+                                        'settings*',
+                                        'logging*'))
+        return True
+
     def __init__(self, configs: Configurations, **kwargs) -> None:
         super().__init__(configs, **kwargs)
+
+        if not configs.has_option(Configurations.GENERAL, 'name'):
+            raise ValueError("Invalid configuration, missing specified system name")
+        self._name = configs[Configurations.GENERAL]['name']
+
+        if configs.has_option(Configurations.GENERAL, 'id'):
+            self._id = self._parse_id(configs[Configurations.GENERAL]['id'])
+        else:
+            self._id = self._parse_id(configs[Configurations.GENERAL]['name'])
+
         self.__activate__(self._components, configs)
 
     # noinspection PyMethodMayBeStatic
@@ -75,7 +117,6 @@ class System(Context):
 
     # noinspection PyUnresolvedReferences
     def __activate__(self, components: Dict[str, Component], configs: Configurations) -> None:
-        super().__activate__(components, configs)
         if configs.has_section('Location'):
             self._location = self.__init_location__(configs)
         else:
@@ -88,9 +129,9 @@ class System(Context):
                 database_dir = configs.get('Database', 'dir')
                 database_central = configs.getboolean('Database', 'central', fallback=False)
                 if database_central:
-                    data_dir = configs['General']['lib_dir']
+                    data_dir = configs.dirs.lib
                 else:
-                    data_dir = configs['General']['data_dir']
+                    data_dir = configs.dirs.data
 
                 if not os.path.isabs(database_dir):
                     database_dir = os.path.join(data_dir, database_dir)
@@ -109,16 +150,15 @@ class System(Context):
         else:
             self._database = None
 
+    @staticmethod
+    def _parse_id(s: str) -> str:
+        for c in INVALID_CHARS:
+            s = s.replace(c, '_')
+        return re.sub('[^\\w]+', '', s).lower()
+
     @property
     def id(self) -> str:
         return self._id
-
-    @id.setter
-    def id(self, s: str) -> None:
-        for c in INVALID_CHARS:
-            s = s.replace(c, '_')
-
-        self._id = re.sub('[^A-Za-z0-9_]+', '', s).lower()
 
     @property
     def name(self):

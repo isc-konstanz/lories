@@ -31,8 +31,8 @@ class Weather(ABC, Configurable):
 
     # noinspection PyShadowingBuiltins
     @classmethod
-    def read(cls, system: System, config_file: str = 'weather.cfg') -> Weather:
-        configs = Configurations.from_configs(system.configs, config_file)
+    def read(cls, system: System, conf_file: str = 'weather.cfg') -> Weather:
+        configs = Configurations.from_configs(system.configs, conf_file)
         type = configs.get('General', 'type', fallback='default')
         if type.lower() in ['default', 'database']:
             return DatabaseWeather(system, configs)
@@ -84,7 +84,7 @@ class TMYWeather(Weather):
         self.version = int(configs.get('General', 'version', fallback='3'))
 
         if 'file' in configs['TMY'] and not os.path.isabs(configs['TMY']['file']):
-            configs['TMY']['file'] = os.path.join(configs['General']['data_dir'], 
+            configs['TMY']['file'] = os.path.join(configs.dirs.data,
                                                   configs['TMY']['file'])
 
         self.file = configs.get('TMY', 'file', fallback=None)
@@ -115,7 +115,7 @@ class EPWWeather(Weather):
 
     def __configure__(self, configs: Configurations, **_) -> None:
         if 'file' in configs['EPW'] and not os.path.isabs(configs['EPW']['file']):
-            configs['EPW']['file'] = os.path.join(configs['General']['data_dir'], 
+            configs['EPW']['file'] = os.path.join(configs.dirs.data,
                                                   configs['EPW']['file'])
 
         self.file = configs.get('EPW', 'file', fallback=None)

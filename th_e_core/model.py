@@ -10,25 +10,17 @@ from abc import ABC
 
 import logging
 import pandas as pd
-from . import Configurations, Configurable, System
+from .system import System
+from .configs import Configurations, Configurable
 
 logger = logging.getLogger(__name__)
 
 
-class Model(Configurable, ABC):
+class Model(ABC, Configurable):
 
     @classmethod
-    def read(cls, system: System) -> Model:
-        return cls(system, cls._read_configs(system))
-
-    @staticmethod
-    def _read_configs(system: System, config_file: str = 'model.cfg') -> Configurations:
-        return Configurable._read_configs(system.configs.get('General', 'root_dir'),
-                                          system.configs.get('General', 'lib_dir'),
-                                          system.configs.get('General', 'tmp_dir'),
-                                          system.configs.get('General', 'data_dir'),
-                                          system.configs.get('General', 'config_dir'),
-                                          config_file)
+    def read(cls, system: System, conf_file: str = 'model.cfg') -> Model:
+        return cls(system, Configurations.from_configs(system.configs, conf_file))
 
     def __init__(self, system: System, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(configs, *args, **kwargs)

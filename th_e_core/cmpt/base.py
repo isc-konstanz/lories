@@ -19,8 +19,8 @@ INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
 class Component(Configurable):
 
     @classmethod
-    def read(cls, context: Context, config_file: str = None) -> Component:
-        return cls(context, Configurations.from_configs(context.configs, config_file=config_file))
+    def read(cls, context: Context, conf_file: str = None) -> Component:
+        return cls(context, Configurations.from_configs(context.configs, conf_file=conf_file))
 
     def __init__(self, context: Context, configs: Configurations, **kwargs) -> None:
         super().__init__(configs, **kwargs)
@@ -62,7 +62,7 @@ class Component(Configurable):
 
     @property
     def context(self) -> Context:
-        return self.context
+        return self._context
 
 
 class Context(Configurable, Mapping):
@@ -72,10 +72,10 @@ class Context(Configurable, Mapping):
         return cls(cls._read_configs(**kwargs))
 
     @classmethod
-    def _read_configs(cls, config_file: str = None, **kwargs) -> Configurations:
-        if config_file is None:
-            config_file = cls.__name__.lower() + '.cfg'
-        return Configurations(config_file, **kwargs)
+    def _read_configs(cls, conf_file: str = None, **kwargs) -> Configurations:
+        if conf_file is None:
+            conf_file = cls.__name__.lower() + '.cfg'
+        return Configurations(conf_file, **kwargs)
 
     def __init__(self, configs: Configurations, **kwargs) -> None:
         super().__init__(configs, **kwargs)
@@ -83,7 +83,7 @@ class Context(Configurable, Mapping):
 
     # noinspection SpellCheckingInspection
     def __readcmpts__(self) -> Dict[str, Component]:
-        cmpt_dir = self.configs.get('General', 'cmpt_dir', fallback='cmpt')
+        cmpt_dir = self.configs.dirs.cmpt
 
         components = dict()
         for entry in os.scandir(cmpt_dir):
@@ -98,15 +98,15 @@ class Context(Configurable, Mapping):
         return components
 
     # noinspection SpellCheckingInspection
-    def __readcmpt__(self, config_file: os.DirEntry) -> Component:
+    def __readcmpt__(self, conf_file: os.DirEntry) -> Component:
         component_configs = Configurations.from_configs(self.configs,
-                                                        config_file=config_file.name,
-                                                        config_dir=os.path.dirname(config_file.path))
+                                                        conf_file=conf_file.name,
+                                                        conf_dir=os.path.dirname(conf_file.path))
 
         if not component_configs.has_option('General', 'id'):
-            component_configs.set('General', 'id', os.path.splitext(config_file.name)[0])
+            component_configs.set('General', 'id', os.path.splitext(conf_file.name)[0])
 
-        component_type = [t for t in self.__cmpt_types__() if config_file.name.startswith(t)][0]
+        component_type = [t for t in self.__cmpt_types__() if conf_file.name.startswith(t)][0]
         component = self.__cmpt__(component_configs, component_type)
 
         if not isinstance(component, Component):

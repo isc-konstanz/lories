@@ -16,6 +16,7 @@ from .configs import (  # noqa: F401
     ConfigurationException,
     ConfigurationUnavailableException
 )
+from .settings import Settings  # noqa: F401
 
 from . import weather  # noqa: F401
 from . import forecast  # noqa: F401
