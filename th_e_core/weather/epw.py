@@ -22,7 +22,9 @@ logger = logging.getLogger(__name__)
 
 class EPWWeather(Weather):
 
-    def __configure__(self, configs: Configurations, **_) -> None:
+    def __configure__(self, configs: Configurations) -> None:
+        super().__configure__(configs)
+
         if 'file' in configs['EPW'] and not os.path.isabs(configs['EPW']['file']):
             configs['EPW']['file'] = os.path.join(configs.dirs.data,
                                                   configs['EPW']['file'])
@@ -31,7 +33,8 @@ class EPWWeather(Weather):
         self.year = configs.getint('EPW', 'year', fallback=None)
 
     # noinspection PyShadowingBuiltins
-    def __activate__(self, system: System, **kwargs) -> None:
+    def __activate__(self, system: System, configs: Configurations) -> None:
+        super().__activate__(system, configs)
         dir = os.path.dirname(self.file)
         if not os.path.isfile(self.file):
             os.makedirs(dir, exist_ok=True)

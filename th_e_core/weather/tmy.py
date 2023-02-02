@@ -18,7 +18,9 @@ from .wx import Weather
 
 class TMYWeather(Weather):
 
-    def __configure__(self, configs: Configurations, **_) -> None:
+    def __configure__(self, configs: Configurations) -> None:
+        super().__configure__(configs)
+
         self.version = int(configs.get('General', 'version', fallback='3'))
 
         if 'file' in configs['TMY'] and not os.path.isabs(configs['TMY']['file']):
@@ -29,7 +31,8 @@ class TMYWeather(Weather):
         self.year = configs.getint('TMY', 'year', fallback=None)
 
     # noinspection PyShadowingBuiltins
-    def __activate__(self, system: System, **kwargs) -> None:
+    def __activate__(self, system: System, configs: Configurations) -> None:
+        super().__activate__(system, configs)
         dir = os.path.dirname(self.file)
         if not os.path.isdir(dir):
             os.makedirs(dir, exist_ok=True)

@@ -10,7 +10,7 @@
     
 """
 from __future__ import annotations
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 import pytz as tz
 import datetime as dt
@@ -26,15 +26,11 @@ from .db import DatabaseWeather
 logger = logging.getLogger(__name__)
 
 
-class WeatherForecast(ABC, Weather):
+class WeatherForecast(Weather):
 
     def __init__(self, system: System, configs: Configurations, *args, **kwargs) -> None:
-        super().__init__(configs, *args, **kwargs)
+        super().__init__(system, configs, *args, **kwargs)
         self._context = system
-        self.__activate__(system, configs)
-
-    def __activate__(self, system: System, configs: Configurations) -> None:
-        pass
 
     def get(self,
             start: pd.Timestamp | dt.datetime = dt.datetime.now(),

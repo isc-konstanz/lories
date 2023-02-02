@@ -28,17 +28,17 @@ class Weather(ABC, Configurable):
     @classmethod
     def read(cls, system: System, conf_file: str = 'weather.cfg') -> Weather:
         configs = Configurations.from_configs(system.configs, conf_file)
-        type = configs.get('General', 'type', fallback='default')
-        if type.lower() in ['default', 'database']:
+        type = configs.get('General', 'type', fallback='default').lower()
+        if type in ['default', 'database']:
             from .db import DatabaseWeather
             return DatabaseWeather(system, configs)
-        elif type.lower() == 'tmy':
+        elif type == 'tmy':
             from .tmy import TMYWeather
             return TMYWeather(system, configs)
-        elif type.lower() == 'epw':
+        elif type == 'epw':
             from .epw import EPWWeather
             return EPWWeather(system, configs)
-        elif type in ['default', 'nmm']:
+        elif type == 'nmm':
             from .nmm import NMM
             return NMM(system, configs)
 
