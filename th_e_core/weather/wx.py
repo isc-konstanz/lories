@@ -44,11 +44,14 @@ class Weather(ABC, Configurable):
 
         raise TypeError('Invalid weather type: {}'.format(type))
 
-    def __init__(self, system: System, configs: Configurations, **kwargs) -> None:
-        super().__init__(configs, **kwargs)
-        self._variables = {}
+    def __init__(self, system: System, configs: Configurations, *args, **kwargs) -> None:
+        super().__init__(configs, *args, **kwargs)
         self._context = system
         self.__activate__(system, configs)
+
+    def __configure__(self, configs: Configurations) -> None:
+        super().__configure__(configs)
+        self._variables = {}
 
     def __activate__(self, system: System, configs: Configurations) -> None:
         pass

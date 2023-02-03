@@ -280,8 +280,8 @@ class CsvDatabase(Database):
 
             files.append(file_path)
         else:
-            end = pd.Timestamp(convert_timezone(end, self.timezone))
-            start = pd.Timestamp(convert_timezone(start, self.timezone))
+            end = convert_timezone(end, self.timezone)
+            start = convert_timezone(start, self.timezone)
             date = start.round('{hours}h'.format(hours=self.interval))
             if date > start:
                 date = (date - relativedelta(hours=self.interval)).round('{hours}h'.format(hours=self.interval))

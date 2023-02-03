@@ -42,7 +42,7 @@ class NMM(ScheduledForecast):
             'temp_felt':                    'felttemperature',
             'wind_speed':                   'windspeed',
             'wind_direction':               'winddirection',
-            'humidity_rel':                 'relativehumidity',
+            'relative_humidity':            'relativehumidity',
             'pressure_sea':                 'sealevelpressure',
             'precipitation_convective':     'convective_precipitation',
             'precipitation_probability':    'precipitation_probability',
@@ -84,7 +84,7 @@ class NMM(ScheduledForecast):
             'high_clouds',                  # Bedeckungsgrad mit hohen Wolken [%]
             'visibility',                   # Sichtweite [km]
             'uv_index',                     # UV index numbers from 1 to 16
-            'humidity_rel',                 # Relative luftfeuchtigkeit [%]
+            'relative_humidity',            # Relative luftfeuchtigkeit [%]
             'pressure_sea',                 # Luftdruck auf Hoehe des Meerespiegels [hPa]
             'precipitation',                # Niederschlagsmenge [mm]
             'precipitation_convective',     # Niederschlag als Schauer [mm]

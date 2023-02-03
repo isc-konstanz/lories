@@ -66,6 +66,9 @@ def derive_power(data: pd.Series) -> pd.Series:
 
 def convert_timezone(date: Union[dt.datetime, pd.Timestamp, str],
                      timezone: dt.tzinfo = tz.UTC) -> pd.Timestamp:
+    if date is None:
+        return date
+
     if isinstance(date, str):
         import dateutil.parser
         date = dateutil.parser.parse(date)

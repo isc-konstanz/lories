@@ -30,7 +30,11 @@ class DatabaseWeather(Weather):
 
         if configs.get('Database', 'type').lower() == 'csv':
             database_dir = configs.get('Database', 'dir')
-            database_central = configs.getboolean('Database', 'central', fallback=False)
+            if configs.has_option('Database', 'central'):
+                database_central = configs.getboolean('Database', 'central')
+                configs.remove_option('Database', 'central')
+            else:
+                database_central = False
             if database_central:
                 if system is None:
                     raise ValueError('Invalid configuration, missing specified forecast id')
