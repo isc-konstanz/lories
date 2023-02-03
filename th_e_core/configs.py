@@ -87,11 +87,11 @@ class Configurations(ConfigParser):
 class Configurable:
 
     @classmethod
-    def _read(cls, conf_file: str = None) -> Configurable:
+    def _read(cls, conf_file: str = None, **kwargs) -> Configurable:
         if conf_file is None:
             conf_file = cls.__name__.lower() + '.cfg'
 
-        return cls(Configurations(conf_file))
+        return cls(Configurations(conf_file), **kwargs)
 
     def __init__(self, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)

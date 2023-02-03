@@ -69,13 +69,7 @@ class Context(Configurable, Mapping):
 
     @classmethod
     def _read(cls, **kwargs) -> Context:
-        return cls(cls._read_configs(**kwargs))
-
-    @classmethod
-    def _read_configs(cls, conf_file: str = None, **kwargs) -> Configurations:
-        if conf_file is None:
-            conf_file = cls.__name__.lower() + '.cfg'
-        return Configurations(conf_file, **kwargs)
+        return cls(Configurations(f"{cls.__name__.lower()}.cfg", **kwargs))
 
     def __init__(self, configs: Configurations, **kwargs) -> None:
         super().__init__(configs, **kwargs)
@@ -103,8 +97,10 @@ class Context(Configurable, Mapping):
                                                         conf_file=conf_file.name,
                                                         conf_dir=os.path.dirname(conf_file.path))
 
-        if not component_configs.has_option('General', 'id'):
-            component_configs.set('General', 'id', os.path.splitext(conf_file.name)[0])
+        if Configurations.GENERAL not in component_configs.sections():
+            component_configs.add_section(Configurations.GENERAL)
+        if not component_configs.has_option(Configurations.GENERAL, 'id'):
+            component_configs.set(Configurations.GENERAL, 'id', os.path.splitext(conf_file.name)[0])
 
         component_type = [t for t in self.__cmpt_types__() if conf_file.name.startswith(t)][0]
         component = self.__cmpt__(component_configs, component_type)

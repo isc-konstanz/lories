@@ -54,7 +54,7 @@ class System(Context):
 
         if system_scan:
             if system_copy:
-                cls._copy_system(settings)
+                cls._copy_configs(settings)
 
             for system_dir in os.scandir(settings.dirs.data):
                 if os.path.isdir(system_dir.path):
@@ -66,9 +66,8 @@ class System(Context):
         return systems
 
     @classmethod
-    def _copy_system(cls, settings: Settings) -> bool:
-        configs = super(System, cls)._read_configs(**settings.dirs.encode())
-
+    def _copy_configs(cls, settings: Settings) -> bool:
+        configs = Configurations(f"{cls.__name__.lower()}.cfg", **settings.dirs.encode())
         if configs.has_option('General', 'id'):
             system_id = cls._parse_id(configs[Configurations.GENERAL]['id'])
         elif configs.has_option(Configurations.GENERAL, 'name'):
