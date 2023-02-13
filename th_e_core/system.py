@@ -94,6 +94,10 @@ class System(Context):
 
     def __init__(self, configs: Configurations, **kwargs) -> None:
         super().__init__(configs, **kwargs)
+        self.__activate__(self._components, configs)
+
+    def __configure__(self, configs: Configurations) -> None:
+        super().__configure__(configs)
 
         if not configs.has_option(Configurations.GENERAL, 'name'):
             raise ValueError("Invalid configuration, missing specified system name")
@@ -104,21 +108,19 @@ class System(Context):
         else:
             self._id = self._parse_id(configs[Configurations.GENERAL]['name'])
 
-        self.__activate__(self._components, configs)
-
-    # noinspection PyUnresolvedReferences
-    def __activate__(self, components: Dict[str, Component], configs: Configurations) -> None:
-        if configs.has_section('Location'):
+        if configs.has_section(Location.SECTION):
             self._location = self.__location__(configs)
         else:
             self._location = None
 
-        if configs.has_section('Database') and \
-                configs.get('Database', 'enabled', fallback='True').lower() == 'true' and \
-                configs.get('Database', 'enable', fallback='True').lower() == 'true':
+        if configs.has_section(Database.SECTION) and \
+                configs.get(Database.SECTION, 'enabled', fallback='True').lower() == 'true' and \
+                configs.get(Database.SECTION, 'enable', fallback='True').lower() == 'true':
             self._database = self.__database__(configs)
         else:
             self._database = None
+
+    def __activate__(self, components: Dict[str, Component], configs: Configurations) -> None:
         try:
             self._weather = self.__weather__(configs)
 
@@ -132,18 +134,18 @@ class System(Context):
 
     # noinspection PyMethodMayBeStatic
     def __location__(self, configs: Configurations) -> Location:
-        return Location(configs.getfloat('Location', 'latitude'),
-                        configs.getfloat('Location', 'longitude'),
-                        timezone=configs.get('Location', 'timezone', fallback='UTC'),
-                        altitude=configs.getfloat('Location', 'altitude', fallback=None),
-                        country=configs.get('Location', 'country', fallback=None),
-                        state=configs.get('Location', 'state', fallback=None))
+        return Location(configs.getfloat(Location.SECTION, 'latitude'),
+                        configs.getfloat(Location.SECTION, 'longitude'),
+                        timezone=configs.get(Location.SECTION, 'timezone', fallback='UTC'),
+                        altitude=configs.getfloat(Location.SECTION, 'altitude', fallback=None),
+                        country=configs.get(Location.SECTION, 'country', fallback=None),
+                        state=configs.get(Location.SECTION, 'state', fallback=None))
 
     def __database__(self, configs: Configurations) -> Database:
-        if configs.get('Database', 'type').lower() == 'csv' and \
-                configs.has_option('Database', 'dir'):
-            database_dir = configs.get('Database', 'dir')
-            database_central = configs.getboolean('Database', 'central', fallback=False)
+        if configs.get(Database.SECTION, 'type').lower() == 'csv' and \
+                configs.has_option(Database.SECTION, 'dir'):
+            database_dir = configs.get(Database.SECTION, 'dir')
+            database_central = configs.getboolean(Database.SECTION, 'central', fallback=False)
             if database_central:
                 data_dir = configs.dirs.lib
             else:
@@ -157,10 +159,10 @@ class System(Context):
                     '{0:08.4f}'.format(float(self.location.latitude)).replace('.', '') + '_' +
                     '{0:08.4f}'.format(float(self.location.longitude)).replace('.', '')
                 )
-            configs.set('Database', 'dir', database_dir)
+            configs.set(Database.SECTION, 'dir', database_dir)
 
-        if not configs.has_option('Database', 'timezone'):
-            configs.set('Database', 'timezone', self.location.timezone.zone)
+        if not configs.has_option(Database.SECTION, 'timezone'):
+            configs.set(Database.SECTION, 'timezone', self.location.timezone.zone)
 
         return Database.open(configs)
 
@@ -181,23 +183,23 @@ class System(Context):
     @property
     def database(self):
         if self._database is None:
-            raise DatabaseUnavailableException(f"System '{self.name}' has no database configured")
+            raise DatabaseUnavailableException(f"System \"{self.name}\" has no database configured")
         if not self._database.enabled:
-            raise DatabaseUnavailableException(f"System '{self.name}' database is disabled")
+            raise DatabaseUnavailableException(f"System \"{self.name}\" database is disabled")
 
         return self._database
 
     @property
     def location(self) -> Location:
         if not self._location:
-            raise LocationUnavailableException(f"System '{self.name}' has no location configured")
+            raise LocationUnavailableException(f"System \"{self.name}\" has no location configured")
 
         return self._location
 
     @property
     def weather(self):
         if self._weather is None:
-            raise WeatherUnavailableException(f"System '{self.name}' has no weather configured")
+            raise WeatherUnavailableException(f"System \"{self.name}\" has no weather configured")
 
         return self._weather
 

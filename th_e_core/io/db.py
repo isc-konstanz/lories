@@ -17,9 +17,11 @@ from ..configs import Configurations
 
 class Database(ABC):
 
+    SECTION = 'Database'
+
     @staticmethod
     def open(configs: Configurations, **kwargs) -> Database:
-        dbargs = dict(configs.items('Database'))
+        dbargs = dict(configs.items(Database.SECTION))
         kwargs.update(dbargs)
 
         database_type = kwargs.pop('type').lower()

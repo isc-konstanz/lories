@@ -31,6 +31,8 @@ class Location:
         Altitude from sea level in meters.
     """
 
+    SECTION = 'Location'
+
     def __init__(self,
                  latitude: float,
                  longitude: float,

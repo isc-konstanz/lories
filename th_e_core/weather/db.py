@@ -22,18 +22,18 @@ class DatabaseWeather(Weather):
 
     def __activate__(self, system: System, configs: Configurations) -> None:
         super().__activate__(system, configs)
-        if not configs.has_section('Database'):
+        if not configs.has_section(Database.SECTION):
             raise DatabaseUnavailableException("Weather database not configured")
-        if not to_bool(configs.get('Database', 'enabled', fallback='True')) or \
-                not to_bool(configs.get('Database', 'enable', fallback='True')):
+        if not to_bool(configs.get(Database.SECTION, 'enabled', fallback='True')) or \
+                not to_bool(configs.get(Database.SECTION, 'enable', fallback='True')):
             raise DatabaseUnavailableException("Weather database not enabled")
 
-        if configs.get('Database', 'type').lower() == 'csv' and \
-                configs.has_option('Database', 'dir'):
-            database_dir = configs.get('Database', 'dir')
-            if configs.has_option('Database', 'central'):
-                database_central = configs.getboolean('Database', 'central')
-                configs.remove_option('Database', 'central')
+        if configs.get(Database.SECTION, 'type').lower() == 'csv' and \
+                configs.has_option(Database.SECTION, 'dir'):
+            database_dir = configs.get(Database.SECTION, 'dir')
+            if configs.has_option(Database.SECTION, 'central'):
+                database_central = configs.getboolean(Database.SECTION, 'central')
+                configs.remove_option(Database.SECTION, 'central')
             else:
                 database_central = False
             if database_central:
@@ -52,10 +52,10 @@ class DatabaseWeather(Weather):
                     '{0:06.2f}'.format(float(system.location.latitude)).replace('.', '') + '_' +
                     '{0:06.2f}'.format(float(system.location.longitude)).replace('.', '')
                 )
-            configs.set('Database', 'dir', database_dir)
+            configs.set(Database.SECTION, 'dir', database_dir)
 
-            if not configs.has_option('Database', 'timezone'):
-                configs.set('Database', 'timezone', system.location.timezone.zone)
+            if not configs.has_option(Database.SECTION, 'timezone'):
+                configs.set(Database.SECTION, 'timezone', system.location.timezone.zone)
 
         self.database = Database.open(configs)
 
