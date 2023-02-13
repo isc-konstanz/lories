@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from typing import Dict, List
 import os
 import re
+from ..cost import Cost, CostUnavailableException
 from ..configs import Configurations, Configurable
 
 # noinspection SpellCheckingInspection
@@ -24,23 +25,35 @@ class Component(Configurable):
 
     def __init__(self, context: Context, configs: Configurations, **kwargs) -> None:
         super().__init__(configs, **kwargs)
+        self._context = context
+        self.__activate__(context, **kwargs)
 
-        if not configs.has_option('General', 'id'):
+    def __configure__(self, configs: Configurations) -> None:
+        super().__configure__(configs)
+
+        if not configs.has_option(Configurations.GENERAL, 'id'):
             raise ValueError('Invalid configuration, missing specified component id')
 
-        self.id = configs.get('General', 'id')
-        self.name = configs.get('General', 'name', fallback=configs.get('General', 'id'))
-        self._context = context
+        self.id = configs.get(Configurations.GENERAL, 'id')
+        self.name = configs.get(Configurations.GENERAL, 'name', fallback=configs.get(Configurations.GENERAL, 'id'))
 
-        self.__activate__(context, **kwargs)
+        if configs.has_section(Cost.SECTION):
+            self._cost = self.__cost__(configs)
+        else:
+            self._cost = None
 
     def __activate__(self, context: Context, **kwargs):
         pass
+
+    # noinspection PyMethodMayBeStatic
+    def __cost__(self, configs: Configurations) -> Cost:
+        return Cost(dict(configs.items(Cost.SECTION)))
 
     @property
     def id(self) -> str:
         return self._id
 
+    # noinspection PyAttributeOutsideInit
     @id.setter
     def id(self, s: str) -> None:
         self._id = re.sub('[^A-Za-z0-9_]+', '', s.translate({ord(c): "_" for c in INVALID_CHARS}))
@@ -49,6 +62,7 @@ class Component(Configurable):
     def name(self):
         return self._name
 
+    # noinspection PyAttributeOutsideInit
     @name.setter
     def name(self, s: str) -> None:
         if s is None:
@@ -59,6 +73,13 @@ class Component(Configurable):
     @property
     def type(self) -> str:
         return 'component'
+
+    @property
+    def cost(self):
+        if self._cost is None:
+            raise CostUnavailableException(f"Component \"{self.name}\" has no costs configured")
+
+        return self._cost
 
     @property
     def context(self) -> Context:

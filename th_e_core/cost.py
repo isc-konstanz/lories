@@ -6,24 +6,36 @@
     
 """
 from __future__ import annotations
+from typing import Dict, Any
 
-from .configs import Configurations, Configurable, ConfigurationException, ConfigurationUnavailableException
-from .system import System
+from .configs import ConfigurationException, ConfigurationUnavailableException
 
 
-class Cost(Configurable):
+class Cost:
 
-    def __init__(self, system: System, configs: Configurations, *args, **kwargs) -> None:
-        super().__init__(configs, *args, **kwargs)
-        self._context = system
-        self.__build__(system, configs)
+    SECTION = 'Cost'
 
-    def __build__(self, system: System, configs: Configurations) -> None:
-        pass
+    def __init__(self, costs: Dict[str, Any]) -> None:
+        self._costs = costs
 
-    @property
-    def context(self) -> System:
-        return self._context
+    def __repr__(self):
+        return ('Cost: \n  ' + '\n  '.join(
+            f'{k}: {str(v)}' for k, v in self._costs.items()))
+
+    def __getattr__(self, attr):
+        if attr in self._costs.keys():
+            val = self._costs[attr]
+            if val.isdigit():
+                val = float(val)
+                if val.is_integer():
+                    val = int(val)
+            return val
+        try:
+            # noinspection PyUnresolvedReferences
+            return super().__getattr__(attr)
+
+        except AttributeError:
+            raise AttributeError("'{0}' object has no attribute '{1}'".format(type(self).__name__, attr))
 
 
 class CostException(ConfigurationException):
