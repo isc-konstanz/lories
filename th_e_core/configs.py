@@ -104,8 +104,11 @@ class Configurable:
 
     def __repr__(self) -> str:
         configs = f"{self._class_name}:\n"
-        for section in self.configs.sections():
-            if section == 'General':
+        sections = self.configs.sections()
+        if Configurations.GENERAL in sections:
+            sections.insert(0, sections.pop(sections.index(Configurations.GENERAL)))
+        for section in sections:
+            if section == Configurations.GENERAL:
                 if self.configs.has_option(section, 'id'):
                     configs_id = self.configs.get(section, 'id')
                     configs += f"\tid = {configs_id}\n"
