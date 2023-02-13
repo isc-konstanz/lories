@@ -241,4 +241,9 @@ class Systems(Sequence):
 
     def __call__(self, *args, **kwargs) -> None:
         for system in self:
-            system(*args, **kwargs)
+            result = system(*args, **kwargs)
+            try:
+                system.database.write(result)
+
+            except DatabaseUnavailableException as e:
+                logger.debug(f"Skipping persisting results: {str(e)}")
