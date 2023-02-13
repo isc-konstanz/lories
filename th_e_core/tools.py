@@ -5,15 +5,14 @@
     
     
 """
-import os
-import time
 import pytz as tz
 import datetime as dt
 import numpy as np
 import pandas as pd
 from copy import copy, deepcopy
-from typing import Union
+from typing import Optional, Union
 from pandas.tseries.frequencies import to_offset
+from dateutil.relativedelta import relativedelta
 
 
 def resample_data(data: pd.DataFrame, seconds: int) -> pd.DataFrame:
@@ -65,10 +64,9 @@ def derive_power(data: pd.Series) -> pd.Series:
 
 
 def convert_timezone(date: Union[dt.datetime, pd.Timestamp, str],
-                     timezone: dt.tzinfo = tz.UTC) -> pd.Timestamp:
+                     timezone: dt.tzinfo = tz.UTC) -> Optional[pd.Timestamp]:
     if date is None:
-        return date
-
+        return None
     if isinstance(date, str):
         import dateutil.parser
         date = dateutil.parser.parse(date)
@@ -85,32 +83,63 @@ def convert_timezone(date: Union[dt.datetime, pd.Timestamp, str],
 
 
 def floor_date(date: Union[dt.datetime, pd.Timestamp, str],
-               timezone: dt.tzinfo = None) -> Union[dt.datetime, pd.Timestamp]:
-    if timezone is not None:
-        date = convert_timezone(date, timezone)
-    return date.replace(hour=0, minute=0, second=0, microsecond=0)
+               timezone: dt.tzinfo = None,
+               freq: str = 'D') -> Optional[pd.Timestamp]:
+    if date is None:
+        return None
+    if timezone is None:
+        timezone = date.tzinfo
+    date = convert_timezone(date, timezone)
+
+    if freq in ['Y', 'M']:
+        return date.tz_localize(None).to_period(freq).to_timestamp().tz_localize(timezone)
+    elif any([freq.endswith(f) for f in ['D', 'H', 'T']]):
+        return date.floor(freq)
+    else:
+        raise ValueError(f"Invalid frequency: {freq}")
 
 
 def ceil_date(date: Union[dt.datetime, pd.Timestamp, str],
-              timezone: dt.tzinfo = None) -> Union[dt.datetime, pd.Timestamp]:
-    if timezone is not None:
-        date = convert_timezone(date, timezone)
-    return date.replace(hour=23, minute=59, second=59, microsecond=999999)
+              timezone: dt.tzinfo = None,
+              freq: str = 'D') -> Optional[pd.Timestamp]:
+    date = floor_date(date, timezone, freq)
+    if date is None:
+        return None
+
+    return date + to_timedelta(freq) - dt.timedelta(microseconds=1)
 
 
 def to_date(date: Union[str, int, dt.datetime, pd.Timestamp],
             timezone: dt.tzinfo = None,
-            format: str = '%d.%m.%Y') -> pd.Timestamp:
+            format: str = '%d.%m.%Y') -> Optional[pd.Timestamp]:
     if date is None:
-        return date
+        return None
 
-    if isinstance(time, str):
+    if isinstance(date, str):
         date = pd.Timestamp(dt.datetime.strptime(date, format))
-    if isinstance(time, int):
+    if isinstance(date, int):
         date = pd.Timestamp(dt.datetime.fromtimestamp(date))
     if timezone is not None:
         date = convert_timezone(date, timezone)
     return date
+
+
+def to_timedelta(freq: str) -> relativedelta:
+    freq_val = freq[:-1]
+    freq_val = int(freq_val) if len(freq_val) > 0 and freq_val.isnumeric() else 1
+    freq = freq[-1:]
+    if freq == 'Y':
+        return relativedelta(years=freq_val)
+    elif freq == 'M':
+        return relativedelta(months=freq_val)
+    elif freq.endswith('D'):
+        return relativedelta(days=freq_val)
+    elif freq.endswith('H'):
+        return relativedelta(hours=freq_val)
+    elif freq.endswith('T'):
+        return relativedelta(minutes=freq_val)
+    else:
+        raise ValueError(f"Invalid frequency: {freq}")
 
 
 def to_float(value: Union[str, float]) -> float:
