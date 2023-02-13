@@ -70,3 +70,19 @@ class Location:
         if self._altitude is None:
             return 0.
         return self._altitude
+
+
+class LocationException(Exception):
+    """
+    Raise if an error occurred accessing the location.
+
+    """
+    pass
+
+
+class LocationUnavailableException(LocationException):
+    """
+    Raise if a configured location access can not be found.
+
+    """
+    pass

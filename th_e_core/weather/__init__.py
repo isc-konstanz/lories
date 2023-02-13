@@ -5,5 +5,9 @@
 
 
 """
-from .wx import Weather  # noqa: F401
+from .wx import (  # noqa: F401
+    Weather,
+    WeatherException,
+    WeatherUnavailableException
+)
 from .fcst import WeatherForecast  # noqa: F401

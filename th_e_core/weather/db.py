@@ -28,7 +28,8 @@ class DatabaseWeather(Weather):
                 not to_bool(configs.get('Database', 'enable', fallback='True')):
             raise DatabaseUnavailableException("Weather database not enabled")
 
-        if configs.get('Database', 'type').lower() == 'csv':
+        if configs.get('Database', 'type').lower() == 'csv' and \
+                configs.has_option('Database', 'dir'):
             database_dir = configs.get('Database', 'dir')
             if configs.has_option('Database', 'central'):
                 database_central = configs.getboolean('Database', 'central')
@@ -56,7 +57,11 @@ class DatabaseWeather(Weather):
             if not configs.has_option('Database', 'timezone'):
                 configs.set('Database', 'timezone', system.location.timezone.zone)
 
-        self._database = Database.open(configs)
+        self.database = Database.open(configs)
+
+    def __build__(self, **kwargs) -> pd.Dataframe:
+        from th_e_data import build
+        return build(self.configs, self.database, location=self.context.location, **kwargs)
 
     # noinspection PyShadowingBuiltins
     def get(self,
@@ -68,4 +73,4 @@ class DatabaseWeather(Weather):
         start = to_date(start, timezone=self.context.location.timezone)
         end = to_date(end, timezone=self.context.location.timezone)
 
-        return self._database.read(start=start, end=end, **kwargs)
+        return self.database.read(start=start, end=end, **kwargs)

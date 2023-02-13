@@ -10,7 +10,7 @@ from abc import ABC
 
 import logging
 import pandas as pd
-from .system import System
+from .cmpt import Context
 from .configs import Configurations, Configurable
 
 logger = logging.getLogger(__name__)
@@ -19,20 +19,20 @@ logger = logging.getLogger(__name__)
 class Model(ABC, Configurable):
 
     @classmethod
-    def read(cls, system: System, conf_file: str = 'model.cfg') -> Model:
-        return cls(system, Configurations.from_configs(system.configs, conf_file))
+    def read(cls, context: Context, conf_file: str = 'model.cfg') -> Model:
+        return cls(context, Configurations.from_configs(context.configs, conf_file))
 
-    def __init__(self, system: System, configs: Configurations, *args, **kwargs) -> None:
+    def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(configs, *args, **kwargs)
-        self._context = system
-        self.__build__(system, configs)
+        self._context = context
+        self.__build__(context, configs)
 
-    def __build__(self, system: System, configs: Configurations) -> None:
+    def __build__(self, context: Context, configs: Configurations) -> None:
         pass
 
     def __call__(self, *args, **kwargs) -> pd.DataFrame:
         raise NotImplementedError
 
     @property
-    def context(self) -> System:
+    def context(self) -> Context:
         return self._context

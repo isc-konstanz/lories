@@ -19,7 +19,6 @@ import logging
 
 from ..tools import to_date
 from ..configs import Configurations
-from ..system import System
 from .wx import Weather
 from .db import DatabaseWeather
 
@@ -27,10 +26,6 @@ logger = logging.getLogger(__name__)
 
 
 class WeatherForecast(Weather):
-
-    def __init__(self, system: System, configs: Configurations, *args, **kwargs) -> None:
-        super().__init__(system, configs, *args, **kwargs)
-        self._context = system
 
     def get(self,
             start: pd.Timestamp | dt.datetime = dt.datetime.now(),
