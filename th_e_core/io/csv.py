@@ -10,6 +10,7 @@ from typing import List
 
 import os
 import copy
+import glob
 import pytz as tz
 import datetime as dt
 import pandas as pd
@@ -17,8 +18,7 @@ import pandas as pd
 # noinspection PyProtectedMember
 from . import _var as var
 from . import Database, DatabaseException
-from ..tools import to_bool, to_int, convert_timezone, resample_data
-from dateutil.relativedelta import relativedelta
+from ..tools import to_bool, to_timedelta, to_date, floor_date, ceil_date, convert_timezone, resample_data
 
 
 class CsvDatabase(Database):
@@ -27,11 +27,11 @@ class CsvDatabase(Database):
     def __init__(self,
                  dir=os.getcwd(),
                  file=None,
-                 format='%Y%m%d_%H%M%S',
                  index_column='Time',
                  index_unix=False,
                  merge=False,
-                 interval=24,
+                 freq='T',
+                 format=None,
                  timezone=tz.UTC,
                  decimal='.',
                  separator=',',
@@ -47,12 +47,21 @@ class CsvDatabase(Database):
             file = os.path.join(dir, file)
         self.file = file
 
-        self.format = format
         self.index_column = index_column
         self.index_unix = to_bool(index_unix)
 
-        self.interval = to_int(interval)
         self.merge = to_bool(merge)
+        self.freq = freq
+        if format is not None:
+            self.format = format
+        elif self.freq == 'Y':
+            self.format = 'Y%'
+        elif self.freq == 'M':
+            self.format = '%Y-%m'
+        elif any([self.freq.endswith(s) for s in ['D', 'H', 'T']]):
+            self.format = '%Y%m%d_%H%M%S'
+        else:
+            raise ValueError(f"Invalid frequency: {freq}")
 
         if isinstance(timezone, str):
             timezone = tz.timezone(timezone)
@@ -187,26 +196,27 @@ class CsvDatabase(Database):
                 start = data.index[0]
             else:
                 start = convert_timezone(start, self.timezone)
+                data = data[data.index >= start]
 
             if end is None:
                 end = data.index[-1]
             else:
                 end = convert_timezone(end, self.timezone)
+                data = data[data.index <= end]
 
             if file is None:
                 file = self.file
             if file is None:
                 file = start.strftime(self.format) + '.csv'
-            file_path = os.path.join(path, file)
+            else:
+                split_data = False
 
             if split_data:
-                time_step = start.replace(hour=0, minute=0, second=0, microsecond=0)
+                time_step = floor_date(start, freq=self.freq)
 
                 def next_step() -> pd.Timestamp:
-                    return (time_step + relativedelta(hours=self.interval)).round('{}h'.format(self.interval))
+                    return floor_date(time_step + to_timedelta(self.freq), timezone=self.timezone, freq=self.freq)
 
-                if time_step < start and time_step.day != start.day:
-                    time_step = next_step()
                 while time_step < end:
                     time_next = next_step()
 
@@ -224,7 +234,7 @@ class CsvDatabase(Database):
 
                     time_step = time_next
             else:
-                self._write_file(file_path, data.loc[start:end], **kwargs)
+                self._write_file(os.path.join(path, file), data, **kwargs)
 
     def _write_file(self,
                     path: str,
@@ -269,6 +279,8 @@ class CsvDatabase(Database):
                    file: str,
                    subdir: str) -> List[str]:
 
+        path = os.path.join(self.dir, subdir)
+
         files = []
         if file is None:
             file = self.file
@@ -282,14 +294,25 @@ class CsvDatabase(Database):
         else:
             end = convert_timezone(end, self.timezone)
             start = convert_timezone(start, self.timezone)
-            date = start.round('{hours}h'.format(hours=self.interval))
-            if date > start:
-                date = (date - relativedelta(hours=self.interval)).round('{hours}h'.format(hours=self.interval))
+            if start is None or end is None:
+                filenames = [os.path.basename(f) for f in glob.glob(os.path.join(path, '*.csv'))]
+                if len(filenames) > 0:
+                    filenames.sort()
+                    if end is None:
+                        end_str = filenames[-1].replace('.csv', '')
+                        end = to_date(end_str, timezone=self.timezone, format=self.format)
+                        end = ceil_date(end, timezone=self.timezone, freq=self.freq)
+                    if start is None:
+                        start_str = filenames[0].replace('.csv', '')
+                        start = to_date(start_str, timezone=self.timezone, format=self.format)
+                if start is None and end is None:
+                    return files
+
+            date = floor_date(start, timezone=self.timezone, freq=self.freq)
 
             def next_date() -> pd.Timestamp:
-                return (date + relativedelta(hours=self.interval)).round('{hours}h'.format(hours=self.interval))
+                return floor_date(date + to_timedelta(self.freq), timezone=self.timezone, freq=self.freq)
 
-            path = os.path.join(self.dir, subdir)
             file = date.strftime(self.format) + '.csv'
             file_path = os.path.join(path, file)
             files.append(file_path)

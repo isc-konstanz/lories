@@ -129,7 +129,7 @@ WEATHER = {
     'dni':                       'Direct Normal Irradiance [W/m2]',
     'dhi':                       'Diffuse Horizontal Irradiance [W/m2]',
     'temp_air':                  'Air Temperature [°C]',
-    'humidity_rel':              'Relative Humidity [%]',
+    'relative_humidity':         'Relative Humidity [%]',
     'pressure_sea':              'Atmospheric Pressure [hPa]',
     'wind_speed':                'Wind Speed [km/h]',
     'wind_gust':                 'Wind Gust [km/h]',
