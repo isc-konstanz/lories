@@ -51,7 +51,7 @@ class CsvDatabase(Database):
         self.index_column = index_column
         self.index_unix = to_bool(index_unix)
 
-        self.resolution = to_int(resolution)*60
+        self.resolution = to_int(resolution)*60 if resolution is not None else None
         self.merge = to_bool(merge)
         self.freq = freq
         if format is not None:
