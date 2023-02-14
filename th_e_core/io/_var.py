@@ -63,6 +63,19 @@ PV = {
     **_PV_ENERGY
 }
 
+_DC_POWER = {
+    'dc_power': 'Generated DC Power [W]'
+}
+
+_DC_ENERGY = {
+    'dc_energy': 'Generated DC Energy [kWh]'
+}
+
+DC = {
+    **_DC_POWER,
+    **_DC_ENERGY
+}
+
 STATES = {
     ElectricalEnergyStorage.STATE_OF_CHARGE: 'EES State of Charge [%]',
     ThermalEnergyStorage.TEMPERATURE:        'TES Temperature [°C]'
@@ -162,6 +175,7 @@ POWER = {
     **_COMPONENTS_POWER,
     **_SYSTEM_POWER,
     **_PV_POWER,
+    **_DC_POWER,
     **_AC_POWER
 }
 
@@ -169,6 +183,7 @@ ENERGY = {
     **_COMPONENTS_ENERGY,
     **_SYSTEM_ENERGY,
     **_PV_ENERGY,
+    **_DC_ENERGY,
     **_AC_ENERGY
 }
 

@@ -18,7 +18,7 @@ import pandas as pd
 # noinspection PyProtectedMember
 from . import _var as var
 from . import Database, DatabaseException
-from ..tools import to_bool, to_timedelta, to_date, floor_date, ceil_date, convert_timezone, resample_data
+from ..tools import to_bool, to_int, to_timedelta, to_date, floor_date, ceil_date, resample_data
 
 
 class CsvDatabase(Database):
@@ -29,6 +29,7 @@ class CsvDatabase(Database):
                  file=None,
                  index_column='Time',
                  index_unix=False,
+                 resolution=None,
                  merge=False,
                  freq='T',
                  format=None,
@@ -50,6 +51,7 @@ class CsvDatabase(Database):
         self.index_column = index_column
         self.index_unix = to_bool(index_unix)
 
+        self.resolution = to_int(resolution)*60
         self.merge = to_bool(merge)
         self.freq = freq
         if format is not None:
@@ -72,8 +74,8 @@ class CsvDatabase(Database):
         self.columns = var.COLUMNS
 
     def exists(self,
-               start: pd.Timestamp | dt.datetime = None,
-               end: pd.Timestamp | dt.datetime = None,
+               start: pd.Timestamp | dt.datetime | str = None,
+               end: pd.Timestamp | dt.datetime | str = None,
                file: str = None,
                subdir: str = '', **_):
 
@@ -81,14 +83,16 @@ class CsvDatabase(Database):
         return all([os.path.isfile(f) for f in files])
 
     def read(self,
-             start: pd.Timestamp | dt.datetime = None,
-             end:   pd.Timestamp | dt.datetime = None,
+             start: pd.Timestamp | dt.datetime | str = None,
+             end:   pd.Timestamp | dt.datetime | str = None,
              resolution: int = None,
              file: str = None,
              subdir: str = '',
              **kwargs) -> pd.DataFrame:
 
         data = pd.DataFrame()
+        start = to_date(start, self.timezone)
+        end = to_date(end, self.timezone)
         for file in self._get_files(start, end, file, subdir):
             if not os.path.isfile(file):
                 raise DatabaseException('Unable to find file: ' + file)
@@ -104,12 +108,10 @@ class CsvDatabase(Database):
 
             data = data.combine_first(file_data)
 
+        if resolution is None:
+            resolution = self.resolution
         if resolution is not None:
             data = resample_data(data, resolution)
-
-            # TODO: verify if this works as intended
-            if end is not None:
-                end += dt.timedelta(seconds=resolution)
 
         if end is not None:
             if start > end:
@@ -176,8 +178,8 @@ class CsvDatabase(Database):
 
     def write(self,
               data: pd.DataFrame,
-              start: pd.Timestamp | dt.datetime = None,
-              end:   pd.Timestamp | dt.datetime = None,
+              start: pd.Timestamp | dt.datetime | str = None,
+              end:   pd.Timestamp | dt.datetime | str = None,
               file: str = None,
               subdir: str = '',
               split_data: bool = False,
@@ -195,13 +197,13 @@ class CsvDatabase(Database):
             if start is None:
                 start = data.index[0]
             else:
-                start = convert_timezone(start, self.timezone)
+                start = to_date(start, self.timezone)
                 data = data[data.index >= start]
 
             if end is None:
                 end = data.index[-1]
             else:
-                end = convert_timezone(end, self.timezone)
+                end = to_date(end, self.timezone)
                 data = data[data.index <= end]
 
             if file is None:
@@ -274,8 +276,8 @@ class CsvDatabase(Database):
         data.to_csv(path, sep=self.separator, decimal=self.decimal, encoding=encoding)
 
     def _get_files(self,
-                   start: pd.Timestamp | dt.datetime,
-                   end:   pd.Timestamp | dt.datetime,
+                   start: pd.Timestamp | dt.datetime | str,
+                   end:   pd.Timestamp | dt.datetime | str,
                    file: str,
                    subdir: str) -> List[str]:
 
@@ -292,8 +294,8 @@ class CsvDatabase(Database):
 
             files.append(file_path)
         else:
-            end = convert_timezone(end, self.timezone)
-            start = convert_timezone(start, self.timezone)
+            end = to_date(end, self.timezone)
+            start = to_date(start, self.timezone)
             if start is None or end is None:
                 filenames = [os.path.basename(f) for f in glob.glob(os.path.join(path, '*.csv'))]
                 if len(filenames) > 0:
@@ -331,13 +333,21 @@ class CsvDatabase(Database):
 def write_csv(system, data, file):
     system_dir = system.configs.dirs.data
     database = copy.deepcopy(system._database)
+    if not isinstance(database, CsvDatabase):
+        return
+
     database.dir = system_dir
     # database.format = '%Y%m%d'
     database.enabled = True
-    data_file = os.path.join(database.dir, file + '.csv')
-    data_dir = os.path.dirname(data_file)
+    if not os.path.isabs(file):
+        data_path = os.path.join(database.dir, file)
+    else:
+        data_path = file
+    if not data_path.endswith('.csv'):
+        data_path += '.csv'
 
+    data_dir = os.path.dirname(data_path)
     if not os.path.isdir(data_dir):
         os.makedirs(data_dir, exist_ok=True)
 
-    data.to_csv(data_file, sep=database.separator, decimal=database.decimal, encoding='utf-8-sig')
+    data.to_csv(data_path, sep=database.separator, decimal=database.decimal, encoding='utf-8-sig')
