@@ -211,7 +211,8 @@ class System(Context):
         data = build(self.configs, self.database, **kwargs)
         try:
             weather = self.weather.build(**kwargs)
-            data = pd.concat([data, weather], axis=1)
+            if weather is not None:
+                data = pd.concat([data, weather], axis=1)
 
         except WeatherUnavailableException as e:
             logger.debug(f"Unable to build weather, as "+str(e))
