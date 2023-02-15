@@ -18,7 +18,7 @@ from dateutil.relativedelta import relativedelta
 def resample_data(data: pd.DataFrame, seconds: int) -> pd.DataFrame:
     resampled = pd.DataFrame()
     resampled.index.name = 'time'
-    for column, series in deepcopy(data).iteritems():
+    for column, series in deepcopy(data).items():
         series = _resample_series(series, seconds)
 
         resampled = pd.concat([resampled, series.to_frame()], axis=1)
