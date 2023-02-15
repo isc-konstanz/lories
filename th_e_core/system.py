@@ -208,11 +208,14 @@ class System(Context):
 
     def __build__(self, **kwargs) -> pd.DataFrame:
         from th_e_data import build
-        data = build(self.configs, self.database, **kwargs)
+        data = pd.DataFrame()
         try:
-            weather = self.weather.build(**kwargs)
-            if weather is not None:
-                data = pd.concat([data, weather], axis=1)
+            data = pd.concat([data, build(self.configs, self.database, **kwargs)], axis=1)
+
+        except DatabaseUnavailableException as e:
+            logger.debug(f"Unable to build data, as "+str(e))
+        try:
+            data = pd.concat([data, self.weather.build(**kwargs)], axis=1)
 
         except WeatherUnavailableException as e:
             logger.debug(f"Unable to build weather, as "+str(e))
