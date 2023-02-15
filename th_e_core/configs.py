@@ -24,13 +24,14 @@ class Configurations(ConfigParser):
     def from_configs(cls,
                      configs: Configurations,
                      conf_file: str = None,
-                     conf_dir: str = None) -> Configurations:
+                     conf_dir: str = None,
+                     **kwargs) -> Configurations:
         if conf_file is None:
             conf_file = cls.__name__.lower() + '.cfg'
-        conf_dirs = configs.dirs.encode()
+        kwargs.update(configs.dirs.encode())
         if conf_dir is not None:
-            conf_dirs['conf_dir'] = conf_dir
-        return cls(conf_file, **conf_dirs)
+            kwargs['conf_dir'] = conf_dir
+        return cls(conf_file, **kwargs)
 
     def __init__(self,
                  conf_file: str,
