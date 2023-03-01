@@ -33,7 +33,7 @@ class System(Context):
 
     POWER_EL = 'el_power'
     POWER_EL_IMP = 'el_import_power'
-    POWER_EL_EXP = 'el_import_power'
+    POWER_EL_EXP = 'el_export_power'
     POWER_TH = 'th_power'
     POWER_TH_HT = 'th_ht_power'
     POWER_TH_DOM = 'th_dom_power'
