@@ -57,7 +57,7 @@ class CsvDatabase(Database):
         if format is not None:
             self.format = format
         elif self.freq == 'Y':
-            self.format = 'Y%'
+            self.format = '%Y'
         elif self.freq == 'M':
             self.format = '%Y-%m'
         elif any([self.freq.endswith(s) for s in ['D', 'H', 'T']]):
