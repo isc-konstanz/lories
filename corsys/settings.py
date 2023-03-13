@@ -93,13 +93,4 @@ def _parse_kwargs(parser: ArgumentParser) -> Dict[str, Any]:
     else:
         kwargs = {}
 
-    if kwargs.get('conf_dir', None) is None:
-        kwargs['conf_dir'] = 'conf'
-
-    if kwargs.get('data_dir', None) is None:
-        kwargs['data_dir'] = 'data'
-
-    if kwargs.get('lib_dir', None) is None:
-        kwargs['lib_dir'] = 'lib'
-
     return kwargs

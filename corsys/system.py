@@ -51,6 +51,7 @@ class System(Context):
         systems = Systems()
         system_dirs = settings.dirs.encode()
         system_scan = to_bool(settings.get(Configurations.GENERAL, 'system_scan', fallback=False))
+        system_flat = to_bool(settings.get(Configurations.GENERAL, 'system_flat', fallback=False))
         system_copy = to_bool(settings.get(Configurations.GENERAL, 'system_copy', fallback=False))
 
         if system_scan:
@@ -59,6 +60,8 @@ class System(Context):
 
             for system_dir in os.scandir(settings.dirs.data):
                 if os.path.isdir(system_dir.path):
+                    if system_flat:
+                        system_dirs['conf_dir'] = ''
                     system_dirs['data_dir'] = system_dir.path
                     systems._systems.append(cls._read(**system_dirs))
         else:
