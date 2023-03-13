@@ -1,6 +1,7 @@
-## TH-E Core
+## CorSys
 
-This repository provides a set of core functions for several projects of ISC Konstanz.  
+This repository provides a set of core functions for several energy system projects of 
+ISC Konstanz e.V.    
 More detailed information and specifics about how to use the package will be added here in the future.
 
 

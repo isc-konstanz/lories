@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-    th-e-core
-    ~~~~~~~~~
+    corsys
+    ~~~~~~
 
 
 """
@@ -11,28 +11,28 @@ from setuptools import setup, find_namespace_packages
 
 here = path.abspath(path.dirname(__file__))
 info = {}
-with open(path.join("th_e_core", "_version.py")) as f:
+with open(path.join("corsys", "_version.py")) as f:
     exec(f.read(), info)
 
 VERSION = info['__version__']
 
-DESCRIPTION = 'This repository provides a set of core functions for several projects of ISC Konstanz.'
+DESCRIPTION = 'This repository provides a set of core functions for several energy system projects of ISC Konstanz.'
 
 # Get the long description from the README file
 with open(path.join(here, 'README.md')) as f:
     README = f.read()
 
-NAME = 'th-e-core'
+NAME = 'corsys'
 LICENSE = 'LGPLv3'
 AUTHOR = 'ISC Konstanz'
 MAINTAINER_EMAIL = 'adrian.minde@isc-konstanz.de'
-URL = 'https://github.com/isc-konstanz/th-e-core'
+URL = 'https://github.com/isc-konstanz/corsys'
 
 INSTALL_REQUIRES = ['numpy >= 1.16',
                     'pandas >= 0.23',
                     'pytz >= 2019.1']
 
-PACKAGES = find_namespace_packages(include=['th_e_core*'])
+PACKAGES = find_namespace_packages(include=['corsys*'])
 
 SETUPTOOLS_KWARGS = {
     'zip_safe': False,
