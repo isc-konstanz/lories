@@ -36,8 +36,8 @@ class CsvDatabase(Database):
                  timezone=tz.UTC,
                  decimal='.',
                  separator=',',
+                 columns=None,
                  **kwargs):
-
         super().__init__(**kwargs)
 
         if "~" in dir:
@@ -71,7 +71,10 @@ class CsvDatabase(Database):
         self.decimal = decimal
         self.separator = separator
 
+        if columns is None:
+            columns = {}
         self.columns = var.COLUMNS
+        self.columns.update(columns)
 
     def exists(self,
                start: pd.Timestamp | dt.datetime | str = None,

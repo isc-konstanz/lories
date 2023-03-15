@@ -24,20 +24,23 @@ class Database(ABC):
         dbargs = dict(configs.items(Database.SECTION))
         kwargs.update(dbargs)
 
+        def section(s) -> dict:
+            if configs.has_section(s):
+                return dict(configs.items(s))
+            return {}
+
         database_type = kwargs.pop('type').lower()
         if database_type == 'sql':
-            database_tables = dict(configs.items('Tables'))
             from corsys.io.sql import SqlDatabase
-            return SqlDatabase(**kwargs, tables=database_tables)
+            return SqlDatabase(**kwargs, tables=section('Tables'))
 
         elif database_type == 'oem':
-            database_feeds = dict(configs.items('Feeds'))
             from corsys.io.oem import EmonDatabase
-            return EmonDatabase(**kwargs, feeds=database_feeds)
+            return EmonDatabase(**kwargs, feeds=section('Feeds'))
 
         elif database_type == 'csv':
             from corsys.io.csv import CsvDatabase
-            return CsvDatabase(**kwargs)
+            return CsvDatabase(**kwargs, columns=section('Columns'))
         else:
             raise ValueError('Invalid database type argument')
 

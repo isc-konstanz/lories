@@ -25,7 +25,6 @@ class SqlDatabase(Database):
                  user='root', password='', database='emondata',
                  tables=None, interval=24,
                  **kwargs):
-
         super().__init__(**kwargs)
 
         self.interval = to_int(interval)
