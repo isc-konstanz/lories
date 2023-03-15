@@ -24,6 +24,27 @@ logger = logging.getLogger(__name__)
 
 class Weather(ABC, Configurable):
 
+    GHI = 'ghi'
+    DNI = 'dni'
+    DHI = 'dhi'
+    TEMP_AIR = 'temp_air'
+    TEMP_FELT = 'temp_felt'
+    TEMP_DEWPOINT = 'dewpoint'
+    HUMIDITY_REL = 'relative_humidity'
+    PRESSURE_SEA = 'pressure_sea'
+    WIND_SPEED = 'wind_speed'
+    WIND_GUST = 'wind_gust'
+    WIND_DIRECTION = 'wind_direction'
+    CLOUDS_TOTAL = 'total_clouds'
+    CLOUDS_LOW = 'clouds_low'
+    CLOUDS_MID = 'clouds_mid'
+    CLOUDS_HIGH = 'clouds_high'
+    PRECIPITATION = 'precipitation'
+    PRECIPITATION_CONV = 'precipitation_convective'
+    PRECIPITATION_PROB = 'precipitation_probability'
+    PRECIPITABLE_WATER = 'precipitable_water'
+    SNOW_FRACTION = 'snow_fraction'
+
     # noinspection PyShadowingBuiltins
     @classmethod
     def read(cls, context: Context, conf_file: str = 'weather.cfg') -> Weather:
@@ -32,12 +53,6 @@ class Weather(ABC, Configurable):
         if type in ['default', 'database']:
             from .db import DatabaseWeather
             return DatabaseWeather(context, configs)
-        elif type == 'tmy':
-            from .tmy import TMYWeather
-            return TMYWeather(context, configs)
-        elif type == 'epw':
-            from .epw import EPWWeather
-            return EPWWeather(context, configs)
         elif type == 'nmm':
             from .nmm import NMM
             return NMM(context, configs)

@@ -46,10 +46,10 @@ class NMM(ScheduledForecast):
             'precipitation_convective':     'convective_precipitation',
             'precipitation_probability':    'precipitation_probability',
             'snow_fraction':                'snowfraction',
-            'low_clouds':                   'lowclouds',
-            'mid_clouds':                   'midclouds',
-            'high_clouds':                  'highclouds',
-            'total_clouds':                 'totalcloudcover',
+            'clouds_low':                   'lowclouds',
+            'clouds_mid':                   'midclouds',
+            'clouds_high':                  'highclouds',
+            'clouds_total':                 'totalcloudcover',
             'uv_index':                     'uvindex',
             'gni':                          'gni_backwards',
             'dni':                          'dni_backwards',
@@ -77,10 +77,10 @@ class NMM(ScheduledForecast):
             'ghi_instant',                  # Global Horizontal Irradiance at the exact time [W/m^2]
             'dhi_instant',                  # Diffuse Horizontal Irradiance at the exact time [W/m^2]
             'etr_instant',                  # Extraterrestrial Solar Radiation at the exact time [W/m^2]
-            'total_clouds',                 # Gesamtbedeckungsgrad mit Wolken [%]
-            'low_clouds',                   # Bedeckungsgrad mit niedrigen Wolken [%]
-            'mid_clouds',                   # Bedeckungsgrad mit mittleren Wolken [%]
-            'high_clouds',                  # Bedeckungsgrad mit hohen Wolken [%]
+            'clouds_total',                 # Gesamtbedeckungsgrad mit Wolken [%]
+            'clouds_low',                   # Bedeckungsgrad mit niedrigen Wolken [%]
+            'clouds_mid',                   # Bedeckungsgrad mit mittleren Wolken [%]
+            'clouds_high',                  # Bedeckungsgrad mit hohen Wolken [%]
             'visibility',                   # Sichtweite [km]
             'uv_index',                     # UV index numbers from 1 to 16
             'relative_humidity',            # Relative luftfeuchtigkeit [%]

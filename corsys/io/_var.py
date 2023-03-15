@@ -6,6 +6,7 @@
     
 """
 from ..system import System
+from ..weather import Weather
 from ..cmpt import ElectricalEnergyStorage, ThermalEnergyStorage, Photovoltaics
 
 
@@ -138,23 +139,25 @@ AC = {
 }
 
 WEATHER = {
-    'ghi':                       'Global Horizontal Irradiance [W/m2]',
-    'dni':                       'Direct Normal Irradiance [W/m2]',
-    'dhi':                       'Diffuse Horizontal Irradiance [W/m2]',
-    'temp_air':                  'Air Temperature [°C]',
-    'relative_humidity':         'Relative Humidity [%]',
-    'pressure_sea':              'Atmospheric Pressure [hPa]',
-    'wind_speed':                'Wind Speed [km/h]',
-    'wind_gust':                 'Wind Gust [km/h]',
-    'wind_direction':            'Wind Direction [°]',
-    'total_clouds':              'Total Cloud Cover [%]',
-    'low_clouds':                'Low Cloud Cover [%]',
-    'mid_clouds':                'Medium Cloud Cover [%]',
-    'high_clouds':               'High Cloud Cover [%]',
-    'precipitation':             'Precipitation [mm]',
-    'precipitation_convective':  'Precipitation Convective [mm]',
-    'precipitation_probability': 'Precipitation Probability [%]',
-    'snow_fraction':             'Snow Fraction [1/0]'
+    Weather.GHI:                'Global Horizontal Irradiance [W/m2]',
+    Weather.DNI:                'Direct Normal Irradiance [W/m2]',
+    Weather.DHI:                'Diffuse Horizontal Irradiance [W/m2]',
+    Weather.TEMP_AIR:           'Air Temperature [°C]',
+    Weather.TEMP_DEWPOINT:      'Dewpoint Temperature [°C]',
+    Weather.HUMIDITY_REL:       'Relative Humidity [%]',
+    Weather.PRESSURE_SEA:       'Atmospheric Pressure [hPa]',
+    Weather.WIND_SPEED:         'Wind Speed [km/h]',
+    Weather.WIND_GUST:          'Wind Gust [km/h]',
+    Weather.WIND_DIRECTION:     'Wind Direction [°]',
+    Weather.CLOUDS_TOTAL:       'Total Cloud Cover [%]',
+    Weather.CLOUDS_LOW:         'Low Cloud Cover [%]',
+    Weather.CLOUDS_MID:         'Medium Cloud Cover [%]',
+    Weather.CLOUDS_HIGH:        'High Cloud Cover [%]',
+    Weather.PRECIPITATION:      'Precipitation [mm]',
+    Weather.PRECIPITATION_CONV: 'Precipitation Convective [mm]',
+    Weather.PRECIPITATION_PROB: 'Precipitation Probability [%]',
+    Weather.PRECIPITABLE_WATER: 'Precipitable water [cm]',
+    Weather.SNOW_FRACTION:      'Snow Fraction [1/0]'
 }
 
 SOLAR = {
