@@ -29,16 +29,19 @@ class Weather(ABC, Configurable):
     DHI = 'dhi'
     TEMP_AIR = 'temp_air'
     TEMP_FELT = 'temp_felt'
-    TEMP_DEWPOINT = 'dewpoint'
+    TEMP_DEW_POINT = 'dew_point'
     HUMIDITY_REL = 'relative_humidity'
     PRESSURE_SEA = 'pressure_sea'
     WIND_SPEED = 'wind_speed'
-    WIND_GUST = 'wind_gust'
+    WIND_SPEED_GUST = 'wind_speed_gust'
     WIND_DIRECTION = 'wind_direction'
-    CLOUDS_TOTAL = 'total_clouds'
+    WIND_DIRECTION_GUST = 'wind_direction_gust'
+    CLOUD_COVER = 'cloud_cover'
     CLOUDS_LOW = 'clouds_low'
     CLOUDS_MID = 'clouds_mid'
     CLOUDS_HIGH = 'clouds_high'
+    SUNSHINE = 'sunshine'
+    VISIBILITY = 'visibility'
     PRECIPITATION = 'precipitation'
     PRECIPITATION_CONV = 'precipitation_convective'
     PRECIPITATION_PROB = 'precipitation_probability'
@@ -53,6 +56,9 @@ class Weather(ABC, Configurable):
         if type in ['default', 'database']:
             from .db import DatabaseWeather
             return DatabaseWeather(context, configs)
+        elif type == 'brightsky':
+            from .dwd import Brightsky
+            return Brightsky(context, configs)
         elif type == 'nmm':
             from .nmm import NMM
             return NMM(context, configs)
@@ -61,12 +67,10 @@ class Weather(ABC, Configurable):
 
     def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(configs, *args, **kwargs)
+        if not hasattr(self, '_variables'):
+            self._variables = {}
         self._context = context
         self.__activate__(context, configs)
-
-    def __configure__(self, configs: Configurations) -> None:
-        super().__configure__(configs)
-        self._variables = {}
 
     def __activate__(self, context: Context, configs: Configurations) -> None:
         pass

@@ -83,7 +83,7 @@ class NMM(ScheduledForecast):
             'clouds_high',                  # Bedeckungsgrad mit hohen Wolken [%]
             'visibility',                   # Sichtweite [km]
             'uv_index',                     # UV index numbers from 1 to 16
-            'relative_humidity',            # Relative luftfeuchtigkeit [%]
+            'relative_humidity',            # Relative Luftfeuchtigkeit [%]
             'pressure_sea',                 # Luftdruck auf Hoehe des Meerespiegels [hPa]
             'precipitation',                # Niederschlagsmenge [mm]
             'precipitation_convective',     # Niederschlag als Schauer [mm]
