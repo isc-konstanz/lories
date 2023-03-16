@@ -117,4 +117,7 @@ class Brightsky(ScheduledForecast):
         data = data.set_index('timestamp').tz_convert(self.location.timezone)
         data.index.name = 'time'
 
+        if data[Weather.CLOUD_COVER].isna().any():
+            data[Weather.CLOUD_COVER].interpolate(method='linear', inplace=True)
+
         return self._rename(data)[self._variables_output]
