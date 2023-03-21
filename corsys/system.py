@@ -148,7 +148,11 @@ class System(Context):
         if configs.get(Database.SECTION, 'type').lower() == 'csv' and \
                 configs.has_option(Database.SECTION, 'dir'):
             database_dir = configs.get(Database.SECTION, 'dir')
-            database_central = configs.getboolean(Database.SECTION, 'central', fallback=False)
+            if configs.has_option(Database.SECTION, 'central'):
+                database_central = configs.getboolean(Database.SECTION, 'central')
+                configs.remove_option(Database.SECTION, 'central')
+            else:
+                database_central = False
             if database_central:
                 data_dir = configs.dirs.lib
             else:
@@ -189,21 +193,18 @@ class System(Context):
             raise DatabaseUnavailableException(f"System \"{self.name}\" has no database configured")
         if not self._database.enabled:
             raise DatabaseUnavailableException(f"System \"{self.name}\" database is disabled")
-
         return self._database
 
     @property
     def location(self) -> Location:
         if not self._location:
             raise LocationUnavailableException(f"System \"{self.name}\" has no location configured")
-
         return self._location
 
     @property
     def weather(self):
         if self._weather is None:
             raise WeatherUnavailableException(f"System \"{self.name}\" has no weather configured")
-
         return self._weather
 
     def build(self, **kwargs) -> pd.DataFrame:

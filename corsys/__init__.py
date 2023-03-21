@@ -19,7 +19,9 @@ from .configs import (  # noqa: F401
 from .settings import Settings  # noqa: F401
 
 from . import weather  # noqa: F401
+
 from . import model  # noqa: F401
+from .model import Model  # noqa: F401
 
 from . import location  # noqa: F401
 from .location import Location  # noqa: F401
