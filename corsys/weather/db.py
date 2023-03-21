@@ -57,11 +57,19 @@ class DatabaseWeather(Weather):
             if not configs.has_option(Database.SECTION, 'timezone'):
                 configs.set(Database.SECTION, 'timezone', system.location.timezone.zone)
 
-        self.database = Database.open(configs)
+        self._database = Database.open(configs)
 
     def __build__(self, **kwargs) -> pd.Dataframe:
         from scisys import build
         return build(self.configs, self.database, location=self.context.location, **kwargs)
+
+    @property
+    def database(self):
+        if self._database is None:
+            raise DatabaseUnavailableException(f"Weather \"{self.context.location.name}\" has no database configured")
+        if not self._database.enabled:
+            raise DatabaseUnavailableException(f"Weather \"{self.context.location.name}\" database is disabled")
+        return self._database
 
     # noinspection PyShadowingBuiltins
     def get(self,

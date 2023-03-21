@@ -18,6 +18,7 @@ import logging
 
 from ..cmpt import Context
 from ..configs import Configurations, Configurable
+from ..io import DatabaseUnavailableException
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,10 @@ class Weather(ABC, Configurable):
     @property
     def context(self) -> Context:
         return self._context
+
+    @property
+    def database(self):
+        raise DatabaseUnavailableException(f"Weather \"{self.context.location.name}\" has no database configured")
 
     @abstractmethod
     def get(self, *args, **kwargs) -> pd.DataFrame:
