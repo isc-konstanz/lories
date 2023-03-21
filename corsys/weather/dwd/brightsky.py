@@ -19,7 +19,7 @@ from io import StringIO
 from ...configs import Configurations
 from ...system import System
 from ..fcst import ScheduledForecast
-from ..wx import Weather
+from ..base import Weather
 
 
 # noinspection SpellCheckingInspection

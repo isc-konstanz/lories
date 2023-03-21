@@ -5,7 +5,7 @@
 
 
 """
-from .wx import (  # noqa: F401
+from .base import (  # noqa: F401
     Weather,
     WeatherException,
     WeatherUnavailableException

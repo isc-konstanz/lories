@@ -18,7 +18,7 @@ import pandas as pd
 
 from ..tools import to_date
 from ..configs import Configurations
-from .wx import Weather
+from .base import Weather
 from .db import DatabaseWeather
 
 

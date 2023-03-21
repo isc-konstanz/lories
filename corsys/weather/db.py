@@ -15,7 +15,7 @@ from ..tools import to_date, to_bool
 from ..configs import Configurations
 from ..system import System
 from ..io import Database, DatabaseUnavailableException
-from .wx import Weather
+from .base import Weather
 
 
 class DatabaseWeather(Weather):
