@@ -152,8 +152,11 @@ class Context(Configurable, Mapping):
         return ['component', 'cmpt', 'pv', 'ev', 'ees', 'tes', *args]
 
     def __getattr__(self, attr):
-        if attr in self._components.keys():
-            return self._components[attr]
+        # __getattr__ gets called when the item is not found via __getattribute__
+        # To avoid recursion, call __getattribute__ directly to get components dict
+        components = Context.__getattribute__(self, '_components')
+        if attr in components.keys():
+            return components[attr]
         try:
             # noinspection PyUnresolvedReferences
             return super().__getattr__(attr)
