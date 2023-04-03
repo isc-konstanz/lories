@@ -229,9 +229,15 @@ class Directories:
 
     @property
     def cmpt(self):
-        cmpt_dir = self._expand(self._cmpt) if self._cmpt is not None else self.conf
-        if not os.path.isabs(cmpt_dir):
-            cmpt_dir = os.path.join(os.getcwd(), cmpt_dir)
+        if self._cmpt is not None:
+            cmpt_dir = self._expand(self._cmpt)
+
+            if not os.path.isabs(cmpt_dir):
+                cmpt_dir = os.path.join(os.getcwd(), cmpt_dir)
+        else:
+            cmpt_dir = self.conf
+            if os.path.isdir(os.path.join(self.conf, 'cmpt')):
+                cmpt_dir = os.path.join(self.conf, 'cmpt')
         return cmpt_dir
 
     def join(self, configs: Configurations) -> Directories:
