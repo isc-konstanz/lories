@@ -94,7 +94,7 @@ def floor_date(date: Union[dt.datetime, pd.Timestamp, str],
     if freq in ['Y', 'M']:
         return date.tz_localize(None).to_period(freq).to_timestamp().tz_localize(timezone)
     elif any([freq.endswith(f) for f in ['D', 'H', 'T']]):
-        return date.floor(freq)
+        return date.tz_localize(None).floor(freq).tz_localize(timezone)
     else:
         raise ValueError(f"Invalid frequency: {freq}")
 
