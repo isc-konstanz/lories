@@ -11,7 +11,7 @@
 """
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Dict
+from typing import Optional, Dict
 
 import pandas as pd
 import logging
@@ -71,15 +71,11 @@ class Weather(ABC, Configurable):
         if not hasattr(self, '_variables'):
             self._variables = {}
         self._context = context
-        self.__activate__(context, configs)
 
-    def __activate__(self, context: Context, configs: Configurations) -> None:
+    def __activate__(self, context: Context) -> None:
         pass
 
-    def build(self, **kwargs) -> pd.DataFrame:
-        return self.__build__(**kwargs)
-
-    def __build__(self, **kwargs) -> pd.DataFrame:
+    def __build__(self, **kwargs) -> Optional[pd.DataFrame]:
         pass
 
     def _rename(self, data: pd.DataFrame, variables: Dict[str, str] = None) -> pd.DataFrame:
@@ -102,12 +98,18 @@ class Weather(ABC, Configurable):
         return data.rename(columns={y: x for x, y in variables.items()})
 
     @property
+    def database(self):
+        raise DatabaseUnavailableException(f"Weather \"{self.context.location.name}\" has no database configured")
+
+    @property
     def context(self) -> Context:
         return self._context
 
-    @property
-    def database(self):
-        raise DatabaseUnavailableException(f"Weather \"{self.context.location.name}\" has no database configured")
+    def activate(self) -> None:
+        self.__activate__(self._context)
+
+    def build(self, **kwargs) -> Optional[pd.DataFrame]:
+        return self.__build__(**kwargs)
 
     @abstractmethod
     def get(self, *args, **kwargs) -> pd.DataFrame:

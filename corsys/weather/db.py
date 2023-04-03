@@ -6,6 +6,7 @@
 
 """
 from __future__ import annotations
+from typing import Optional
 
 import os
 import datetime as dt
@@ -15,18 +16,26 @@ from ..tools import to_date, to_bool
 from ..configs import Configurations
 from ..system import System
 from ..io import Database, DatabaseUnavailableException
-from .base import Weather
+from .base import Weather, WeatherUnavailableException
 
 
 class DatabaseWeather(Weather):
 
-    def __activate__(self, system: System, configs: Configurations) -> None:
-        super().__activate__(system, configs)
+    def __configure__(self, configs: Configurations) -> None:
+        super().__configure__(configs)
+
+    def __activate__(self, system: System) -> None:
+        super().__activate__(system)
+        self._database = self.__database__(system, self.configs)
+        self._database.open()
+
+    # noinspection PyMethodMayBeStatic
+    def __database__(self, system: System, configs: Configurations) -> Database:
         if not configs.has_section(Database.SECTION):
-            raise DatabaseUnavailableException("Weather database not configured")
+            raise WeatherUnavailableException("Weather database not configured")
         if not to_bool(configs.get(Database.SECTION, 'enabled', fallback='True')) or \
                 not to_bool(configs.get(Database.SECTION, 'enable', fallback='True')):
-            raise DatabaseUnavailableException("Weather database not enabled")
+            raise WeatherUnavailableException("Weather database not enabled")
 
         if configs.get(Database.SECTION, 'type').lower() == 'csv' and \
                 configs.has_option(Database.SECTION, 'dir'):
@@ -57,15 +66,15 @@ class DatabaseWeather(Weather):
             if not configs.has_option(Database.SECTION, 'timezone'):
                 configs.set(Database.SECTION, 'timezone', system.location.timezone.zone)
 
-        self._database = Database.open(configs)
+        return Database.from_configs(configs)
 
-    def __build__(self, **kwargs) -> pd.Dataframe:
+    def __build__(self, **kwargs) -> Optional[pd.DataFrame]:
         from scisys import build
         return build(self.configs, self.database, location=self.context.location, **kwargs)
 
     @property
     def database(self):
-        if self._database is None:
+        if not hasattr(self, '_database') or self._database is None:
             raise DatabaseUnavailableException(f"Weather \"{self.context.location.name}\" has no database configured")
         if not self._database.enabled:
             raise DatabaseUnavailableException(f"Weather \"{self.context.location.name}\" database is disabled")
@@ -78,7 +87,7 @@ class DatabaseWeather(Weather):
             format: str = '%d.%m.%Y',
             **kwargs) -> pd.DataFrame:
 
-        start = to_date(start, timezone=self.context.location.timezone)
-        end = to_date(end, timezone=self.context.location.timezone)
+        start = to_date(start, timezone=self.context.location.timezone, format=format)
+        end = to_date(end, timezone=self.context.location.timezone, format=format)
 
         return self.database.read(start=start, end=end, **kwargs)

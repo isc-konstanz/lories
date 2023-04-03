@@ -12,7 +12,7 @@ import pytz as tz
 import datetime as dt
 import pandas as pd
 
-from . import Database
+from . import Database, DatabaseException
 from ..tools import to_int, resample_data
 from mysql import connector
 
@@ -26,21 +26,39 @@ class SqlDatabase(Database):
                  tables=None, interval=24,
                  **kwargs):
         super().__init__(**kwargs)
+        self._connector = None
 
         self.interval = to_int(interval)
         self.tables = tables
         if self.tables is None:
             self.tables = {}
 
-        self.connector = connector.connect(
-            host=host,
-            port=to_int(port),
-            user=user,
-            passwd=password,
-            database=database
+        self.host = host
+        self.port = to_int(port)
+        self.user = user
+        self.password = password
+        self.database = database
+
+    def __open__(self, **_) -> None:
+        self._connection = connector.connect(
+            host=self.host,
+            port=self.port,
+            user=self.user,
+            passwd=self.password,
+            database=self.database
         )
 
+    def __close__(self) -> None:
+        self._connection.close()
+
+    @property
+    def connection(self):
+        if self._connection is None:
+            raise DatabaseException("SQL Connection not open")
+        return self._connector
+
     def exists(self, **kwargs):
+        # TODO: Replace this placeholder more resource efficient
         data = self.read(**kwargs)
         return not data.empty
 
@@ -78,7 +96,7 @@ class SqlDatabase(Database):
         if start is None:
             start = epoch
 
-        cursor = self.connector.cursor()
+        cursor = self.connection.cursor()
         select = "SELECT time, data FROM {0} WHERE ".format(table)
         if end is None:
             select += "time >= %s ORDER BY time ASC"
@@ -102,7 +120,7 @@ class SqlDatabase(Database):
     def write(self, data: pd.DataFrame, **_):
         epoch = dt.datetime(1970, 1, 1, tzinfo=tz.UTC)
 
-        cursor = self.connector.cursor()
+        cursor = self.connection.cursor()
         for column in data.columns:
             insert = "INSERT INTO {0} (time,data) VALUES ('%s', '%s') ON DUPLICATE KEY UPDATE data=VALUES(data)"\
                 .format(self.tables[column])
@@ -114,4 +132,4 @@ class SqlDatabase(Database):
 
             cursor.executemany(insert, values)
 
-        self.connector.commit()
+        self.connection.commit()

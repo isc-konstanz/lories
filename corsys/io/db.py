@@ -19,8 +19,9 @@ class Database(ABC):
 
     SECTION = 'Database'
 
+    # noinspection SpellCheckingInspection
     @staticmethod
-    def open(configs: Configurations, **kwargs) -> Database:
+    def from_configs(configs: Configurations, **kwargs) -> Database:
         dbargs = dict(configs.items(Database.SECTION))
         kwargs.update(dbargs)
 
@@ -52,6 +53,33 @@ class Database(ABC):
         if isinstance(timezone, str):
             timezone = tz.timezone(timezone)
         self.timezone = timezone
+
+    def __enter__(self, **kwargs) -> Database:
+        self.__open__(**kwargs)
+        return self
+
+    def __open__(self, **kwargs) -> None:
+        pass
+
+    def __exit__(self, type, value, traceback):
+        self.__close__()
+
+    def __close__(self) -> None:
+        pass
+
+    def open(self, **kwargs) -> None:
+        """
+        Opens the database and initiates resources
+
+        """
+        self.__open__(**kwargs)
+
+    def close(self, **kwargs) -> None:
+        """
+        Closes the database and cleans up all resources
+
+        """
+        self.__close__()
 
     @abstractmethod
     def exists(self,
@@ -111,13 +139,6 @@ class Database(ABC):
             the data set to be written
         :type data: 
             :class:`pandas.DataFrame`
-        """
-        pass
-
-    def close(self, **kwargs) -> None:
-        """ 
-        Closes the database and cleans up all resources
-        
         """
         pass
 

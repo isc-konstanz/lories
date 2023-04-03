@@ -91,8 +91,8 @@ class NMM(ScheduledForecast):
             'snow_fraction'                 # Schneefall [0.0 - 1.0]
         ]
 
-    def __activate__(self, system: System, configs: Configurations) -> None:
-        super().__activate__(system, configs)
+    def __activate__(self, system: System) -> None:
+        super().__activate__(system)
         self.location = system.location
 
     # noinspection PyPackageRequirements

@@ -6,10 +6,13 @@
 
 """
 from __future__ import annotations
+from typing import Optional, Dict, List
 from collections.abc import Mapping
-from typing import Dict, List
+
 import os
 import re
+import pandas as pd
+
 from ..cost import Cost, CostUnavailableException
 from ..configs import Configurations, Configurable
 
@@ -23,10 +26,9 @@ class Component(Configurable):
     def read(cls, context: Context, conf_file: str = None) -> Component:
         return cls(context, Configurations.from_configs(context.configs, conf_file=conf_file))
 
-    def __init__(self, context: Context, configs: Configurations, **kwargs) -> None:
-        super().__init__(configs, **kwargs)
+    def __init__(self, context: Context, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self._context = context
-        self.__activate__(context, **kwargs)
 
     def __configure__(self, configs: Configurations) -> None:
         super().__configure__(configs)
@@ -42,7 +44,10 @@ class Component(Configurable):
         else:
             self._cost = None
 
-    def __activate__(self, context: Context, **kwargs):
+    def __activate__(self, context: Context) -> None:
+        pass
+
+    def __build__(self, **kwargs) -> Optional[pd.DataFrame]:
         pass
 
     # noinspection PyMethodMayBeStatic
@@ -78,12 +83,17 @@ class Component(Configurable):
     def cost(self):
         if self._cost is None:
             raise CostUnavailableException(f"Component \"{self.name}\" has no costs configured")
-
         return self._cost
 
     @property
     def context(self) -> Context:
         return self._context
+
+    def activate(self) -> None:
+        self.__activate__(self._context)
+
+    def build(self, **kwargs) -> Optional[pd.DataFrame]:
+        return self.__build__(**kwargs)
 
 
 class Context(Configurable, Mapping):
@@ -92,11 +102,18 @@ class Context(Configurable, Mapping):
     def _read(cls, **kwargs) -> Context:
         return cls(Configurations(f"{cls.__name__.lower()}.cfg", **kwargs))
 
-    def __init__(self, configs: Configurations, **kwargs) -> None:
-        super().__init__(configs, **kwargs)
+    def __init__(self, configs: Configurations, *args, **kwargs) -> None:
+        super().__init__(configs, *args, **kwargs)
         self._components = self.__readcmpts__()
+        self.__activate__(self._components)
 
-    # noinspection SpellCheckingInspection
+    def __activate__(self, components: Dict[str, Component]) -> None:
+        pass
+
+    def __build__(self, **kwargs) -> Optional[pd.DataFrame]:
+        pass
+
+    # noinspection PyUnresolvedReferences, SpellCheckingInspection
     def __readcmpts__(self) -> Dict[str, Component]:
         cmpt_dir = self.configs.dirs.cmpt
 
@@ -181,3 +198,6 @@ class Context(Configurable, Mapping):
 
     def contains_type(self, key):
         return len(self.get_type(key)) > 0
+
+    def build(self, **kwargs) -> Optional[pd.DataFrame]:
+        return self.__build__(**kwargs)

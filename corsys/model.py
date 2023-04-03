@@ -25,9 +25,8 @@ class Model(ABC, Configurable):
     def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(configs, *args, **kwargs)
         self._context = context
-        self.__build__(context, configs)
 
-    def __build__(self, context: Context, configs: Configurations) -> None:
+    def __build__(self, context: Context) -> None:
         pass
 
     def __call__(self, *args, **kwargs) -> pd.DataFrame:
@@ -36,3 +35,6 @@ class Model(ABC, Configurable):
     @property
     def context(self) -> Context:
         return self._context
+
+    def build(self) -> None:
+        self.__build__(self._context)

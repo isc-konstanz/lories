@@ -68,6 +68,7 @@ class WeatherForecast(Weather):
         pass
 
 
+# noinspection PyAbstractClass
 class ScheduledForecast(WeatherForecast, DatabaseWeather):
 
     def __configure__(self, configs: Configurations) -> None:

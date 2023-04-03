@@ -6,21 +6,22 @@
     
 """
 from __future__ import annotations
-from typing import Dict, Iterator
+from typing import Optional, Iterator, Dict
 from collections.abc import Sequence
 
 import os
 import re
 import logging
+import datetime as dt
 import pandas as pd
 from shutil import copytree, ignore_patterns
 
 from .settings import Settings
-from .tools import to_bool
-from .io import Database, DatabaseUnavailableException
-from .location import Location, LocationUnavailableException
+from .tools import to_bool, to_date, ceil_date
+from .io import Database, DatabaseException, DatabaseUnavailableException
+from .weather import Weather, WeatherException, WeatherUnavailableException
 from .configs import Configurations, ConfigurationUnavailableException
-from .weather import Weather, WeatherUnavailableException
+from .location import Location, LocationUnavailableException
 from .cmpt import Component, Context
 
 # noinspection SpellCheckingInspection
@@ -45,7 +46,7 @@ class System(Context):
     ENERGY_TH_HT = 'th_ht_energy'
     ENERGY_TH_DOM = 'th_dom_energy'
 
-    # noinspection PyProtectedMember
+    # noinspection PyProtectedMember, PyUnresolvedReferences
     @classmethod
     def read(cls, settings: Settings) -> Systems:
         systems = Systems()
@@ -95,10 +96,6 @@ class System(Context):
                                         'logging*'))
         return True
 
-    def __init__(self, configs: Configurations, **kwargs) -> None:
-        super().__init__(configs, **kwargs)
-        self.__activate__(self._components, configs)
-
     def __configure__(self, configs: Configurations) -> None:
         super().__configure__(configs)
 
@@ -123,11 +120,10 @@ class System(Context):
         else:
             self._database = None
 
-    def __activate__(self, components: Dict[str, Component], configs: Configurations) -> None:
         try:
-            self._weather = self.__weather__(configs)
+            self._weather = self.__weather__(self.configs)
 
-        except ConfigurationUnavailableException:
+        except (WeatherUnavailableException, ConfigurationUnavailableException):
             self._weather = None
             logger.debug(f"System '{self.name}' has no weather configured")
 
@@ -171,7 +167,66 @@ class System(Context):
         if not configs.has_option(Database.SECTION, 'timezone'):
             configs.set(Database.SECTION, 'timezone', self.location.timezone.zone)
 
-        return Database.open(configs)
+        return Database.from_configs(configs)
+
+    def __activate__(self, components: Dict[str, Component]) -> None:
+        super().__activate__(components)
+        try:
+            self.database.open()
+
+        except DatabaseException as e:
+            logger.debug(f"Unable to open database, as "+str(e))
+
+        for component in components.values():
+            component.activate()
+        try:
+            self.weather.activate()
+
+        except WeatherException as e:
+            logger.debug(f"Unable to activate weather, as "+str(e))
+
+    def __build__(self,
+                  start: str | pd.Timestamp | dt.datetime = None,
+                  end:   str | pd.Timestamp | dt.datetime = None,
+                  **kwargs) -> Optional[pd.DataFrame]:
+        from scisys import build
+
+        data = pd.DataFrame()
+        try:
+            database = self.database
+            start = to_date(start, timezone=database.timezone)
+            end = to_date(end, timezone=database.timezone)
+            end = ceil_date(end)
+
+            kwargs['start'] = start
+            kwargs['end'] = end
+            try:
+                weather_data = self.weather.build(**kwargs)
+                if weather_data is not None:
+                    kwargs['weather'] = weather_data
+                    data = pd.concat([weather_data, data], axis='columns')
+
+            except (DatabaseUnavailableException, WeatherUnavailableException) as e:
+                logger.debug(f"Unable to build weather, as "+str(e))
+
+            system_data = build(self.configs, self.database, **kwargs)
+            if system_data is not None:
+                data = pd.concat([system_data, data], axis='columns')
+
+        except DatabaseUnavailableException as e:
+            logger.debug(f"Unable to build data, as "+str(e))
+
+        for component in self.values():
+            component_data = component.build(**kwargs)
+            if component_data is not None:
+                data = pd.concat([component_data, data], axis='columns')
+
+        if data is None or data.empty:
+            return None
+        return data
+
+    def __call__(self, *args, **kwargs) -> pd.DataFrame:
+        raise NotImplementedError
 
     @staticmethod
     def _parse_id(s: str) -> str:
@@ -207,31 +262,6 @@ class System(Context):
             raise WeatherUnavailableException(f"System \"{self.name}\" has no weather configured")
         return self._weather
 
-    def build(self, **kwargs) -> pd.DataFrame:
-        return self.__build__(**kwargs)
-
-    def __build__(self, **kwargs) -> pd.DataFrame:
-        from scisys import build
-        data = pd.DataFrame()
-        try:
-            weather = self.weather.build(**kwargs)
-            if weather is not None:
-                kwargs['weather'] = weather
-                data = pd.concat([data, weather], axis=1)
-
-        except WeatherUnavailableException as e:
-            logger.debug(f"Unable to build weather, as "+str(e))
-        try:
-            data = pd.concat([data, build(self.configs, self.database, **kwargs)], axis=1)
-
-        except DatabaseUnavailableException as e:
-            logger.debug(f"Unable to build data, as "+str(e))
-
-        return data
-
-    def __call__(self, *args, **kwargs) -> pd.DataFrame:
-        raise NotImplementedError
-
 
 class Systems(Sequence):
 
@@ -248,10 +278,6 @@ class Systems(Sequence):
     def __len__(self) -> int:
         return len(self._systems)
 
-    def build(self, **kwargs) -> None:
-        for system in self:
-            system.build(**kwargs)
-
     def __call__(self, *args, **kwargs) -> None:
         for system in self:
             result = system(*args, **kwargs)
@@ -260,3 +286,7 @@ class Systems(Sequence):
 
             except DatabaseUnavailableException as e:
                 logger.debug(f"Skipping persisting results: {str(e)}")
+
+    def build(self, **kwargs) -> None:
+        for system in self:
+            system.build(**kwargs)
