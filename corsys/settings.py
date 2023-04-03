@@ -17,6 +17,7 @@ from .configs import Configurations
 
 class Settings(Configurations):
 
+    # noinspection SpellCheckingInspection
     def __init__(self,
                  name: str,
                  conf_file='settings.cfg',

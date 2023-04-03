@@ -148,7 +148,7 @@ class Context(Configurable, Mapping):
 
         return component
 
-    # noinspection SpellCheckingInspection, PyShadowingBuiltins
+    # noinspection PyShadowingBuiltins
     def __cmpt__(self, configs: Configurations, type: str) -> Component:
         if type == 'pv':
             from corsys.cmpt import Photovoltaics

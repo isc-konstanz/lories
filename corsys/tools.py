@@ -28,7 +28,7 @@ def resample_data(data: pd.DataFrame, seconds: int) -> pd.DataFrame:
 def _resample_series(data: pd.Series, seconds: int) -> pd.Series:
     index = copy(data.index)
     resampled = data.resample('{}s'.format(seconds), closed='right')
-    if data.name.endswith('_energy'):
+    if str(data.name).endswith('_energy'):
         data = resampled.last()
     else:
         data = resampled.mean()
@@ -58,7 +58,7 @@ def derive_power(data: pd.Series) -> pd.Series:
     delta_index = (delta_index - delta_index.shift(1)) / np.timedelta64(1, 'h')
 
     data_power = pd.Series(delta_energy / delta_index, index=data.index)
-    data_power.name = data.name.replace("_energy", "_power")
+    data_power.name = str(data.name).replace("_energy", "_power")
 
     return data_power.dropna()
 
@@ -109,6 +109,7 @@ def ceil_date(date: Union[dt.datetime, pd.Timestamp, str],
     return date + to_timedelta(freq) - dt.timedelta(microseconds=1)
 
 
+# noinspection PyShadowingBuiltins
 def to_date(date: Union[str, int, dt.datetime, pd.Timestamp],
             timezone: dt.tzinfo = None,
             format: str = '%d.%m.%Y') -> Optional[pd.Timestamp]:
