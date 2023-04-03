@@ -31,7 +31,7 @@ class CsvDatabase(Database):
                  index_unix=False,
                  resolution=None,
                  merge=False,
-                 freq='T',
+                 freq='D',
                  format=None,
                  timezone=tz.UTC,
                  decimal='.',
@@ -316,8 +316,17 @@ class CsvDatabase(Database):
 
             date = floor_date(start, timezone=self.timezone, freq=self.freq)
 
+            # noinspection PyShadowingNames
             def next_date() -> pd.Timestamp:
-                return floor_date(date + to_timedelta(self.freq), timezone=self.timezone, freq=self.freq)
+                next_date = floor_date(date + to_timedelta(self.freq), timezone=self.timezone, freq=self.freq)
+                if next_date == date:
+                    next_date += to_timedelta(self.freq)
+                    next_offset = date.utcoffset() - next_date.utcoffset()
+                    if next_offset.seconds > 0:
+                        next_date = floor_date(next_date + next_offset, timezone=self.timezone, freq=self.freq)
+                    else:
+                        DatabaseException(f"Unable to increment date for freq '{self.freq}'")
+                return next_date
 
             file = date.strftime(self.format) + '.csv'
             file_path = os.path.join(path, file)
