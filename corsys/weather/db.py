@@ -75,9 +75,9 @@ class DatabaseWeather(Weather):
     @property
     def database(self):
         if not hasattr(self, '_database') or self._database is None:
-            raise DatabaseUnavailableException(f"Weather \"{self.context.location.name}\" has no database configured")
+            raise WeatherUnavailableException(f"Weather \"{self.context.location.name}\" has no database configured")
         if not self._database.enabled:
-            raise DatabaseUnavailableException(f"Weather \"{self.context.location.name}\" database is disabled")
+            raise WeatherUnavailableException(f"Weather \"{self.context.location.name}\" database is disabled")
         return self._database
 
     # noinspection PyShadowingBuiltins
