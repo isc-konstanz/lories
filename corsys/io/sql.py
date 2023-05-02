@@ -26,7 +26,7 @@ class SqlDatabase(Database):
                  tables=None, interval=24,
                  **kwargs):
         super().__init__(**kwargs)
-        self._connector = None
+        self._connection = None
 
         self.interval = to_int(interval)
         self.tables = tables
@@ -55,7 +55,7 @@ class SqlDatabase(Database):
     def connection(self):
         if self._connection is None:
             raise DatabaseException("SQL Connection not open")
-        return self._connector
+        return self._connection
 
     def exists(self, **kwargs):
         # TODO: Replace this placeholder more resource efficient
