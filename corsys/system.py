@@ -22,6 +22,7 @@ from .io import Database, DatabaseException, DatabaseUnavailableException
 from .weather import Weather, WeatherException, WeatherUnavailableException
 from .configs import Configurations, ConfigurationUnavailableException
 from .location import Location, LocationUnavailableException
+from .cost import Cost, CostUnavailableException
 from .cmpt import Component, Context
 
 # noinspection SpellCheckingInspection
@@ -120,16 +121,17 @@ class System(Context):
         else:
             self._database = None
 
+        if configs.has_section(Cost.SECTION):
+            self._cost = self.__cost__(configs)
+        else:
+            self._cost = None
+
         try:
             self._weather = self.__weather__(self.configs)
 
         except (WeatherUnavailableException, ConfigurationUnavailableException):
             self._weather = None
             logger.debug(f"System '{self.name}' has no weather configured")
-
-    # noinspection PyUnusedLocal
-    def __weather__(self, configs: Configurations) -> Weather:
-        return Weather.read(self)
 
     # noinspection PyMethodMayBeStatic
     def __location__(self, configs: Configurations) -> Location:
@@ -168,6 +170,13 @@ class System(Context):
             configs.set(Database.SECTION, 'timezone', self.location.timezone.zone)
 
         return Database.from_configs(configs)
+
+    def __cost__(self, configs: Configurations) -> Cost:
+        return Cost(**dict(configs.items(Cost.SECTION)))
+
+    # noinspection PyUnusedLocal
+    def __weather__(self, configs: Configurations) -> Weather:
+        return Weather.read(self)
 
     def __activate__(self, components: Dict[str, Component]) -> None:
         super().__activate__(components)
@@ -243,6 +252,12 @@ class System(Context):
         return self._name
 
     @property
+    def location(self) -> Location:
+        if not self._location:
+            raise LocationUnavailableException(f"System \"{self.name}\" has no location configured")
+        return self._location
+
+    @property
     def database(self):
         if self._database is None:
             raise DatabaseUnavailableException(f"System \"{self.name}\" has no database configured")
@@ -251,10 +266,10 @@ class System(Context):
         return self._database
 
     @property
-    def location(self) -> Location:
-        if not self._location:
-            raise LocationUnavailableException(f"System \"{self.name}\" has no location configured")
-        return self._location
+    def cost(self):
+        if self._cost is None:
+            raise CostUnavailableException(f"System \"{self.name}\" has no costs configured")
+        return self._cost
 
     @property
     def weather(self):
