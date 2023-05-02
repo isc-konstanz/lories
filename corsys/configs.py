@@ -81,6 +81,11 @@ class Configurations(ConfigParser):
         self._dirs = dirs
 
     @property
+    def enabled(self) -> bool:
+        return self.getboolean(self.GENERAL, 'enabled', fallback=True) and not \
+            self.getboolean(self.GENERAL, 'disabled', fallback=False)
+
+    @property
     def general(self) -> Dict[str, str]:
         return dict(self.items(self.GENERAL))
 
@@ -131,6 +136,10 @@ class Configurable:
     @property
     def configs(self) -> Configurations:
         return self._configs
+
+    @property
+    def enabled(self) -> bool:
+        return self._configs.enabled
 
     @property
     def _class_name(self) -> str:

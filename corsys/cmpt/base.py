@@ -124,7 +124,8 @@ class Context(Configurable, Mapping):
                     and entry.name.startswith(tuple(self.__cmpt_types__())):
                 # noinspection PyTypeChecker
                 component = self.__readcmpt__(entry)
-                components[component.id] = component
+                if component.enabled:
+                    components[component.id] = component
 
         return components
 
@@ -192,11 +193,12 @@ class Context(Configurable, Mapping):
     def get_types(self) -> List[str]:
         return self.__cmpt_types__()
 
-    def get_type(self, key: str) -> List[Component]:
-        return [component for component in self._components.values() if component.type in key]
+    def get_type(self, *keys: str) -> List[Component] | Component:
+        return [component for component in self._components.values()
+                if any(key.startswith(component.type) for key in keys)]
 
-    def contains_type(self, key):
-        return len(self.get_type(key)) > 0
+    def contains_type(self, *keys):
+        return len(self.get_type(*keys)) > 0
 
     def build(self, **kwargs) -> Optional[pd.DataFrame]:
         return self.__build__(**kwargs)
