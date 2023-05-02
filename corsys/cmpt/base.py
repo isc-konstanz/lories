@@ -50,9 +50,8 @@ class Component(Configurable):
     def __build__(self, **kwargs) -> Optional[pd.DataFrame]:
         pass
 
-    # noinspection PyMethodMayBeStatic
     def __cost__(self, configs: Configurations) -> Cost:
-        return Cost(dict(configs.items(Cost.SECTION)))
+        return Cost(**dict(configs.items(Cost.SECTION)))
 
     @property
     def id(self) -> str:

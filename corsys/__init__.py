@@ -26,6 +26,9 @@ from .model import Model  # noqa: F401
 from . import location  # noqa: F401
 from .location import Location  # noqa: F401
 
+from . import cost  # noqa: F401
+from .cost import Cost  # noqa: F401
+
 from . import cmpt  # noqa: F401
 from .cmpt import Component  # noqa: F401
 
