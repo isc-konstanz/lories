@@ -7,7 +7,7 @@
 """
 from ..system import System
 from ..weather import Weather
-from ..cmpt import ElectricalEnergyStorage, ThermalEnergyStorage, Photovoltaics
+from ..cmpt import ElectricalEnergyStorage, ThermalEnergyStorage, Photovoltaic
 
 
 _DEPRECATION = {
@@ -55,13 +55,13 @@ _COMPONENTS_ENERGY = {
 }
 
 _PV_POWER = {
-    Photovoltaics.POWER: 'Generated PV Power [W]',
-    Photovoltaics.POWER_EXP: 'Exported PV Power [W]'
+    Photovoltaic.POWER:     'Generated PV Power [W]',
+    Photovoltaic.POWER_EXP: 'Exported PV Power [W]'
 }
 
 _PV_ENERGY = {
-    Photovoltaics.ENERGY: 'Generated PV Energy [kWh]',
-    Photovoltaics.ENERGY_EXP: 'Exported PV Energy [kWh]'
+    Photovoltaic.ENERGY:     'Generated PV Energy [kWh]',
+    Photovoltaic.ENERGY_EXP: 'Exported PV Energy [kWh]'
 }
 
 PV = {
@@ -88,10 +88,10 @@ STATES = {
 }
 
 _AC_POWER = {
-    'active_power':    'Total Active Power [W]',
-    'l1_active_power': 'Phase 1 Active Power [W]',
-    'l2_active_power': 'Phase 2 Active Power [W]',
-    'l3_active_power': 'Phase 3 Active Power [W]',
+    'active_power':      'Total Active Power [W]',
+    'l1_active_power':   'Phase 1 Active Power [W]',
+    'l2_active_power':   'Phase 2 Active Power [W]',
+    'l3_active_power':   'Phase 3 Active Power [W]',
     'reactive_power':    'Total Reactive Power [W]',
     'l1_reactive_power': 'Phase 1 Reactive Power [W]',
     'l2_reactive_power': 'Phase 2 Reactive Power [W]',
@@ -100,21 +100,21 @@ _AC_POWER = {
     'l1_apparent_power': 'Phase 1 Apparent Power [W]',
     'l2_apparent_power': 'Phase 2 Apparent Power [W]',
     'l3_apparent_power': 'Phase 3 Apparent Power [W]',
-    'import_power':    'Total Imported Power [W]',
-    'l1_import_power': 'Phase 1 Imported Power [W]',
-    'l2_import_power': 'Phase 2 Imported Power [W]',
-    'l3_import_power': 'Phase 3 Imported Power [W]',
-    'export_power': 'Total Exported Power [W]',
-    'l1_export_power': 'Phase 1 Exported Power [W]',
-    'l2_export_power': 'Phase 2 Exported Power [W]',
-    'l3_export_power': 'Phase 3 Exported Power [W]'
+    'import_power':      'Total Imported Power [W]',
+    'l1_import_power':   'Phase 1 Imported Power [W]',
+    'l2_import_power':   'Phase 2 Imported Power [W]',
+    'l3_import_power':   'Phase 3 Imported Power [W]',
+    'export_power':      'Total Exported Power [W]',
+    'l1_export_power':   'Phase 1 Exported Power [W]',
+    'l2_export_power':   'Phase 2 Exported Power [W]',
+    'l3_export_power':   'Phase 3 Exported Power [W]'
 }
 
 _AC_ENERGY = {
-    'active_energy':    'Total Active Energy [kWh]',
-    'l1_active_energy': 'Phase 1 Active Energy [kWh]',
-    'l2_active_energy': 'Phase 2 Active Energy [kWh]',
-    'l3_active_energy': 'Phase 3 Active Energy [kWh]',
+    'active_energy':      'Total Active Energy [kWh]',
+    'l1_active_energy':   'Phase 1 Active Energy [kWh]',
+    'l2_active_energy':   'Phase 2 Active Energy [kWh]',
+    'l3_active_energy':   'Phase 3 Active Energy [kWh]',
     'reactive_energy':    'Total Reactive Energy [kWh]',
     'l1_reactive_energy': 'Phase 1 Reactive Energy [kWh]',
     'l2_reactive_energy': 'Phase 2 Reactive Energy [kWh]',
@@ -123,14 +123,14 @@ _AC_ENERGY = {
     'l1_apparent_energy': 'Phase 1 Apparent Energy [kWh]',
     'l2_apparent_energy': 'Phase 2 Apparent Energy [kWh]',
     'l3_apparent_energy': 'Phase 3 Apparent Energy [kWh]',
-    'import_energy':    'Total Imported Energy [kWh]',
-    'l1_import_energy': 'Phase 1 Imported Energy [kWh]',
-    'l2_import_energy': 'Phase 2 Imported Energy [kWh]',
-    'l3_import_energy': 'Phase 3 Imported Energy [kWh]',
-    'export_energy': 'Total Exported Energy [kWh]',
-    'l1_export_energy': 'Phase 1 Exported Energy [kWh]',
-    'l2_export_energy': 'Phase 2 Exported Energy [kWh]',
-    'l3_export_energy': 'Phase 3 Exported Energy [kWh]'
+    'import_energy':      'Total Imported Energy [kWh]',
+    'l1_import_energy':   'Phase 1 Imported Energy [kWh]',
+    'l2_import_energy':   'Phase 2 Imported Energy [kWh]',
+    'l3_import_energy':   'Phase 3 Imported Energy [kWh]',
+    'export_energy':      'Total Exported Energy [kWh]',
+    'l1_export_energy':   'Phase 1 Exported Energy [kWh]',
+    'l2_export_energy':   'Phase 2 Exported Energy [kWh]',
+    'l3_export_energy':   'Phase 3 Exported Energy [kWh]'
 }
 
 AC = {
@@ -170,16 +170,16 @@ WEATHER = {
 
 SOLAR = {
     'solar_elevation': 'Solar Elevation [°]',
-    'solar_zenith': 'Solar Zenith [°]',
-    'solar_azimuth': 'Solar Azimuth [°]'
+    'solar_zenith':    'Solar Zenith [°]',
+    'solar_azimuth':   'Solar Azimuth [°]'
 }
 
 TIME = {
-    'hour': 'Hour',
+    'hour':        'Hour',
     'day_of_week': 'Day of the Week',
     'day_of_year': 'Day of the Year',
-    'month': 'Month',
-    'year': 'Year'
+    'month':       'Month',
+    'year':        'Year'
 }
 
 POWER = {

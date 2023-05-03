@@ -11,6 +11,8 @@ from . import Component
 
 class ElectricVehicle(Component):
 
+    TYPE = 'ev'
+
     # noinspection PyProtectedMember
     def __configure__(self, configs: Configurations) -> None:
         super().__configure__(configs)
@@ -18,7 +20,7 @@ class ElectricVehicle(Component):
 
     @property
     def type(self) -> str:
-        return 'ev'
+        return self.TYPE
 
     @property
     def capacity(self) -> float:

@@ -151,8 +151,8 @@ class Context(Configurable, Mapping):
     # noinspection PyShadowingBuiltins
     def __cmpt__(self, configs: Configurations, type: str) -> Component:
         if type == 'pv':
-            from corsys.cmpt import Photovoltaics
-            return Photovoltaics(self, configs)
+            from corsys.cmpt import Photovoltaic
+            return Photovoltaic(self, configs)
         elif type == 'ev':
             from corsys.cmpt import ElectricVehicle
             return ElectricVehicle(self, configs)

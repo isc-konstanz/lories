@@ -11,6 +11,8 @@ from . import Component
 
 class ThermalEnergyStorage(Component):
 
+    TYPE = 'tes'
+
     TEMPERATURE = 'tes_temp'
     TEMPERATURE_HEATING = 'tes_ht_temp'
     TEMPERATURE_DOMESTIC = 'tes_dom_temp'
@@ -27,7 +29,7 @@ class ThermalEnergyStorage(Component):
 
     @property
     def type(self) -> str:
-        return 'tes'
+        return self.TYPE
 
     @property
     def volume(self) -> float:
