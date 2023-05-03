@@ -52,3 +52,36 @@ class ElectricalEnergyStorage(Component):
     @property
     def power_max(self) -> float:
         return self._power_max
+
+    def infer_soc(self, data: pd.DataFrame) -> pd.DataFrame:
+        from copy import deepcopy
+        from .. import System
+
+        if System.POWER_EL not in data.columns:
+            raise ValueError("Unable to infer battery storage state of charge without import/export power")
+
+        columns = [self.STATE_OF_CHARGE, self.POWER_CHARGE, self.POWER_DISCHARGE]
+
+        data = deepcopy(data)
+        data.loc[data.index[0], columns] = [0, 0, 0]
+
+        for i in range(1, len(data.index) - 1):
+            index = data.index[i]
+            hours = (index - data.index[i-1]).total_seconds() / 3600.
+
+            power = -min(self.power_max, max(-self.power_max, data.loc[index, System.POWER_EL]))
+
+            soc = data.loc[data.index[i-1], self.STATE_OF_CHARGE]
+            charge_max = self.percent_to_energy(100 - soc)
+            discharge_max = self.percent_to_energy(0 - soc)
+
+            energy = power/1000. * hours
+            energy = min(charge_max, max(discharge_max, energy))
+            soc += self.energy_to_percent(energy)
+
+            power = energy*1000. / hours
+            data.loc[index, columns] = [soc, max(0., power), max(0., -power)]
+            data.loc[index, System.POWER_EL] += power
+        data.loc[abs(data[System.POWER_EL]) <= 1e-3, System.POWER_EL] = 0
+
+        return data
