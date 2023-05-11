@@ -35,6 +35,7 @@ class Brightsky(ScheduledForecast):
             raise ValueError(f"Invalid forecast horizon: {self.horizon}")
 
         self._variables = {
+            Weather.GHI:                 'solar',
             Weather.TEMP_AIR:            'temperature',
             Weather.PRESSURE_SEA:        'pressure_msl',
             Weather.WIND_SPEED_GUST:     'wind_gust_speed',
@@ -42,6 +43,7 @@ class Brightsky(ScheduledForecast):
         }
 
         self._variables_output = [
+            Weather.GHI,
             Weather.TEMP_AIR,
             Weather.TEMP_DEW_POINT,
             Weather.HUMIDITY_REL,
@@ -54,6 +56,7 @@ class Brightsky(ScheduledForecast):
             Weather.SUNSHINE,
             Weather.VISIBILITY,
             Weather.PRECIPITATION,
+            Weather.PRECIPITATION_PROB,
             'condition',
             'icon'
         ]
@@ -116,6 +119,11 @@ class Brightsky(ScheduledForecast):
         data['timestamp'] = pd.to_datetime(data['timestamp'], utc=True)
         data = data.set_index('timestamp').tz_convert(self.location.timezone)
         data.index.name = 'time'
+
+        hours = pd.Series(data=data.index, index=data.index).diff().bfill().dt.total_seconds() / 3600.
+
+        # Convert global horizontal irradiance from kWh/m^2 to W/m^2
+        data['solar'] = data['solar']*hours*1000
 
         if data[Weather.CLOUD_COVER].isna().any():
             data[Weather.CLOUD_COVER].interpolate(method='linear', inplace=True)
