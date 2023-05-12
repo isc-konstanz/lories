@@ -116,7 +116,7 @@ class Brightsky(ScheduledForecast):
 
         data = json.loads(response.text)
         data = pd.DataFrame(data['weather'])
-        data['timestamp'] = pd.to_datetime(data['timestamp'], utc=True)
+        data['timestamp'] = pd.DatetimeIndex(pd.to_datetime(data['timestamp'], utc=True))
         data = data.set_index('timestamp').tz_convert(self.location.timezone)
         data.index.name = 'time'
 
@@ -127,5 +127,7 @@ class Brightsky(ScheduledForecast):
 
         if data[Weather.CLOUD_COVER].isna().any():
             data[Weather.CLOUD_COVER].interpolate(method='linear', inplace=True)
+
+        data.dropna(how='all', axis='columns', inplace=True)
 
         return self._rename(data)[self._variables_output]
