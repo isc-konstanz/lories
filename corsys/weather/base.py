@@ -53,15 +53,15 @@ class Weather(ABC, Configurable):
     def read(cls, system, conf_file: str = 'weather.cfg') -> Weather:
         configs = Configurations.from_configs(system.configs, conf_file)
         type = configs.get('General', 'type', fallback='default').lower()
-        if type in ['default', 'database']:
-            from .db import DatabaseWeather
-            return DatabaseWeather(context, configs)
-        elif type == 'brightsky':
+        if type in ['brightsky', 'default']:
             from .dwd import Brightsky
-            return Brightsky(context, configs)
-        elif type == 'nmm':
+            return Brightsky(system, configs)
+        elif type in ['meteoblue', 'nmm']:
             from .nmm import NMM
-            return NMM(context, configs)
+            return NMM(system, configs)
+        elif type == 'database':
+            from .db import DatabaseWeather
+            return DatabaseWeather(system, configs)
 
         raise TypeError('Invalid weather type: {}'.format(type))
 

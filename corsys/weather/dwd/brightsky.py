@@ -61,30 +61,14 @@ class Brightsky(ScheduledForecast):
             'icon'
         ]
 
-    def __activate__(self, system: System, configs: Configurations) -> None:
-        super().__activate__(system, configs)
+    def __activate__(self, system: System) -> None:
+        super().__activate__(system)
         self.location = system.location
 
-    def get(self,
-            start: dt.datetime | pd.Timestamp = pd.Timestamp.now(tz.UTC),
-            end:   dt.datetime | pd.Timestamp = None,
-            **kwargs) -> pd.DataFrame:
-
-        timezone = self.location.timezone
-        today = pd.Timestamp.now(timezone).replace(hour=0, minute=0, second=0, microsecond=0)
-        start = to_date(start, timezone=timezone)
-        end = to_date(end, timezone=timezone)
-        if start >= today:
-            return super().get(start, end, **kwargs)
-        elif end is None:
-            end = today - dt.timedelta(days=1)
-
-        # TODO: Check and read data from database first and request and write data if not existing
-        forecast = self._request(start, end)
-        return self._get_range(forecast, start, end)
-
-    def predict(self, date: pd.Timestamp) -> pd.DataFrame:
-        return self._request(date)
+    def predict(self,
+                start: dt.datetime | pd.Timestamp = pd.Timestamp.now(tz.UTC),
+                end: dt.datetime | pd.Timestamp = None) -> pd.DataFrame:
+        return self._request(start, end)
 
     # noinspection PyPackageRequirements
     def _request(self,
