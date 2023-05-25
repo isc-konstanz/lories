@@ -110,7 +110,7 @@ class CsvDatabase(Database):
                     # TODO: verify if the energy values are continuously integrated or timestep deltas
                     file_data.loc[:, column] = file_data[column] + data.loc[data.index[-1], column]
 
-            data = data.combine_first(file_data)
+            data = file_data.combine_first(data)
 
         if resolution is None:
             resolution = self.resolution
@@ -304,15 +304,17 @@ class CsvDatabase(Database):
                 filenames = [os.path.basename(f) for f in glob.glob(os.path.join(path, '*.csv'))]
                 if len(filenames) > 0:
                     filenames.sort()
-                    if end is None:
-                        end_str = filenames[-1].replace('.csv', '')
-                        end = to_date(end_str, timezone=self.timezone, format=self.format)
-                        end = ceil_date(end, timezone=self.timezone, freq=self.freq)
+                    if start is None and end is None:
+                        return [os.path.join(path, f) for f in filenames]
+
                     if start is None:
                         start_str = filenames[0].replace('.csv', '')
                         start = to_date(start_str, timezone=self.timezone, format=self.format)
-                if start is None and end is None:
-                    return files
+
+                        if end is None:
+                            end_str = filenames[-1].replace('.csv', '')
+                            end = to_date(end_str, timezone=self.timezone, format=self.format)
+                            end = ceil_date(end, timezone=self.timezone, freq=self.freq)
 
             date = floor_date(start, timezone=self.timezone, freq=self.freq)
 
