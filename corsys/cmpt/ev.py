@@ -16,12 +16,8 @@ class ElectricVehicle(Component):
     # noinspection PyProtectedMember
     def __configure__(self, configs: Configurations) -> None:
         super().__configure__(configs)
-        self._capacity = configs.getfloat('EV', 'capacity', fallback=30)
+        self.capacity = configs.getfloat('EV', 'capacity')
 
     @property
     def type(self) -> str:
         return self.TYPE
-
-    @property
-    def capacity(self) -> float:
-        return self._capacity

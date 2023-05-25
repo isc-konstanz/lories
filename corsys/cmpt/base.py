@@ -23,12 +23,12 @@ INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
 class Component(Configurable):
 
     @classmethod
-    def read(cls, context: Context, conf_file: str = None) -> Component:
-        return cls(context, Configurations.from_configs(context.configs, conf_file=conf_file))
+    def read(cls, system, conf_file: str = None) -> Component:
+        return cls(system, Configurations.from_configs(system.configs, conf_file=conf_file))
 
-    def __init__(self, context: Context, *args, **kwargs) -> None:
+    def __init__(self, system, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._context = context
+        self.system = system
 
     def __configure__(self, configs: Configurations) -> None:
         super().__configure__(configs)
@@ -44,7 +44,7 @@ class Component(Configurable):
         else:
             self._cost = None
 
-    def __activate__(self, context: Context) -> None:
+    def __activate__(self, system) -> None:
         pass
 
     def __build__(self, **kwargs) -> Optional[pd.DataFrame]:
@@ -84,21 +84,17 @@ class Component(Configurable):
             raise CostUnavailableException(f"Component \"{self.name}\" has no costs configured")
         return self._cost
 
-    @property
-    def context(self) -> Context:
-        return self._context
-
     def activate(self) -> None:
-        self.__activate__(self._context)
+        self.__activate__(self.system)
 
     def build(self, **kwargs) -> Optional[pd.DataFrame]:
         return self.__build__(**kwargs)
 
 
-class Context(Configurable, Mapping):
+class Components(Configurable, Mapping):
 
     @classmethod
-    def _read(cls, **kwargs) -> Context:
+    def _read(cls, **kwargs) -> Components:
         return cls(Configurations(f"{cls.__name__.lower()}.cfg", **kwargs))
 
     def __init__(self, configs: Configurations, *args, **kwargs) -> None:
@@ -171,7 +167,7 @@ class Context(Configurable, Mapping):
     def __getattr__(self, attr):
         # __getattr__ gets called when the item is not found via __getattribute__
         # To avoid recursion, call __getattribute__ directly to get components dict
-        components = Context.__getattribute__(self, '_components')
+        components = Components.__getattribute__(self, '_components')
         if attr in components.keys():
             return components[attr]
         try:

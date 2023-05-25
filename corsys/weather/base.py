@@ -16,7 +16,6 @@ from typing import Optional, Dict
 import pandas as pd
 import logging
 
-from ..cmpt import Context
 from ..configs import Configurations, Configurable
 from ..io import DatabaseUnavailableException
 
@@ -51,8 +50,8 @@ class Weather(ABC, Configurable):
 
     # noinspection PyShadowingBuiltins
     @classmethod
-    def read(cls, context: Context, conf_file: str = 'weather.cfg') -> Weather:
-        configs = Configurations.from_configs(context.configs, conf_file)
+    def read(cls, system, conf_file: str = 'weather.cfg') -> Weather:
+        configs = Configurations.from_configs(system.configs, conf_file)
         type = configs.get('General', 'type', fallback='default').lower()
         if type in ['default', 'database']:
             from .db import DatabaseWeather
@@ -66,13 +65,13 @@ class Weather(ABC, Configurable):
 
         raise TypeError('Invalid weather type: {}'.format(type))
 
-    def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
+    def __init__(self, system, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(configs, *args, **kwargs)
         if not hasattr(self, '_variables'):
             self._variables = {}
-        self._context = context
+        self.system = system
 
-    def __activate__(self, context: Context) -> None:
+    def __activate__(self, system) -> None:
         pass
 
     def __build__(self, **kwargs) -> Optional[pd.DataFrame]:
@@ -99,14 +98,10 @@ class Weather(ABC, Configurable):
 
     @property
     def database(self):
-        raise DatabaseUnavailableException(f"Weather \"{self.context.location.name}\" has no database configured")
-
-    @property
-    def context(self) -> Context:
-        return self._context
+        raise DatabaseUnavailableException(f"Weather of system \"{self.system.name}\" has no database configured")
 
     def activate(self) -> None:
-        self.__activate__(self._context)
+        self.__activate__(self.system)
 
     def build(self, **kwargs) -> Optional[pd.DataFrame]:
         return self.__build__(**kwargs)

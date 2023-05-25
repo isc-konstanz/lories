@@ -23,7 +23,7 @@ from .weather import Weather, WeatherException, WeatherUnavailableException
 from .configs import Configurations, ConfigurationUnavailableException
 from .location import Location, LocationUnavailableException
 from .cost import Cost, CostUnavailableException
-from .cmpt import Component, Context
+from .cmpt import Component, Components
 
 # noinspection SpellCheckingInspection
 INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
@@ -31,7 +31,7 @@ INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
 logger = logging.getLogger(__name__)
 
 
-class System(Context):
+class System(Components):
 
     POWER_EL = 'el_power'
     POWER_EL_IMP = 'el_import_power'
@@ -248,7 +248,7 @@ class System(Context):
         return self._id
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name
 
     @property
@@ -266,13 +266,13 @@ class System(Context):
         return self._database
 
     @property
-    def cost(self):
+    def cost(self) -> Cost:
         if self._cost is None:
             raise CostUnavailableException(f"System \"{self.name}\" has no costs configured")
         return self._cost
 
     @property
-    def weather(self):
+    def weather(self) -> Weather:
         if self._weather is None:
             raise WeatherUnavailableException(f"System \"{self.name}\" has no weather configured")
         return self._weather

@@ -26,32 +26,20 @@ class ElectricalEnergyStorage(Component):
     # noinspection PyProtectedMember
     def __configure__(self, configs: Configurations) -> None:
         super().__configure__(configs)
-        self._capacity = configs.getfloat(Configurations.GENERAL, 'capacity')
-        self._efficiency = configs.getfloat(Configurations.GENERAL, 'efficiency')
+        self.capacity = configs.getfloat(Configurations.GENERAL, 'capacity')
+        self.efficiency = configs.getfloat(Configurations.GENERAL, 'efficiency')
 
-        self._power_max = configs.getfloat(Configurations.GENERAL, 'power_max') * 1000.
+        self.power_max = configs.getfloat(Configurations.GENERAL, 'power_max') * 1000
 
     @property
     def type(self) -> str:
         return self.TYPE
 
-    @property
-    def capacity(self) -> float:
-        return self._capacity
-
     def percent_to_energy(self, percent) -> float:
-        return percent * self._capacity / 100
+        return percent * self.capacity / 100
 
     def energy_to_percent(self, capacity) -> float:
-        return capacity / self._capacity * 100
-
-    @property
-    def efficiency(self) -> float:
-        return self._efficiency
-
-    @property
-    def power_max(self) -> float:
-        return self._power_max
+        return capacity / self.capacity * 100
 
     def infer_soc(self, data: pd.DataFrame) -> pd.DataFrame:
         from copy import deepcopy

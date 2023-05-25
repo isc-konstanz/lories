@@ -15,7 +15,7 @@ import pandas as pd
 from ..tools import to_date, to_bool
 from ..configs import Configurations
 from ..system import System
-from ..io import Database, DatabaseUnavailableException
+from ..io import Database
 from .base import Weather, WeatherUnavailableException
 
 
@@ -70,14 +70,14 @@ class DatabaseWeather(Weather):
 
     def __build__(self, **kwargs) -> Optional[pd.DataFrame]:
         from scisys import build
-        return build(self.configs, self.database, location=self.context.location, **kwargs)
+        return build(self.configs, self.database, location=self.system.location, **kwargs)
 
     @property
     def database(self):
         if not hasattr(self, '_database') or self._database is None:
-            raise WeatherUnavailableException(f"Weather \"{self.context.location.name}\" has no database configured")
+            raise WeatherUnavailableException(f"Weather \"{self.system.location.name}\" has no database configured")
         if not self._database.enabled:
-            raise WeatherUnavailableException(f"Weather \"{self.context.location.name}\" database is disabled")
+            raise WeatherUnavailableException(f"Weather \"{self.system.location.name}\" database is disabled")
         return self._database
 
     # noinspection PyShadowingBuiltins
@@ -87,7 +87,7 @@ class DatabaseWeather(Weather):
             format: str = '%d.%m.%Y',
             **kwargs) -> pd.DataFrame:
 
-        start = to_date(start, timezone=self.context.location.timezone, format=format)
-        end = to_date(end, timezone=self.context.location.timezone, format=format)
+        start = to_date(start, timezone=self.system.location.timezone, format=format)
+        end = to_date(end, timezone=self.system.location.timezone, format=format)
 
         return self.database.read(start=start, end=end, **kwargs)

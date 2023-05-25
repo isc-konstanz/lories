@@ -25,14 +25,10 @@ class Photovoltaic(Component):
     def __configure__(self, configs: Configurations) -> None:
         super().__configure__(configs)
 
-        self._power_max = configs.getfloat('General', 'power_max', fallback=None)
-        if self._power_max:
-            self._power_max *= 1000.
+        self.power_max = configs.getfloat('General', 'power_max', fallback=None)
+        if self.power_max:
+            self.power_max *= 1000.
 
     @property
     def type(self) -> str:
         return self.TYPE
-
-    @property
-    def power_max(self) -> float:
-        return self._power_max
