@@ -84,16 +84,20 @@ class ScheduledForecast(WeatherForecast, DatabaseWeather):
         timezone = self.system.location.timezone
         end = to_date(end, timezone=timezone)
         start = to_date(start, timezone=timezone)
-        start_schedule = floor_date(start, timezone, f"{self.interval}T") + dt.timedelta(minutes=self.delay)
+        start_schedule = floor_date(start, self.database.timezone, f"{self.interval}T")
+        start_schedule += dt.timedelta(minutes=self.delay)
         if start_schedule > start:
             start_schedule -= dt.timedelta(minutes=self.interval)
 
         if self.database.exists(start_schedule):
-            forecast = self.database.read(start_schedule)
+            forecast = self.database.read(start_schedule).tz_convert(timezone)
+
         elif start < pd.Timestamp.now(timezone):
             raise WeatherException("Unable to read persisted historic forecast")
+
         else:
-            forecast = self.predict(start, **kwargs)
+            forecast = self.predict(start_schedule, **kwargs)
 
             self.database.write(forecast, start=start_schedule)
+
         return self._get_range(forecast, start_schedule, end)
