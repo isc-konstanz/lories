@@ -46,7 +46,8 @@ SYSTEM = {
 }
 
 _COMPONENTS_POWER = {
-    ElectricalEnergyStorage.POWER_CHARGE: 'EES Charging Power [W]'
+    ElectricalEnergyStorage.POWER_CHARGE: 'EES Charging Power [W]',
+    ElectricalEnergyStorage.POWER_DISCHARGE: 'EES Discharging Power [W]'
 }
 
 _COMPONENTS_ENERGY = {

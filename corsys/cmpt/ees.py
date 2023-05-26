@@ -31,6 +31,11 @@ class ElectricalEnergyStorage(Component):
 
         self.power_max = configs.getfloat(Configurations.GENERAL, 'power_max') * 1000
 
+        self.grid_power_max = configs.getfloat(Configurations.GENERAL, 'grid_power_max',
+                                               fallback=0) * 1000
+        self.grid_power_min = configs.getfloat(Configurations.GENERAL, 'grid_power_min',
+                                               fallback=self.grid_power_max) * 1000
+
     @property
     def type(self) -> str:
         return self.TYPE
@@ -41,7 +46,7 @@ class ElectricalEnergyStorage(Component):
     def energy_to_percent(self, capacity) -> float:
         return capacity / self.capacity * 100
 
-    def infer_soc(self, data: pd.DataFrame) -> pd.DataFrame:
+    def infer_soc(self, data: pd.DataFrame, inplace: bool = False) -> pd.DataFrame:
         from copy import deepcopy
         from .. import System
 
@@ -50,14 +55,25 @@ class ElectricalEnergyStorage(Component):
 
         columns = [self.STATE_OF_CHARGE, self.POWER_CHARGE, self.POWER_DISCHARGE]
 
-        data = deepcopy(data)
+        if not inplace:
+            data = deepcopy(data)
         data.loc[data.index[0], columns] = [0, 0, 0]
 
-        for i in range(1, len(data.index) - 1):
+        for i in range(1, len(data.index)):
             index = data.index[i]
             hours = (index - data.index[i-1]).total_seconds() / 3600.
 
-            power = -min(self.power_max, max(-self.power_max, data.loc[index, System.POWER_EL]))
+            power = data.loc[index, System.POWER_EL]
+            if power > self.grid_power_max:
+                power = self.grid_power_max - power
+            elif power < self.grid_power_min:
+                power = self.grid_power_min - power
+            else:
+                power = 0
+            if power > self.power_max:
+                power = self.power_max
+            elif power < -self.power_max:
+                power = -self.power_max
 
             soc = data.loc[data.index[i-1], self.STATE_OF_CHARGE]
             charge_max = self.percent_to_energy(100 - soc)
@@ -65,11 +81,11 @@ class ElectricalEnergyStorage(Component):
 
             energy = power/1000. * hours
             energy = min(charge_max, max(discharge_max, energy))
+            power = energy*1000. / hours
+
             soc += self.energy_to_percent(energy)
 
-            power = energy*1000. / hours
             data.loc[index, columns] = [soc, max(0., power), max(0., -power)]
             data.loc[index, System.POWER_EL] += power
-        data.loc[abs(data[System.POWER_EL]) <= 1e-3, System.POWER_EL] = 0
 
         return data
