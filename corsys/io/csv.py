@@ -155,7 +155,7 @@ class CsvDatabase(Database):
             if self.index_unix:
                 data[index_column] = pd.to_datetime(data[index_column], unit='ms')
             else:
-                data[index_column] = pd.to_datetime(data[index_column], infer_datetime_format=True)
+                data[index_column] = pd.to_datetime(data[index_column])
 
             data.set_index(index_column, verify_integrity=True, inplace=True)
             data.index.name = 'time'
@@ -167,7 +167,7 @@ class CsvDatabase(Database):
                 data.index.name = 'time'
                 data.index = data.index.tz_localize(tz.utc).tz_convert(self.timezone)
 
-            if data.index.tzinfo is None or data.index.tzinfo.utcoffset(data.index) is None:
+            if data.index.tzinfo is None or any(data.index.tzinfo.utcoffset(i) is None for i in data.index):
                 data.index = data.index.tz_localize(self.timezone, ambiguous="infer")
             elif data.index.tzinfo != self.timezone:
                 data.index = data.index.tz_convert(self.timezone)
