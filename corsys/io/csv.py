@@ -167,10 +167,11 @@ class CsvDatabase(Database):
                 data.index.name = 'time'
                 data.index = data.index.tz_localize(tz.utc).tz_convert(self.timezone)
 
-            if data.index.tzinfo is None or any(data.index.tzinfo.utcoffset(i) is None for i in data.index):
+            if hasattr(data.index, 'tzinfo') and data.index.tzinfo is not None:
+                if data.index.tzinfo != self.timezone:
+                    data.index = data.index.tz_convert(self.timezone)
+            else:
                 data.index = data.index.tz_localize(self.timezone, ambiguous="infer")
-            elif data.index.tzinfo != self.timezone:
-                data.index = data.index.tz_convert(self.timezone)
 
             # noinspection PyProtectedMember
             data = data.rename(columns=var._DEPRECATION)
