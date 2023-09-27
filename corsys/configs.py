@@ -164,6 +164,15 @@ class ConfigurationUnavailableException(ConfigurationException):
 
 class Directories:
 
+    LIB = 'lib_dir'
+    LOG = 'log_dir'
+    TMP = 'tmp_dir'
+    DATA = 'data_dir'
+    CMPT = 'cmpt_dir'
+    CONF = 'conf_dir'
+
+    KEYS = [LIB, LOG, TMP, DATA, CMPT, CONF]
+
     def __init__(self,
                  lib_dir: str = None,
                  log_dir: str = None,
@@ -187,15 +196,15 @@ class Directories:
 
     def encode(self) -> Dict[str, str]:
         dirs = {
-            'lib_dir': self._lib,
-            'log_dir': self._log,
-            'tmp_dir': self._tmp,
-            'data_dir': self._data
+            self.LIB: self._lib,
+            self.LOG: self._log,
+            self.TMP: self._tmp,
+            self.DATA: self._data
         }
         if self._cmpt is None or not os.path.isabs(self._cmpt):
-            dirs['cmpt_dir'] = self._cmpt
+            dirs[self.CMPT] = self._cmpt
         if self._conf is None or not os.path.isabs(self._conf):
-            dirs['conf_dir'] = self._conf
+            dirs[self.CONF] = self._conf
         return dirs
 
     @property

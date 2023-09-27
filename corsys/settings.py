@@ -12,7 +12,7 @@ import os
 import sys
 import shutil
 from argparse import ArgumentParser
-from .configs import Configurations
+from .configs import Configurations, Directories
 
 
 class Settings(Configurations):
@@ -56,11 +56,15 @@ class Settings(Configurations):
         if not os.path.isdir(self.dirs.log):
             os.makedirs(self.dirs.log, exist_ok=True)
 
+        override_path = os.path.join(self.dirs.data, conf_file)
+        if os.path.isfile(override_path):
+            self.read(override_path, encoding='utf-8')
+            self.dirs.join(self)
+
     @property
     def general(self) -> Dict[str, str]:
         return dict({k: v for k, v in self.items(self.GENERAL)
-                     if k not in ['lib_dir', 'log_dir', 'tmp_dir', 'data_dir', 'cmpt_dir',
-                                  'system_scan', 'system_copy']})
+                     if k not in Directories.KEYS + ['system_scan', 'system_copy']})
 
     # def __getattr__(self, attr):
     #     if self.has_option(self.GENERAL, attr):
