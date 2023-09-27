@@ -345,27 +345,3 @@ class CsvDatabase(Database):
                     date = next_date()
 
         return files
-
-
-# noinspection PyProtectedMember
-def write_csv(system, data, file):
-    system_dir = system.configs.dirs.data
-    database = copy.deepcopy(system._database)
-    if not isinstance(database, CsvDatabase):
-        return
-
-    database.dir = system_dir
-    # database.format = '%Y%m%d'
-    database.enabled = True
-    if not os.path.isabs(file):
-        data_path = os.path.join(database.dir, file)
-    else:
-        data_path = file
-    if not data_path.endswith('.csv'):
-        data_path += '.csv'
-
-    data_dir = os.path.dirname(data_path)
-    if not os.path.isdir(data_dir):
-        os.makedirs(data_dir, exist_ok=True)
-
-    data.to_csv(data_path, sep=database.separator, decimal=database.decimal, encoding='utf-8-sig')
