@@ -19,7 +19,8 @@ _DEPRECATION = {
     'low_clouds': 'clouds_low',
     'mid_clouds': 'clouds_mid',
     'high_clouds': 'clouds_high',
-    'wind_gust': 'wind_speed_gust'
+    'wind_gust': 'wind_speed_gust',
+    'humidity_rel': 'relative_humidity'
 }
 
 _SYSTEM_POWER = {
