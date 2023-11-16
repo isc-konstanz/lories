@@ -41,10 +41,14 @@ class Configurations(ConfigParser):
                  tmp_dir: str = None,
                  log_dir: str = None,
                  lib_dir: str = None,
+                 flat: bool = False,
                  require: bool = True,
                  **kwargs) -> None:
         super().__init__()
         self.optionxform = str
+
+        if not conf_dir and flat:
+            conf_dir = ''
 
         dirs = Directories(lib_dir, log_dir, tmp_dir, data_dir, cmpt_dir, conf_dir)
 
@@ -66,7 +70,7 @@ class Configurations(ConfigParser):
             if self.GENERAL not in self.sections():
                 self.add_section(self.GENERAL)
             for kw, arg in kwargs.items():
-                self.set(self.GENERAL, kw, arg)
+                self.set(self.GENERAL, kw, str(arg))
 
         self.dirs = dirs.join(self)
         self.path = conf_path
@@ -106,7 +110,7 @@ class Configurable:
 
     def __configure__(self, configs: Configurations) -> None:
         if logger.isEnabledFor(logging.DEBUG):
-            print(self)
+            logger.debug(self)
 
     def __repr__(self) -> str:
         configs = f"{self._class_name}:\n"

@@ -17,14 +17,14 @@ from .configs import Configurations, Directories
 
 class Settings(Configurations):
 
-    # noinspection SpellCheckingInspection
+    # noinspection PyProtectedMember, SpellCheckingInspection
     def __init__(self,
                  name: str,
                  conf_file='settings.cfg',
                  parser: ArgumentParser = None) -> None:
         super().__init__(conf_file, require=False, **_parse_kwargs(parser))
 
-        logging_file = os.path.join(self.dirs.conf, 'logging.cfg')
+        logging_file = os.path.join(self.dirs._conf or 'conf', 'logging.cfg')
         if not os.path.isfile(logging_file):
             logging_default = logging_file.replace('logging.cfg', 'logging.default.cfg')
             if os.path.isfile(logging_default):
@@ -35,13 +35,16 @@ class Settings(Configurations):
 
         if os.path.isfile(logging_file):
             logging.config.fileConfig(logging_file)
+            for handler in logging.getLoggerClass().root.handlers:
+                if isinstance(handler, logging.FileHandler):
+                    self.dirs._log = os.path.dirname(handler.baseFilename)
         else:
             handler_console = logging.StreamHandler(sys.stdout)
             handler_console.setLevel(logging.INFO)
             handler_console.setFormatter(logging.Formatter("%(asctime)s.%(msecs)03d - %(name)s - %(message)s",
                                                            "%Y-%m-%d %H:%M:%S"))
 
-            handler_file = logging.FileHandler(os.path.join(self.dirs.log, f'{name}.log'))
+            handler_file = logging.FileHandler(os.path.join(self.dirs._log or 'log', f'{name}.log'))
             handler_file.setLevel(logging.WARN)
             handler_file.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(message)s",
                                                         "%Y-%m-%d %H:%M:%S"))
@@ -79,19 +82,19 @@ class Settings(Configurations):
 
 def _parse_kwargs(parser: ArgumentParser) -> Dict[str, Any]:
     if parser is not None:
-        parser.add_argument('-d', '--data-directory',
-                            dest='data_dir',
-                            help="directory to expect and write result files to",
+        parser.add_argument('-c', '--conf-directory',
+                            dest='conf_dir',
+                            help="directory to expect basic configuration files",
                             metavar='DIR')
 
-        parser.add_argument('--lib-directory',
+        parser.add_argument('-l', '--lib-directory',
                             dest='lib_dir',
                             help="directory to expect and write library files to",
                             metavar='DIR')
 
-        parser.add_argument('--conf-directory',
-                            dest='conf_dir',
-                            help="directory to expect basic configuration files",
+        parser.add_argument('-d', '--data-directory',
+                            dest='data_dir',
+                            help="directory to expect and write result files to",
                             metavar='DIR')
 
         args = parser.parse_args()

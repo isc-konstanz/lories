@@ -47,14 +47,15 @@ class System(Components):
     ENERGY_TH_HT = 'th_ht_energy'
     ENERGY_TH_DOM = 'th_dom_energy'
 
-    # noinspection PyProtectedMember, PyUnresolvedReferences
+    # noinspection PyProtectedMember, PyUnresolvedReferences, PyTypeChecker
     @classmethod
     def read(cls, settings: Settings) -> Systems:
         systems = Systems()
-        system_dirs = settings.dirs.encode()
         system_scan = to_bool(settings.get(Configurations.GENERAL, 'system_scan', fallback=False))
         system_flat = to_bool(settings.get(Configurations.GENERAL, 'system_flat', fallback=False))
         system_copy = to_bool(settings.get(Configurations.GENERAL, 'system_copy', fallback=False))
+        system_dirs = settings.dirs.encode()
+        system_dirs['conf_dir'] = None
 
         if system_scan:
             if system_copy:
@@ -62,12 +63,10 @@ class System(Components):
 
             for system_dir in os.scandir(settings.dirs.data):
                 if os.path.isdir(system_dir.path):
-                    if system_flat:
-                        system_dirs['conf_dir'] = ''
                     system_dirs['data_dir'] = system_dir.path
-                    systems._systems.append(cls._read(**system_dirs))
+                    systems._systems.append(cls._read(**system_dirs, flat=system_flat))
         else:
-            systems._systems.append(cls._read(**system_dirs))
+            systems._systems.append(cls._read(**system_dirs, flat=system_flat))
 
         return systems
 
@@ -171,6 +170,7 @@ class System(Components):
 
         return Database.from_configs(configs)
 
+    # noinspection PyMethodMayBeStatic
     def __cost__(self, configs: Configurations) -> Cost:
         return Cost(**dict(configs.items(Cost.SECTION)))
 
