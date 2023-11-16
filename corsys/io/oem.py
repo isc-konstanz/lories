@@ -13,7 +13,7 @@ import datetime as dt
 import pandas as pd
 
 from . import Database
-from ..tools import to_int, resample_data
+from ..tools import to_int, resample
 from emonpy import Emoncms
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ class EmonDatabase(Database):
             data.index.name = 'time'
 
             if resolution is not None:
-                data = resample_data(data, resolution)
+                data = resample(data, resolution)
 
             return data
 

@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import List
 
 import os
-import copy
 import glob
 import pytz as tz
 import datetime as dt
@@ -18,7 +17,7 @@ import pandas as pd
 # noinspection PyProtectedMember
 from . import _var as var
 from . import Database, DatabaseException
-from ..tools import to_bool, to_int, to_timedelta, to_date, floor_date, ceil_date, resample_data
+from ..tools import to_bool, to_int, to_timedelta, to_date, floor_date, ceil_date, resample
 
 
 class CsvDatabase(Database):
@@ -117,7 +116,7 @@ class CsvDatabase(Database):
         if resolution is None:
             resolution = self.resolution
         if resolution is not None:
-            data = resample_data(data, resolution)
+            data = resample(data, resolution)
 
         if end is not None:
             if start > end:

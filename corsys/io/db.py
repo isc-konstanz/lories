@@ -33,15 +33,15 @@ class Database(ABC):
         database_type = kwargs.pop('type').lower()
         if database_type == 'sql':
             from corsys.io.sql import SqlDatabase
-            return SqlDatabase(**kwargs, tables=section('Tables'))
+            return SqlDatabase(**kwargs, tables=section('Database.Tables'))
 
         elif database_type == 'oem':
             from corsys.io.oem import EmonDatabase
-            return EmonDatabase(**kwargs, feeds=section('Feeds'))
+            return EmonDatabase(**kwargs, feeds=section('Database.Feeds'))
 
         elif database_type == 'csv':
             from corsys.io.csv import CsvDatabase
-            return CsvDatabase(**kwargs, columns=section('Columns'))
+            return CsvDatabase(**kwargs, columns=section('Database.Columns'))
         else:
             raise ValueError('Invalid database type argument')
 
