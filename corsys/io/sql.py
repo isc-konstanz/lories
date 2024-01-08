@@ -242,8 +242,12 @@ class SqlTable:
                             (end.astimezone(tz.UTC)-epoch).total_seconds()))
 
     # noinspection PyUnresolvedReferences
-    def write(self, data: pd.Series, **_):
+    def write(self, data: pd.DataFrame | pd.Series, **_):
         epoch = dt.datetime(1970, 1, 1, tzinfo=tz.UTC)
+
+        # Make sure to iterate over a Series, not a DataFrame
+        if isinstance(data, pd.DataFrame):
+            data = data[self.name]
 
         with self.connection.cursor() as cursor:
             insert = f"INSERT INTO {self.name} (time,data) VALUES ('%s', '%s') " \
