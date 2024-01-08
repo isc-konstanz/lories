@@ -41,7 +41,7 @@ def resample(data: Union[pd.DataFrame, pd.Series], resolution: int) -> pd.DataFr
 
         resampled.append(series)
 
-    resampled = pd.concat(resampled, axis='index')
+    resampled = pd.concat(resampled, axis='columns')
     resampled.index.name = data.index.name
     return resampled.dropna(how='all')
 
