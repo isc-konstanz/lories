@@ -53,7 +53,7 @@ def resample_series(data: pd.Series, resolution: int, method: str, offset: pd.Ti
         kwargs['offset'] = offset
     index = copy(data.index)
     freq = index.freq
-    if freq is None:
+    if freq is None and len(index) > 2:
         freq = pd.tseries.frequencies.to_offset(pd.infer_freq(index))
     if freq is None or freq.delta < pd.Timedelta(seconds=resolution):
         # FIXME: AttributeError: 'NoneType' object has no attribute 'delta'

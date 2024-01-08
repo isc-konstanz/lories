@@ -97,7 +97,7 @@ class CsvDatabase(Database):
         end = to_date(end, self.timezone)
         end = ceil_date(end, self.timezone)  # TODO: Check if ceiling this is unproblematic
         for file in self._get_files(start, end, file, subdir):
-            if not data.empty and data.index[-1] > end:
+            if not data.empty and (end is not None and data.index[-1] > end):
                 break
             if not os.path.isfile(file):
                 raise DatabaseException('Unable to find file: ' + file)
