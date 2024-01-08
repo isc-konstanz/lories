@@ -20,11 +20,14 @@ class Settings(Configurations):
     # noinspection PyProtectedMember, SpellCheckingInspection
     def __init__(self,
                  name: str,
-                 conf_file='settings.cfg',
+                 conf_file: str = 'settings.cfg',
                  parser: ArgumentParser = None) -> None:
         super().__init__(conf_file, require=False, **_parse_kwargs(parser))
 
-        logging_file = os.path.join(self.dirs._conf or 'conf', 'logging.cfg')
+        if self.dirs._conf is None:
+            self.dirs._conf = os.path.dirname(self.path)
+
+        logging_file = os.path.join(self.dirs.conf, 'logging.cfg')
         if not os.path.isfile(logging_file):
             logging_default = logging_file.replace('logging.cfg', 'logging.default.cfg')
             if os.path.isfile(logging_default):
