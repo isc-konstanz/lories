@@ -62,7 +62,7 @@ class DatabaseWeather(Weather):
                         '{0:06.2f}'.format(float(system.location.longitude)).replace('.', '')
                     )
             else:
-                database_dir = configs.dir.data
+                database_dir = configs.dirs.data
 
             configs.set(Database.SECTION, 'dir', database_dir)
 
