@@ -13,6 +13,7 @@ import os
 import re
 import pandas as pd
 
+from collections import OrderedDict
 from ..cost import Cost, CostUnavailableException
 from ..configs import Configurations, Configurable
 
@@ -72,7 +73,7 @@ class Component(Configurable):
         if s is None:
             self._name = s
         else:
-            self._name = re.sub('[^A-Za-z0-9 ]+', '', s.translate({ord(c): " " for c in INVALID_CHARS+'_'}))
+            self._name = re.sub('[^A-Za-z0-9%&;:()\- ]+', '', s)
 
     @property
     def type(self) -> str:
@@ -108,8 +109,8 @@ class Components(Configurable, Mapping):
     def __build__(self, **kwargs) -> Optional[pd.DataFrame]:
         pass
 
-    # noinspection PyUnresolvedReferences, SpellCheckingInspection
-    def __readcmpts__(self) -> Dict[str, Component]:
+    # noinspection PyUnresolvedReferences, PyTypeChecker, SpellCheckingInspection
+    def __readcmpts__(self) -> OrderedDict[str, Component]:
         cmpt_dir = self.configs.dirs.cmpt
 
         components = dict()
@@ -123,7 +124,10 @@ class Components(Configurable, Mapping):
                 if component.enabled:
                     components[component.id] = component
 
-        return components
+        def convert(text: str) -> int | str:
+            return int(text) if text.isdigit() else text
+        components = sorted(components.items(), key=lambda e: [convert(t) for t in re.split('([0-9]+)', e[0])])
+        return OrderedDict(components)
 
     # noinspection SpellCheckingInspection
     def __readcmpt__(self, conf_file: os.DirEntry) -> Component:
