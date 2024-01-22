@@ -37,30 +37,33 @@ class DatabaseWeather(Weather):
                 not to_bool(configs.get(Database.SECTION, 'enable', fallback='True')):
             raise WeatherUnavailableException("Weather database not enabled")
 
-        if configs.get(Database.SECTION, 'type').lower() == 'csv' and \
-                configs.has_option(Database.SECTION, 'dir'):
-            database_dir = configs.get(Database.SECTION, 'dir')
-            if configs.has_option(Database.SECTION, 'central'):
-                database_central = configs.getboolean(Database.SECTION, 'central')
-                configs.remove_option(Database.SECTION, 'central')
-            else:
-                database_central = False
-            if database_central:
-                if system is None:
-                    raise ValueError('Invalid configuration, missing specified forecast id')
+        if configs.get(Database.SECTION, 'type').lower() == 'csv':
+            if configs.has_option(Database.SECTION, 'dir'):
+                database_dir = configs.get(Database.SECTION, 'dir')
+                if configs.has_option(Database.SECTION, 'central'):
+                    database_central = configs.getboolean(Database.SECTION, 'central')
+                    configs.remove_option(Database.SECTION, 'central')
+                else:
+                    database_central = False
+                if database_central:
+                    if system is None:
+                        raise ValueError('Invalid configuration, missing specified forecast id')
 
-                data_dir = configs.dirs.lib
-            else:
-                data_dir = configs.dirs.data
+                    data_dir = configs.dirs.lib
+                else:
+                    data_dir = configs.dirs.data
 
-            if not os.path.isabs(database_dir):
-                database_dir = os.path.join(data_dir, database_dir)
-            if database_central:
-                database_dir = os.path.join(
-                    database_dir,
-                    '{0:06.2f}'.format(float(system.location.latitude)).replace('.', '') + '_' +
-                    '{0:06.2f}'.format(float(system.location.longitude)).replace('.', '')
-                )
+                if not os.path.isabs(database_dir):
+                    database_dir = os.path.join(data_dir, database_dir)
+                if database_central:
+                    database_dir = os.path.join(
+                        database_dir,
+                        '{0:06.2f}'.format(float(system.location.latitude)).replace('.', '') + '_' +
+                        '{0:06.2f}'.format(float(system.location.longitude)).replace('.', '')
+                    )
+            else:
+                database_dir = configs.dir.data
+
             configs.set(Database.SECTION, 'dir', database_dir)
 
             if not configs.has_option(Database.SECTION, 'timezone'):
