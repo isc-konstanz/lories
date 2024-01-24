@@ -156,7 +156,7 @@ class CsvDatabase(Database):
             if self.index_unix:
                 data[index_column] = pd.to_datetime(data[index_column], unit='ms')
             else:
-                data[index_column] = pd.to_datetime(data[index_column])
+                data[index_column] = pd.to_datetime(data[index_column])  # , utc=True)
 
             data.set_index(index_column, verify_integrity=True, inplace=True)
             data.index.name = 'time'
