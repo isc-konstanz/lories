@@ -73,7 +73,7 @@ class Component(Configurable):
         if s is None:
             self._name = s
         else:
-            self._name = re.sub('[^A-Za-z0-9%&;:()\- ]+', '', s)
+            self._name = re.sub('[^0-9A-Za-zäöüÄÖÜß%&;:()\- ]+', '', s)
 
     @property
     def type(self) -> str:
