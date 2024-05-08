@@ -1,0 +1,115 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+"""
+    loris
+    ~~~~~~
+
+    To learn how to configure the scientific processing of energy systems, see "loris --help"
+
+"""
+from __future__ import annotations
+
+import os
+import pytz as tz
+import datetime as dt
+import inspect
+import logging
+
+from argparse import ArgumentParser, RawTextHelpFormatter
+
+logger = logging.getLogger('loris')
+
+
+def main() -> None:
+    import loris
+
+    # systems = loris.load(settings)
+    with loris.load(parser=_get_parser()) as application:
+        if application.settings['action'] == 'run':
+            application.run()
+
+    # elif action == 'rotate':
+    #     systems.rotate(full=to_bool(full))
+    # elif action == 'backup':
+    #     systems.backup()
+    # elif action == 'sync':
+    #     systems.backup.synchronize()
+    # elif action == 'build':
+    #     systems.build(**kwargs)
+    # elif action == 'process':
+    #     for system in systems:
+    #         process(system, **kwargs)
+
+
+# def process(system: System,
+#             data_dir: str = 'data',
+#             start: str | dt.datetime = dt.datetime(1970, 1, 1, tzinfo=tz.UTC),
+#             end: str | dt.datetime = None, **kwargs) -> None:
+#     from loris.io._connectors.csv import CsvDatabase
+#     from loris.data.process import process
+#
+#     start = to_date(start, timezone=system.location.timezone)
+#     end = to_date(end, timezone=system.location.timezone)
+#     if end is not None:
+#         end = ceil_date(end, timezone=system.location.timezone)
+#
+#     if not os.path.exists(data_dir):
+#         os.makedirs(data_dir)
+#     data_file = os.path.join(data_dir, system.id)
+#     data = system.database.read_file(start, end)
+#
+#     try:
+#         import sqlite3 as sqlite
+#         data.to_sql(system.name, sqlite.connect(data_file + '_raw.sqlite'), if_exists='replace')
+#
+#     except Exception as e:
+#         logger.warning("unable to write_file data as SQLite file: " + str(e))
+#
+#     database = CsvDatabase(timezone=system.location.timezone)
+#     database.write_file(data, file=data_file + '_raw.csv')
+#
+#     resolution = int(kwargs.pop('resolution', '1'))
+#     processed = process(data, resolution, **kwargs)
+#     database.write_file(processed, file=data_file + '_{}m.csv'.format(resolution))
+#     for resolution in [15, 60]:
+#         resampled = resample(processed, resolution * 60)
+#         database.write_file(resampled, file=data_file + '_{}m.csv'.format(resolution))
+
+
+def _get_parser() -> ArgumentParser:
+    from loris import __version__
+
+    parser = ArgumentParser(description=__doc__, formatter_class=RawTextHelpFormatter)
+    parser.add_argument('-v', '--version',
+                        action='version',
+                        version='%(prog)s {version}'.format(version=__version__))
+
+    subparsers = parser.add_subparsers(dest='action')
+    # subparsers.required = True
+
+    subparsers.default = 'run'
+    subparsers.add_parser('run', help='PLACEHOLDER')
+    # subparsers.add_parser('rotate', help='Rotate the database for the configured set of systems')
+    # subparsers.add_parser('backup', help='Backups data for the configured set of systems')
+    # subparsers.add_parser('sync', help='Synchronizes remote backups for the configured set of systems')
+    # subparsers.add_parser('build', help='Build data for the configured set of systems')
+    # subparsers.add_parser('process', help='Processes data for the configured set of systems')
+
+    parser.add_argument('--system-scan', dest='system_scan', action='store_true')
+    parser.add_argument('--system-flat', dest='system_flat', action='store_true')
+    parser.add_argument('--system-copy', dest='system_copy', action='store_true')
+
+    # parser.add_argument('--rotate-full', dest='rotate_full', action='store_true')
+
+    return parser
+
+
+if __name__ == "__main__":
+    run_dir = os.path.dirname(os.path.abspath(inspect.getsourcefile(main)))
+    if os.path.basename(run_dir) == 'bin':
+        run_dir = os.path.dirname(run_dir)
+
+    os.chdir(run_dir)
+    os.environ['NUMEXPR_MAX_THREADS'] = str(os.cpu_count())
+
+    main()

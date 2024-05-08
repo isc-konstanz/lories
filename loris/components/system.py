@@ -1,0 +1,114 @@
+# -*- coding: utf-8 -*-
+"""
+    loris.system
+    ~~~~~~~~~~~~~
+    
+    
+"""
+from __future__ import annotations
+from typing import Optional, List
+
+import os
+import pandas as pd
+import logging
+
+from loris import components
+from loris import Configurations, ConfigurationException, Location, LocationUnavailableException
+from loris.components import ComponentContext, Component, Weather, WeatherUnavailableException
+from loris.data.context import DataContext
+from loris.data import DataAccess
+from loris.util import parse_id
+
+components.register(Weather, Weather.TYPE)
+
+logger = logging.getLogger(__name__)
+
+
+class System(Component, ComponentContext):
+
+    TYPE: str = 'system'
+
+    @classmethod
+    def load(cls, context: DataContext, **kwargs) -> System:
+        return cls(context, Configurations.load(f"{cls.__name__.lower()}.conf", **kwargs))
+
+    # noinspection PyUnresolvedReferences
+    @classmethod
+    def scan(cls, context: DataContext, scan_dir: str, **kwargs) -> List[System]:
+        systems = []
+        for system_dir in os.scandir(scan_dir):
+            if os.path.isdir(system_dir.path):
+                kwargs['data_dir'] = system_dir.path
+                systems.append(cls.load(context, **kwargs))
+        return systems
+
+    def __init__(self, context: DataContext, configs: Configurations, *args, **kwargs) -> None:
+        if 'id' in configs:
+            self._id = self._uuid = parse_id(configs.get('id'))
+            self._name = configs.get('name', default=configs.get('id'))
+        elif 'name' in configs:
+            self._id = self._uuid = parse_id(configs['id'] if 'id' in configs else configs['name'])
+            self._name = configs['name']
+        else:
+            raise ConfigurationException('Invalid configuration, missing specified system ID')
+
+        self.data = DataAccess(self, context, configs.get_section('data', default={}))
+        super(Component, self).__init__(context, configs, *args, **kwargs)
+
+    # noinspection PyShadowingNames
+    def __getattr__(self, attr):
+        # __getattr__ gets called when the item is not found via __getattribute__
+        # To avoid recursion, call __getattribute__ directly to get components dict
+        components = ComponentContext.__getattribute__(self, '_components')
+        if attr in components.keys():
+            return components[attr]
+        raise AttributeError(f"'{type(self).__name__}' object has no component '{attr}'")
+
+    def __configure__(self, configs: Configurations) -> None:
+        super().__configure__(configs)
+
+        if configs.has_section(Location.SECTION):
+            self._location = self.__localize__(configs.get_section(Location.SECTION))
+        else:
+            self._location = None
+
+    # noinspection PyMethodMayBeStatic
+    def __localize__(self, configs: Configurations) -> Location:
+        return Location(configs.get_float('latitude'),
+                        configs.get_float('longitude'),
+                        timezone=configs.get('timezone', default='UTC'),
+                        altitude=configs.get_float('altitude', default=None),
+                        country=configs.get('country', default=None),
+                        state=configs.get('state', default=None))
+
+    # noinspection PyUnresolvedReferences
+    def activate(self) -> None:
+        logger.info(f"Activating {type(self).__name__}: {self.name}")
+        super(Component, self).activate()
+        self._active = True
+
+    # noinspection PyUnresolvedReferences
+    def deactivate(self) -> None:
+        logger.info(f"Deactivating {type(self).__name__}: {self.name}")
+        super(Component, self).deactivate()
+        self._active = False
+
+    @property
+    def location(self) -> Location:
+        if not self._location:
+            raise LocationUnavailableException(f"System \"{self.name}\" has no location configured")
+        return self._location
+
+    # noinspection PyTypeChecker
+    @property
+    def weather(self) -> Weather:
+        if not self.has_component(Weather.TYPE):
+            raise WeatherUnavailableException(f"System \"{self.name}\" has no weather configured")
+        return self.get_component_type(Weather.TYPE)[0]
+
+    def get_type(self):
+        return self.TYPE
+
+    # noinspection PyMethodMayBeStatic
+    def run(self, *args, **kwargs) -> Optional[pd.DataFrame]:
+        return None

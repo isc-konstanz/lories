@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-    corsys
-    ~~~~~~
+    loris
+    ~~~~~
 
 
 """
@@ -11,28 +11,35 @@ from setuptools import setup, find_namespace_packages
 
 here = path.abspath(path.dirname(__file__))
 info = {}
-with open(path.join("corsys", "_version.py")) as f:
+with open(path.join("loris", "_version.py")) as f:
     exec(f.read(), info)
 
 VERSION = info['__version__']
 
-DESCRIPTION = 'This repository provides a set of core functions for several energy system projects of ISC Konstanz.'
+DESCRIPTION = 'This repository provides a set of core functions for several ' \
+              'Local Resource Integration Systems of ISC Konstanz e.V.'
 
 # Get the long description from the README file
 with open(path.join(here, 'README.md')) as f:
     README = f.read()
 
-NAME = 'corsys'
+NAME = 'loris'
 LICENSE = 'LGPLv3'
-AUTHOR = 'ISC Konstanz'
+AUTHOR = 'ISC Konstanz e.V.'
 MAINTAINER_EMAIL = 'adrian.minde@isc-konstanz.de'
-URL = 'https://github.com/isc-konstanz/corsys'
+URL = 'https://github.com/isc-konstanz/loris'
 
 INSTALL_REQUIRES = ['numpy >= 1.16',
                     'pandas >= 0.23',
                     'pytz >= 2019.1']
 
-PACKAGES = find_namespace_packages(include=['corsys*'])
+EXTRAS_REQUIRE = {
+    ':python_version < "3.11"': ['tomli']
+}
+
+SCRIPTS = ['bin/loris']
+
+PACKAGES = find_namespace_packages(include=['loris*'])
 
 SETUPTOOLS_KWARGS = {
     'zip_safe': False,
@@ -50,5 +57,7 @@ setup(
     url=URL,
     packages=PACKAGES,
     install_requires=INSTALL_REQUIRES,
+    extras_require=EXTRAS_REQUIRE,
+    scripts=SCRIPTS,
     **SETUPTOOLS_KWARGS
 )

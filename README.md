@@ -1,7 +1,7 @@
-## CorSys
+## Loris
 
-This repository provides a set of core functions for several energy system projects of 
-ISC Konstanz e.V.  
+This repository provides a set of core functions for several
+***Lo**cal **R**esource **I**ntegration **S**ystems* of ISC Konstanz e.V.  
 More detailed information and specifics about how to use the package will be added here in the future.
 
 
@@ -9,5 +9,5 @@ More detailed information and specifics about how to use the package will be add
 
 ![ISC logo](doc/img/isc-logo.png)
 
-- [**ISC** Konstanz](http://isc-konstanz.de/) (International Solar Energy Research Center)
+- [**ISC** Konstanz e.V.](http://isc-konstanz.de/) (International Solar Energy Research Center)
 - **Adrian Minde**: adrian.minde@isc-konstanz.de
