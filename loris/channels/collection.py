@@ -12,7 +12,7 @@ from typing import Tuple, List, Iterator, Any
 import numpy as np
 import pandas as pd
 
-from loris.core.channels import Channel
+from loris.channels import Channel
 
 
 class Channels(Collection[Channel]):

@@ -12,7 +12,7 @@ import os
 import sys
 import shutil
 from argparse import ArgumentParser
-from loris.core import Configurations, Directories
+from loris.configs import Configurations, Directories
 
 
 class Settings(Configurations):
@@ -79,7 +79,7 @@ class Settings(Configurations):
 
         override_path = os.path.join(self.dirs.data, self.name)
         if os.path.isfile(override_path):
-            from core.configs import load_toml
+            from configs import load_toml
             self.update(load_toml(override_path))
             self.dirs.join(self)
 

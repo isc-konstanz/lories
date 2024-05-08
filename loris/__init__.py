@@ -7,52 +7,50 @@
 """
 from ._version import __version__  # noqa: F401
 
-from . import core  # noqa: F401
-from .core import (  # noqa: F401
+from .exceptions import (  # noqa: F401
     LocalResourceException,
-    ComponentException,
-    ComponentUnavailableException,
-    ConnectorException,
-    ConnectionException
+    LocalResourceUnavailableException
 )
 
-from .core import configs  # noqa: F401
-from .core.configs import (  # noqa: F401
+from .configs import (  # noqa: F401
+    Directories,
     Configurable,
     Configurations,
     ConfigurationException,
-    ConfigurationUnavailableException,
+    ConfigurationUnavailableException
 )
 
 from .settings import Settings  # noqa: F401
 
-from .core import location  # noqa: F401
-from .core.location import (  # noqa: F401
-    Location,
-    LocationException,
-    LocationUnavailableException
-)
-
-from .core import channels  # noqa: F401
-from .core.channels import (  # noqa: F401
+from .channels import (  # noqa: F401
     ChannelState,
     Channel,
     Channels
 )
 
-from .core import connector  # noqa: F401
-from .core.connector import Connector  # noqa: F401
+from .location import (  # noqa: F401
+    Location,
+    LocationException,
+    LocationUnavailableException
+)
 
 from . import connectors  # noqa: F401
-
-from .core import component  # noqa: F401
-from .core.component import Component  # noqa: F401
+from .connectors import (  # noqa: F401
+    Connector,
+    ConnectorException,
+    ConnectionException
+)
 
 from . import components  # noqa: F401
-
 from .components import weather  # noqa: F401
+from .components.weather import Weather  # noqa: F401
 
-from .components import System  # noqa: F401
+from .components import (  # noqa: F401
+    Component,
+    ComponentException,
+    ComponentUnavailableException,
+    System
+)
 
 from . import io  # noqa: F401
 

@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-    loris._components
+    loris.components
     ~~~~~~~~~~~~~~~~
 
 
 """
-from ..core.component import Component  # noqa: F401
-from ..core import (  # noqa: F401
+from .exceptions import (  # noqa: F401
     ComponentException,
     ComponentUnavailableException
 )
+
+from .component import Component  # noqa: F401
 
 from .registration import ComponentRegistration  # noqa: F401
 

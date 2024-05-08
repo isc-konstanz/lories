@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris._components.weather.exceptions
+    loris.components.weather.exceptions
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
-from loris import ComponentException, ComponentUnavailableException
+from loris.components import ComponentException, ComponentUnavailableException
 
 
 class WeatherException(ComponentException):

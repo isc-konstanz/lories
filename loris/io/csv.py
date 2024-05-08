@@ -14,10 +14,11 @@ import pytz as tz
 import datetime as dt
 import pandas as pd
 
-from loris import ConnectionException
+from loris.connectors import ConnectionException
 from loris.util import to_timedelta, to_date, floor_date, ceil_date
 
 
+# noinspection PyShadowingBuiltins
 def has_range(path: str,
               freq: str,
               format: str,

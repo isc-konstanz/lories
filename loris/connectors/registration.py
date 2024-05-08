@@ -7,7 +7,7 @@
 """
 from __future__ import annotations
 
-from loris import Connector, ConnectorException
+from loris.connectors import Connector, ConnectorException
 
 
 # noinspection PyShadowingBuiltins

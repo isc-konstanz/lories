@@ -10,15 +10,13 @@
 
 """
 from __future__ import annotations
-from typing import Optional
 
-import pandas as pd
-import datetime as dt
 import logging
 
-from loris import Configurations, Component, Location
-from loris.components.weather import WeatherConnector, WeatherException
+from loris import Configurations, Location
 from loris.connectors import ConnectorContext
+from loris.components import Component
+from loris.components.weather import WeatherConnector, WeatherException
 
 logger = logging.getLogger(__name__)
 

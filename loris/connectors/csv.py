@@ -15,7 +15,9 @@ import pandas as pd
 
 from loris.util import resample
 from loris.io import csv
-from loris import Channel, Channels, Connector, Configurations, ConfigurationException
+from loris.configs import Configurations, ConfigurationException
+from loris.channels import Channel, Channels
+from loris.connectors import Connector
 
 
 # noinspection PyShadowingBuiltins

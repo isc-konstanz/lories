@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-    loris.core.channels.channel
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    loris.channels.channel
+    ~~~~~~~~~~~~~~~~~~~~~~
     
     
 """
@@ -13,7 +13,7 @@ import logging
 
 from collections import OrderedDict
 from loris.util import parse_id
-from loris.core.channels import ChannelState, ChannelConnector
+from loris.channels import ChannelState, ChannelConnector
 
 logger = logging.getLogger(__name__)
 

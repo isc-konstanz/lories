@@ -18,7 +18,7 @@ import pandas as pd
 
 from copy import deepcopy
 from loris.util import to_bool, to_int, to_float, to_date
-from loris.core.configs import Directories, ConfigurationUnavailableException
+from loris.configs import Directories, ConfigurationUnavailableException
 
 logger = logging.getLogger(__name__)
 

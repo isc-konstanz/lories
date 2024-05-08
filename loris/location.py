@@ -8,10 +8,10 @@
 from __future__ import annotations
 import pytz as tz
 
-from loris import ComponentException, ComponentUnavailableException
+from loris import LocalResourceException, LocalResourceUnavailableException
 
 
-class LocationException(ComponentException):
+class LocationException(LocalResourceException):
     """
     Raise if an error occurred accessing the location.
 
@@ -19,7 +19,7 @@ class LocationException(ComponentException):
     pass
 
 
-class LocationUnavailableException(ComponentUnavailableException, LocationException):
+class LocationUnavailableException(LocalResourceUnavailableException, LocationException):
     """
     Raise if a configured location access can not be found.
 
