@@ -1,0 +1,15 @@
+[Unit]
+Description=Local Resource Integration System
+After=network.target
+
+[Service]
+User=loris
+Group=loris
+Type=forking
+Restart=always
+RestartSec=60s
+ExecStart=/usr/local/bin/loris start -c /etc/loris
+WorkingDirectory=/var/opt/loris
+
+[Install]
+WantedBy=multi-user.target
