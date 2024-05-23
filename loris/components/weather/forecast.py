@@ -16,10 +16,10 @@ import pandas as pd
 
 from loris.util import to_int, to_date, floor_date
 from loris import Configurations
-from loris.components.weather import WeatherComponent, WeatherConnector, WeatherException
+from loris.components.weather import WeatherBase, WeatherConnector, WeatherException
 
 
-class WeatherForecast(WeatherComponent):
+class WeatherForecast(WeatherBase):
 
     SECTION: str = 'forecast'
 
@@ -41,13 +41,13 @@ class WeatherForecast(WeatherComponent):
         Retrieves the forecasted data for a specified time interval
 
         :param start: 
-            the start time for which forecasted data will be looked up for.
+            the start timestamp for which forecasted data will be looked up for.
             For many applications, passing datetime.datetime.now() will suffice.
         :type start: 
             :class:`pandas.Timestamp` or datetime
         
         :param end: 
-            the end time for which forecasted data will be looked up for.
+            the end timestamp for which forecasted data will be looked up for.
             For many applications, passing datetime.datetime.now() will suffice.
         :type end: 
             :class:`pandas.Timestamp` or datetime

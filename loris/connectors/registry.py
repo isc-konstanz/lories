@@ -1,13 +1,22 @@
 # -*- coding: utf-8 -*-
 """
-    loris._connectors.registration
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    loris.connectors.registry
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
 from __future__ import annotations
 
 from loris.connectors import Connector, ConnectorException
+
+types = {}
+
+
+# noinspection PyShadowingBuiltins
+def register(cls: type, type: str, *alias: str, factory: callable = None, replace: bool = False) -> None:
+    if type in types and not replace:
+        raise ConnectorException(f"Connector \"{type}\" does already exist: {types[type].name}")
+    types[type] = ConnectorRegistration(cls, type, *alias, factory)
 
 
 # noinspection PyShadowingBuiltins

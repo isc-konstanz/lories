@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 import pandas as pd
 import datetime as dt
 
-from loris import Channels, Configurable, Configurations, ConfigurationException
+from loris import Channels, ChannelState, Configurable, Configurations, ConfigurationException, LocalResourceException
 from loris.util import parse_id
 
 
@@ -54,3 +54,23 @@ class Connector(ABC, Configurable):
     @abstractmethod
     def is_connected(self) -> bool:
         pass
+
+
+class ConnectorException(LocalResourceException):
+    """
+    Raise if an error occurred accessing the connector.
+
+    """
+
+    # noinspection PyArgumentList
+    def __init__(self, connector: Connector, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.connector = connector
+
+
+class ConnectionException(ConnectorException, IOError):
+    """
+    Raise if an error occurred with the connection.
+
+    """
+

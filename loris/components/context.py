@@ -15,18 +15,9 @@ import logging
 
 from collections import OrderedDict
 from loris import Configurations, Configurable
-from loris.components import ComponentRegistration, Component, ComponentException
+from loris.components import Component, ComponentException, registry
 
 logger = logging.getLogger(__name__)
-
-registrations = {}
-
-
-# noinspection PyShadowingBuiltins
-def register(cls: type, type: str, *alias: str, factory: callable = None, replace: bool = False) -> None:
-    if type in registrations and not replace:
-        raise ComponentException(f"Component \"{type}\" does already exist: {registrations[type].name}")
-    registrations[type] = ComponentRegistration(cls, type, *alias, factory)
 
 
 class ComponentContext(Configurable, Mapping[str, Component]):
@@ -67,16 +58,16 @@ class ComponentContext(Configurable, Mapping[str, Component]):
             configs.move_to_top('id')
 
         registration_type = os.path.splitext(configs.name)[0]
-        for registration in registrations.values():
+        for registration in registry.types.values():
             if registration.is_alias(registration_type):
                 registration_type = registration.type
                 logger.debug(f"Using alias \"{','.join(registration.alias.keys())}\" "
                              f"for component: {registration_type}")
 
-        if registration_type not in registrations.keys():
+        if registration_type not in registry.types.keys():
             raise ComponentException(f"Invalid component type: {registration_type}")
 
-        return registrations[registration_type].initialize(self, configs)
+        return registry.types[registration_type].initialize(self, configs)
 
     def _add(self, component: Component) -> None:
         self._components[component.id] = component
@@ -100,13 +91,7 @@ class ComponentContext(Configurable, Mapping[str, Component]):
 
     def activate(self) -> None:
         for component_id, component in self._components.items():
-            try:
-                component.activate()
-
-            except Exception as e:
-                logger.warning(f"Error activating component \"{component_id}\": {e}")
-                logger.exception(e)
-                del self._components[component_id]
+            component.activate()
 
         self.__activate__()
 
@@ -129,7 +114,7 @@ class ComponentContext(Configurable, Mapping[str, Component]):
 
     # noinspection PyMethodMayBeStatic
     def get_types(self) -> List[str]:
-        return list(registrations.keys())
+        return list(registry.types.keys())
 
     def has_type(self, *types: str | type) -> bool:
         return len(self.get_all(*types)) > 0

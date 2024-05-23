@@ -5,14 +5,13 @@
 
 
 """
-from .exceptions import (  # noqa: F401
+from .connector import WeatherConnector  # noqa: F401
+
+from .base import (  # noqa: F401
+    WeatherBase,
     WeatherException,
     WeatherUnavailableException
 )
-
-from .connector import WeatherConnector  # noqa: F401
-
-from .component import WeatherComponent  # noqa: F401
 
 from . import forecast  # noqa: F401
 from .forecast import WeatherForecast  # noqa: F401

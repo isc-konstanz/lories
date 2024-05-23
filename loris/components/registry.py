@@ -10,6 +10,15 @@ from typing import List
 
 from loris.components import Component, ComponentException
 
+types = {}
+
+
+# noinspection PyShadowingBuiltins
+def register(cls: type, type: str, *alias: str, factory: callable = None, replace: bool = False) -> None:
+    if type in types and not replace:
+        raise ComponentException(f"Component \"{type}\" does already exist: {types[type].name}")
+    types[type] = ComponentRegistration(cls, type, *alias, factory)
+
 
 # noinspection PyShadowingBuiltins
 class ComponentRegistration:

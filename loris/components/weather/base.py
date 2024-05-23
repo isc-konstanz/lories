@@ -15,14 +15,14 @@ import logging
 
 from loris import Configurations, Location
 from loris.connectors import ConnectorContext
-from loris.components import Component
-from loris.components.weather import WeatherConnector, WeatherException
+from loris.components import Component, ComponentException, ComponentUnavailableException
+from loris.components.weather import WeatherConnector
 
 logger = logging.getLogger(__name__)
 
 
 # noinspection SpellCheckingInspection
-class WeatherComponent(Component):
+class WeatherBase(Component):
 
     TYPE = 'weather'
 
@@ -49,3 +49,19 @@ class WeatherComponent(Component):
 
     def get_type(self) -> str:
         return self.TYPE
+
+
+class WeatherException(ComponentException):
+    """
+    Raise if an error occurred accessing the weather.
+
+    """
+    pass
+
+
+class WeatherUnavailableException(ComponentUnavailableException, WeatherException):
+    """
+    Raise if a configured weather access can not be found.
+
+    """
+    pass

@@ -15,7 +15,8 @@ import datetime as dt
 import logging
 
 from shutil import copytree, ignore_patterns
-from loris import Settings, Configurable, Configurations, ConfigurationException
+from loris import Settings, LocalResourceException, LocalResourceUnavailableException
+from loris.configs import Configurable, Configurations, ConfigurationException
 from loris.data import DataAccess
 from loris.util import parse_id, to_date
 
@@ -150,3 +151,19 @@ class Component(ABC, Configurable):
         #     component.deactivate()
         self.__deactivate__()
         self._active = False
+
+
+class ComponentException(LocalResourceException):
+    """
+    Raise if an error occurred accessing the component.
+
+    """
+    pass
+
+
+class ComponentUnavailableException(LocalResourceUnavailableException, ComponentException):
+    """
+    Raise if an accessed component can not be found.
+
+    """
+    pass

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-    loris._connectors.context
+    loris.connectors.context
     ~~~~~~~~~~~~~~~~~~~~~~~~
     
     
@@ -13,22 +13,16 @@ import os
 import logging
 
 from collections import OrderedDict
-from loris import ChannelState, Configurable, Configurations, ConfigurationException
-from loris.connectors import Connector, ConnectorException, ConnectorRegistration
+from loris import Configurable, Configurations, ConfigurationException
+from loris.connectors import Connector, ConnectorException, ConnectorRegistration, registry
 from loris.connectors.csv import CsvConnector
 
 logger = logging.getLogger(__name__)
 
-registrations = {
-    CsvConnector.TYPE: ConnectorRegistration(CsvConnector, CsvConnector.TYPE)
-}
 
+logger.debug("Registering CSV connector")
+registry.types[CsvConnector.TYPE] = ConnectorRegistration(CsvConnector, CsvConnector.TYPE)
 
-# noinspection PyShadowingBuiltins
-def register(cls: type, type: str, *alias: str, factory: callable = None, replace: bool = False) -> None:
-    if type in registrations and not replace:
-        raise ConnectorException(f"Connector \"{type}\" does already exist: {registrations[type].name}")
-    registrations[type] = ConnectorException(cls, type, *alias, factory)
 
 
 class ConnectorContext(Configurable, Mapping[str, Connector]):
@@ -78,10 +72,10 @@ class ConnectorContext(Configurable, Mapping[str, Connector]):
             configs.move_to_top('id')
 
         registration_type = configs.get('type').lower()
-        if registration_type not in registrations.keys():
+        if registration_type not in registry.types.keys():
             raise ConnectorException(f"Invalid connector type: {registration_type}")
 
-        return registrations[registration_type].initialize(self, configs)
+        return registry.types[registration_type].initialize(self, configs)
 
     # noinspection PyProtectedMember
     def _add(self, connector: Connector) -> None:

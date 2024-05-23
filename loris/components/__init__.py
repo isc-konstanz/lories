@@ -5,17 +5,17 @@
 
 
 """
-from .exceptions import (  # noqa: F401
+from .component import (  # noqa: F401
+    Component,
     ComponentException,
     ComponentUnavailableException
 )
 
-from .component import Component  # noqa: F401
-
-from .registration import ComponentRegistration  # noqa: F401
+from . import registry  # noqa: F401
+from .registry import ComponentRegistration, register  # noqa: F401
 
 from . import context  # noqa: F401
-from .context import ComponentContext, register  # noqa: F401
+from .context import ComponentContext  # noqa: F401
 
 from . import weather  # noqa: F401
 from .weather import (
