@@ -60,7 +60,7 @@ def read_files(path: str,
 
 
 def read_file(path: str,
-              index_column: str = 'Time',
+              index_column: str = 'Timestamp',
               index_unix: bool = False,
               timezone: Optional[tz.tzinfo] = None,
               separator: str = ',',
@@ -164,7 +164,7 @@ def write_files(data: pd.DataFrame,
 
     index_name = data.index.name
     if index_name is None:
-        index_name = 'time'
+        index_name = 'Timestamp'
     if data.index.tzinfo is None or data.index.tzinfo.utcoffset(data.index) is None:
         data.index = data.index.tz_localize(tz.UTC, ambiguous="infer")
     if timezone is None:

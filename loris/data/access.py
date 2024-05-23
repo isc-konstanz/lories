@@ -27,20 +27,20 @@ class DataAccess(Configurable, DataMapping):
     # noinspection PyProtectedMember
     def __configure__(self, configs: Configurations) -> None:
         try:
-            self._context.connectors._load(configs.get_section('connectors'), self._component._uuid)
+            self._context.connectors._load(configs.get_section('connectors'), self._component.uuid)
 
         except ConfigurationUnavailableException:
             logger.debug(f"No connectors configured for configuration: {configs.name}")
 
         try:
-            self._context._load(configs.get_section('channels'), self._component._uuid)
+            self._context._load(configs.get_section('channels'), self._component.uuid)
 
         except ConfigurationUnavailableException:
             logger.debug(f"No channels configured for configuration: {configs.name}")
 
     # noinspection PyProtectedMember
     def add(self, channel: Channel | Configurations) -> None:
-        channel_id = f"{self._component._uuid}.{channel._configs['id']}"
+        channel_id = f"{self._component.uuid}.{channel._configs['id']}"
         self._context._add(channel_id, channel)
         self._add(self._context._add.get(channel_id))
 

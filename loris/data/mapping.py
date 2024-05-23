@@ -19,8 +19,9 @@ class DataMapping(Mapping[str, Channel]):
 
     _channels: OrderedDict[str, Channel]
 
-    def __init__(self, channels=(), **kwargs) -> None:
-        self._channels = OrderedDict(channels, **kwargs)
+    def __init__(self, channels=(), *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._channels = OrderedDict(channels)
 
     def __getattr__(self, attr):
         channels = DataMapping.__getattribute__(self, '_channels')

@@ -13,11 +13,11 @@ import pytz as tz
 import datetime as dt
 import pandas as pd
 
-from loris.util import resample
 from loris.io import csv
 from loris.configs import Configurations, ConfigurationException
 from loris.channels import Channel, Channels
 from loris.connectors import Connector
+from loris.util import resample
 
 
 # noinspection PyShadowingBuiltins
@@ -40,19 +40,19 @@ class CsvConnector(Connector):
             data_path = os.path.join(data_dir, data_path)
         self._data_path = data_path
 
-        self.index_column = configs.get('index_column', default='time')
+        self.index_column = configs.get('index_column', default='timestamp')
         self.index_unix = configs.get_bool('index_unix', default=False)
 
         # TODO: Validate if minutely default resolution is sufficient
         resolution = configs.get_int('resolution', default=None)
         if resolution is not None:
-            resolution += 60
+            resolution *= 60
         self.resolution = resolution
 
         self.override = configs.get_bool('override', default=False)
         self.slice = configs.get_bool('slice', default=True)
 
-        self.freq = configs.get('freq', default='D')
+        self.freq = configs.get('f', default='D')
 
         format = configs.get('format', default=None)
         if format is not None:
@@ -80,9 +80,10 @@ class CsvConnector(Connector):
         self.decimal = configs.get('decimal', '.')
         self.separator = configs.get('separator', ',')
 
+        # TODO: Implement flag if pretty printing should be used or not
         self.columns = configs.get('columns', default={})
 
-    def connect(self, channels: List[Channel]) -> None:
+    def __connect__(self, channels: Channels) -> None:
         if self._data_path is not None:
             self._data = csv.read_file(self._data_path,
                                        index_column=self.index_column,
@@ -92,7 +93,7 @@ class CsvConnector(Connector):
                                        decimal=self.decimal,
                                        rename=self.columns)
 
-    def close(self) -> None:
+    def __disconnect__(self) -> None:
         self._data = None
 
     def read(self,
@@ -133,7 +134,7 @@ class CsvConnector(Connector):
             data.index.name = self.index_column
             csv.write_files(channels.to_frame(), self._data_dir, self.freq, self.format, **kwargs)
         else:
-            for data_time, data_channels in channels.groupby('time'):
+            for data_time, data_channels in channels.groupby('timestamp'):
                 data = data_channels.to_frame()
                 data.index.name = self.index_column
 

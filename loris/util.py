@@ -19,12 +19,6 @@ from dateutil.relativedelta import relativedelta
 INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
 
 
-def parse_id(s: str) -> str:
-    for c in INVALID_CHARS:
-        s = s.replace(c, '_')
-    return re.sub('[^\\w]+', '', s).lower()
-
-
 # noinspection PyUnresolvedReferences, PyShadowingBuiltins, PyShadowingNames
 def is_type(series: pd.Series, *type: str) -> bool:
     series_name = series.name.split('_')
@@ -35,7 +29,7 @@ def is_type(series: pd.Series, *type: str) -> bool:
 def infer_resample_method(series: pd.Series) -> str:
     if is_type(series, 'state', 'state', 'mode', 'code'):
         return 'max'
-    elif is_type(series, 'time', 'progress', 'energy'):
+    elif is_type(series, 'timestamp', 'time', 'progress', 'energy'):
         return 'last'
     else:
         return 'mean'
@@ -158,10 +152,10 @@ def floor_date(date: Union[dt.datetime, pd.Timestamp, str],
     if timezone is None:
         timezone = date.tzinfo
     date = convert_timezone(date, timezone)
-
-    if freq.upper() in ['Y', 'M']:
+    freq = _parse_freq(freq)
+    if freq in ['Y', 'M']:
         return date.tz_localize(None).to_period(freq).to_timestamp().tz_localize(timezone)
-    elif any([freq.upper().endswith(f) for f in ['D', 'H', 'T', 'S']]):
+    elif any([freq.endswith(f) for f in ['D', 'H', 'T', 'S']]):
         return date.tz_localize(None).floor(freq).tz_localize(timezone)
     else:
         raise ValueError(f"Invalid frequency: {freq}")
@@ -193,22 +187,22 @@ def to_date(date: Union[str, int, dt.datetime, pd.Timestamp],
     return date
 
 
-def to_timedelta(freq: str) -> relativedelta:
-    freq_val = freq[:-1]
-    freq_val = int(freq_val) if len(freq_val) > 0 and freq_val.isnumeric() else 1
-    freq = freq[-1:].upper()
+def to_timedelta(freq: str) -> Union[relativedelta, pd.Timedelta]:
+    freq_val = ''.join(s for s in freq if s.isnumeric())
+    freq_val = int(freq_val) if len(freq_val) > 0 else 1
+    freq = _parse_freq(freq)
     if freq == 'Y':
         return relativedelta(years=freq_val)
     elif freq == 'M':
         return relativedelta(months=freq_val)
     elif freq.endswith('D'):
-        return relativedelta(days=freq_val)
+        return pd.Timedelta(days=freq_val)
     elif freq.endswith('H'):
-        return relativedelta(hours=freq_val)
+        return pd.Timedelta(hours=freq_val)
     elif freq.endswith('T'):
-        return relativedelta(minutes=freq_val)
+        return pd.Timedelta(minutes=freq_val)
     elif freq.endswith('S'):
-        return relativedelta(seconds=freq_val)
+        return pd.Timedelta(seconds=freq_val)
     else:
         raise ValueError(f"Invalid frequency: {freq}")
 
@@ -229,6 +223,32 @@ def to_bool(value: Union[str, bool]) -> bool:
     if isinstance(value, str):
         return value.lower() in ['true', 'yes', 'y']
     return value
+
+
+# noinspection SpellCheckingInspection
+def _parse_freq(f: str) -> str:
+    v = ''.join(s for s in f if s.isnumeric())
+    v = int(v) if len(v) > 0 else 1
+    if f.upper() == 'Y':
+        return 'Y'
+    elif f.upper() == 'M':
+        return 'M'
+    elif f.lower().endswith(('d', 'day', 'days')):
+        return f'{v}D'
+    elif f.lower().endswith(('h', 'hour', 'hours')):
+        return f'{v}H'
+    elif f.lower().endswith(('m', 'min', 'mins', 't')):
+        return f'{v}T'
+    elif f.lower().endswith(('s', 'sec', 'secs')):
+        return f'{v}S'
+    else:
+        raise ValueError(f"Invalid frequency: {f}")
+
+
+def parse_id(s: str) -> str:
+    for c in INVALID_CHARS:
+        s = s.replace(c, '_')
+    return re.sub('[^\\w]+', '', s).lower()
 
 
 class ConversionException(Exception):

@@ -6,7 +6,7 @@
     
 """
 from __future__ import annotations
-from typing import Any
+from typing import Optional, Any
 from collections import OrderedDict
 from collections.abc import MutableMapping, Mapping
 
@@ -64,28 +64,39 @@ class Configurations(MutableMapping[str, Any]):
         from .toml import load_toml
         return load_toml(conf_path)
 
-    def __init__(self, name: str, path: str, dirs: Directories, other: Mapping[str, Any] = (), **kwargs) -> None:
+    def __init__(self,
+                 name: str,
+                 path: str,
+                 dirs: Directories,
+                 other: Optional[Mapping[str, Any]] = None, **kwargs) -> None:
         super().__init__()
         self.name = name
         self.path = path
 
+        if other is None:
+            other = {}
         self._configs = OrderedDict(other, **kwargs)
         self._dirs = dirs
         self._dirs.join(self)
 
     def __repr__(self) -> str:
-        def represent_sections(header: str, section: Mapping[str, Any]) -> str:
-            representation = f"[{header}]\n"
+        represent_configs = deepcopy(self._configs)
+        for represent_section in [s for s, c in self._configs.items() if isinstance(c, Mapping)]:
+            represent_configs.move_to_end(represent_section)
+
+        def represent_sections(header: str, section: Mapping[str, Any], ) -> str:
+            representation = f'[{header}]\n'
             for (k, v) in section.items():
                 if isinstance(v, Mapping):
-                    representation += represent_sections(f'{header}.{k}', v)
+                    representation += '\n' + represent_sections(f'{header}.{k}', v)
                 else:
-                    representation += f"{k} = {v}\n"
-            return representation + "\n"
+                    representation += f'{k} = {v}\n'
+            return representation
+
         represent_prefix = self.name.replace('.conf', '')
-        representation_dirs = str(self.dirs).replace(f"[{Directories.SECTION}]",
-                                                     f"[{represent_prefix}.{Directories.SECTION}]")
-        return represent_sections(represent_prefix, self._configs) + representation_dirs
+        representation_dirs = '\n' + str(self.dirs).replace(f"[{Directories.SECTION}]",
+                                                            f"[{represent_prefix}.{Directories.SECTION}]")
+        return represent_sections(represent_prefix, represent_configs) + representation_dirs
 
     def __delitem__(self, key: str) -> None:
         del self._configs[key]
@@ -100,6 +111,8 @@ class Configurations(MutableMapping[str, Any]):
         return self._configs[key]
 
     def get(self, key: str, default: Any = None) -> Any:
+        if default is None:
+            return self._configs.get(key)
         return self._configs.get(key, default)
 
     def get_bool(self, key, default: bool = None) -> bool:
@@ -122,15 +135,20 @@ class Configurations(MutableMapping[str, Any]):
             return False
         return True
 
-    def get_section(self, section: str, default: Mapping[str, Any] = ()) -> Configurations:
+    def get_section(self, section: str, default: Optional[Mapping[str, Any]] = None) -> Configurations:
         configs_name = f"{section.split('.')[-1]}.conf"
         configs_path = os.path.join(self.path.replace('.conf', '.d'), configs_name)
         configs = Configurations(configs_name, configs_path, self.dirs, default)
-        configs.update(self._get_section(self._configs, *section.split('.')))
+        try:
+            configs.update(self._get_section(self._configs, *section.split('.')))
+
+        except ConfigurationUnavailableException as e:
+            if default is None:
+                raise e
         return configs
 
     @staticmethod
-    def _get_section(configs: Mapping[str, Any], *sections: str, pop: bool = False) -> Mapping[str, Any]:
+    def _get_section(configs: Mapping[str, Any], *sections: str) -> Mapping[str, Any]:
         if len(sections) < 1:
             raise ValueError(f"'Invalid configuration section: {'.'.join(sections)}")
         sections = list(sections)

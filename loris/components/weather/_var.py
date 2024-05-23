@@ -8,7 +8,7 @@
 from loris.components.weather import Weather
 
 
-WEATHER = {
+WEATHER_NAMES = {
     Weather.GHI:                 'Global Horizontal Irradiance [W/m2]',
     Weather.DNI:                 'Direct Normal Irradiance [W/m2]',
     Weather.DHI:                 'Diffuse Horizontal Irradiance [W/m2]',

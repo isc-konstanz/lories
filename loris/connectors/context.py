@@ -23,6 +23,13 @@ logger = logging.getLogger(__name__)
 logger.debug("Registering CSV connector")
 registry.types[CsvConnector.TYPE] = ConnectorRegistration(CsvConnector, CsvConnector.TYPE)
 
+try:
+    logger.debug("Registering MySQL connector")
+    from loris.connectors.mysql import MySqlConnector
+    registry.types[MySqlConnector.TYPE] = ConnectorRegistration(MySqlConnector, MySqlConnector.TYPE)
+
+except ImportError as e:
+    logger.debug(f"Failed registering MySQL connector: {e}")
 
 
 class ConnectorContext(Configurable, Mapping[str, Connector]):
@@ -77,15 +84,14 @@ class ConnectorContext(Configurable, Mapping[str, Connector]):
 
         return registry.types[registration_type].initialize(self, configs)
 
-    # noinspection PyProtectedMember
     def _add(self, connector: Connector) -> None:
         if not isinstance(connector, Connector):
             raise ConnectorException(f'Invalid connector type: {type(connector)}')
 
-        if connector._uuid in self._connectors.keys():
-            raise ConfigurationException(f'Connector with UUID "{connector._uuid}" already exists')
+        if connector.uuid in self._connectors.keys():
+            raise ConfigurationException(f'Connector with UUID "{connector.uuid}" already exists')
 
-        self._connectors[connector._uuid] = connector
+        self._connectors[connector.uuid] = connector
 
     def _remove(self, uuid: str) -> None:
         del self._connectors[uuid]
@@ -99,33 +105,3 @@ class ConnectorContext(Configurable, Mapping[str, Connector]):
 
     def __len__(self) -> int:
         return len(self._connectors)
-
-    # noinspection PyProtectedMember
-    def connect(self) -> None:
-        for uuid, connector in self._connectors.items():
-            channels = self._context.filter(lambda c: c.reader._uuid == uuid or c.writer._uuid == uuid).values()
-            for channel in channels:
-                channel.state = ChannelState.CONNECTING
-            try:
-                logger.info(f"Connecting {type(connector).__name__}: {uuid}")
-                connector.connect(channels)
-                for channel in channels:
-                    channel.state = ChannelState.CONNECTED
-
-            except Exception as e:
-                logger.warning(f"Error opening connector \"{uuid}\": {e}")
-                logger.exception(e)
-                for channel in channels:
-                    channel.state = ChannelState.DISCONNECTED
-                self._remove(uuid)
-
-    # noinspection PyProtectedMember
-    def close(self):
-        for uuid, connector in self._connectors.items():
-            try:
-                logger.info(f"Closing {type(connector).__name__}: {uuid}")
-                connector.close()
-
-            except Exception as e:
-                logger.warning(f"Error closing connector \"{uuid}\": {e}")
-                logger.exception(e)

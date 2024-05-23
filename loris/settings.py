@@ -58,7 +58,7 @@ class Settings(Configurations):
                                                            "%Y-%m-%d %H:%M:%S"))
 
             # TODO: Think about fallback logging configuration necessity to use default logfile location
-            # log_file = application
+            # log_file = application.lower()
             # if not log_file.endswith('.log'):
             #     log_file += '.log'
             # handler_file = logging.FileHandler(os.path.join(self.dirs._log or 'log', log_file))

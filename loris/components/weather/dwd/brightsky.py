@@ -51,9 +51,12 @@ class Brightsky(WeatherConnector):
                     'channels': {
                         'horizon': self.horizon,
                         'source': 'forecast',
-                        'time_created': {
-                            'name': 'Time created',
-                            'address': 'source_first_record'
+                        'timestamp_creation': {
+                            'name': 'Creation Timestamp',
+                            'address': 'source_first_record',
+                            'value_type': pd.Timestamp,
+                            'primary': True,
+                            'nullable': False
                         },
                         **parse_defaults(self._uuid)
                     }
@@ -189,7 +192,7 @@ class Brightsky(WeatherConnector):
         data = pd.DataFrame(response_json['weather'])
         data['timestamp'] = pd.DatetimeIndex(data['timestamp'])
         data = data.set_index('timestamp').tz_convert(self.location.timezone)
-        data.index.name = 'time'
+        data.index.name = 'timestamp'
 
         hours = pd.Series(data=data.index, index=data.index).diff().bfill().dt.total_seconds() / 3600.
 

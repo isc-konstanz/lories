@@ -48,7 +48,7 @@ class DataContext(Configurable, DataMapping):
 
     def _load(self, configs: Configurations, prefix_uuid: str = None) -> None:
         channel_ids = [i for i in configs.keys() if (isinstance(configs[i], Mapping) and
-                                                     i not in ['reader', 'writer'])]
+                                                     i not in ['logger', 'connector'])]
         channels = {
             i: configs.pop(i) for i in channel_ids
         }
@@ -59,11 +59,13 @@ class DataContext(Configurable, DataMapping):
             channel_configs.set('uuid', channel_uuid)
             channel_configs.set('id', channel_id)
 
-            for connector_type in ['reader', 'writer']:
+            for connector_type in ['logger', 'connector']:
                 connector = channel_configs.get(connector_type, None)
                 if not connector:
                     continue
-                if not isinstance(connector, Mapping):
+                if isinstance(connector, str):
+                    channel_configs[connector_type] = connector = {'connector': connector}
+                elif not isinstance(connector, Mapping):
                     raise ConfigurationException(f'Invalid channel {connector_type} type: ' + str(connector))
                 if 'connector' in connector:
                     connector_uuid = connector['connector']
@@ -78,22 +80,15 @@ class DataContext(Configurable, DataMapping):
     def _new(self, configs: Configurations) -> Channel:
         return Channel(**configs)
 
-    # noinspection PyProtectedMember
     def _add(self, channel: Channel) -> None:
         if not isinstance(channel, Channel):
-            raise ConnectorException(f'Invalid channel type: {type(channel)}')
+            raise LocalResourceException(f'Invalid channel type: {type(channel)}')
 
-        if channel._uuid in self._channels.keys():
-            raise ConfigurationException(f'Channel with UUID "{channel._uuid}" already exists')
-
-        for connector_type in ['reader', 'writer']:
-            connector = getattr(channel, connector_type)
-            if connector._uuid is not None and connector._uuid not in self.connectors.keys():
-                raise ConfigurationException(f'Connector with UUID "{channel._uuid}" of '
-                                             f'Channel {connector_type} does not exist')
+        if channel.uuid in self._channels.keys():
+            raise ConfigurationException(f'Channel with UUID "{channel.uuid}" already exists')
 
         # TODO: connector sanity check
-        self._channels[channel._uuid] = channel
+        self._channels[channel.uuid] = channel
 
     def _remove(self, uuid: str) -> None:
         del self._connectors[uuid]

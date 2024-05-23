@@ -20,7 +20,7 @@ class Channels(Collection[Channel]):
     _channels: List[Channel]
 
     def __init__(self, channels=()) -> None:
-        self._channels = list(channels)
+        self._channels = [*channels]
 
     def __repr__(self) -> str:
         return str(self.to_frame())
@@ -37,6 +37,9 @@ class Channels(Collection[Channel]):
     def _add(self, channel: Channel):
         self._channels.append(channel)
 
+    def copy(self) -> Channels:
+        return Channels([channel.copy() for channel in self._channels])
+
     def apply(self, apply: callable) -> None:
         for channel in self._channels:
             apply(channel)
@@ -52,22 +55,18 @@ class Channels(Collection[Channel]):
             groups.append((group_by, self.filter(lambda c: getattr(c, by) == group_by)))
         return groups
 
-    # noinspection PyProtectedMember
     def to_frame(self, unique: bool = False) -> pd.DataFrame:
         columns = []
         data = []
         for channel in self._channels:
-            channel_id = channel.id if not unique else channel._uuid
+            channel_id = channel.id if not unique else channel.uuid
             if not isinstance(channel.value, (pd.Series, pd.DataFrame)):
-                channel_data = pd.Series(index=[channel.time], data=[channel.value], name=channel_id)
+                channel_data = pd.Series(index=[channel.timestamp], data=[channel.value], name=channel_id)
             else:
                 channel_data = channel.value
                 channel_data.name = channel_id
             columns.append(channel_id)
             data.append(channel_data)
         if len(data) > 0:
-            return pd.concat(data, axis='columns', keys=columns)\
-                .dropna(axis='index', how='all')\
-                .dropna(axis='columns', how='all')
-        else:
-            return pd.DataFrame(columns=columns)
+            return pd.concat(data, axis='columns', keys=columns)  # .dropna(axis='columns', how='all')
+        return pd.DataFrame(columns=columns)

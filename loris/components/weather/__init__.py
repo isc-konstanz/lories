@@ -19,4 +19,4 @@ from .forecast import WeatherForecast  # noqa: F401
 from . import weather  # noqa: F401
 from .weather import Weather  # noqa: F401
 
-from ._var import WEATHER  # noqa: F401
+from ._var import WEATHER_NAMES  # noqa: F401

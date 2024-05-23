@@ -17,16 +17,13 @@ from loris.util import parse_id
 class ChannelConnector:
 
     _uuid: str
-
-    _type: str
     _configs: OrderedDict[str, Any]
 
-    time: pd.Timestamp = pd.NaT
+    timestamp: pd.Timestamp = pd.NaT
 
     # noinspection PyShadowingBuiltins
-    def __init__(self, type: str, connector: str = None, **configs: Any) -> None:
+    def __init__(self, connector: str = None, **configs: Any) -> None:
         self._uuid = connector
-        self._type = type
         connector_configs = OrderedDict(configs)
         if connector is not None:
             connector_configs['id'] = parse_id(connector.split('.')[-1])
@@ -42,8 +39,11 @@ class ChannelConnector:
         configs = ChannelConnector.__getattribute__(self, '_configs')
         if attr in configs.keys():
             return configs[attr]
-        raise AttributeError(f"'{type(self).__name__}' {self._type} object has no configuration '{attr}'")
+        raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
 
     @property
     def id(self) -> str:
         return self._configs['id']
+
+    def copy(self) -> ChannelConnector:
+        return ChannelConnector(self._uuid, **self._configs)

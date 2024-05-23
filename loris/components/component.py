@@ -98,6 +98,10 @@ class Component(ABC, Configurable):
         return super().__repr__() + f"\tactive = {self.is_active()}\n"
 
     @property
+    def uuid(self) -> str:
+        return self._uuid
+
+    @property
     def id(self) -> str:
         return self._id
 
