@@ -7,26 +7,21 @@
     To learn how to use local resource integration systems, see "loris --help"
 
 """
-from __future__ import annotations
-
 import os
-import inspect
-import logging
+import loris
 
 from argparse import ArgumentParser, RawTextHelpFormatter
 
-logger = logging.getLogger('loris')
+os.environ['NUMEXPR_MAX_THREADS'] = str(os.cpu_count())
 
 
 def main() -> None:
-    import loris
-
     with loris.load(parser=_get_parser()) as application:
         if application.settings['action'] == 'run':
             application.run()
         elif application.settings['action'] == 'start':
             application.start()
-            application.join()
+            application.wait()
 
 
 def _get_parser() -> ArgumentParser:
@@ -40,22 +35,11 @@ def _get_parser() -> ArgumentParser:
     subparsers = parser.add_subparsers(dest='action')
     # subparsers.required = True
     subparsers.default = 'run'
-    subparsers.add_parser('run', help='Run local resources, connectors and systems')
-    subparsers.add_parser('start', help='Start the local resource system')
-
-    parser.add_argument('--system-scan', dest='system_scan', action='store_true')
-    parser.add_argument('--system-flat', dest='system_flat', action='store_true')
-    parser.add_argument('--system-copy', dest='system_copy', action='store_true')
+    subparsers.add_parser('run', help='run local resources, connectors and systems')
+    subparsers.add_parser('start', help='start the local resource system')
 
     return parser
 
 
 if __name__ == "__main__":
-    run_dir = os.path.dirname(os.path.abspath(inspect.getsourcefile(main)))
-    if os.path.basename(run_dir) == 'bin':
-        run_dir = os.path.dirname(run_dir)
-
-    os.chdir(run_dir)
-    os.environ['NUMEXPR_MAX_THREADS'] = str(os.cpu_count())
-
     main()

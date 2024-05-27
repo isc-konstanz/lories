@@ -77,6 +77,9 @@ class Application(DataManager, Thread):
         self._interrupt.clear()
         super().start()
 
+    def wait(self, **kwargs) -> None:
+        self.join(**kwargs)
+
     def interrupt(self) -> None:
         self._interrupt.set()
 

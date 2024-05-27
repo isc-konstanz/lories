@@ -30,21 +30,23 @@ class Settings(Configurations):
         conf_path = os.path.join(conf_dirs.conf, conf_file)
 
         if os.path.isfile(conf_path):
-            kwargs['other'] = self._load(conf_path)
+            kwargs.update(self._load(conf_path))
 
         super().__init__(conf_file, conf_path, conf_dirs, **kwargs)
         self.application = application
+
+        self.dirs.join(self)
         if self.dirs._conf is None:
             self.dirs._conf = os.path.dirname(self.path)
+
+        # Load the logging configuration
+        import logging.config
 
         logging_file = os.path.join(self.dirs.conf, 'logging.conf')
         if not os.path.isfile(logging_file):
             logging_default = logging_file.replace('logging.conf', 'logging.default.conf')
             if os.path.isfile(logging_default):
                 shutil.copy(logging_default, logging_file)
-
-        # Load the logging configuration
-        import logging.config
 
         if os.path.isfile(logging_file):
             logging.config.fileConfig(logging_file)
@@ -65,7 +67,6 @@ class Settings(Configurations):
             # handler_file.setLevel(logging.WARN)
             # handler_file.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(message)s",
             #                                             "%Y-%m-%d %H:%M:%S"))
-
             logging.basicConfig(
                 force=True,
                 level=logging.INFO,
@@ -96,20 +97,37 @@ class Settings(Configurations):
 
 def _parse_kwargs(parser: ArgumentParser) -> Dict[str, Any]:
     if parser is not None:
-        parser.add_argument('-c', '--conf-directory',
+        parser.add_argument('-c', '--conf-dir',
                             dest='conf_dir',
-                            help="directory to expect basic configuration files",
-                            metavar='DIR')
+                            metavar='dir',
+                            help="directory to expect root configuration files")
 
-        parser.add_argument('-l', '--lib-directory',
+        parser.add_argument('-l', '--lib-dir',
                             dest='lib_dir',
-                            help="directory to expect and write_file library files to",
-                            metavar='DIR')
+                            metavar='dir',
+                            help="directory to expect and write library files to")
 
-        parser.add_argument('-d', '--data-directory',
+        parser.add_argument('-d', '--data-dir',
                             dest='data_dir',
-                            help="directory to expect and write_file result files to",
-                            metavar='DIR')
+                            metavar='dir',
+                            help="directory to expect and write data files to")
+
+        parser.add_argument('--system-scan',
+                            dest='system_scan',
+                            action='store_true',
+                            help="flags whether several systems will be expected, instead of a single one")
+
+        parser.add_argument('--system-flat',
+                            dest='system_flat',
+                            action='store_true',
+                            help="flags if the configuration files will be expected directly in the data directory,"
+                                 "instead of a corresponding 'conf' directory")
+
+        parser.add_argument('--system-copy',
+                            dest='system_copy',
+                            action='store_true',
+                            help="flags if the configured system files should be "
+                                 "copied to the specified data directory if it is empty")
 
         args = parser.parse_args()
         kwargs = vars(args)

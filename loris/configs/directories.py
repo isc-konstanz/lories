@@ -112,7 +112,7 @@ class Directories:
     # noinspection PyShadowingBuiltins
     def join(self, configs: Mapping[str, str]) -> None:
         for key in ['lib', 'log', 'tmp', 'data']:
-            dir = configs.get(f'_{key}')
+            dir = configs.get(f'{key}_dir')
             if dir is not None:
                 setattr(self, f'_{key}', dir)
 

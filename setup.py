@@ -37,7 +37,11 @@ EXTRAS_REQUIRE = {
     ':python_version < "3.11"': ['tomli']
 }
 
-SCRIPTS = ['bin/loris']
+ENTRY_POINTS = {
+    'console_scripts': [
+        "loris = loris.__main__:main"
+    ]
+}
 
 PACKAGES = find_namespace_packages(include=['loris*'])
 
@@ -58,6 +62,6 @@ setup(
     packages=PACKAGES,
     install_requires=INSTALL_REQUIRES,
     extras_require=EXTRAS_REQUIRE,
-    scripts=SCRIPTS,
+    entry_points=ENTRY_POINTS,
     **SETUPTOOLS_KWARGS
 )

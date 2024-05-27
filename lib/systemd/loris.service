@@ -8,7 +8,7 @@ Group=loris
 Type=forking
 Restart=always
 RestartSec=60s
-ExecStart=/usr/local/bin/loris start -c /etc/loris
+ExecStart=/opt/loris/.venv/bin/python loris -c /etc/loris start
 WorkingDirectory=/var/opt/loris
 
 [Install]
