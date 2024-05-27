@@ -34,7 +34,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
     @property
     def connection(self):
         if self._connection is None or not self._connection.is_connected():
-            raise ConnectionException(self, "MySQL Connection not open")
+            raise ConnectionException("MySQL Connection not open", connector=self)
         return self._connection
 
     def __getitem__(self, table_name: str) -> MySqlTable:
@@ -100,7 +100,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
                                                  primary='PRI' in table_column['column_key'],
                                                  nullable='YES' == table_column['is_nullable']))
             table_index = table_columns.pop(0)
-            table = MySqlTable(self._connection,
+            table = MySqlTable(self,
                                table_schema['table_name'],
                                table_index,
                                table_columns,
@@ -131,11 +131,11 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
                         if 'value_type' in table_channel else self._table_data_type
                     table_columns.append(MySqlColumn(table_column_name, table_column_type, **table_column_args))
 
-                table = MySqlTable(self._connection, table_name, table_index, table_columns)
+                table = MySqlTable(self, table_name, table_index, table_columns)
                 table.create()
                 tables[table.name] = table
             else:
-                raise ConnectorException(f"Unable to find configured table: {table_name}")
+                raise ConnectorException(f"Unable to find configured table: {table_name}", connector=self)
 
         return tables
 
@@ -171,7 +171,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
                name: str,
                columns: Optional[List[MySqlColumn]] = None,
                engine: str = None) -> MySqlTable:  # 'MyISAM'):
-        table = MySqlTable(self._connection, name, columns, engine)
+        table = MySqlTable(self, name, columns, engine)
         table.create()
 
         self._tables[table.name] = table
@@ -195,7 +195,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
 
         for table_name, table_channels in channels.groupby('table'):
             if table_name not in self._tables:
-                raise ConnectorException(f'Table "{table_name}" not available')
+                raise ConnectorException(f'Table "{table_name}" not available', connector=self)
 
             table_columns = [c.id if 'column' not in c else c.column for c in table_channels]
             table = self.get(table_name)
@@ -229,7 +229,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
     def write(self, channels: Channels) -> None:
         for table_name, table_channels in self._channels.groupby('table'):
             if table_name not in self._tables:
-                raise ConnectorException(f'Table "{table_name}" not available')
+                raise ConnectorException(f'Table "{table_name}" not available', connector=self)
 
             table_columns = {c.column: c.id for c in table_channels if 'column' in c}
 

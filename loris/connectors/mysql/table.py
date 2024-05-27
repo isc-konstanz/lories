@@ -35,12 +35,12 @@ class MySqlTable:
     columns: List[MySqlColumn]
 
     def __init__(self,
-                 connection,
+                 connector,
                  name: str,
                  index: Optional[MySqlColumn] = None,
                  columns: Optional[List[MySqlColumn]] = None,
                  engine: str = None):  # 'MyISAM'):
-        self._connection = connection
+        self._connector = connector
 
         self.name = name
 
@@ -55,9 +55,7 @@ class MySqlTable:
 
     @property
     def connection(self):
-        if self._connection is None or not self._connection.is_connected():
-            raise ConnectionException("MySQL Connection not open")
-        return self._connection
+        return self._connector.connection
 
     def create(self):
         columns = [str(c) for c in self.columns]

@@ -46,7 +46,7 @@ def read_files(path: str,
         if not data.empty and (end is not None and data.index[-1] > end):
             break
         if not os.path.isfile(file):
-            raise ConnectionException('File not found: ' + file)
+            raise IOError('File not found: ' + file)
 
         data = read_file(file, timezone=timezone, **kwargs).combine_first(data)
 

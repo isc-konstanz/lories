@@ -94,7 +94,7 @@ class ConnectorException(LocalResourceException):
     """
 
     # noinspection PyArgumentList
-    def __init__(self, connector: Connector, *args, **kwargs) -> None:
+    def __init__(self, *args, connector: Optional[Connector] = None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.connector = connector
 

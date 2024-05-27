@@ -64,8 +64,10 @@ class System(Component, ComponentContext):
             return components[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no component '{attr}'")
 
+    # noinspection PyProtectedMember
     def __configure__(self, configs: Configurations) -> None:
         super().__configure__(configs)
+        self._context.connectors._load_file(configs.dirs.conf, 'connectors.conf', self.uuid)
 
         if configs.has_section(Location.SECTION):
             self._location = self.__localize__(configs.get_section(Location.SECTION))
