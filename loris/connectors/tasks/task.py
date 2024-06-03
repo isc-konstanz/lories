@@ -10,6 +10,7 @@ from abc import ABC, abstractmethod
 from threading import Thread
 from loris.channels import Channels, ChannelState
 from loris.connectors import Connector, ConnectorException, ConnectionException
+import logging
 
 
 class ConnectorTask(ABC, Thread):
@@ -19,6 +20,7 @@ class ConnectorTask(ABC, Thread):
 
     def __init__(self, connector: Connector, channels: Channels, name: str = None, *args, **kwargs):
         super().__init__(name=name, target=self.__call__, *args, **kwargs)
+        self._logger = logging.getLogger(self.__module__)
         self.connector = connector
         self.channels = channels
 
@@ -33,7 +35,8 @@ class ConnectorTask(ABC, Thread):
             finally:
                 self.connector.set_states(ChannelState.DISCONNECTED)
             raise e
-
+        except ConnectorException as e:
+            raise e
         except Exception as e:
             raise ConnectorException(e, connector=self.connector)
 

@@ -16,8 +16,6 @@ import logging
 from loris.configs import ConfigurationException
 from mysql.connector import FieldType
 
-logger = logging.getLogger(__name__)
-
 
 class MySqlColumn:
 
@@ -45,7 +43,8 @@ class MySqlColumn:
             self.type += ' DEFAULT CURRENT_TIMESTAMP'
         self.type_length = type_length
 
-        logger.debug(f"Configured {'PRIMARY ' if self.primary else ''}COLUMN {self}")
+        self._logger = logging.getLogger(__name__)
+        self._logger.debug(f"Configured {'PRIMARY ' if self.primary else ''}COLUMN {self}")
 
     def __repr__(self) -> str:
         column = f"`{self.name}` {self.type}"

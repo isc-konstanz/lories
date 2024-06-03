@@ -11,13 +11,10 @@ from typing import List, Iterator
 
 import os
 import re
-import logging
 
 from collections import OrderedDict
 from loris import Configurations, Configurable
 from loris.components import Component, ComponentException, registry
-
-logger = logging.getLogger(__name__)
 
 
 class ComponentContext(Configurable, Mapping[str, Component]):
@@ -61,7 +58,7 @@ class ComponentContext(Configurable, Mapping[str, Component]):
         for registration in registry.types.values():
             if registration.is_alias(registration_type):
                 registration_type = registration.type
-                logger.debug(f"Using alias \"{','.join(registration.alias.keys())}\" "
+                self._logger.debug(f"Using alias \"{','.join(registration.alias.keys())}\" "
                              f"for component: {registration_type}")
 
         if registration_type not in registry.types.keys():
@@ -104,8 +101,8 @@ class ComponentContext(Configurable, Mapping[str, Component]):
                 component.deactivate()
 
             except Exception as e:
-                logger.warning(f"Error deactivating component \"{component_id}\": {e}")
-                logger.exception(e)
+                self._logger.warning(f"Error deactivating component \"{component_id}\": {e}")
+                self._logger.exception(e)
 
         self.__deactivate__()
 

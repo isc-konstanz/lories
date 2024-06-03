@@ -10,13 +10,8 @@
 
 """
 from __future__ import annotations
-
-import logging
-
 from loris import Configurations, Location
 from loris.components.weather import WeatherBase, WeatherForecast, WeatherException
-
-logger = logging.getLogger(__name__)
 
 
 # noinspection SpellCheckingInspection

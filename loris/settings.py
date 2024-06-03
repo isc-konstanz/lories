@@ -11,6 +11,9 @@ from typing import Dict, Any
 import os
 import sys
 import shutil
+
+import logging.config
+
 from argparse import ArgumentParser
 from loris.configs import Configurations, Directories
 
@@ -39,20 +42,17 @@ class Settings(Configurations):
         if self.dirs._conf is None:
             self.dirs._conf = os.path.dirname(self.path)
 
-        # Load the logging configuration
-        import logging.config
-
         logging_file = os.path.join(self.dirs.conf, 'logging.conf')
         if not os.path.isfile(logging_file):
             logging_default = logging_file.replace('logging.conf', 'logging.default.conf')
             if os.path.isfile(logging_default):
                 shutil.copy(logging_default, logging_file)
-
         if os.path.isfile(logging_file):
             logging.config.fileConfig(logging_file)
             for handler in logging.getLoggerClass().root.handlers:
                 if isinstance(handler, logging.FileHandler):
                     self.dirs._log = os.path.dirname(handler.baseFilename)
+                    break
         else:
             handler_console = logging.StreamHandler(sys.stdout)
             handler_console.setLevel(logging.INFO)

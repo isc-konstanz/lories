@@ -10,15 +10,10 @@
 
 """
 from __future__ import annotations
-
-import logging
-
 from loris import Configurations, Location
 from loris.connectors import ConnectorContext
 from loris.components import Component, ComponentException, ComponentUnavailableException
 from loris.components.weather import WeatherConnector
-
-logger = logging.getLogger(__name__)
 
 
 # noinspection SpellCheckingInspection

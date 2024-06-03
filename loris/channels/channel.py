@@ -17,8 +17,6 @@ from loris.configs import ConfigurationException
 from loris.channels import ChannelState, ChannelConnector
 from loris.util import parse_id, _parse_freq, to_timedelta
 
-logger = logging.getLogger(__name__)
-
 
 class Channel:
 
@@ -48,9 +46,10 @@ class Channel:
             _logger = {'connector': _logger}
         self.logger = ChannelConnector(**_logger)
 
+        self._logger = logging.getLogger(__name__)
         self._configs = OrderedDict({'id': parse_id(id), **configs})
         if self._configs['id'] != id:
-            logger.warning(f'Value container ID contains invalid characters: {id}')
+            self._logger.warning(f'Value container ID contains invalid characters: {id}')
 
         self._uuid = uuid if uuid is not None else self.id
 

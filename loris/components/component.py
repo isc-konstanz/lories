@@ -12,15 +12,12 @@ from typing import Optional
 import os
 import pandas as pd
 import datetime as dt
-import logging
 
 from shutil import copytree, ignore_patterns
 from loris import Settings, LocalResourceException, LocalResourceUnavailableException
 from loris.configs import Configurable, Configurations, ConfigurationException
 from loris.data import DataAccess
 from loris.util import parse_id, to_date
-
-logger = logging.getLogger(__name__)
 
 
 class Component(ABC, Configurable):
@@ -143,14 +140,14 @@ class Component(ABC, Configurable):
         return self._active
 
     def activate(self) -> None:
-        logger.info(f"Activating {type(self).__name__}: {self.name}")
+        self._logger.info(f"Activating {type(self).__name__}: {self.name}")
         # for component in self._class_objects(Component):
         #     component.activate()
         self.__activate__()
         self._active = True
 
     def deactivate(self) -> None:
-        logger.info(f"Deactivating {type(self).__name__}: {self.name}")
+        self._logger.info(f"Deactivating {type(self).__name__}: {self.name}")
         # for component in self._class_objects(Component):
         #     component.deactivate()
         self.__deactivate__()

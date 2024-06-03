@@ -13,18 +13,17 @@ import logging
 
 from .configurations import Configurations
 
-logger = logging.getLogger(__name__)
-
 
 class Configurable:
 
     def __init__(self, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self._logger = logging.getLogger(self.__module__)
         self._configs = configs
 
     def __configure__(self, configs: Configurations) -> None:
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(self)
+        if self._logger.isEnabledFor(logging.DEBUG):
+            self._logger.debug(self)
 
     def __repr__(self) -> str:
         representation = f"{type(self).__name__}:\n"
@@ -44,7 +43,7 @@ class Configurable:
 
     # noinspection SpellCheckingInspection
     def configure(self) -> None:
-        logger.debug(f"Configuring {type(self).__name__}: {self.configs.name}")
+        self._logger.debug(f"Configuring {type(self).__name__}: {self.configs.name}")
         self.__configure__(self._configs)
 
     @property

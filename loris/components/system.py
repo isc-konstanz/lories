@@ -10,7 +10,6 @@ from typing import Optional, List
 
 import os
 import pandas as pd
-import logging
 
 from loris import components
 from loris import Configurations, ConfigurationException, Location, LocationUnavailableException
@@ -20,8 +19,6 @@ from loris.data import DataAccess
 from loris.util import parse_id
 
 components.register(Weather, Weather.TYPE)
-
-logger = logging.getLogger(__name__)
 
 
 class System(Component, ComponentContext):
@@ -85,13 +82,13 @@ class System(Component, ComponentContext):
 
     # noinspection PyUnresolvedReferences
     def activate(self) -> None:
-        logger.info(f"Activating {type(self).__name__}: {self.name}")
+        self._logger.info(f"Activating {type(self).__name__}: {self.name}")
         super(Component, self).activate()
         self._active = True
 
     # noinspection PyUnresolvedReferences
     def deactivate(self) -> None:
-        logger.info(f"Deactivating {type(self).__name__}: {self.name}")
+        self._logger.info(f"Deactivating {type(self).__name__}: {self.name}")
         super(Component, self).deactivate()
         self._active = False
 

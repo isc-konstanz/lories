@@ -12,10 +12,7 @@ import logging
 import datetime as dt
 import pandas as pd
 
-from loris.connectors import ConnectionException
 from loris.connectors.mysql import MySqlColumn
-
-logger = logging.getLogger(__name__)
 
 
 class MySqlTable:
@@ -53,22 +50,25 @@ class MySqlTable:
 
         self.engine = engine
 
+        self._logger = logging.getLogger(__name__)
+
     @property
     def connection(self):
         return self._connector.connection
 
     def create(self):
-        columns = [str(c) for c in self.columns]
-        primary = [c.name for c in self.columns if c.primary]
+        columns = [self.index] + self.columns
+        primary = [c.name for c in columns if c.primary]
 
-        create = f"CREATE TABLE IF NOT EXISTS {self.name} " \
-                 f"({', '.join(columns)}, PRIMARY KEY ({', '.join(primary)}))"
+        query = f"CREATE TABLE IF NOT EXISTS {self.name} " \
+                f"({', '.join([str(c) for c in columns])}, PRIMARY KEY ({', '.join(primary)}))"
 
         if self.engine is not None:
-            create += f" ENGINE={self.engine}"
+            query += f" ENGINE={self.engine}"
 
         with self.connection.cursor() as cursor:
-            cursor.execute(create)
+            self._logger.debug(query)
+            cursor.execute(query)
 
             self.connection.commit()
         return self
@@ -114,6 +114,7 @@ class MySqlTable:
 
     def _select(self, column_names: List[str], query: str) -> pd.DataFrame:
         with self.connection.cursor(buffered=True) as cursor:
+            self._logger.debug(query)
             if cursor.rowcount > 0:
                 cursor.execute(query)
                 columns = sorted([c for c in self.columns if c.name in column_names], key=lambda c: c.name)
@@ -147,6 +148,7 @@ class MySqlTable:
         query += " WHERE" + " AND".join(where)
 
         with self.connection.cursor() as cursor:
+            self._logger.debug(query)
             cursor.execute(query)
 
     # noinspection PyUnresolvedReferences
@@ -158,6 +160,7 @@ class MySqlTable:
         query += f" ON DUPLICATE KEY UPDATE " + ', '.join([f'`{c.name}`=VALUES(`{c.name}`)' for c in columns
                                                            if not c.primary])
         with self.connection.cursor() as cursor:
+            self._logger.debug(query)
             params = []
             for timestamp, values in data.iterrows():
                 params.append((self.index.encode(timestamp), *[c.encode(values[c.name]) for c in columns]))

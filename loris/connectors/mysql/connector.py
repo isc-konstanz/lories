@@ -9,7 +9,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Optional, Any, Dict, List, Iterator
 
-import logging
 import pytz as tz
 import datetime as dt
 import pandas as pd
@@ -20,8 +19,6 @@ from loris.channels import Channels, ChannelState
 from loris.connectors import Connector, ConnectorException, ConnectionException
 from loris.connectors.mysql import MySqlTable, MySqlColumn
 from loris.util import resample
-
-logger = logging.getLogger(__name__)
 
 
 class MySqlConnector(Connector, Mapping[str, MySqlTable]):
@@ -76,7 +73,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
         self.database = configs.get('database')
 
     def __connect__(self, channels: Channels) -> None:
-        logger.info(f"Connecting to MySQL database {self.database}@{self.host}:{self.port}")
+        self._logger.info(f"Connecting to MySQL database {self.database}@{self.host}:{self.port}")
         self._connection = connector.connect(
             host=self.host,
             port=self.port,
@@ -209,7 +206,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
                         table_data = resample(table_data, self.resolution)
 
                     except TypeError as e:
-                        logger.exception(str(e))
+                        self._logger.exception(str(e))
 
             for table_channel in table_channels:
                 table_channel_column = table_channel.id if 'column' not in table_channel else table_channel.column
@@ -224,7 +221,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
 
                 else:
                     table_channel.state = ChannelState.NOT_AVAILABLE
-                    logger.warning(f'Unable to read nonexisting column of table "{table_name}": {table_channel_column}')
+                    self._logger.warning(f'Unable to read nonexisting column of table "{table_name}": {table_channel_column}')
 
     def write(self, channels: Channels) -> None:
         for table_name, table_channels in self._channels.groupby('table'):

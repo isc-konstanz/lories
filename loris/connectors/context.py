@@ -17,9 +17,8 @@ from loris import Configurable, Configurations, ConfigurationException
 from loris.connectors import Connector, ConnectorException, ConnectorRegistration, registry
 from loris.connectors.csv import CsvConnector
 
+
 logger = logging.getLogger(__name__)
-
-
 logger.debug("Registering CSV connector")
 registry.types[CsvConnector.TYPE] = ConnectorRegistration(CsvConnector, CsvConnector.TYPE)
 

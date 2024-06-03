@@ -6,13 +6,8 @@
     
 """
 from __future__ import annotations
-
-import logging
-
 from loris import Channel, Configurable, Configurations, ConfigurationUnavailableException
 from loris.data import DataMapping
-
-logger = logging.getLogger(__name__)
 
 
 class DataAccess(Configurable, DataMapping):
@@ -30,13 +25,13 @@ class DataAccess(Configurable, DataMapping):
             self._context.connectors._load(configs.get_section('connectors'), self._component.uuid)
 
         except ConfigurationUnavailableException:
-            logger.debug(f"No connectors configured for configuration: {configs.name}")
+            self._logger.debug(f"No connectors configured for configuration: {configs.name}")
 
         try:
             self._context._load(configs.get_section('channels'), self._component.uuid)
 
         except ConfigurationUnavailableException:
-            logger.debug(f"No channels configured for configuration: {configs.name}")
+            self._logger.debug(f"No channels configured for configuration: {configs.name}")
 
     # noinspection PyProtectedMember
     def add(self, channel: Channel | Configurations) -> None:

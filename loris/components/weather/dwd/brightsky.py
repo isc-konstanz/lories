@@ -6,7 +6,7 @@
 
 """
 from __future__ import annotations
-from typing import Optional, Iterable, Tuple, List, Mapping, Any
+from typing import Optional, Tuple, List, Mapping, Any
 
 import json
 
@@ -15,14 +15,11 @@ import datetime as dt
 import numpy as np
 import pandas as pd
 import requests
-import logging
 
 from loris import Configurations, Channel, Channels, ChannelState
 from loris.components.weather import Weather, WeatherConnector
 from loris.components.weather.dwd._channels import parse_defaults
 from loris.util import floor_date, ceil_date
-
-logger = logging.getLogger(__name__)
 
 
 # noinspection SpellCheckingInspection
@@ -88,7 +85,7 @@ class Brightsky(WeatherConnector):
         for channel in channels:
             if channel.address not in data.columns:
                 channel.state = ChannelState.NOT_AVAILABLE
-                logger.warning('Unable to read nonexisting brightsky column: ' + channel.address)
+                self._logger.warning('Unable to read nonexisting brightsky column: ' + channel.address)
                 continue
 
             channel_sources = channel.source if isinstance(channel.source, (Tuple, List)) else (channel.source,)
@@ -96,7 +93,7 @@ class Brightsky(WeatherConnector):
                                     np.unique([*data_source_columns, channel.address])]
             if channel_data.empty:
                 channel.state = ChannelState.UNKNOWN_ERROR
-                logger.warning(f'Unable to read {self._uuid} channel: {channel.id}')
+                self._logger.warning(f'Unable to read {self._uuid} channel: {channel.id}')
                 continue
 
             if any(source == 'forecast' for source in channel_sources):
@@ -109,7 +106,7 @@ class Brightsky(WeatherConnector):
                     self._parse_current(channel_data, channel)
             else:
                 channel.state = ChannelState.NOT_AVAILABLE
-                logger.warning('Unable to read nonexisting brightsky source: ' + str(channel.source))
+                self._logger.warning('Unable to read nonexisting brightsky source: ' + str(channel.source))
 
     def _parse_forecast(self,
                         data: pd.DataFrame,
@@ -132,7 +129,7 @@ class Brightsky(WeatherConnector):
         timestamps = data['source_first_record'].unique()
         if len(timestamps) > 1:
             channel.state = ChannelState.UNKNOWN_ERROR
-            logger.warning(f'Unable to read {self._uuid} channel for inconsistend forecast dates: {channel.id}')
+            self._logger.warning(f'Unable to read {self._uuid} channel for inconsistend forecast dates: {channel.id}')
             return
         timestamp = timestamps[0].tz_convert(self.location.timezone)
 

@@ -9,14 +9,11 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 import os
-import logging
 
 from loris import Channel, Configurable, Configurations, ConfigurationException, LocalResourceException
 from loris.data import DataMapping
 from loris.connectors import ConnectorContext
 from loris.components import ComponentContext
-
-logger = logging.getLogger(__name__)
 
 
 class DataContext(Configurable, DataMapping):

@@ -9,14 +9,11 @@ from __future__ import annotations
 
 import pytz as tz
 import pandas as pd
-import logging
 
 from threading import Thread, Event
 from loris import Settings, System, Channel
 from loris.util import to_bool, to_timedelta, floor_date
 from loris.data.manager import DataManager
-
-logger = logging.getLogger(__name__)
 
 
 # noinspection PyUnresolvedReferences
@@ -73,7 +70,7 @@ class Application(DataManager, Thread):
         return self.settings.application
 
     def start(self) -> None:
-        logger.info(f"Starting {type(self).__name__}: {self.name}")
+        self._logger.info(f"Starting {type(self).__name__}: {self.name}")
         self._interrupt.clear()
         super().start()
 
@@ -94,7 +91,7 @@ class Application(DataManager, Thread):
                 now = pd.Timestamp.now(tz.UTC)
                 next = _next(now, interval)
                 sleep = (next - now).total_seconds()
-                logger.debug(f"Sleeping until next execution in {sleep} seconds: {next}")
+                self._logger.debug(f"Sleeping until next execution in {sleep} seconds: {next}")
                 self._interrupt.wait(sleep)
 
             except KeyboardInterrupt:
@@ -110,7 +107,7 @@ class Application(DataManager, Thread):
             now = pd.Timestamp.now(tz.UTC)
             channels = self.values().filter(lambda c: is_reading(c, now))
 
-            logger.debug(f"Reading {len(channels)} channels of application: {self.name}")
+            self._logger.debug(f"Reading {len(channels)} channels of application: {self.name}")
             if len(channels) > 0:
                 self.read(channels)
                 self.notify(channels)
@@ -123,11 +120,11 @@ class Application(DataManager, Thread):
         for system in self.components.get_all(System):
             try:
                 # TODO: Implement check if data was updated
-                logger.debug(f"Running {type(system).__name__}: {system.name}")
+                self._logger.debug(f"Running {type(system).__name__}: {system.name}")
                 system.run(*args, **kwargs)
 
             except Exception as e:
-                logger.warning(f"Error running system \"{system.id}\":", str(e))
+                self._logger.warning(f"Error running system \"{system.id}\":", str(e))
 
 
 # noinspection PyShadowingBuiltins

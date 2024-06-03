@@ -12,7 +12,6 @@ from collections.abc import MutableMapping, Mapping
 
 import os
 import shutil
-import logging
 import datetime as dt
 import pandas as pd
 
@@ -20,8 +19,6 @@ from copy import deepcopy
 from loris import LocalResourceException, LocalResourceUnavailableException
 from loris.util import to_bool, to_int, to_float, to_date
 from loris.configs import Directories
-
-logger = logging.getLogger(__name__)
 
 
 class Configurations(MutableMapping[str, Any]):

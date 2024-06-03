@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Collection
 from typing import Tuple, List, Iterator, Any
 
+import logging
 import numpy as np
 import pandas as pd
 
@@ -20,6 +21,7 @@ class Channels(Collection[Channel]):
     _channels: List[Channel]
 
     def __init__(self, channels=()) -> None:
+        self._logger = logging.getLogger(__name__)
         self._channels = [*channels]
 
     def __repr__(self) -> str:
