@@ -5,7 +5,9 @@
 
 
 """
-from ._version import __version__  # noqa: F401
+from . import _version
+__version__ = _version.get_versions().get("version")
+del _version
 
 from .exceptions import (  # noqa: F401
     LocalResourceException,

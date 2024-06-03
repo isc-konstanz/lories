@@ -1,0 +1,77 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ['setuptools >= 61.0', 'versioneer[toml]']
+
+[project]
+name = "loris"
+description = """\
+This repository provides a set of core functions for several \
+Local Resource Integration Systems of ISC Konstanz e.V."""
+
+authors = [
+    {name = "ISC Konstanz e.V."}
+]
+maintainers = [
+    {name = "Adrian Minde", email = "adrian.minde@isc-konstanz.de"}
+]
+
+urls.author = "https://isc-konstanz.de"
+urls.source = "https://github.com/isc-konstanz/loris/"
+urls.issues = "https://github.com/isc-konstanz/loris/issues"
+
+classifiers = [
+    "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent"
+]
+
+readme = "README.md"
+requires-python = ">= 3.9"
+license.file = "LICENSE"
+dynamic = ["version"]
+
+dependencies = [
+    "tomli >= 1.1.0; python_version < '3.11'",
+    "numpy >= 1.16",
+    "pandas >= 0.23",
+    "pytz >= 2019.1"
+]
+
+[project.optional-dependencies]
+mysql = [
+    "mysql-connector-python"
+]
+dev = [
+    "loris[mysql]",
+    "isort",
+    "black",
+    "autoflake",
+    "pre-commit",
+    "pytest"
+]
+
+[tool.setuptools.package-data]
+loris = []
+
+[tool.setuptools.packages.find]
+namespaces = false
+exclude = [
+    "doc",
+    "data*"
+]
+
+[tool.versioneer]
+VCS = "git"
+style = "pep440"
+versionfile_source = "loris/_version.py"
+versionfile_build = "loris/_version.py"
+parentdir_prefix = "loris-"
+tag_prefix = "v"
+
+[project.scripts]
+loris = "loris.__main__:main"
