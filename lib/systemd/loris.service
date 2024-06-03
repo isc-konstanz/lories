@@ -5,10 +5,10 @@ After=network.target
 [Service]
 User=loris
 Group=loris
-Type=forking
+Type=simple
 Restart=always
 RestartSec=60s
-ExecStart=/opt/loris/.venv/bin/python loris -c /etc/loris start
+ExecStart=/opt/loris/.venv/bin/loris -c /etc/loris start
 WorkingDirectory=/var/opt/loris
 
 [Install]
