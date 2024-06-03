@@ -8,6 +8,7 @@
 from __future__ import annotations
 from typing import Optional, Any
 
+import pytz as tz
 import pandas as pd
 import logging
 
@@ -100,7 +101,7 @@ class Channel:
     @value.setter
     def value(self, value) -> None:
         self._value = value
-        self._timestamp = pd.Timestamp.now()
+        self._timestamp = pd.Timestamp.now(tz.UTC).floor(freq='s')
         self._state = ChannelState.VALID
 
     @property
@@ -110,7 +111,7 @@ class Channel:
     @state.setter
     def state(self, state) -> None:
         self._value = None
-        self._timestamp = pd.Timestamp.now()
+        self._timestamp = pd.Timestamp.now(tz.UTC).floor(freq='s')
         self._state = state
 
     def set(self, timestamp: pd.Timestamp, value: Any, state: str | ChannelState = ChannelState.VALID) -> None:
@@ -131,3 +132,15 @@ class Channel:
     # noinspection PyProtectedMember
     def has_connector(self, uuid: Optional[str] = None) -> bool:
         return self.connector._uuid == uuid if uuid is not None else self.connector._uuid is not None
+
+    def to_series(self, state: bool = False) -> pd.Series:
+        if isinstance(self.value, pd.Series):
+            return self.value
+        elif isinstance(self.value, pd.DataFrame):
+            return self.value[self.id]
+        else:
+            if state and pd.isna(self.value):
+                data = self.state
+            else:
+                data = self.value
+            return pd.Series(index=[self.timestamp], data=[data], name=self.id)

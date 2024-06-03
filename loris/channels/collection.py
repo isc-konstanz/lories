@@ -10,6 +10,7 @@ from collections.abc import Collection
 from typing import Tuple, List, Iterator, Any
 
 import logging
+import pytz as tz
 import numpy as np
 import pandas as pd
 
@@ -25,7 +26,7 @@ class Channels(Collection[Channel]):
         self._channels = [*channels]
 
     def __repr__(self) -> str:
-        return str(self.to_frame())
+        return str(self.to_frame(states=True))
 
     def __contains__(self, __x: object) -> bool:
         return __x in self._channels
@@ -57,16 +58,19 @@ class Channels(Collection[Channel]):
             groups.append((group_by, self.filter(lambda c: getattr(c, by) == group_by)))
         return groups
 
-    def to_frame(self, unique: bool = False) -> pd.DataFrame:
+    def to_frame(self, unique: bool = False, states: bool = False) -> pd.DataFrame:
         columns = []
         data = []
         for channel in self._channels:
             channel_id = channel.id if not unique else channel.uuid
-            if not isinstance(channel.value, (pd.Series, pd.DataFrame)):
-                channel_data = pd.Series(index=[channel.timestamp], data=[channel.value], name=channel_id)
-            else:
-                channel_data = channel.value
-                channel_data.name = channel_id
+            channel_data = channel.to_series(state=states)
+            channel_data.name = channel_id
+
+            if channel_data.index.tzinfo is None:
+                self._logger.warning(f"UTC will be presumed for channel \"{channel.uuid}\" timestamps, "
+                                     f"as tz-naive with tz-aware DatetimeIndex cannot be joined: {channel_data}")
+                channel_data.index = channel_data.index.tz_localize(tz.UTC)
+
             columns.append(channel_id)
             data.append(channel_data)
         if len(data) > 0:

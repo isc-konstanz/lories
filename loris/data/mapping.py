@@ -45,5 +45,5 @@ class DataMapping(Mapping[str, Channel]):
     def filter(self, filter: callable) -> DataMapping:
         return DataMapping({i: c for i, c in self._channels.items() if filter(c)})
 
-    def to_frame(self) -> pd.DataFrame:
-        return self.values().to_frame()
+    def to_frame(self, **kwargs) -> pd.DataFrame:
+        return self.values().to_frame(**kwargs)

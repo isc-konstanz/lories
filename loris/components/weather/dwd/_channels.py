@@ -66,7 +66,7 @@ def _parse_channel(channel_id: str) -> Dict[str, Any]:
         'value_type': _parse_value_type(channel_id)
     }
     if channel['value_type'] == str:
-        channel['value_length'] = 16
+        channel['value_length'] = 32
     return channel
 
 

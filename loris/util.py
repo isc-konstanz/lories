@@ -155,7 +155,7 @@ def floor_date(date: Union[dt.datetime, pd.Timestamp, str],
     freq = _parse_freq(freq)
     if freq in ['Y', 'M']:
         return date.tz_localize(None).to_period(freq).to_timestamp().tz_localize(timezone)
-    elif any([freq.endswith(f) for f in ['D', 'H', 'T', 'S']]):
+    elif any([freq.endswith(f) for f in ['D', 'h', 'min', 's']]):
         return date.tz_localize(None).floor(freq).tz_localize(timezone)
     else:
         raise ValueError(f"Invalid frequency: {freq}")
@@ -197,11 +197,11 @@ def to_timedelta(freq: str) -> Union[relativedelta, pd.Timedelta]:
         return relativedelta(months=freq_val)
     elif freq.endswith('D'):
         return pd.Timedelta(days=freq_val)
-    elif freq.endswith('H'):
+    elif freq.endswith('h'):
         return pd.Timedelta(hours=freq_val)
-    elif freq.endswith('T'):
+    elif freq.endswith('min'):
         return pd.Timedelta(minutes=freq_val)
-    elif freq.endswith('S'):
+    elif freq.endswith('s'):
         return pd.Timedelta(seconds=freq_val)
     else:
         raise ValueError(f"Invalid frequency: {freq}")
@@ -236,11 +236,11 @@ def _parse_freq(f: str) -> str:
     elif f.lower().endswith(('d', 'day', 'days')):
         return f'{v}D'
     elif f.lower().endswith(('h', 'hour', 'hours')):
-        return f'{v}H'
+        return f'{v}h'
     elif f.lower().endswith(('m', 'min', 'mins', 't')):
-        return f'{v}T'
+        return f'{v}min'
     elif f.lower().endswith(('s', 'sec', 'secs')):
-        return f'{v}S'
+        return f'{v}s'
     else:
         raise ValueError(f"Invalid frequency: {f}")
 

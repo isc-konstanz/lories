@@ -149,7 +149,7 @@ class Brightsky(WeatherConnector):
                           start: Optional[pd.Timestamp, dt.datetime] = None,
                           end:   Optional[pd.Timestamp, dt.datetime] = None) -> None:
 
-        timestamp = pd.Timestamp.now(tz=self.location.timezone)
+        timestamp = pd.Timestamp.now(tz=self.location.timezone).floor(freq='s')
         if start is None:
             start = pd.Timestamp(0, tz=self.location.timezone)
         if end is None:
