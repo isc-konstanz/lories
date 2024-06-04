@@ -2,14 +2,13 @@
 """
     loris.core.channels.state
     ~~~~~~~~~~~~~~~~~~~~~~~~~
-    
-    
+
+
 """
 from enum import Enum
 
 
 class ChannelState(Enum):
-
     DISABLED = "DISABLED"
 
     DISCONNECTING = "DISCONNECTING"

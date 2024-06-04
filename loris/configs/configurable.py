@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.core.configs.configurable
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    
-    
+    loris.configs.configurable
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
 """
 from __future__ import annotations
-from collections.abc import Sequence, Mapping
-from typing import List
 
 import logging
 
@@ -15,7 +13,6 @@ from .configurations import Configurations
 
 
 class Configurable:
-
     def __init__(self, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._logger = logging.getLogger(self.__module__)
@@ -28,7 +25,7 @@ class Configurable:
     def __repr__(self) -> str:
         representation = f"{type(self).__name__}:\n"
         for attr in dir(self):
-            if attr.startswith('_') or attr.isupper():
+            if attr.startswith("_") or attr.isupper():
                 continue
             try:
                 value = getattr(self, attr)

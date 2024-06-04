@@ -2,41 +2,42 @@
 """
     loris.connectors.mysql.table
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    
-    
+
+
 """
 from __future__ import annotations
-from typing import Optional, List
 
-import logging
 import datetime as dt
-import pandas as pd
+import logging
+from typing import List, Optional
 
+import pandas as pd
 from loris.connectors.mysql import MySqlColumn
 
 
 class MySqlTable:
-
     SECTION = "table"
 
-    DEFAULT_INDEX_COLUMN = 'timestamp'
-    DEFAULT_INDEX_TYPE = 'TIMESTAMP'
+    DEFAULT_INDEX_COLUMN = "timestamp"
+    DEFAULT_INDEX_TYPE = "TIMESTAMP"
     DEFAULT_INDEX = MySqlColumn(DEFAULT_INDEX_COLUMN, DEFAULT_INDEX_TYPE, nullable=False, primary=True)
 
-    DEFAULT_DATA_COLUMN = 'data'
-    DEFAULT_DATA_TYPE = 'FLOAT'
+    DEFAULT_DATA_COLUMN = "data"
+    DEFAULT_DATA_TYPE = "FLOAT"
     DEFAULT_COLUMNS = [MySqlColumn(DEFAULT_DATA_COLUMN, DEFAULT_DATA_TYPE)]
 
     index: MySqlColumn
 
     columns: List[MySqlColumn]
 
-    def __init__(self,
-                 connector,
-                 name: str,
-                 index: Optional[MySqlColumn] = None,
-                 columns: Optional[List[MySqlColumn]] = None,
-                 engine: str = None):  # 'MyISAM'):
+    def __init__(
+        self,
+        connector,
+        name: str,
+        index: Optional[MySqlColumn] = None,
+        columns: Optional[List[MySqlColumn]] = None,
+        engine: str = None,  # 'MyISAM'
+    ):
         self._connector = connector
 
         self.name = name
@@ -60,8 +61,10 @@ class MySqlTable:
         columns = [self.index] + self.columns
         primary = [c.name for c in columns if c.primary]
 
-        query = f"CREATE TABLE IF NOT EXISTS {self.name} " \
-                f"({', '.join([str(c) for c in columns])}, PRIMARY KEY ({', '.join(primary)}))"
+        query = (
+            f"CREATE TABLE IF NOT EXISTS {self.name} "
+            f"({', '.join([str(c) for c in columns])}, PRIMARY KEY ({', '.join(primary)}))"
+        )
 
         if self.engine is not None:
             query += f" ENGINE={self.engine}"
@@ -73,20 +76,24 @@ class MySqlTable:
             self.connection.commit()
         return self
 
-    def exists(self,
-               columns: Optional[List[str]] = None,
-               start: Optional[pd.Timestamp, dt.datetime] = None,
-               end:   Optional[pd.Timestamp, dt.datetime] = None):
+    def exists(
+        self,
+        columns: Optional[List[str]] = None,
+        start: Optional[pd.Timestamp, dt.datetime] = None,
+        end: Optional[pd.Timestamp, dt.datetime] = None,
+    ) -> bool:
         if columns is None:
             columns = [c.name for c in self.columns]
 
         # TODO: Replace this placeholder more resource efficient
         return not self.select(columns, start, end).empty
 
-    def select(self,
-               columns: Optional[List[str]] = None,
-               start: pd.Timestamp | dt.datetime = None,
-               end:   pd.Timestamp | dt.datetime = None) -> pd.DataFrame:
+    def select(
+        self,
+        columns: Optional[List[str]] = None,
+        start: pd.Timestamp | dt.datetime = None,
+        end: pd.Timestamp | dt.datetime = None,
+    ) -> pd.DataFrame:
         if columns is None:
             columns = [c.name for c in self.columns]
         query = f"SELECT {', '.join([self.index.name] + columns)} FROM {self.name}"
@@ -132,9 +139,7 @@ class MySqlTable:
             data.index.name = self.index.name
         return data
 
-    def delete(self,
-               start: pd.Timestamp | dt.datetime,
-               end:   pd.Timestamp | dt.datetime) -> None:
+    def delete(self, start: pd.Timestamp | dt.datetime, end: pd.Timestamp | dt.datetime) -> None:
         if start is None or end is None:
             return
 
@@ -155,10 +160,11 @@ class MySqlTable:
     def insert(self, data: pd.DataFrame) -> None:
         columns = [c for c in self.columns if c.name in data.columns]
 
-        query = f"INSERT INTO {self.name} (`{self.index.name}`, " + ', '.join([f'`{c.name}`' for c in columns]) + ")"
-        query += f" VALUES (%s, " + ', '.join(['%s']*(len(columns))) + ")"
-        query += f" ON DUPLICATE KEY UPDATE " + ', '.join([f'`{c.name}`=VALUES(`{c.name}`)' for c in columns
-                                                           if not c.primary])
+        query = f"INSERT INTO {self.name} (`{self.index.name}`, " + ", ".join([f"`{c.name}`" for c in columns]) + ")"
+        query += f" VALUES (%s, " + ", ".join(["%s"] * (len(columns))) + ")"
+        query += f" ON DUPLICATE KEY UPDATE " + ", ".join(
+            [f"`{c.name}`=VALUES(`{c.name}`)" for c in columns if not c.primary]
+        )
         with self.connection.cursor() as cursor:
             self._logger.debug(query)
             params = []
@@ -171,9 +177,11 @@ class MySqlTable:
 
     def _get_column_type(self, column: str) -> str:
         with self.connection.cursor(buffered=True) as cursor:
-            select = f"SELECT data_type FROM information_schema.COLUMNS " \
-                     f"WHERE table_schema = '{self.connection.database}' " \
-                     f"AND table_name = '{self.name}' " \
-                     f"AND column_name = '{column}'"
+            select = (
+                f"SELECT data_type FROM information_schema.COLUMNS "
+                f"WHERE table_schema = '{self.connection.database}' "
+                f"AND table_name = '{self.name}' "
+                f"AND column_name = '{column}'"
+            )
             cursor.execute(select)
             return cursor.fetchone()[0].upper()

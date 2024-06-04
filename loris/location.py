@@ -6,8 +6,8 @@
 
 """
 from __future__ import annotations
-import pytz as tz
 
+import pytz as tz
 from loris import LocalResourceException, LocalResourceUnavailableException
 
 
@@ -16,7 +16,6 @@ class LocationException(LocalResourceException):
     Raise if an error occurred accessing the location.
 
     """
-    pass
 
 
 class LocationUnavailableException(LocalResourceUnavailableException, LocationException):
@@ -24,7 +23,6 @@ class LocationUnavailableException(LocalResourceUnavailableException, LocationEx
     Raise if a configured location access can not be found.
 
     """
-    pass
 
 
 class Location:
@@ -49,16 +47,17 @@ class Location:
         Altitude from sea level in meters.
     """
 
-    SECTION = 'location'
+    SECTION = "location"
 
-    def __init__(self,
-                 latitude: float,
-                 longitude: float,
-                 timezone: str | tz.BaseTzInfo = tz.UTC,
-                 altitude: float = None,
-                 country: str = None,
-                 state: str = None):
-
+    def __init__(
+        self,
+        latitude: float,
+        longitude: float,
+        timezone: str | tz.BaseTzInfo = tz.UTC,
+        altitude: float = None,
+        country: str = None,
+        state: str = None,
+    ) -> None:
         self.latitude = latitude
         self.longitude = longitude
 
@@ -67,7 +66,7 @@ class Location:
         elif isinstance(timezone, tz.BaseTzInfo):
             self._timezone = timezone
         else:
-            raise TypeError('Invalid tz specification')
+            raise TypeError("Invalid tz specification")
 
         self._altitude = altitude
 
@@ -77,9 +76,8 @@ class Location:
         self.state = state
 
     def __repr__(self):
-        attrs = ['latitude', 'longitude', 'altitude', 'timezone']
-        return (f'\t{Location.SECTION}:\n  ' + '\t\n'.join(
-            f'{attr}: {str(getattr(self, attr))}' for attr in attrs))
+        attrs = ["latitude", "longitude", "altitude", "timezone"]
+        return f"\t{Location.SECTION}:\n" + "\t\n".join(f"{attr}: {str(getattr(self, attr))}" for attr in attrs)
 
     @property
     def timezone(self) -> tz.BaseTzInfo:
@@ -88,5 +86,5 @@ class Location:
     @property
     def altitude(self) -> float:
         if self._altitude is None:
-            return 0.
+            return 0.0
         return self._altitude

@@ -2,25 +2,24 @@
 """
     loris.channels.channel
     ~~~~~~~~~~~~~~~~~~~~~~
-    
-    
+
+
 """
 from __future__ import annotations
-from typing import Optional, Any
 
-import pytz as tz
-import pandas as pd
 import logging
-
-from copy import deepcopy
 from collections import OrderedDict
+from copy import deepcopy
+from typing import Any, Optional
+
+import pandas as pd
+import pytz as tz
+from loris.channels import ChannelConnector, ChannelState
 from loris.configs import ConfigurationException
-from loris.channels import ChannelState, ChannelConnector
-from loris.util import parse_id, _parse_freq, to_timedelta
+from loris.util import _parse_freq, parse_id, to_timedelta
 
 
 class Channel:
-
     _uuid: str
 
     logger: ChannelConnector
@@ -35,38 +34,40 @@ class Channel:
     # noinspection PyShadowingBuiltins
     def __init__(self, uuid: str = None, id: str = None, **configs: Any) -> None:
         if id is None:
-            raise ConfigurationException('Invalid configuration, missing specified channel ID')
+            raise ConfigurationException("Invalid configuration, missing specified channel ID")
 
-        _connector = configs.pop('connector', {})
+        _connector = configs.pop("connector", {})
         if isinstance(_connector, str):
-            _connector = {'connector': _connector}
+            _connector = {"connector": _connector}
         self.connector = ChannelConnector(**_connector)
 
-        _logger = configs.pop('logger', {})
+        _logger = configs.pop("logger", {})
         if isinstance(_logger, str):
-            _logger = {'connector': _logger}
+            _logger = {"connector": _logger}
         self.logger = ChannelConnector(**_logger)
 
         self._logger = logging.getLogger(__name__)
-        self._configs = OrderedDict({'id': parse_id(id), **configs})
-        if self._configs['id'] != id:
-            self._logger.warning(f'Value container ID contains invalid characters: {id}')
+        self._configs = OrderedDict({"id": parse_id(id), **configs})
+        if self._configs["id"] != id:
+            self._logger.warning(f"Value container ID contains invalid characters: {id}")
 
         self._uuid = uuid if uuid is not None else self.id
 
     def __repr__(self) -> str:
-        representation = 'Channel:\n\t' + '\n\t'.join(f'{key}: {str(val)}' for key, val in self._configs.items())
-        return representation + f'\n\ttimestamp: {str(self.timestamp)}' + \
-                                f'\n\tvalue: {str(self.value)}' + \
-                                f'\n\tstatus: {str(self.state)}'
+        return (
+            "Channel:\n\t" + "\n\t".join(f"{key}: {str(val)}" for key, val in self._configs.items()) +
+            f"\n\ttimestamp: {str(self.timestamp)}" +
+            f"\n\tvalue: {str(self.value)}" +
+            f"\n\tstatus: {str(self.state)}"
+        )
 
     def __contains__(self, attr):
-        return attr in ['id', 'timestamp', 'value', 'state', 'logger', 'connector'] + list(self._configs.keys())
+        return attr in ["id", "timestamp", "value", "state", "logger", "connector"] + list(self._configs.keys())
 
     def __getattr__(self, attr):
         # __getattr__ gets called when the item is not found via __getattribute__
         # To avoid recursion, call __getattribute__ directly to get components dict
-        configs = Channel.__getattribute__(self, '_configs')
+        configs = Channel.__getattribute__(self, "_configs")
         if attr in configs.keys():
             return configs[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
@@ -77,11 +78,11 @@ class Channel:
 
     @property
     def id(self) -> str:
-        return self._configs['id']
+        return self._configs["id"]
 
     @property
     def freq(self) -> Optional[str]:
-        for k in ['freq', 'frequency', 'resolution']:
+        for k in ["freq", "frequency", "resolution"]:
             if k in self._configs:
                 return _parse_freq(self._configs[k])
         return None
@@ -101,7 +102,7 @@ class Channel:
     @value.setter
     def value(self, value) -> None:
         self._value = value
-        self._timestamp = pd.Timestamp.now(tz.UTC).floor(freq='s')
+        self._timestamp = pd.Timestamp.now(tz.UTC).floor(freq="s")
         self._state = ChannelState.VALID
 
     @property
@@ -111,7 +112,7 @@ class Channel:
     @state.setter
     def state(self, state) -> None:
         self._value = None
-        self._timestamp = pd.Timestamp.now(tz.UTC).floor(freq='s')
+        self._timestamp = pd.Timestamp.now(tz.UTC).floor(freq="s")
         self._state = state
 
     def set(self, timestamp: pd.Timestamp, value: Any, state: str | ChannelState = ChannelState.VALID) -> None:
@@ -121,8 +122,8 @@ class Channel:
 
     def copy(self) -> Channel:
         configs = deepcopy(self._configs)
-        configs['logger'] = self.logger.copy()
-        configs['connector'] = self.connector.copy()
+        configs["logger"] = self.logger.copy()
+        configs["connector"] = self.connector.copy()
         return Channel(self.id, self._uuid, **configs)
 
     # noinspection PyProtectedMember

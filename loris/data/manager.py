@@ -2,33 +2,34 @@
 """
     loris.data.manager
     ~~~~~~~~~~~~~~~~~~
-    
-    
+
+
 """
 from __future__ import annotations
-from typing import Optional
 
-import os
-import pytz as tz
-import pandas as pd
 import datetime as dt
-
+import os
 from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor
-from loris import Configurations, Channels, Channel, ChannelState
+from typing import Optional
+
+import pandas as pd
+import pytz as tz
+from loris import Channel, Channels, ChannelState, Configurations
 from loris.connectors import ConnectorException
 from loris.connectors.tasks import ConnectTask, ReadTask, WriteTask
 from loris.data.context import DataContext
 
 
 class DataManager(DataContext):
-
     _executor: ThreadPoolExecutor
 
     def __init__(self, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(configs, *args, **kwargs)
-        self._executor = ThreadPoolExecutor(thread_name_prefix="DataManager",
-                                            max_workers=max(int((os.cpu_count() or 1) / 2), 1))
+        self._executor = ThreadPoolExecutor(
+            thread_name_prefix="DataManager",
+            max_workers=max(int((os.cpu_count() or 1) / 2), 1)
+        )
 
     def __enter__(self) -> DataManager:
         self.activate()
@@ -65,7 +66,7 @@ class DataManager(DataContext):
                 connect_future.result()
 
             except ConnectorException as e:
-                self._logger.warning(f"Error opening connector \"{e.connector.uuid}\": {e}")
+                self._logger.warning(f"Error opening connector '{e.connector.uuid}': {e}")
                 self._logger.exception(e)
                 e.connector.set_states(ChannelState.UNKNOWN_ERROR)
 
@@ -77,7 +78,7 @@ class DataManager(DataContext):
                 connector.disconnect()
 
             except Exception as e:
-                self._logger.warning(f"Error closing connector \"{uuid}\": {e}")
+                self._logger.warning(f"Error closing connector '{uuid}': {e}")
                 self._logger.exception(e)
             finally:
                 connector.set_states(ChannelState.DISCONNECTED)
@@ -93,10 +94,12 @@ class DataManager(DataContext):
     def notify(self, channels: Optional[Channels] = None) -> None:
         pass
 
-    def read(self, channels: Optional[Channels] = None,
-             start: Optional[pd.Timestamp, dt.datetime] = None,
-             end:   Optional[pd.Timestamp, dt.datetime] = None) -> pd.DataFrame:
-
+    def read(
+        self,
+        channels: Optional[Channels] = None,
+        start: Optional[pd.Timestamp, dt.datetime] = None,
+        end: Optional[pd.Timestamp, dt.datetime] = None,
+    ) -> pd.DataFrame:
         time = pd.Timestamp.now(tz=tz.UTC)
         if channels is None:
             channels = self.values()
@@ -119,19 +122,21 @@ class DataManager(DataContext):
 
                 def update_connector(read_channel: Channel) -> None:
                     read_channel.connector.timestamp = time
+
                 read_channels.apply(update_connector)
 
             except ConnectorException as e:
-                self._logger.warning(f"Error reading connector \"{e.connector.uuid}\": {e}")
+                self._logger.warning(f"Error reading connector '{e.connector.uuid}': {e}")
                 self._logger.exception(e)
 
                 def update_state(read_channel: Channel) -> None:
                     read_channel.state = ChannelState.UNKNOWN_ERROR
+
                 read_task = read_tasks[e.connector.uuid]
                 read_task.channels.apply(update_state)
 
         if len(read_data) > 0:
-            return pd.concat(read_data, axis='columns')
+            return pd.concat(read_data, axis="columns")
         return pd.DataFrame()
 
     def write(self, data: pd.DataFrame, channels: Optional[Channels] = None) -> None:
@@ -163,15 +168,17 @@ class DataManager(DataContext):
                 # noinspection PyShadowingNames
                 def update_connector(write_channel: Channel) -> None:
                     write_channel.connector.timestamp = time
+
                 write_task.channels.apply(update_connector)
 
             except ConnectorException as e:
-                self._logger.warning(f"Error writing connector \"{e.connector.uuid}\": {e}")
+                self._logger.warning(f"Error writing connector '{e.connector.uuid}': {e}")
                 self._logger.exception(e)
 
                 # noinspection PyShadowingNames
                 def update_state(write_channel: Channel) -> None:
                     write_channel.state = ChannelState.UNKNOWN_ERROR
+
                 write_task = write_tasks[e.connector.uuid]
                 write_task.channels.apply(update_state)
 
@@ -182,8 +189,10 @@ class DataManager(DataContext):
         log_tasks = {}
         log_futures = []
         for uuid, connector in self.connectors.items():
+
             def has_update(channel: Channel) -> bool:
                 return pd.isna(channel.logger.timestamp) or channel.logger.timestamp < channel.timestamp
+
             log_channels = channels.filter(lambda c: (c.has_logger(uuid) and has_update(c)))
             if len(log_channels) == 0:
                 continue
@@ -198,8 +207,9 @@ class DataManager(DataContext):
 
                 def update_logger(channel: Channel) -> None:
                     channel.logger.timestamp = channel.timestamp
+
                 log_task.channels.apply(update_logger)
 
             except ConnectorException as e:
-                self._logger.warning(f"Error logging connector \"{e.connector.uuid}\": {e}")
+                self._logger.warning(f"Error logging connector '{e.connector.uuid}': {e}")
                 self._logger.exception(e)

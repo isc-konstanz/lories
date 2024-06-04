@@ -1,29 +1,27 @@
 # -*- coding: utf-8 -*-
 """
     loris.system
-    ~~~~~~~~~~~~~
-    
-    
+    ~~~~~~~~~~~~
+
+
 """
 from __future__ import annotations
-from typing import Optional, List
 
 import os
-import pandas as pd
+from typing import List, Optional
 
-from loris import components
-from loris import Configurations, ConfigurationException, Location, LocationUnavailableException
-from loris.components import ComponentContext, Component, Weather, WeatherUnavailableException
-from loris.data.context import DataContext
+import pandas as pd
+from loris import ConfigurationException, Configurations, Location, LocationUnavailableException, components
+from loris.components import Component, ComponentContext, Weather, WeatherUnavailableException
 from loris.data import DataAccess
+from loris.data.context import DataContext
 from loris.util import parse_id
 
 components.register(Weather, Weather.TYPE)
 
 
 class System(Component, ComponentContext):
-
-    TYPE: str = 'system'
+    TYPE: str = "system"
 
     @classmethod
     def load(cls, context: DataContext, **kwargs) -> System:
@@ -35,28 +33,28 @@ class System(Component, ComponentContext):
         systems = []
         for system_dir in os.scandir(scan_dir):
             if os.path.isdir(system_dir.path):
-                kwargs['data_dir'] = system_dir.path
+                kwargs["data_dir"] = system_dir.path
                 systems.append(cls.load(context, **kwargs))
         return systems
 
     def __init__(self, context: DataContext, configs: Configurations, *args, **kwargs) -> None:
-        if 'id' in configs:
-            self._id = self._uuid = parse_id(configs.get('id'))
-            self._name = configs.get('name', default=configs.get('id'))
-        elif 'name' in configs:
-            self._id = self._uuid = parse_id(configs['id'] if 'id' in configs else configs['name'])
-            self._name = configs['name']
+        if "id" in configs:
+            self._id = self._uuid = parse_id(configs.get("id"))
+            self._name = configs.get("name", default=configs.get("id"))
+        elif "name" in configs:
+            self._id = self._uuid = parse_id(configs["id"] if "id" in configs else configs["name"])
+            self._name = configs["name"]
         else:
-            raise ConfigurationException('Invalid configuration, missing specified system ID')
+            raise ConfigurationException("Invalid configuration, missing specified system ID")
 
-        self.data = DataAccess(self, context, configs.get_section('data', default={}))
+        self.data = DataAccess(self, context, configs.get_section("data", default={}))
         super(Component, self).__init__(context, configs, *args, **kwargs)
 
     # noinspection PyShadowingNames
     def __getattr__(self, attr):
         # __getattr__ gets called when the item is not found via __getattribute__
         # To avoid recursion, call __getattribute__ directly to get components dict
-        components = ComponentContext.__getattribute__(self, '_components')
+        components = ComponentContext.__getattribute__(self, "_components")
         if attr in components.keys():
             return components[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no component '{attr}'")
@@ -64,7 +62,7 @@ class System(Component, ComponentContext):
     # noinspection PyProtectedMember
     def __configure__(self, configs: Configurations) -> None:
         super().__configure__(configs)
-        self._context.connectors._load_file(configs.dirs.conf, 'connectors.conf', self.uuid)
+        self._context.connectors._load_file(configs.dirs.conf, "connectors.conf", self.uuid)
 
         if configs.has_section(Location.SECTION):
             self._location = self.__localize__(configs.get_section(Location.SECTION))
@@ -73,12 +71,14 @@ class System(Component, ComponentContext):
 
     # noinspection PyMethodMayBeStatic
     def __localize__(self, configs: Configurations) -> Location:
-        return Location(configs.get_float('latitude'),
-                        configs.get_float('longitude'),
-                        timezone=configs.get('timezone', default='UTC'),
-                        altitude=configs.get_float('altitude', default=None),
-                        country=configs.get('country', default=None),
-                        state=configs.get('state', default=None))
+        return Location(
+            configs.get_float("latitude"),
+            configs.get_float("longitude"),
+            timezone=configs.get("timezone", default="UTC"),
+            altitude=configs.get_float("altitude", default=None),
+            country=configs.get("country", default=None),
+            state=configs.get("state", default=None),
+        )
 
     # noinspection PyUnresolvedReferences
     def activate(self) -> None:
@@ -95,14 +95,14 @@ class System(Component, ComponentContext):
     @property
     def location(self) -> Location:
         if not self._location:
-            raise LocationUnavailableException(f"System \"{self.name}\" has no location configured")
+            raise LocationUnavailableException(f"System '{self.name}' has no location configured")
         return self._location
 
     # noinspection PyTypeChecker
     @property
     def weather(self) -> Weather:
         if not self.has_component(Weather.TYPE):
-            raise WeatherUnavailableException(f"System \"{self.name}\" has no weather configured")
+            raise WeatherUnavailableException(f"System '{self.name}' has no weather configured")
         return self.get_component_type(Weather.TYPE)[0]
 
     def get_type(self):

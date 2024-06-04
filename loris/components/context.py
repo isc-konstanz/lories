@@ -1,24 +1,23 @@
 # -*- coding: utf-8 -*-
 """
     loris._components.context
-    ~~~~~~~~~~~~~~~~~~~~~~~~
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
 from __future__ import annotations
-from collections.abc import Mapping
-from typing import List, Iterator
 
 import os
 import re
-
 from collections import OrderedDict
-from loris import Configurations, Configurable
+from collections.abc import Mapping
+from typing import Iterator, List
+
+from loris import Configurable, Configurations
 from loris.components import Component, ComponentException, registry
 
 
 class ComponentContext(Configurable, Mapping[str, Component]):
-
     _components: OrderedDict[str, Component] = OrderedDict()
 
     def __init__(self, context, configs: Configurations, *args, **kwargs) -> None:
@@ -31,35 +30,38 @@ class ComponentContext(Configurable, Mapping[str, Component]):
         components = {}
         if os.path.isdir(configs_dir):
             for configs_entry in os.scandir(configs_dir):
-                if configs_entry.is_file() and configs_entry.path.endswith('.conf') \
-                        and not configs_entry.path.endswith('default.conf') \
-                        and not (configs_entry.path.endswith('results.conf') or
-                                 configs_entry.path.endswith('evaluations.conf')) \
-                        and configs_entry.name.startswith(tuple(self.get_types())):
+                if (configs_entry.is_file() and configs_entry.path.endswith('.conf')
+                        and not configs_entry.path.endswith('default.conf')
+                        and not (configs_entry.path.endswith('results.conf')
+                                 or configs_entry.path.endswith('evaluations.conf'))
+                        and configs_entry.name.startswith(tuple(self.get_types()))):
 
                     configs_dirs = self.configs.dirs.encode()
-                    configs_dirs['conf_dir'] = os.path.dirname(configs_entry.path)
+                    configs_dirs["conf_dir"] = os.path.dirname(configs_entry.path)
                     component = self._new(Configurations.load(configs_entry.name, **configs_dirs))
                     if component.is_enabled:
                         components[component.id] = component
 
             def convert(text: str) -> int | str:
                 return int(text) if text.isdigit() else text
-            self._components = OrderedDict(sorted(components.items(),
-                                                  key=lambda e: [convert(t) for t in re.split('([0-9]+)', e[0])]))
+
+            self._components = OrderedDict(
+                sorted(components.items(), key=lambda e: [convert(t) for t in re.split("([0-9]+)", e[0])])
+            )
 
     # noinspection SpellCheckingInspection
     def _new(self, configs: Configurations) -> Component:
-        if 'id' not in configs:
-            configs.set('id', os.path.splitext(configs.name)[0])
-            configs.move_to_top('id')
+        if "id" not in configs:
+            configs.set("id", os.path.splitext(configs.name)[0])
+            configs.move_to_top("id")
 
         registration_type = os.path.splitext(configs.name)[0]
         for registration in registry.types.values():
             if registration.is_alias(registration_type):
                 registration_type = registration.type
-                self._logger.debug(f"Using alias \"{','.join(registration.alias.keys())}\" "
-                             f"for component: {registration_type}")
+                self._logger.debug(
+                    f"Using alias \"{','.join(registration.alias.keys())}\" " f"for component: {registration_type}"
+                )
 
         if registration_type not in registry.types.keys():
             raise ComponentException(f"Invalid component type: {registration_type}")
@@ -101,7 +103,7 @@ class ComponentContext(Configurable, Mapping[str, Component]):
                 component.deactivate()
 
             except Exception as e:
-                self._logger.warning(f"Error deactivating component \"{component_id}\": {e}")
+                self._logger.warning(f"Error deactivating component '{component_id}': {e}")
                 self._logger.exception(e)
 
         self.__deactivate__()
@@ -117,6 +119,10 @@ class ComponentContext(Configurable, Mapping[str, Component]):
         return len(self.get_all(*types)) > 0
 
     def get_all(self, *types: str | type) -> List[Component] | Component:
-        return [component for component in self._components.values()
-                if (any(t.startswith(component.get_type()) for t in types if isinstance(t, str)) or
-                    any(isinstance(component, t) for t in types if isinstance(t, type)))]
+        return [
+            component for component in self._components.values()
+            if (
+                any(t.startswith(component.get_type()) for t in types if isinstance(t, str))
+                or any(isinstance(component, t) for t in types if isinstance(t, type))
+            )
+        ]

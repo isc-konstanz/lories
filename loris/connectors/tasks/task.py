@@ -6,15 +6,16 @@
 
 """
 from __future__ import annotations
+
+import logging
 from abc import ABC, abstractmethod
 from threading import Thread
+
 from loris.channels import Channels, ChannelState
-from loris.connectors import Connector, ConnectorException, ConnectionException
-import logging
+from loris.connectors import ConnectionException, Connector, ConnectorException
 
 
 class ConnectorTask(ABC, Thread):
-
     connector: Connector
     channels: Channels
 

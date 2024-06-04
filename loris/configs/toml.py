@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-    loris.core.configs.toml
-    ~~~~~~~~~~~~~~~~~~~~~~~
-    
-    
+    loris.configs.toml
+    ~~~~~~~~~~~~~~~~~~
+
+
 """
-from typing import Any
 from collections.abc import Mapping
+from typing import Any
+
 try:
     import tomllib as toml
 except ModuleNotFoundError:

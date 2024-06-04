@@ -2,17 +2,17 @@
 """
     loris.data.access
     ~~~~~~~~~~~~~~~~~
-    
-    
+
+
 """
 from __future__ import annotations
+
 from loris import Channel, Configurable, Configurations, ConfigurationUnavailableException
 from loris.data import DataMapping
 
 
 class DataAccess(Configurable, DataMapping):
-
-    SECTION: str = 'data'
+    SECTION: str = "data"
 
     def __init__(self, component, context, configs: Configurations, **channels: Channel) -> None:
         super().__init__(configs, **channels)
@@ -22,13 +22,13 @@ class DataAccess(Configurable, DataMapping):
     # noinspection PyProtectedMember
     def __configure__(self, configs: Configurations) -> None:
         try:
-            self._context.connectors._load(configs.get_section('connectors'), self._component.uuid)
+            self._context.connectors._load(configs.get_section("connectors"), self._component.uuid)
 
         except ConfigurationUnavailableException:
             self._logger.debug(f"No connectors configured for configuration: {configs.name}")
 
         try:
-            self._context._load(configs.get_section('channels'), self._component.uuid)
+            self._context._load(configs.get_section("channels"), self._component.uuid)
 
         except ConfigurationUnavailableException:
             self._logger.debug(f"No channels configured for configuration: {configs.name}")

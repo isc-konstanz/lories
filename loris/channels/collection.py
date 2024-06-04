@@ -2,23 +2,22 @@
 """
     loris.core.channel.collection
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    
-    
+
+
 """
 from __future__ import annotations
-from collections.abc import Collection
-from typing import Tuple, List, Iterator, Any
 
 import logging
-import pytz as tz
+from collections.abc import Collection
+from typing import Any, Iterator, List, Tuple
+
 import numpy as np
 import pandas as pd
-
+import pytz as tz
 from loris.channels import Channel
 
 
 class Channels(Collection[Channel]):
-
     _channels: List[Channel]
 
     def __init__(self, channels=()) -> None:
@@ -67,12 +66,14 @@ class Channels(Collection[Channel]):
             channel_data.name = channel_id
 
             if channel_data.index.tzinfo is None:
-                self._logger.warning(f"UTC will be presumed for channel \"{channel.uuid}\" timestamps, "
-                                     f"as tz-naive with tz-aware DatetimeIndex cannot be joined: {channel_data}")
+                self._logger.warning(
+                    f'UTC will be presumed for channel "{channel.uuid}" timestamps, '
+                    f"as tz-naive with tz-aware DatetimeIndex cannot be joined: {channel_data}"
+                )
                 channel_data.index = channel_data.index.tz_localize(tz.UTC)
 
             columns.append(channel_id)
             data.append(channel_data)
         if len(data) > 0:
-            return pd.concat(data, axis='columns', keys=columns)  # .dropna(axis='columns', how='all')
+            return pd.concat(data, axis="columns", keys=columns)  # .dropna(axis='columns', how='all')
         return pd.DataFrame(columns=columns)

@@ -2,22 +2,21 @@
 """
     loris.connectors.connector
     ~~~~~~~~~~~~~~~~~~~~~~~~~~
-    
-    
+
+
 """
 from __future__ import annotations
-from typing import Optional
+
+import datetime as dt
 from abc import ABC, abstractmethod
+from typing import Optional
 
 import pandas as pd
-import datetime as dt
-
-from loris import Channels, ChannelState, Configurable, Configurations, ConfigurationException, LocalResourceException
+from loris import Channels, ChannelState, Configurable, ConfigurationException, Configurations, LocalResourceException
 from loris.util import parse_id
 
 
 class Connector(ABC, Configurable):
-
     _uuid: str
     _id: str
 
@@ -28,11 +27,11 @@ class Connector(ABC, Configurable):
 
     def __init__(self, context, configs: Configurations, channels: Channels = None, *args, **kwargs) -> None:
         super().__init__(configs, *args, **kwargs)
-        if 'id' not in configs:
-            raise ConfigurationException('Invalid configuration, missing specified connector ID')
+        if "id" not in configs:
+            raise ConfigurationException("Invalid configuration, missing specified connector ID")
 
-        self._id = parse_id(configs.get('id'))
-        self._uuid = configs.pop('uuid') if 'uuid' in configs else self.id
+        self._id = parse_id(configs.get("id"))
+        self._uuid = configs.pop("uuid") if "uuid" in configs else self.id
         self._context = context
         self._channels = channels if channels is not None else Channels()
 
@@ -72,10 +71,12 @@ class Connector(ABC, Configurable):
         self.__disconnect__()
 
     @abstractmethod
-    def read(self,
-             channels: Channels,
-             start: Optional[pd.Timestamp, dt.datetime] = None,
-             end:   Optional[pd.Timestamp, dt.datetime] = None) -> None:
+    def read(
+        self,
+        channels: Channels,
+        start: Optional[pd.Timestamp, dt.datetime] = None,
+        end: Optional[pd.Timestamp, dt.datetime] = None,
+    ) -> None:
         pass
 
     @abstractmethod
@@ -104,4 +105,3 @@ class ConnectionException(ConnectorException, IOError):
     Raise if an error occurred with the connection.
 
     """
-

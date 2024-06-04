@@ -2,21 +2,20 @@
 """
     loris.data.mapping
     ~~~~~~~~~~~~~~~~~~
-    
-    
+
+
 """
 from __future__ import annotations
-from collections.abc import Mapping
+
 from collections import OrderedDict
+from collections.abc import Mapping
 from typing import Iterator
 
 import pandas as pd
-
 from loris import Channel, Channels
 
 
 class DataMapping(Mapping[str, Channel]):
-
     _channels: OrderedDict[str, Channel]
 
     def __init__(self, channels=(), *args, **kwargs) -> None:
@@ -24,7 +23,7 @@ class DataMapping(Mapping[str, Channel]):
         self._channels = OrderedDict(channels)
 
     def __getattr__(self, attr):
-        channels = DataMapping.__getattribute__(self, '_channels')
+        channels = DataMapping.__getattribute__(self, "_channels")
         if attr in channels.keys():
             return channels[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no channel '{attr}'")

@@ -2,18 +2,18 @@
 """
     loris.components.weather.connector
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    
-    
+
+
 """
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Any, Dict
 
 from loris import Configurations, Connector, Location
 
 
 class WeatherConnector(Connector, ABC):
-
     location: Location
 
     def __init__(self, context, configs: Configurations, location, *args, **kwargs) -> None:

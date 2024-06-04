@@ -39,7 +39,8 @@ dependencies = [
     "tomli >= 1.1.0; python_version < '3.11'",
     "numpy >= 1.16",
     "pandas >= 0.23",
-    "pytz >= 2019.1"
+    "pytz >= 2019.1",
+    "requests"
 ]
 
 [project.optional-dependencies]
@@ -75,3 +76,20 @@ tag_prefix = "v"
 
 [project.scripts]
 loris = "loris.__main__:main"
+
+[tool.autoflake]
+expand-star-imports = true
+remove-unused-variables = true
+ignore-init-module-imports = true
+remove-all-unused-imports = true
+
+[tool.isort]
+profile = "black"
+line_length = 120
+src_paths = ["loris"]
+known_first_party = ["loris", "numpy", "pandas", "pytz"]
+extra_standard_library = ["dateutil"]
+
+[tool.black]
+target-version = ["py39"]
+line-length = 120

@@ -2,27 +2,26 @@
 """
     loris.application
     ~~~~~~~~~~~~~~~~~
-    
-    
+
+
 """
 from __future__ import annotations
 
-import pytz as tz
-import pandas as pd
+from threading import Event, Thread
 
-from threading import Thread, Event
-from loris import Settings, System, Channel
-from loris.util import to_bool, to_timedelta, floor_date
+import pandas as pd
+import pytz as tz
+from loris import Channel, Settings, System
 from loris.data.manager import DataManager
+from loris.util import floor_date, to_bool, to_timedelta
 
 
 # noinspection PyUnresolvedReferences
-def load(name: str = 'Loris', **kwargs) -> Application:
+def load(name: str = "Loris", **kwargs) -> Application:
     return Application.load(Settings(name, **kwargs))
 
 
 class Application(DataManager, Thread):
-
     _interval: int
     _interrupt: Event = Event()
 
@@ -31,13 +30,13 @@ class Application(DataManager, Thread):
     def load(cls, settings: Settings):
         app = cls(settings)
 
-        systems_flat = to_bool(settings.get('system_flat', default=False))
+        systems_flat = to_bool(settings.get("system_flat", default=False))
         system_dirs = settings.dirs.encode()
-        system_dirs['conf_dir'] = None
-        if to_bool(settings.get('system_scan', default=False)):
-            if to_bool(settings.get('system_copy', default=False)):
+        system_dirs["conf_dir"] = None
+        if to_bool(settings.get("system_scan", default=False)):
+            if to_bool(settings.get("system_copy", default=False)):
                 System.copy(settings)
-            system_dirs['scan_dir'] = settings.dirs.data
+            system_dirs["scan_dir"] = settings.dirs.data
             for system in System.scan(app, **system_dirs, flat=systems_flat):
                 app.components._add(system)
         else:
@@ -52,7 +51,7 @@ class Application(DataManager, Thread):
 
     def __configure__(self, configs) -> None:
         super().__configure__(configs)
-        self._interval = configs.get_int('interval', default=1)
+        self._interval = configs.get_int("interval", default=1)
 
     def __eq__(self, other):
         return self is other
@@ -85,7 +84,7 @@ class Application(DataManager, Thread):
         self.read(*args, **kwargs)
         self._run(*args, **kwargs)
 
-        interval = f'{self._interval}s'
+        interval = f"{self._interval}s"
         while not self._interrupt.is_set():
             try:
                 now = pd.Timestamp.now(tz.UTC)
@@ -124,7 +123,7 @@ class Application(DataManager, Thread):
                 system.run(*args, **kwargs)
 
             except Exception as e:
-                self._logger.warning(f"Error running system \"{system.id}\":", str(e))
+                self._logger.warning(f"Error running system '{system.id}':", str(e))
 
 
 # noinspection PyShadowingBuiltins

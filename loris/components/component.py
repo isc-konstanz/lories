@@ -6,22 +6,21 @@
 
 """
 from __future__ import annotations
-from abc import ABC, abstractmethod
-from typing import Optional
 
 import os
-import pandas as pd
 import datetime as dt
-
+from abc import ABC, abstractmethod
 from shutil import copytree, ignore_patterns
-from loris import Settings, LocalResourceException, LocalResourceUnavailableException
-from loris.configs import Configurable, Configurations, ConfigurationException
+from typing import Optional
+
+import pandas as pd
+from loris import LocalResourceException, LocalResourceUnavailableException, Settings
+from loris.configs import Configurable, ConfigurationException, Configurations
 from loris.data import DataAccess
 from loris.util import parse_id, to_date
 
 
 class Component(ABC, Configurable):
-
     _uuid: str
 
     _id: str
@@ -33,11 +32,11 @@ class Component(ABC, Configurable):
     @classmethod
     def copy(cls, settings: Settings) -> bool:
         configs = Configurations(f"{cls.__name__.lower()}.conf", **settings.dirs.encode())
-        if 'id' in configs:
-            id = parse_id(configs['id'])
-        elif 'name' in configs:
-            id = parse_id(configs['name'])
-            configs['id'] = id
+        if "id" in configs:
+            id = parse_id(configs["id"])
+        elif "name" in configs:
+            id = parse_id(configs["name"])
+            configs["id"] = id
         else:
             raise ValueError("Invalid configuration, missing specified system name")
 
@@ -47,26 +46,30 @@ class Component(ABC, Configurable):
             return False
         os.makedirs(configs.dirs.data, exist_ok=True)
 
-        copytree(settings.dirs.conf,
-                 configs.dirs.conf,
-                 ignore=ignore_patterns('*.default.conf',
-                                        'evaluations*',
-                                        'results*',
-                                        'settings*',
-                                        'logging*'))
+        copytree(
+            settings.dirs.conf,
+            configs.dirs.conf,
+            ignore=ignore_patterns(
+                "*.default.conf",
+                "evaluations*",
+                "results*",
+                "settings*",
+                "logging*"
+            ),
+        )
         return True
 
     # noinspection PyProtectedMember
     def __init__(self, context, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(configs, *args, **kwargs)
-        if 'id' in configs:
-            self._id = parse_id(configs.get('id'))
-            self._name = configs.get('name', default=configs.get('id'))
-        elif 'name' in configs:
-            self._id = parse_id(configs['id'] if 'id' in configs else configs['name'])
-            self._name = configs['name']
+        if "id" in configs:
+            self._id = parse_id(configs.get("id"))
+            self._name = configs.get("name", default=configs.get("id"))
+        elif "name" in configs:
+            self._id = parse_id(configs["id"] if "id" in configs else configs["name"])
+            self._name = configs["name"]
         else:
-            raise ConfigurationException('Invalid configuration, missing specified component ID')
+            raise ConfigurationException("Invalid configuration, missing specified component ID")
 
         self._uuid = self._id if not isinstance(context, Component) else f"{context._uuid}.{configs['id']}"
         self._context = context
@@ -122,11 +125,12 @@ class Component(ABC, Configurable):
         pass
 
     # noinspection PyShadowingBuiltins
-    def get(self,
-            start:  Optional[pd.Timestamp, dt.datetime, str] = None,
-            end:    Optional[pd.Timestamp, dt.datetime, str] = None,
-            **kwargs) -> pd.DataFrame:
-
+    def get(
+        self,
+        start: Optional[pd.Timestamp, dt.datetime, str] = None,
+        end: Optional[pd.Timestamp, dt.datetime, str] = None,
+        **kwargs,
+    ) -> pd.DataFrame:
         data = self.data.to_frame()
         if start is not None:
             start = to_date(start, **kwargs)
@@ -159,7 +163,6 @@ class ComponentException(LocalResourceException):
     Raise if an error occurred accessing the component.
 
     """
-    pass
 
 
 class ComponentUnavailableException(LocalResourceUnavailableException, ComponentException):
@@ -167,4 +170,3 @@ class ComponentUnavailableException(LocalResourceUnavailableException, Component
     Raise if an accessed component can not be found.
 
     """
-    pass

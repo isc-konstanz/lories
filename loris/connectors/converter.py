@@ -2,6 +2,6 @@
 """
     loris.connectors.converter
     ~~~~~~~~~~~~~~~~~~~~~~~~~~
-    
-    
+
+
 """
