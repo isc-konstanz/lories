@@ -8,7 +8,7 @@
 from collections import OrderedDict
 from typing import Any, Dict
 
-from loris.components.weather import WEATHER_NAMES as CHANNEL_NAMES
+from loris.components.weather import WEATHER as CHANNEL_NAMES
 from loris.components.weather import Weather
 
 CHANNEL_IDS = [

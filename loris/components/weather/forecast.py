@@ -1,12 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-    loris.weather.forecast
-    ~~~~~~~~~~~~~~~~~~~~~~
+    loris.components.weather.forecast
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    This module provides the :class:`loris.weather.WeatherForecast`, used as reference to
-    calculate e.g. photovoltaic installations generated power. The provided environmental data
-    contains temperatures and horizontal solar irradiation, which can be used, to calculate the
-    effective irradiance on defined, tilted photovoltaic systems.
 
 """
 from __future__ import annotations
@@ -16,22 +12,29 @@ import datetime as dt
 import pandas as pd
 import pytz as tz
 from loris import Configurations
-from loris.components.weather import WeatherBase, WeatherConnector, WeatherException
+from loris.components import Component
+from loris.components.weather.connector import WeatherConnector
 from loris.util import floor_date, to_date, to_int
 
 
-class WeatherForecast(WeatherBase):
+class WeatherForecast(Component):
+    TYPE: str = "weather_forecast"
     SECTION: str = "forecast"
+
+    connector: WeatherConnector
 
     def __init__(self, context, connector: WeatherConnector, configs: Configurations) -> None:
         super().__init__(context, configs)
-        self._connector = connector
+        self.connector = connector
 
     # noinspection PyProtectedMember
     def __configure__(self, configs: Configurations) -> None:
         super().__configure__(configs)
         self.interval = to_int(configs.get("interval", default=60))
         self.offset = to_int(configs.get("offset", default=0))
+
+    def get_type(self) -> str:
+        return self.TYPE
 
     def get(
         self,

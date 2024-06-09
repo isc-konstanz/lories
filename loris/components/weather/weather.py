@@ -11,12 +11,20 @@
 """
 from __future__ import annotations
 
+import datetime as dt
+import pandas as pd
+import pytz as tz
+
+from typing import Optional
 from loris import Configurations, Location
-from loris.components.weather import WeatherBase, WeatherException, WeatherForecast
+from loris.components import Component, ComponentException, ComponentUnavailableException
+from loris.components.weather import WeatherConnector, WeatherForecast
 
 
 # noinspection SpellCheckingInspection
-class Weather(WeatherBase):
+class Weather(Component):
+    TYPE = "weather"
+
     GHI = "ghi"
     DNI = "dni"
     DHI = "dhi"
@@ -43,28 +51,46 @@ class Weather(WeatherBase):
 
     location: Location
 
-    _forecast: WeatherForecast = None
+    _forecast: Optional[WeatherForecast] = None
+    _connector: Optional[WeatherConnector] = None
 
     # noinspection PyProtectedMember
     def __configure__(self, configs: Configurations) -> None:
         super().__configure__(configs)
-        self.__localize__(configs.get_section(Location.SECTION))
+        self.__localize__(configs)
 
         connector_configs = configs.copy()
         connector_configs["id"] = connector_configs.get("type").lower()
         connector_configs["uuid"] = f"{self._uuid}.{connector_configs['id']}"
         connector_configs.pop("data", None)
-        connector_context = self._context._context.connectors
-        connector = self._load_connector(connector_context, connector_configs, self.location)
-        connector_context._add(connector)
-        self._connector = connector
-        self._connector.configure()
-        self._configs.update(self._connector._get_config_defaults(), replace=False)
+        connector_context = self._context.context.connectors
 
-        if connector.has_forecast() and self._configs.has_section(WeatherForecast.SECTION):
-            self._configs[WeatherForecast.SECTION]["id"] = f"{self.id}.forecast"
-            self._forecast = WeatherForecast(self._context, connector, configs.get_section(WeatherForecast.SECTION))
-            self._forecast.configure()
+        connector_type = configs.get("type", default="default").lower()
+        if connector_type in ["default", "virtual"]:
+            self._connector = None
+        elif connector_type in ["brightsky", "dwd"]:
+            from .dwd import Brightsky
+            self._connector = Brightsky(connector_context, connector_configs, self.location)
+
+        elif connector_type in ["meteoblue", "nmm"]:
+            from .meteoblue import Meteoblue
+            self._connector = Meteoblue(connector_context, connector_configs, self.location)
+
+        if self._connector is not None:
+            connector_context._add(self._connector)
+            self._connector.configure()
+            self._configs.update(self._connector._get_config_defaults(), replace=False)
+
+            if self._connector.has_forecast() and self._configs.has_section(WeatherForecast.SECTION):
+                self._configs[WeatherForecast.SECTION]["id"] = f"{self.id}.forecast"
+                self._forecast = WeatherForecast(
+                    self._context,
+                    self._connector,
+                    configs.get_section(WeatherForecast.SECTION)
+                )
+                self._forecast.configure()
+
+        # TODO: configure default channels
 
     # noinspection PyMethodMayBeStatic
     def __localize__(self, configs: Configurations) -> None:
@@ -75,13 +101,14 @@ class Weather(WeatherBase):
             self.location = location
 
         elif configs.has_section(Location.SECTION):
+            location_configs = configs.get_section(Location.SECTION)
             self.location = Location(
-                configs.get_float("latitude"),
-                configs.get_float("longitude"),
-                timezone=configs.get("timezone", default="UTC"),
-                altitude=configs.get_float("altitude", default=None),
-                country=configs.get("country", default=None),
-                state=configs.get("state", default=None),
+                location_configs.get_float("latitude"),
+                location_configs.get_float("longitude"),
+                timezone=location_configs.get("timezone", default="UTC"),
+                altitude=location_configs.get_float("altitude", default=None),
+                country=location_configs.get("country", default=None),
+                state=location_configs.get("state", default=None),
             )
         else:
             raise WeatherException(f"Unable to find valid location for weather configuration: {self.configs.name}")
@@ -99,3 +126,66 @@ class Weather(WeatherBase):
         if not self._forecast:
             raise WeatherException(f"Weather '{self.name}' has no forecast configured")
         return self._forecast
+
+    @property
+    def connector(self) -> WeatherConnector:
+        if not self._connector:
+            raise WeatherException(f"Weather '{self.name}' has no connector available")
+        return self._connector
+
+    def get_type(self) -> str:
+        return self.TYPE
+
+    def get(
+        self,
+        start: pd.Timestamp | dt.datetime = None,
+        end: pd.Timestamp | dt.datetime = None,
+        **kwargs
+    ) -> pd.DataFrame:
+        """
+        Retrieves the weather data for a specified time interval
+
+        :param start:
+            the start timestamp for which weather data will be looked up for.
+            For many applications, passing datetime.datetime.now() will suffice.
+        :type start:
+            :class:`pandas.Timestamp` or datetime
+
+        :param end:
+            the end timestamp for which weather data will be looked up for.
+        :type end:
+            :class:`pandas.Timestamp` or datetime
+
+        :returns:
+            the weather data, indexed in a specific time interval.
+
+        :rtype:
+            :class:`pandas.DataFrame`
+        """
+        return self._get_range(self.data.to_frame(), start, end)
+
+    @staticmethod
+    def _get_range(
+        data: pd.DataFrame,
+        start: pd.Timestamp | dt.datetime,
+        end: pd.Timestamp | dt.datetime
+    ) -> pd.DataFrame:
+        if start is not None:
+            data = data[data.index >= start]
+        if end is not None:
+            data = data[data.index <= end]
+        return data
+
+
+class WeatherException(ComponentException):
+    """
+    Raise if an error occurred accessing the weather.
+
+    """
+
+
+class WeatherUnavailableException(ComponentUnavailableException, WeatherException):
+    """
+    Raise if a configured weather access can not be found.
+
+    """
