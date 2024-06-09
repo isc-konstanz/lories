@@ -7,6 +7,8 @@
 """
 from __future__ import annotations
 
+from typing import Any
+
 from loris import Channel, Configurable, Configurations, ConfigurationUnavailableException
 from loris.data import DataMapping
 
@@ -33,11 +35,11 @@ class DataAccess(Configurable, DataMapping):
         except ConfigurationUnavailableException:
             self._logger.debug(f"No channels configured for configuration: {configs.name}")
 
-    # noinspection PyProtectedMember
-    def add(self, channel: Channel | Configurations) -> None:
-        channel_id = f"{self._component.uuid}.{channel._configs['id']}"
-        self._context._add(channel_id, channel)
-        self._add(self._context._add.get(channel_id))
+    # noinspection PyProtectedMember, PyShadowingBuiltins
+    def add(self, id: str, **configs: Any) -> None:
+        channel = Channel(uuid=f"{self._component.uuid}.{id}", id=id, **configs)
+        self._context._add(channel)
+        self._add(channel)
 
     def _add(self, channel: Channel) -> None:
         self._channels[channel.id] = channel
