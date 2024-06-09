@@ -16,7 +16,7 @@ types = {}
 def register(cls: type, type: str, factory: callable = None, replace: bool = False) -> None:
     if type in types and not replace:
         raise ConnectorException(f"Connector '{type}' does already exist: {types[type].name}")
-    types[type] = ConnectorRegistration(cls, type, factory)
+    types[type] = ConnectorRegistration(cls, type, factory=factory)
 
 
 # noinspection PyShadowingBuiltins

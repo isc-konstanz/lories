@@ -47,20 +47,21 @@ class Configurations(MutableMapping[str, Any]):
                 config_default = conf_path.replace(".conf", ".default.conf")
                 if os.path.isfile(config_default):
                     shutil.copy(config_default, conf_path)
-                elif require:
-                    raise ConfigurationUnavailableException(f'Invalid configuration file "{conf_path}"')
         elif require:
             raise ConfigurationUnavailableException(f"Invalid configuration directory: {conf_dirs.conf}")
 
-        configs = cls._load(conf_path)
-        return cls(conf_file, conf_path, conf_dirs, configs, **kwargs)
+        configs = cls(conf_file, conf_path, conf_dirs, **kwargs)
+        if os.path.isfile(conf_path):
+            configs._load(conf_path)
+        elif require:
+            raise ConfigurationUnavailableException(f'Invalid configuration file "{conf_path}"')
+        return configs
 
-    @staticmethod
-    def _load(conf_path: str):
+    def _load(self, conf_path: str) -> None:
         # TODO: Implement other configuration parsers
         from .toml import load_toml
 
-        return load_toml(conf_path)
+        self.update(load_toml(conf_path))
 
     def __init__(
         self,

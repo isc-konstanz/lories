@@ -27,10 +27,8 @@ class Settings(Configurations):
         conf_dirs = Directories(**{d: kwargs.pop(d, None) for d in Directories.KEYS})
         conf_path = os.path.join(conf_dirs.conf, app_file)
 
-        if os.path.isfile(conf_path):
-            kwargs.update(self._load(conf_path))
-
         super().__init__(app_file, conf_path, conf_dirs, **kwargs)
+        self._load(conf_path)
         self.application = app_name
 
         self.dirs.join(self)

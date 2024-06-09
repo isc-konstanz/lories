@@ -7,6 +7,8 @@
 """
 from __future__ import annotations
 
+from typing import Optional
+
 import pytz as tz
 from loris import LocalResourceException, LocalResourceUnavailableException
 
@@ -54,17 +56,18 @@ class Location:
         latitude: float,
         longitude: float,
         timezone: str | tz.BaseTzInfo = tz.UTC,
-        altitude: float = None,
-        country: str = None,
-        state: str = None,
+        altitude: Optional[float] = None,
+        country: Optional[str] = None,
+        state: Optional[str] = None
     ) -> None:
         self.latitude = latitude
         self.longitude = longitude
-
         if isinstance(timezone, str):
             self._timezone = tz.timezone(timezone)
         elif isinstance(timezone, tz.BaseTzInfo):
             self._timezone = timezone
+        elif isinstance(timezone, (int, float)):
+            self._timezone = tz.FixedOffset(timezone*60)
         else:
             raise TypeError("Invalid tz specification")
 
@@ -77,7 +80,7 @@ class Location:
 
     def __repr__(self):
         attrs = ["latitude", "longitude", "altitude", "timezone"]
-        return f"\t{Location.SECTION}:\n" + "\t\n".join(f"{attr}: {str(getattr(self, attr))}" for attr in attrs)
+        return f"\t{Location.SECTION}: \n" + "\t\n".join(f"{attr}: {str(getattr(self, attr))}" for attr in attrs)
 
     @property
     def timezone(self) -> tz.BaseTzInfo:

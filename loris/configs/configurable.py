@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import logging
 
-from .configurations import Configurations
+from loris import LocalResourceException
+from loris.configs import Configurations
 
 
 class Configurable:
@@ -23,7 +24,7 @@ class Configurable:
             self._logger.debug(self)
 
     def __repr__(self) -> str:
-        representation = f"{type(self).__name__}:\n"
+        representation = f"{type(self).__name__}: \n"
         for attr in dir(self):
             if attr.startswith("_") or attr.isupper():
                 continue
@@ -34,7 +35,7 @@ class Configurable:
                 if isinstance(value, Configurable):
                     value = type(value).__name__
                 representation += f"\t{attr} = {value}\n"
-            except AttributeError:
+            except (LocalResourceException, AttributeError):
                 pass
         return representation + f"\tenabled = {self.is_enabled()}\n"
 
