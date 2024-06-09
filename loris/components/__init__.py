@@ -23,6 +23,3 @@ from .weather import (
     WeatherException,
     WeatherUnavailableException
 )
-
-from . import system  # noqa: F401
-from .system import System  # noqa: F401

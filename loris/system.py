@@ -23,6 +23,8 @@ components.register(Weather, Weather.TYPE)
 class System(Component, ComponentContext):
     TYPE: str = "system"
 
+    _location: Location = None
+
     @classmethod
     def load(cls, context: DataContext, **kwargs) -> System:
         return cls(context, Configurations.load(f"{cls.__name__.lower()}.conf", **kwargs))
@@ -62,23 +64,21 @@ class System(Component, ComponentContext):
     # noinspection PyProtectedMember
     def __configure__(self, configs: Configurations) -> None:
         super().__configure__(configs)
+        self.__localize__(configs)
         self._context.connectors._load_file(configs.dirs.conf, "connectors.conf", self.uuid)
 
-        if configs.has_section(Location.SECTION):
-            self._location = self.__localize__(configs.get_section(Location.SECTION))
-        else:
-            self._location = None
-
     # noinspection PyMethodMayBeStatic
-    def __localize__(self, configs: Configurations) -> Location:
-        return Location(
-            configs.get_float("latitude"),
-            configs.get_float("longitude"),
-            timezone=configs.get("timezone", default="UTC"),
-            altitude=configs.get_float("altitude", default=None),
-            country=configs.get("country", default=None),
-            state=configs.get("state", default=None),
-        )
+    def __localize__(self, configs: Configurations) -> None:
+        if configs.has_section(Location.SECTION):
+            location_configs = configs.get_section(Location.SECTION)
+            self._location = Location(
+                location_configs.get_float("latitude"),
+                location_configs.get_float("longitude"),
+                timezone=location_configs.get("timezone", default="UTC"),
+                altitude=location_configs.get_float("altitude", default=None),
+                country=location_configs.get("country", default=None),
+                state=location_configs.get("state", default=None),
+            )
 
     # noinspection PyUnresolvedReferences
     def activate(self) -> None:

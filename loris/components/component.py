@@ -22,9 +22,10 @@ from loris.util import parse_id, to_date
 
 class Component(ABC, Configurable):
     _uuid: str
-
     _id: str
     _name: str
+
+    data: DataAccess
 
     _active: bool = False
 
@@ -74,11 +75,7 @@ class Component(ABC, Configurable):
         self._uuid = self._id if not isinstance(context, Component) else f"{context._uuid}.{configs['id']}"
         self._context = context
 
-        self.data = DataAccess(self, context._context, configs.get_section(DataAccess.SECTION, default={}))
-
-    def __configure__(self, configs: Configurations) -> None:
-        super().__configure__(configs)
-        self.data.configure()
+        self.data = DataAccess(self, context.context, configs.get_section(DataAccess.SECTION, default={}))
 
     def __activate__(self) -> None:
         pass
@@ -97,6 +94,14 @@ class Component(ABC, Configurable):
     def __repr__(self) -> str:
         return super().__repr__() + f"\tactive = {self.is_active()}\n"
 
+    # noinspection SpellCheckingInspection
+    def configure(self) -> None:
+        super().configure()
+
+        # Configure DataAccess object outsite of __configure__, to allow channel configuration in inherited functions
+        self.data.configs.update(self.configs.get_section(self.data.SECTION, default={}), replace=False)
+        self.data.configure()
+
     @property
     def uuid(self) -> str:
         return self._uuid
@@ -110,7 +115,7 @@ class Component(ABC, Configurable):
     #     self._id = re.sub('[^A-Za-z0-9_]+', '', s.translate({ord(c): "_" for c in INVALID_CHARS}))
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name
 
     # @name.setter
@@ -119,6 +124,10 @@ class Component(ABC, Configurable):
     #         self._name = s
     #     else:
     #         self._name = re.sub('[^0-9A-Za-zäöüÄÖÜß%&;:()\- ]+', '', s)
+
+    @property
+    def context(self):
+        return self._context
 
     @abstractmethod
     def get_type(self) -> str:

@@ -50,9 +50,11 @@ from .components.weather import Weather  # noqa: F401
 from .components import (  # noqa: F401
     Component,
     ComponentException,
-    ComponentUnavailableException,
-    System
+    ComponentUnavailableException
 )
+
+from . import system  # noqa: F401
+from .system import System  # noqa: F401
 
 from . import io  # noqa: F401
 

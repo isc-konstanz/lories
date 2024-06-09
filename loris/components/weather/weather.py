@@ -47,18 +47,8 @@ class Weather(WeatherBase):
 
     # noinspection PyProtectedMember
     def __configure__(self, configs: Configurations) -> None:
-        # Do not call super __configure__ to avoid data channels to be configured, before the
-        # local connector object is instanced
-        if hasattr(self._context, "location"):
-            location = getattr(self._context, "location")
-            if not isinstance(location, Location):
-                raise WeatherException(f"Invalid location type for weather '{self._uuid}': {type(location)}")
-            self.location = location
-
-        elif configs.has_section(Location.SECTION):
-            self.location = self.__localize__(configs.get_section(Location.SECTION))
-        else:
-            raise WeatherException(f"Unable to find valid location for weather configuration: {self.configs.name}")
+        super().__configure__(configs)
+        self.__localize__(configs.get_section(Location.SECTION))
 
         connector_configs = configs.copy()
         connector_configs["id"] = connector_configs.get("type").lower()
@@ -76,19 +66,25 @@ class Weather(WeatherBase):
             self._forecast = WeatherForecast(self._context, connector, configs.get_section(WeatherForecast.SECTION))
             self._forecast.configure()
 
-        self.data.configs.update(self.configs.get_section(self.data.SECTION, default={}), replace=False)
-        self.data.configure()
-
     # noinspection PyMethodMayBeStatic
-    def __localize__(self, configs: Configurations) -> Location:
-        return Location(
-            configs.get_float("latitude"),
-            configs.get_float("longitude"),
-            timezone=configs.get("timezone", default="UTC"),
-            altitude=configs.get_float("altitude", default=None),
-            country=configs.get("country", default=None),
-            state=configs.get("state", default=None),
-        )
+    def __localize__(self, configs: Configurations) -> None:
+        if hasattr(self._context, "location"):
+            location = getattr(self._context, "location")
+            if not isinstance(location, Location):
+                raise WeatherException(f"Invalid location type for weather '{self._uuid}': {type(location)}")
+            self.location = location
+
+        elif configs.has_section(Location.SECTION):
+            self.location = Location(
+                configs.get_float("latitude"),
+                configs.get_float("longitude"),
+                timezone=configs.get("timezone", default="UTC"),
+                altitude=configs.get_float("altitude", default=None),
+                country=configs.get("country", default=None),
+                state=configs.get("state", default=None),
+            )
+        else:
+            raise WeatherException(f"Unable to find valid location for weather configuration: {self.configs.name}")
 
     def __activate__(self) -> None:
         super().__activate__()

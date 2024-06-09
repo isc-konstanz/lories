@@ -1,19 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-    loris._components.context
-    ~~~~~~~~~~~~~~~~~~~~~~~~~
+    loris.components.context
+    ~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
 from __future__ import annotations
 
+import itertools
 import os
 import re
+from copy import deepcopy
 from collections import OrderedDict
 from collections.abc import Mapping
 from typing import Iterator, List
 
-from loris import Configurable, Configurations
+from loris import Configurable, Configurations, Directories
 from loris.components import Component, ComponentException, registry
 
 
@@ -23,31 +25,65 @@ class ComponentContext(Configurable, Mapping[str, Component]):
     def __init__(self, context, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(configs, *args, **kwargs)
         self._context = context
-        self._load_dir(configs.dirs.cmpt)
+        self._load(configs)
 
     # noinspection PyTypeChecker, PyProtectedMember, PyUnresolvedReferences
-    def _load_dir(self, configs_dir: str) -> None:
+    def _load(self, configs) -> None:
+        components = {}
+        component_defaults = {}
+        if 'components' in configs:
+            components_section = configs.get_section('components')
+            component_ids = [
+                i for i in components_section.keys() if (isinstance(components_section[i], Mapping) and i != "data")
+            ]
+            component_defaults.update(components_section.pop('data', {}))
+
+            for component_id in component_ids:
+                component_file = f"{component_id}.conf"
+                component_section = deepcopy(component_defaults)
+                component_section.update(components_section.get(component_id))
+                component_configs = Configurations.load(
+                    component_file,
+                    **configs.dirs.encode(),
+                    **component_section,
+                    require=False
+                )
+                component = self._new(component_configs)
+                if component.is_enabled():
+                    components[component.id] = component
+        components.update(self._load_dir(configs.dirs.cmpt, component_defaults))
+
+        def convert(text: str) -> int | str:
+            return int(text) if text.isdigit() else text
+
+        self._components = OrderedDict(
+            sorted(components.items(), key=lambda e: [convert(t) for t in re.split("([0-9]+)", e[0])])
+        )
+
+    # noinspection PyTypeChecker, PyProtectedMember, PyUnresolvedReferences
+    def _load_dir(self, configs_dir: str, config_defaults: Optional[Mapping[str, Any]]) -> Mapping[str, Component]:
         components = {}
         if os.path.isdir(configs_dir):
+            config_types = tuple(itertools.chain(*[[t.type, *t.alias] for t in registry.types.values()]))
             for configs_entry in os.scandir(configs_dir):
                 if (configs_entry.is_file() and configs_entry.path.endswith('.conf')
                         and not configs_entry.path.endswith('default.conf')
                         and not (configs_entry.path.endswith('results.conf')
                                  or configs_entry.path.endswith('evaluations.conf'))
-                        and configs_entry.name.startswith(tuple(self.get_types()))):
+                        and configs_entry.name.startswith(config_types)):
 
                     configs_dirs = self.configs.dirs.encode()
                     configs_dirs["conf_dir"] = os.path.dirname(configs_entry.path)
-                    component = self._new(Configurations.load(configs_entry.name, **configs_dirs))
-                    if component.is_enabled:
+                    component_configs = Configurations.load(
+                        configs_entry.name,
+                        **configs_dirs,
+                        **config_defaults
+                    )
+                    component = self._new(component_configs)
+                    if component.is_enabled():
                         components[component.id] = component
 
-            def convert(text: str) -> int | str:
-                return int(text) if text.isdigit() else text
-
-            self._components = OrderedDict(
-                sorted(components.items(), key=lambda e: [convert(t) for t in re.split("([0-9]+)", e[0])])
-            )
+        return components
 
     # noinspection SpellCheckingInspection
     def _new(self, configs: Configurations) -> Component:
