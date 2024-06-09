@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from threading import Event, Thread
+from typing import Type
 
 import pandas as pd
 import pytz as tz
@@ -27,7 +28,7 @@ class Application(DataManager, Thread):
 
     # noinspection PyProtectedMember
     @classmethod
-    def load(cls, settings: Settings):
+    def load(cls, settings: Settings, factory: Type[System] = System) -> Application:
         app = cls(settings)
 
         systems_flat = to_bool(settings.get("system_flat", default=False))
@@ -35,12 +36,12 @@ class Application(DataManager, Thread):
         system_dirs["conf_dir"] = None
         if to_bool(settings.get("system_scan", default=False)):
             if to_bool(settings.get("system_copy", default=False)):
-                System.copy(settings)
+                factory.copy(settings)
             system_dirs["scan_dir"] = settings.dirs.data
-            for system in System.scan(app, **system_dirs, flat=systems_flat):
+            for system in factory.scan(app, **system_dirs, flat=systems_flat):
                 app.components._add(system)
         else:
-            app.components._add(System.load(app, **system_dirs, flat=systems_flat))
+            app.components._add(factory.load(app, **system_dirs, flat=systems_flat))
         app.configure()
         return app
 
@@ -123,7 +124,7 @@ class Application(DataManager, Thread):
                 system.run(*args, **kwargs)
 
             except Exception as e:
-                self._logger.warning(f"Error running system '{system.id}':", str(e))
+                self._logger.warning(f"Error running system '{system.id}': ", str(e))
 
 
 # noinspection PyShadowingBuiltins

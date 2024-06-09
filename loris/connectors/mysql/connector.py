@@ -84,7 +84,8 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
         self._tables = self._load_tables(channels)
 
     def __disconnect__(self) -> None:
-        self._connection.close()
+        if self._connection is not None:
+            self._connection.close()
 
     def _load_tables(self, channels: Channels) -> Dict[str, MySqlTable]:
         tables = {}
