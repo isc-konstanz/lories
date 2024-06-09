@@ -210,7 +210,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
     ) -> None:
         for table_name, table_channels in channels.groupby("table"):
             if table_name not in self._tables:
-                raise ConnectorException(f'Table "{table_name}" not available', connector=self)
+                raise ConnectorException(f"Table '{table_name}' not available", connector=self)
 
             table_columns = [c.id if "column" not in c else c.column for c in table_channels]
             table = self.get(table_name)
@@ -240,13 +240,13 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
                 else:
                     table_channel.state = ChannelState.NOT_AVAILABLE
                     self._logger.warning(
-                        f'Unable to read nonexisting column of table "{table_name}": {table_channel_column}'
+                        f"Unable to read nonexisting column of table '{table_name}': {table_channel_column}"
                     )
 
     def write(self, channels: Channels) -> None:
         for table_name, table_channels in self._channels.groupby("table"):
             if table_name not in self._tables:
-                raise ConnectorException(f'Table "{table_name}" not available', connector=self)
+                raise ConnectorException(f"Table '{table_name}' not available", connector=self)
 
             table_columns = {c.column: c.id for c in table_channels if "column" in c}
 

@@ -59,13 +59,13 @@ class Weather(Component):
         super().__configure__(configs)
         self.__localize__(configs)
 
+        connector_type = configs.get("type", default="default").lower()
         connector_configs = configs.copy()
-        connector_configs["id"] = connector_configs.get("type").lower()
+        connector_configs["id"] = connector_configs.get("id", default=connector_type).lower()
         connector_configs["uuid"] = f"{self._uuid}.{connector_configs['id']}"
         connector_configs.pop("data", None)
         connector_context = self._context.context.connectors
 
-        connector_type = configs.get("type", default="default").lower()
         if connector_type in ["default", "virtual"]:
             self._connector = None
         elif connector_type in ["brightsky", "dwd"]:
