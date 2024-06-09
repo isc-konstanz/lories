@@ -142,7 +142,7 @@ dmypy.json
 
 # Configurations except for default files
 conf/*
-!conf/*.default.cfg
+!conf/*.default.conf
 
 # Configurations and default generated output files
 data/
