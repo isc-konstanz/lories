@@ -50,12 +50,14 @@ class Directories:
             self.LIB: self._lib,
             self.LOG: self._log,
             self.TMP: self._tmp,
-            self.DATA: self._data
+            self.DATA: self._data,
+            self.CMPT: self._cmpt,
+            self.CONF: self._conf
         }
-        if self._cmpt is None or not os.path.isabs(self._cmpt):
-            dirs[self.CMPT] = self._cmpt
-        if self._conf is None or not os.path.isabs(self._conf):
-            dirs[self.CONF] = self._conf
+        # if self._cmpt is None or not os.path.isabs(self._cmpt):
+        #     dirs[self.CMPT] = self._cmpt
+        # if self._conf is None or not os.path.isabs(self._conf):
+        #     dirs[self.CONF] = self._conf
         return dirs
 
     @property
