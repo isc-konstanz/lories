@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.connectors.mysql.table
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.connectors.mysql.table
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 import datetime as dt
@@ -161,8 +162,8 @@ class MySqlTable:
         columns = [c for c in self.columns if c.name in data.columns]
 
         query = f"INSERT INTO {self.name} (`{self.index.name}`, " + ", ".join([f"`{c.name}`" for c in columns]) + ")"
-        query += f" VALUES (%s, " + ", ".join(["%s"] * (len(columns))) + ")"
-        query += f" ON DUPLICATE KEY UPDATE " + ", ".join(
+        query += " VALUES (%s, " + ", ".join(["%s"] * (len(columns))) + ")"
+        query += " ON DUPLICATE KEY UPDATE " + ", ".join(
             [f"`{c.name}`=VALUES(`{c.name}`)" for c in columns if not c.primary]
         )
         with self.connection.cursor() as cursor:

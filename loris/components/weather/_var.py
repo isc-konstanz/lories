@@ -1,20 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-    loris.components.weather
-    ~~~~~~~~~~~~~~~~~~~~~~~~
+loris.components.weather
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from loris.components.weather import Weather
 
-
 DEPRECATED = {
-    'total_clouds': 'cloud_cover',
-    'low_clouds': 'clouds_low',
-    'mid_clouds': 'clouds_mid',
-    'high_clouds': 'clouds_high',
-    'wind_gust': 'wind_speed_gust',
-    'humidity_rel': 'relative_humidity'
+    "total_clouds": "cloud_cover",
+    "low_clouds": "clouds_low",
+    "mid_clouds": "clouds_mid",
+    "high_clouds": "clouds_high",
+    "wind_gust": "wind_speed_gust",
+    "humidity_rel": "relative_humidity",
 }
 
 WEATHER = {

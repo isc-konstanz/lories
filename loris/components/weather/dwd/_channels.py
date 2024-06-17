@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.component.weather.dwd._channels
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.component.weather.dwd._channels
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from collections import OrderedDict
 from typing import Any, Dict
 

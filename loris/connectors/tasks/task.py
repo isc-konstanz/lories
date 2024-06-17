@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.connectors.tasks.task
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.connectors.tasks.task
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 import logging

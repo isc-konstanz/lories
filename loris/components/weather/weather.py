@@ -1,21 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-    loris.components.weather.weather
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.components.weather.weather
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    This module provides the :class:`loris.components.weather.weather.Weather`, used as reference to
-    calculate e.g. photovoltaic installations generated power. The provided environmental data
-    contains temperatures and horizontal solar irradiation, which can be used, to calculate the
-    effective irradiance on defined, tilted photovoltaic systems.
+This module provides the :class:`loris.components.weather.weather.Weather`, used as reference to
+calculate e.g. photovoltaic installations generated power. The provided environmental data
+contains temperatures and horizontal solar irradiation, which can be used, to calculate the
+effective irradiance on defined, tilted photovoltaic systems.
 
 """
+
 from __future__ import annotations
 
 import datetime as dt
-import pandas as pd
-import pytz as tz
-
 from typing import Optional
+
+import pandas as pd
 from loris import Configurations, Location
 from loris.components import Component, ComponentException, ComponentUnavailableException
 from loris.components.weather import WeatherConnector, WeatherForecast
@@ -70,10 +70,12 @@ class Weather(Component):
             self._connector = None
         elif connector_type in ["brightsky", "dwd"]:
             from .dwd import Brightsky
+
             self._connector = Brightsky(connector_context, connector_configs, self.location)
 
         elif connector_type in ["meteoblue", "nmm"]:
             from .meteoblue import Meteoblue
+
             self._connector = Meteoblue(connector_context, connector_configs, self.location)
 
         if self._connector is not None:

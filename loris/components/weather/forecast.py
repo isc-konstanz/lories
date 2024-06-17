@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.components.weather.forecast
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.components.weather.forecast
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 import datetime as dt
@@ -14,7 +15,7 @@ import pytz as tz
 from loris import Configurations
 from loris.components import Component
 from loris.components.weather.connector import WeatherConnector
-from loris.util import floor_date, to_date, to_int
+from loris.util import to_int
 
 
 class WeatherForecast(Component):
@@ -40,7 +41,7 @@ class WeatherForecast(Component):
         self,
         start: pd.Timestamp | dt.datetime = pd.Timestamp.now(tz=tz.UTC),
         end: pd.Timestamp | dt.datetime = None,
-        **kwargs
+        **kwargs,
     ) -> pd.DataFrame:
         """
         Retrieves the forecasted data for a specified time interval

@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.data.context
-    ~~~~~~~~~~~~~~~~~~
+loris.data.context
+~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 import os

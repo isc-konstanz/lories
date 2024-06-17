@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.data.manager
-    ~~~~~~~~~~~~~~~~~~
+loris.data.manager
+~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 import datetime as dt
@@ -17,7 +18,7 @@ import pandas as pd
 import pytz as tz
 from loris import Channel, Channels, ChannelState, Configurations
 from loris.connectors import ConnectorException
-from loris.connectors.tasks import ConnectTask, ReadTask, WriteTask, LogTask
+from loris.connectors.tasks import ConnectTask, LogTask, ReadTask, WriteTask
 from loris.data.context import DataContext
 
 

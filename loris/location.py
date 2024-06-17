@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.core.location
-    ~~~~~~~~~~~~~~~~~~~
+loris.core.location
+~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -58,7 +59,7 @@ class Location:
         timezone: str | tz.BaseTzInfo = tz.UTC,
         altitude: Optional[float] = None,
         country: Optional[str] = None,
-        state: Optional[str] = None
+        state: Optional[str] = None,
     ) -> None:
         self.latitude = latitude
         self.longitude = longitude
@@ -67,7 +68,7 @@ class Location:
         elif isinstance(timezone, tz.BaseTzInfo):
             self._timezone = timezone
         elif isinstance(timezone, (int, float)):
-            self._timezone = tz.FixedOffset(timezone*60)
+            self._timezone = tz.FixedOffset(timezone * 60)
         else:
             raise TypeError("Invalid tz specification")
 

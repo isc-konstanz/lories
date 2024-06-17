@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-    loris
-    ~~~~~
+"""loris
+~~~~~
 
-    Legacy compatibility setup script for the loris package.
+Legacy compatibility setup script for the loris package.
 
 """
+
 import versioneer
 from setuptools import setup
 

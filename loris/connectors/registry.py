@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.connectors.registry
-    ~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.connectors.registry
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 from loris.connectors import Connector, ConnectorException

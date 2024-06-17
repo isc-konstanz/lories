@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.core.channels.state
-    ~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.core.channels.state
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from enum import Enum
 
 

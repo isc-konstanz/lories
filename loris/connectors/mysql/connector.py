@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.connectors.mysql.connector
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.connectors.mysql.connector
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 import datetime as dt
@@ -186,7 +187,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
         self,
         name: str,
         columns: Optional[List[MySqlColumn]] = None,
-        engine: str = None  # 'MyISAM'
+        engine: str = None,  # 'MyISAM'
     ) -> MySqlTable:
         table = MySqlTable(self, name, columns, engine)
         table.create()

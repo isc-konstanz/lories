@@ -6,25 +6,16 @@ repos:
     hooks:
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
-      - id: end-of-file-fixer
-      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
       - id: check-toml
-  - repo: https://github.com/PyCQA/autoflake
-    rev: v2.0.1
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.8
     hooks:
-      - id: autoflake
-  - repo: https://github.com/PyCQA/isort
-    rev: 5.12.0
-    hooks:
-    - id: isort
-      args: ["--profile", "black",
-             "--filter-files",
-             "--skip-gitignore",
-             "--skip", "loris/_version.py",
-             "--skip-glob", "*/__init__.py"]
-  - repo: https://github.com/psf/black
-    rev: 23.1.0
-    hooks:
-      - id: black
-        exclude: ^(loris\/_version\.py|.*\/__init__\.py)$
-        #args: ["--verbose", "--check"]
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format

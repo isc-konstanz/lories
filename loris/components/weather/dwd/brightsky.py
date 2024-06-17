@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.component.weather.dwd.brightsky
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.component.weather.dwd.brightsky
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 import datetime as dt

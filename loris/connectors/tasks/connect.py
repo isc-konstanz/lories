@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.connectors.tasks.connect
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.connectors.tasks.connect
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from loris.channels import ChannelState
 from loris.connectors.tasks.task import ConnectorTask
 

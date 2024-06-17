@@ -1,20 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-    loris.channels.channel
-    ~~~~~~~~~~~~~~~~~~~~~~
+loris.channels.channel
+~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 import logging
 from collections import OrderedDict
 from copy import deepcopy
+from pydoc import locate
 from typing import Any, Optional, Type
 
 import pandas as pd
 import pytz as tz
-from pydoc import locate
 from loris.channels import ChannelConnector, ChannelState
 from loris.configs import ConfigurationException
 from loris.util import _parse_freq, parse_id, to_timedelta
@@ -36,13 +37,14 @@ class Channel:
 
     # noinspection PyShadowingBuiltins
     def __init__(
-            self,
-            uuid: str = None,
-            id: str = None,
-            name: Optional[str] = None,
-            value_type: Optional[str | Type] = None,
-            value_length: Optional[int] = None,
-            **configs: Any) -> None:
+        self,
+        uuid: str = None,
+        id: str = None,
+        name: Optional[str] = None,
+        value_type: Optional[str | Type] = None,
+        value_length: Optional[int] = None,
+        **configs: Any,
+    ) -> None:
         self._logger = logging.getLogger(__name__)
 
         if id is None:
@@ -79,15 +81,15 @@ class Channel:
 
     def __repr__(self) -> str:
         return (
-            "Channel:\n\t" +
-            f"\n\tid: {self.id}" +
-            f"\n\tname: {self.name}" +
-            "\n\t".join(f"{key}: {str(val)}" for key, val in self._configs.items()) +
-            f"\n\tvalue type: {self.value_type}" +
-            f"\n\tvalue length: {self._value_length}" +
-            f"\n\tvalue: {str(self.value)}" +
-            f"\n\tstatus: {str(self.state)}" +
-            f"\n\ttimestamp: {str(self.timestamp)}"
+            "Channel:\n\t"
+            + f"\n\tid: {self.id}"
+            + f"\n\tname: {self.name}"
+            + "\n\t".join(f"{key}: {str(val)}" for key, val in self._configs.items())
+            + f"\n\tvalue type: {self.value_type}"
+            + f"\n\tvalue length: {self._value_length}"
+            + f"\n\tvalue: {str(self.value)}"
+            + f"\n\tstatus: {str(self.state)}"
+            + f"\n\ttimestamp: {str(self.timestamp)}"
         )
 
     def __contains__(self, attr):
@@ -100,7 +102,7 @@ class Channel:
             "value_length",
             "value",
             "state",
-            "timestamp"
+            "timestamp",
         ] + list(self._configs.keys())
 
     def __getattr__(self, attr):

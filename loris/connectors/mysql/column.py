@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.connectors.mysql.column
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.connectors.mysql.column
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 import datetime as dt

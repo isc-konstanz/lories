@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.configs.configurable
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.configs.configurable
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 import logging

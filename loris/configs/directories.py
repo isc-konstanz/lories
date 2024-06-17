@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.configs.directories
-    ~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.configs.directories
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 import os
@@ -52,7 +53,7 @@ class Directories:
             self.TMP: self._tmp,
             self.DATA: self._data,
             self.CMPT: self._cmpt,
-            self.CONF: self._conf
+            self.CONF: self._conf,
         }
         # if self._cmpt is None or not os.path.isabs(self._cmpt):
         #     dirs[self.CMPT] = self._cmpt

@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.core.channels.channel
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.core.channels.channel
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 from collections import OrderedDict
@@ -30,9 +31,9 @@ class ChannelConnector:
 
     def __repr__(self) -> str:
         return (
-            "ChannelConnector:\n\t" +
-            f"\n\tid: {self.id}" +
-            "\n\t".join(f"{key}: {str(val)}" for key, val in self._configs.items())
+            "ChannelConnector:\n\t"
+            + f"\n\tid: {self.id}"
+            + "\n\t".join(f"{key}: {str(val)}" for key, val in self._configs.items())
         )
 
     def __getattr__(self, attr):

@@ -49,11 +49,8 @@ mysql = [
 ]
 dev = [
     "loris[mysql]",
-    "isort",
-    "black",
-    "autoflake",
     "pre-commit",
-    "pytest"
+    "ruff"
 ]
 
 [tool.setuptools.package-data]
@@ -77,19 +74,23 @@ tag_prefix = "v"
 [project.scripts]
 loris = "loris.__main__:main"
 
-[tool.autoflake]
-expand-star-imports = true
-remove-unused-variables = true
-ignore-init-module-imports = true
-remove-all-unused-imports = true
-
-[tool.isort]
-profile = "black"
-line_length = 120
-src_paths = ["loris"]
-known_first_party = ["loris", "numpy", "pandas", "pytz"]
-extra_standard_library = ["dateutil"]
-
-[tool.black]
-target-version = ["py39"]
+[tool.ruff]
+indent-width = 4
 line-length = 120
+target-version = "py37"
+exclude = ["loris/_version.py"]
+
+[tool.ruff.lint]
+select = [
+    # "D",  # pydocstyle
+    "E",  # pycodestyle
+    "F",  # pyflakes
+    "I",  # isort
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E", "I"]
+
+[tool.ruff.lint.isort]
+extra-standard-library = ["dateutil"]
+known-first-party = ["loris", "numpy", "pandas", "pytz"]

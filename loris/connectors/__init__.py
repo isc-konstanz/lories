@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-    loris.connectors
-    ~~~~~~~~~~~~~~~~
+loris.connectors
+~~~~~~~~~~~~~~~~
 
 
 """
+
 from .connector import (  # noqa: F401
     Connector,
     ConnectorException,
-    ConnectionException
+    ConnectionException,
 )
 
 from . import registry  # noqa: F401

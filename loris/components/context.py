@@ -1,21 +1,22 @@
 # -*- coding: utf-8 -*-
 """
-    loris.components.context
-    ~~~~~~~~~~~~~~~~~~~~~~~~
+loris.components.context
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 import itertools
 import os
 import re
-from copy import deepcopy
 from collections import OrderedDict
 from collections.abc import Mapping
-from typing import Iterator, List
+from copy import deepcopy
+from typing import Any, Iterator, List, Optional
 
-from loris import Configurable, Configurations, Directories
+from loris import Configurable, Configurations
 from loris.components import Component, ComponentException, registry
 
 
@@ -31,12 +32,12 @@ class ComponentContext(Configurable, Mapping[str, Component]):
     def _load(self, configs) -> None:
         components = {}
         component_defaults = {}
-        if 'components' in configs:
-            components_section = configs.get_section('components')
+        if "components" in configs:
+            components_section = configs.get_section("components")
             component_ids = [
                 i for i in components_section.keys() if (isinstance(components_section[i], Mapping) and i != "data")
             ]
-            component_defaults.update(components_section.pop('data', {}))
+            component_defaults.update(components_section.pop("data", {}))
 
             for component_id in component_ids:
                 component_file = f"{component_id}.conf"

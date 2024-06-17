@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-    loris.util
-    ~~~~~~~~~~
+loris.util
+~~~~~~~~~~
 
 
 """
-import re
+
 import datetime as dt
+import re
 from copy import copy
 from dateutil.relativedelta import relativedelta
 from typing import List, Optional, Tuple, Union
@@ -78,7 +79,7 @@ def resample_series(
         elif method == "last":
             data = resampled.last()
         else:
-            raise ValueError(f"Unknown resampling method: {how}")
+            raise ValueError(f"Unknown resampling method: {method}")
 
         data.index += to_offset(f"{int(resolution)}s")
     return data[(data.index >= index[0]) & (data.index <= index[-1])]

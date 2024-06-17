@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.data.mapping
-    ~~~~~~~~~~~~~~~~~~
+loris.data.mapping
+~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 from collections import OrderedDict

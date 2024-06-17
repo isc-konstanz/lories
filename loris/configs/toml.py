@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.configs.toml
-    ~~~~~~~~~~~~~~~~~~
+loris.configs.toml
+~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from collections.abc import Mapping
 from typing import Any
 

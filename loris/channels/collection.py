@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.core.channel.collection
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.core.channel.collection
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 import logging

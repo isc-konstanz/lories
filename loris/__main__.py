@@ -1,12 +1,12 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-"""
-    loris
-    ~~~~~
+"""loris
+~~~~~
 
-    To learn how to use local resource integration systems, see "loris --help"
+To learn how to use local resource integration systems, see "loris --help"
 
 """
+
 import os
 from argparse import ArgumentParser, RawTextHelpFormatter
 

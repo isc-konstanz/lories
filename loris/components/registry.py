@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.components.registry
-    ~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.components.registry
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 from typing import List

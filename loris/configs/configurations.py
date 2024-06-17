@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.configs.configurations
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.configs.configurations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 import datetime as dt

@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-    loris.application
-    ~~~~~~~~~~~~~~~~~
+loris.application
+~~~~~~~~~~~~~~~~~
 
 
 """
+
 from __future__ import annotations
 
 from threading import Event, Thread
