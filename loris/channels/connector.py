@@ -16,6 +16,8 @@ from loris.util import parse_id
 
 class ChannelConnector:
     _uuid: str
+    _id: str
+
     _configs: OrderedDict[str, Any]
 
     timestamp: pd.Timestamp = pd.NaT
@@ -23,14 +25,15 @@ class ChannelConnector:
     # noinspection PyShadowingBuiltins
     def __init__(self, connector: str = None, **configs: Any) -> None:
         self._uuid = connector
-        connector_configs = OrderedDict(configs)
-        if connector is not None:
-            connector_configs["id"] = parse_id(connector.split(".")[-1])
-            connector_configs.move_to_end("id", last=False)
-        self._configs = connector_configs
+        self._id = parse_id(connector.split(".")[-1]) if connector is not None else None
+        self._configs = OrderedDict(configs)
 
     def __repr__(self) -> str:
-        return "ChannelConnector:\n\t" + "\n\t".join(f"{key}: {str(val)}" for key, val in self._configs.items())
+        return (
+            "ChannelConnector:\n\t" +
+            f"\n\tid: {self.id}" +
+            "\n\t".join(f"{key}: {str(val)}" for key, val in self._configs.items())
+        )
 
     def __getattr__(self, attr):
         # __getattr__ gets called when the item is not found via __getattribute__
@@ -41,8 +44,12 @@ class ChannelConnector:
         raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
 
     @property
+    def uuid(self) -> str:
+        return self._uuid
+
+    @property
     def id(self) -> str:
-        return self._configs["id"]
+        return self._id
 
     def copy(self) -> ChannelConnector:
         return ChannelConnector(self._uuid, **self._configs)

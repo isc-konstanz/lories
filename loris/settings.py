@@ -28,8 +28,10 @@ class Settings(Configurations):
         conf_path = os.path.join(conf_dirs.conf, app_file)
 
         super().__init__(app_file, conf_path, conf_dirs, **kwargs)
-        self._load(conf_path)
         self.application = app_name
+
+        if os.path.isfile(conf_path):
+            self._load(conf_path)
 
         self.dirs.join(self)
         if self.dirs._conf is None:

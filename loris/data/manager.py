@@ -17,7 +17,7 @@ import pandas as pd
 import pytz as tz
 from loris import Channel, Channels, ChannelState, Configurations
 from loris.connectors import ConnectorException
-from loris.connectors.tasks import ConnectTask, ReadTask, WriteTask
+from loris.connectors.tasks import ConnectTask, ReadTask, WriteTask, LogTask
 from loris.data.context import DataContext
 
 
@@ -197,7 +197,7 @@ class DataManager(DataContext):
             if len(log_channels) == 0:
                 continue
 
-            log_task = WriteTask(connector, log_channels)
+            log_task = LogTask(connector, log_channels)
             log_tasks[uuid] = log_task
             log_futures.append(self._executor.submit(log_task))
 
