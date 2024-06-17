@@ -69,13 +69,13 @@ class MySqlColumn:
 
             return type_info[1]
 
-        if type == str:
+        if type == str:  # noqa: E721
             return "VARCHAR" if type_length is not None else "STRING"
         elif type in [pd.Timestamp, dt.datetime]:
             return "TIMESTAMP"
-        elif type == int:
+        elif type == int:  # noqa: E721
             return "INT"
-        elif type == float:
+        elif type == float:  # noqa: E721
             return "FLOAT"
 
         raise ConfigurationException(f"Unknown MySQL data type: {type}")

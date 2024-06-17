@@ -68,7 +68,7 @@ def _parse_channel(channel_id: str) -> Dict[str, Any]:
         "address": _parse_address(channel_id),
         "value_type": _parse_value_type(channel_id),
     }
-    if channel["value_type"] == str:
+    if channel["value_type"] == str:  # noqa: E721
         channel["value_length"] = 32
     return channel
 

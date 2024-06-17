@@ -123,7 +123,7 @@ def _parse_kwargs(parser: ArgumentParser) -> Dict[str, Any]:
             "--system-flat",
             dest="system_flat",
             action="store_true",
-            help="flags if the configuration files will be expected directly in the data directory,"
+            help="flags if the configuration files will be expected directly in the data directory, "
                  "instead of a corresponding 'conf' directory",
         )
         parser.add_argument(
