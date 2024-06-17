@@ -115,35 +115,40 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
             if table_name in tables:
                 continue
             if self._tables_create:
-                table_index = MySqlColumn(
-                    self._table_index_column,
-                    self._table_index_type,
-                    primary=True,
-                    nullable=False
-                )
-                table_columns = []
-                for table_channel in table_channels:
-                    table_column_name = table_channel.id if "column" not in table_channel else table_channel.column
-                    table_column_args = {}
-                    if "nullable" in table_channel:
-                        table_column_args["nullable"] = table_channel.nullable
-                    if "primary" in table_channel:
-                        table_column_args["primary"] = table_channel.primary
-                    if "value_length" in table_channel:
-                        table_column_args["type_length"] = table_channel.value_length
-
-                    table_column_type = (
-                        table_channel.value_type if "value_type" in table_channel else self._table_data_type
-                    )
-                    table_columns.append(MySqlColumn(table_column_name, table_column_type, **table_column_args))
-
-                table = MySqlTable(self, table_name, table_index, table_columns)
-                table.create()
+                table = self._create_table(table_name, table_channels)
                 tables[table.name] = table
             else:
                 raise ConnectorException(f"Unable to find configured table: {table_name}", connector=self)
 
         return tables
+
+    def _create_table(self, name: str, channels: Channels):
+        index = MySqlColumn(
+            self._table_index_column,
+            self._table_index_type,
+            primary=True,
+            nullable=False
+        )
+        columns = []
+        for channel in channels:
+            column_name = channel.id if "column" not in channel else channel.column
+            column_args = {}
+            if "nullable" in channel:
+                column_args["nullable"] = channel.nullable
+            if "primary" in channel:
+                column_args["primary"] = channel.primary
+            if "value_length" in channel:
+                column_args["type_length"] = channel.value_length
+
+            column_type = (
+                channel.value_type if "value_type" in channel else self._table_data_type
+            )
+            columns.append(MySqlColumn(column_name, column_type, **column_args))
+
+        table = MySqlTable(self, name, index, columns)
+        table.create()
+
+        return table
 
     def _get_column_schemas(self, table: str, select=None) -> List[Dict[str, Any]]:
         if select is None:
