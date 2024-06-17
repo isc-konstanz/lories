@@ -87,11 +87,12 @@ class ComponentContext(Configurable, Mapping[str, Component]):
 
     # noinspection SpellCheckingInspection
     def _new(self, configs: Configurations) -> Component:
+        registration_name = os.path.splitext(configs.name)[0]
         if "id" not in configs:
-            configs.set("id", os.path.splitext(configs.name)[0])
+            configs.set("id", registration_name)
             configs.move_to_top("id")
 
-        registration_type = os.path.splitext(configs.name)[0]
+        registration_type = re.split(r"[^a-zA-Z0-9\s]", registration_name)[0]
         for registration in registry.types.values():
             if registration.is_alias(registration_type):
                 registration_type = registration.type
