@@ -48,8 +48,15 @@ dependencies = [
 mysql = [
     "mysql-connector-python"
 ]
+doc = [
+    "graphviz",
+    "sphinx",
+    "sphinx-autoapi",
+    "pydata-sphinx-theme",
+    "myst-parser",
+]
 dev = [
-    "loris[mysql]",
+    "loris[mysql, doc]",
     "pre-commit",
     "ruff"
 ]
