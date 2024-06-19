@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-loris._components.weather
+loris.components.weather
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 
