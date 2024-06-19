@@ -196,7 +196,7 @@ class Brightsky(WeatherConnector):
         sources["last_record"] = pd.DatetimeIndex(sources["last_record"])
 
         data = pd.DataFrame(response_json["weather"])
-        data["timestamp"] = pd.DatetimeIndex(data["timestamp"])
+        data["timestamp"] = pd.to_datetime(data["timestamp"], utc=True)
         data = data.set_index("timestamp").tz_convert(self.location.timezone)
         data.index.name = "timestamp"
 
