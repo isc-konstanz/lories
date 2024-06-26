@@ -1,7 +1,7 @@
 # Contributing to the Code
 
-Encouraging more people to help develop loris is essential to our success.
-Therefore, we want to make it easy and rewarding for you to contribute.
+Encouraging more people to help develop loris is essential to the project's success.
+Therefore, we want to make it easy and straight forward for you to contribute.
 
 There is a lot of material in this section, aimed at a variety of contributors from novice to expert.
 Don't worry if you don't (yet) understand parts of it.
@@ -67,19 +67,17 @@ The best way to ensure that a pull request will be reviewed and merged in a time
   especially for pull requests with a lot of new primary code.
 - Tag loris community members or ``@pvlib`` when the pull request is ready for review.
 
-(code-style)=
+
 ## Code Style
 
 Loris generally follows the the [Python PEP8](https://peps.python.org/pep-0008/) code style.
 Maximum line length for code is 120 characters.  
 Additionally, the use of [Black](https://black.readthedocs.io/en/stable/) is aspired to ensure a consistent code style across the code base.
 
-Please see the [Documentation section](#documentation) for information specific to documentation style.
-
 Remove any ``logging`` calls and ``print`` statements that you added
 during development. ``warning`` is ok.
 
-(documentation)=
+
 ## Documentation
 
 ```{warning}
@@ -100,9 +98,11 @@ As such, they should form the basis of the documentation of the loris code base.
 ### Building the documentation
 
 Building the documentation locally is useful for testing out changes to the documentation's source code
-without having to repeatedly update a pull request and have Read the Docs build it for you.
-Building the docs locally requires installing loris as an editable library, including the ``doc`` dependencies
-specified in the.
+without having to repeatedly update a pull request and have Read the Docs (RTD) build it for you.
+For the RTD to be built correctly, a [Graphviz](https://www.graphviz.org/) needs to be accessible
+in the system path first.  
+Next, to build the docs locally requires installing loris as an editable library, including the ``doc`` dependencies
+specified in the project's setup configurations.
 An easy way to do this is with:
 
     pip install loris[doc]    # on Mac:  pip install "loris[doc]"

@@ -1,4 +1,3 @@
-(connectors)=
 # Connectors
 
 This section contains (or will contain) information on the loris connector configurations.

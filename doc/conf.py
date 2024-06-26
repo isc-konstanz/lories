@@ -123,11 +123,6 @@ html_theme_options = {
     "navbar_end": ["navbar-icon-links.html"],
     "footer_start": ["copyright"],
     "footer_end": ["footer"],
-    "logo": {
-        "text": "Loris",  # "Local Resource Integration System",
-        "image_light": "_images/isc-logo.png",
-        "image_dark": "_images/isc-logo-white.png",
-    },
 }
 
 html_sidebars = {
@@ -146,12 +141,12 @@ html_context = {
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-html_logo = "_images/isc-logo.png"
+html_logo = "_images/loris-logo.png"
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
 # pixels large.
-html_favicon = "_images/isc-favicon.ico"
+html_favicon = "_images/loris-favicon.ico"
 
 # A list of paths that contain custom static files (such as style sheets or script files).
 # Relative paths are taken as relative to the configuration directory.

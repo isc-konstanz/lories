@@ -1,4 +1,3 @@
-(contact)=
 # Contact
 
 The loris community is ought to be growing and open discussion hubs will be setup in the future.  
