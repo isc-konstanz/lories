@@ -21,7 +21,7 @@
 <br />
 <div align="center">
   <a href="https://github.com/isc-konstanz/loris">
-    <img src="doc/_images/loris-logo.png" alt="Loris Logo" width="120">
+    <img src="doc/_images/loris-logo.png" alt="Loris Logo" width="256">
   </a>
   <h3 align="center">Loris</h3>
   <p align="center">
