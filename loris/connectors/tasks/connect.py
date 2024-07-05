@@ -11,9 +11,9 @@ from loris.connectors.tasks.task import ConnectorTask
 
 
 class ConnectTask(ConnectorTask):
+    # noinspection PyProtectedMember
     def run(self) -> None:
-        self._logger.info(f"Connecting {type(self.connector).__name__}: {self.connector.uuid}")
         self.set_states(ChannelState.CONNECTING)
-        self.connector.connect(self.channels)
+        self.connector._do_connect(self.channels)
 
         self.set_states(ChannelState.CONNECTED)

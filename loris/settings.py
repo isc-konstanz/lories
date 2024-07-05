@@ -30,9 +30,7 @@ class Settings(Configurations):
 
         super().__init__(app_file, conf_path, conf_dirs, **kwargs)
         self.application = app_name
-
-        if os.path.isfile(conf_path):
-            self._load(conf_path)
+        self._load(require=False)
 
         self.dirs.join(self)
         if self.dirs._conf is None:
@@ -77,9 +75,7 @@ class Settings(Configurations):
 
         override_path = os.path.join(self.dirs.data, self.name)
         if os.path.isfile(override_path):
-            from configs import load_toml
-
-            self.update(load_toml(override_path))
+            self._load_toml(override_path)
             self.dirs.join(self)
 
     # def __getattr__(self, attr):

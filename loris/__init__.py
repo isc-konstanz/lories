@@ -18,7 +18,7 @@ from .exceptions import (  # noqa: F401
 
 from .configs import (  # noqa: F401
     Directories,
-    Configurable,
+    Configurator,
     Configurations,
     ConfigurationException,
     ConfigurationUnavailableException,
@@ -46,14 +46,16 @@ from .connectors import (  # noqa: F401
 )
 
 from . import components  # noqa: F401
-from .components import weather  # noqa: F401
-from .components.weather import Weather  # noqa: F401
+from .components.activator import Activator  # noqa: F401
 
 from .components import (  # noqa: F401
     Component,
     ComponentException,
     ComponentUnavailableException,
 )
+
+from .components import weather  # noqa: F401
+from .components.weather import Weather  # noqa: F401
 
 from . import system  # noqa: F401
 from .system import System  # noqa: F401

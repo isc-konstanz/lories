@@ -6,11 +6,13 @@ loris.util
 
 """
 
+from __future__ import annotations
+
 import datetime as dt
 import re
 from copy import copy
 from dateutil.relativedelta import relativedelta
-from typing import List, Optional, Tuple, Union
+from typing import Any, Callable, List, Mapping, Optional, Tuple, Type
 
 import numpy as np
 import pandas as pd
@@ -21,10 +23,41 @@ from pandas.tseries.frequencies import to_offset
 INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
 
 
+# noinspection PyShadowingBuiltins
+def get_variables(object: Any, type: Type) -> Mapping[str, Any]:
+    private = _get_variables(object, lambda attr, member: isinstance(member, type) and "__" in attr)
+    return _get_variables(object, lambda attr, member: isinstance(member, type) and member not in private.values())
+
+
+# noinspection PyShadowingBuiltins
+def _get_variables(object: Any, filter: Callable) -> Mapping[str, Any]:
+    return get_members(object, lambda attr, member: not callable(member) and filter(attr, member))
+
+
+# noinspection PyShadowingBuiltins
+def get_members(object: Any, filter: Callable = None) -> Mapping[str, Any]:
+    from loris import LocalResourceException
+
+    members = dict()
+    processed = set()
+    for attr in dir(object):
+        try:
+            member = getattr(object, attr)
+            # Handle duplicate attr
+            if attr in processed:
+                raise AttributeError
+        except (AttributeError, LocalResourceException):
+            continue
+        if member not in members.values() and (filter and filter(attr, member)):
+            members[attr] = member
+        processed.add(attr)
+    return dict(sorted(members.items()))
+
+
 # noinspection PyUnresolvedReferences, PyShadowingBuiltins, PyShadowingNames
 def is_type(series: pd.Series, *type: str) -> bool:
     series_name = series.name.split("_")
-    series_suffix = series_name[(-1 if len(series_name) < 3 else -2) :]
+    series_suffix = series_name[(-1 if len(series_name) < 3 else -2):]
     return any(t in series_suffix for t in type)
 
 
@@ -109,7 +142,7 @@ def derive_by_hours(data: pd.Series) -> pd.Series:
 
 
 def convert_timezone(
-    date: Union[dt.datetime, pd.Timestamp, str],
+    date: dt.datetime | pd.Timestamp | str,
     timezone: dt.tzinfo = tz.UTC
 ) -> Optional[pd.Timestamp]:
     if date is None:
@@ -131,8 +164,8 @@ def convert_timezone(
 
 
 def slice_range(
-    start: Union[dt.datetime, pd.Timestamp, str],
-    end: Union[dt.datetime, pd.Timestamp, str],
+    start: dt.datetime | pd.Timestamp | str,
+    end: dt.datetime | pd.Timestamp | str,
     timezone: dt.tzinfo = None,
     freq: str = "D",
     **kwargs,
@@ -158,7 +191,7 @@ def slice_range(
 
 
 def floor_date(
-    date: Union[dt.datetime, pd.Timestamp, str],
+    date: dt.datetime | pd.Timestamp | str,
     timezone: dt.tzinfo = None,
     freq: str = "D"
 ) -> Optional[pd.Timestamp]:
@@ -177,7 +210,7 @@ def floor_date(
 
 
 def ceil_date(
-    date: Union[dt.datetime, pd.Timestamp, str],
+    date: dt.datetime | pd.Timestamp | str,
     timezone: dt.tzinfo = None,
     freq: str = "D"
 ) -> Optional[pd.Timestamp]:
@@ -190,23 +223,38 @@ def ceil_date(
 
 # noinspection PyShadowingBuiltins
 def to_date(
-    date: Union[str, int, dt.datetime, pd.Timestamp],
+    date: Optional[str | int | dt.datetime | pd.Timestamp],
     timezone: dt.tzinfo = None,
     format: str = "%d.%m.%Y"
 ) -> Optional[pd.Timestamp]:
     if date is None:
         return None
-
+    if isinstance(date, (dt.datetime, pd.Timestamp)):
+        return date
     if isinstance(date, str):
         date = pd.Timestamp(dt.datetime.strptime(date, format))
     if isinstance(date, int):
         date = pd.Timestamp(dt.datetime.fromtimestamp(date))
     if timezone is not None:
         date = convert_timezone(date, timezone)
-    return date
+
+    raise TypeError(f"Invalid date type: {type(date)}")
 
 
-def to_timedelta(freq: str) -> Union[relativedelta, pd.Timedelta]:
+def to_timezone(timezone: Optional[str | int | float | tz.BaseTzInfo]) -> Optional[tz.BaseTzInfo]:
+    if timezone is None:
+        return None
+    if isinstance(timezone, tz.BaseTzInfo):
+        return timezone
+    if isinstance(timezone, str):
+        return tz.timezone(timezone)
+    if isinstance(timezone, (int, float)):
+        return tz.FixedOffset(timezone * 60)
+
+    raise TypeError(f"Invalid timezone type: {type(timezone)}")
+
+
+def to_timedelta(freq: str) -> relativedelta | pd.Timedelta:
     freq_val = "".join(s for s in freq if s.isnumeric())
     freq_val = int(freq_val) if len(freq_val) > 0 else 1
     freq = _parse_freq(freq)
@@ -226,19 +274,19 @@ def to_timedelta(freq: str) -> Union[relativedelta, pd.Timedelta]:
         raise ValueError(f"Invalid frequency: {freq}")
 
 
-def to_float(value: Union[str, float]) -> float:
+def to_float(value: str | float) -> float:
     if isinstance(value, str):
         return float(value)
     return value
 
 
-def to_int(value: Union[str, int]) -> int:
+def to_int(value: str | int) -> int:
     if isinstance(value, str):
         return int(value)
     return value
 
 
-def to_bool(value: Union[str, bool]) -> bool:
+def to_bool(value: str | bool) -> bool:
     if isinstance(value, str):
         return value.lower() in ["true", "yes", "y"]
     return value

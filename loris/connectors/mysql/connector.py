@@ -15,7 +15,6 @@ from typing import Any, Dict, Iterator, List, Optional
 from mysql import connector
 
 import pandas as pd
-import pytz as tz
 from loris.channels import Channels, ChannelState
 from loris.configs import Configurations
 from loris.connectors import ConnectionException, Connector, ConnectorException
@@ -27,7 +26,22 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
     TYPE: str = "mysql"
 
     _connection = None
-    _tables: Dict[str, MySqlTable]
+    _tables: Dict[str, MySqlTable] = {}
+
+    _table_index_column: str = MySqlTable.DEFAULT_INDEX_COLUMN
+    _table_index_type: str = MySqlTable.DEFAULT_INDEX_TYPE
+    _table_data_column: str = MySqlTable.DEFAULT_DATA_COLUMN
+    _table_data_type: str = MySqlTable.DEFAULT_DATA_TYPE
+    _tables_create: bool = True
+
+    user: str
+    password: str
+    database: str
+
+    host: str = "127.0.0.1"
+    port: int = 3306
+
+    resolution: Optional[int] = None
 
     @property
     def connection(self):
@@ -44,47 +58,38 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
     def __len__(self) -> int:
         return len(self._tables)
 
-    def __configure__(self, configs: Configurations) -> None:
-        super().__configure__(configs)
-        table_configs = configs.get_section(MySqlTable.SECTION, default={})
-        self._table_index_column = table_configs.get("index_column", default=MySqlTable.DEFAULT_INDEX_COLUMN)
-        self._table_index_type = table_configs.get("index_type", default=MySqlTable.DEFAULT_INDEX_TYPE)
-        self._table_data_column = table_configs.get("data_column", default=MySqlTable.DEFAULT_DATA_COLUMN)
-        self._table_data_type = table_configs.get("data_type", default=MySqlTable.DEFAULT_DATA_TYPE)
-        self._tables_create = table_configs.get_bool("create", default=True)
-        self._tables = {}
+    def configure(self, configs: Configurations) -> None:
+        super().configure(configs)
+        if configs.has_section(MySqlTable.SECTION):
+            table = configs.get_section(MySqlTable.SECTION)
+            self._table_index_column = table.get("index_column", default=MySqlConnector._table_index_column)
+            self._table_index_type = table.get("index_type", default=MySqlConnector._table_index_type)
+            self._table_data_column = table.get("data_column", default=MySqlConnector._table_data_column)
+            self._table_data_type = table.get("data_type", default=MySqlConnector._table_data_type)
+            self._tables_create = table.get_bool("create", default=MySqlConnector._tables_create)
 
         # TODO: Validate if minutely default resolution is sufficient
-        resolution = configs.get_int("resolution", default=None)
+        resolution = configs.get_int("resolution", default=MySqlConnector.resolution)
         if resolution is not None:
             resolution *= 60
         self.resolution = resolution
 
-        timezone = configs.get("timezone", None)
-        if isinstance(timezone, str):
-            timezone = tz.timezone(timezone)
-        self.timezone = timezone
-
-        self.host = configs.get("host", "127.0.0.1")
-        self.port = configs.get_int("port", 3306)
+        self.host = configs.get("host", MySqlConnector.host)
+        self.port = configs.get_int("port", MySqlConnector.port)
 
         self.user = configs.get("user")
         self.password = configs.get("password")
 
         self.database = configs.get("database")
 
-    def __connect__(self, channels: Channels) -> None:
+    def connect(self, channels: Channels) -> None:
         self._logger.info(f"Connecting to MySQL database {self.database}@{self.host}:{self.port}")
         self._connection = connector.connect(
-            host=self.host,
-            port=self.port,
-            user=self.user,
-            passwd=self.password,
-            database=self.database
+            host=self.host, port=self.port, user=self.user, passwd=self.password, database=self.database
         )
         self._tables = self._load_tables(channels)
 
-    def __disconnect__(self) -> None:
+    def disconnect(self) -> None:
         if self._connection is not None:
             self._connection.close()
 
@@ -104,11 +109,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
                 )
             table_index = table_columns.pop(0)
             table = MySqlTable(
-                self,
-                table_schema["table_name"],
-                table_index,
-                table_columns,
-                engine=table_schema["engine"]
+                self, table_schema["table_name"], table_index, table_columns, engine=table_schema["engine"]
             )
             tables[table.name] = table
 
@@ -141,9 +142,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
             if "value_length" in channel:
                 column_args["type_length"] = channel.value_length
 
-            column_type = (
-                channel.value_type if "value_type" in channel else self._table_data_type
-            )
+            column_type = channel.value_type if "value_type" in channel else self._table_data_type
             columns.append(MySqlColumn(column_name, column_type, **column_args))
 
         table = MySqlTable(self, name, index, columns)
@@ -203,7 +202,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
     ) -> bool:
         # TODO: Replace this placeholder more resource efficient
         if channels is None:
-            channels = self._channels
+            channels = self.channels
         containers = channels.copy()
         self.read(containers, start, end)
         return not containers.to_frame().empty
@@ -250,7 +249,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
                     )
 
     def write(self, channels: Channels) -> None:
-        for table_name, table_channels in self._channels.groupby("table"):
+        for table_name, table_channels in self.channels.groupby("table"):
             if table_name not in self._tables:
                 raise ConnectorException(f"Table '{table_name}' not available", connector=self)
 

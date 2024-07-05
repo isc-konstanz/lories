@@ -14,56 +14,78 @@ import re
 from collections import OrderedDict
 from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Iterator, List, Optional
+from typing import Any, Collection, Dict, Iterator, List, Optional
 
-from loris import Configurable, Configurations
-from loris.components import Component, ComponentException, registry
+from loris import Configurations, Configurator
+from loris.components import Activator, Component, ComponentException, registry
+from loris.data import DataAccess
 
 
-class ComponentContext(Configurable, Mapping[str, Component]):
-    _components: OrderedDict[str, Component] = OrderedDict()
+class ComponentContext(Activator, Mapping[str, Component]):
+    SECTION: str = "components"
 
-    def __init__(self, context, configs: Configurations, *args, **kwargs) -> None:
+    __components: Dict[str, Component]
+
+    def __init__(self, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(configs, *args, **kwargs)
-        self._context = context
-        self._load(configs)
+        self.__components = OrderedDict()
 
-    # noinspection PyTypeChecker, PyProtectedMember, PyUnresolvedReferences
-    def _load(self, configs) -> None:
-        components = {}
-        component_defaults = {}
-        if "components" in configs:
-            components_section = configs.get_section("components")
-            component_ids = [
-                i for i in components_section.keys() if (isinstance(components_section[i], Mapping) and i != "data")
-            ]
-            component_defaults.update(components_section.pop("data", {}))
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.__components)
 
-            for component_id in component_ids:
-                component_file = f"{component_id}.conf"
-                component_section = deepcopy(component_defaults)
-                component_section.update(components_section.get(component_id))
-                component_configs = Configurations.load(
-                    component_file,
-                    **configs.dirs.encode(),
-                    **component_section,
-                    require=False
-                )
-                component = self._new(component_configs)
-                if component.is_enabled():
-                    components[component.id] = component
-        components.update(self._load_dir(configs.dirs.cmpt, component_defaults))
+    def __len__(self) -> int:
+        return len(self.__components)
+
+    def __getitem__(self, component_id: str) -> Component:
+        return self.__get(component_id)
+
+    def __contains__(self, component_id) -> bool:
+        return component_id in self.__components.keys()
+
+    # noinspection PyTypeChecker
+    def configure(self, configs: Configurations) -> None:
+        super().configure(configs)
 
         def convert(text: str) -> int | str:
             return int(text) if text.isdigit() else text
 
-        self._components = OrderedDict(
-            sorted(components.items(), key=lambda e: [convert(t) for t in re.split("([0-9]+)", e[0])])
+        config_defaults = {}
+        if configs.has_section(ComponentContext.SECTION):
+            components = configs.get_section(ComponentContext.SECTION)
+            config_defaults.update(components.pop(DataAccess.SECTION, {}))
+
+            self._do_load_sections(components, config_defaults)
+        self._do_load_from_dir(configs.dirs.cmpt, config_defaults)
+        self.__components = OrderedDict(
+            sorted(self.__components.items(), key=lambda e: [convert(t) for t in re.split("([0-9]+)", e[0])])
         )
 
+    def _do_configure_members(self, configurators: Collection[Configurator]) -> None:
+        configurators = list(configurators)
+        configurators.extend([c for c in self.__components.values() if c not in configurators])
+        super()._do_configure_members(configurators)
+
     # noinspection PyTypeChecker, PyProtectedMember, PyUnresolvedReferences
-    def _load_dir(self, configs_dir: str, config_defaults: Optional[Mapping[str, Any]]) -> Mapping[str, Component]:
-        components = {}
+    def _do_load_sections(self, configs: Configurations, defaults: Optional[Mapping[str, Any]]) -> None:
+        component_ids = [s for s in configs.sections if s != DataAccess.SECTION]
+        for component_id in component_ids:
+            component_file = f"{component_id}.conf"
+            component_section = deepcopy(defaults)
+            component_section.update(configs.get(component_id))
+            component_configs = Configurations.load(
+                component_file,
+                **configs.dirs.encode(),
+                **component_section,
+                require=False
+            )
+            component = self._new(component_configs)
+            if component.id in self:
+                self.__get(component.id).configs.update(component_configs)
+            else:
+                self._add(component)
+
+    # noinspection PyTypeChecker, PyProtectedMember, PyUnresolvedReferences
+    def _do_load_from_dir(self, configs_dir: str, defaults: Optional[Mapping[str, Any]]) -> None:
         if os.path.isdir(configs_dir):
             config_types = tuple(itertools.chain(*[[t.type, *t.alias] for t in registry.types.values()]))
             for configs_entry in os.scandir(configs_dir):
@@ -78,13 +100,16 @@ class ComponentContext(Configurable, Mapping[str, Component]):
                     component_configs = Configurations.load(
                         configs_entry.name,
                         **configs_dirs,
-                        **config_defaults
+                        **defaults
                     )
                     component = self._new(component_configs)
-                    if component.is_enabled():
-                        components[component.id] = component
+                    if component.id in self:
+                        self.__get(component.id).configs.update(component_configs)
+                    else:
+                        self._add(component)
 
-        return components
+    def __get(self, component_id: str) -> Component:
+        return self.__components[component_id]
 
     # noinspection SpellCheckingInspection
     def _new(self, configs: Configurations) -> Component:
@@ -107,47 +132,26 @@ class ComponentContext(Configurable, Mapping[str, Component]):
         return registry.types[registration_type].initialize(self, configs)
 
     def _add(self, component: Component) -> None:
-        self._components[component.id] = component
+        self.__components[component.id] = component
 
     def _remove(self, component_id: str) -> None:
-        del self._components[component_id]
-
-    def __getitem__(self, component_id: str) -> Component:
-        return self._components[component_id]
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self._components)
-
-    def __len__(self) -> int:
-        return len(self._components)
-
-    def configure(self) -> None:
-        super().configure()
-        for component in self._components.values():
-            component.configure()
+        del self.__components[component_id]
 
     def activate(self) -> None:
-        for component_id, component in self._components.items():
-            component.activate()
-
-        self.__activate__()
-
-    def __activate__(self) -> None:
         pass
+
+    def _do_activate_members(self, activators: Collection[Activator]) -> None:
+        activators = list(activators)
+        activators.extend([c for c in self.__components.values() if c not in activators])
+        super()._do_activate_members(activators)
 
     def deactivate(self) -> None:
-        for component_id, component in self._components.items():
-            try:
-                component.deactivate()
-
-            except Exception as e:
-                self._logger.warning(f"Error deactivating component '{component_id}': {e}")
-                self._logger.exception(e)
-
-        self.__deactivate__()
-
-    def __deactivate__(self) -> None:
         pass
+
+    def _do_deactivate_members(self, activators: Collection[Activator]) -> None:
+        activators = list(activators)
+        activators.extend([c for c in self.__components.values() if c not in activators])
+        super()._do_deactivate_members(activators)
 
     # noinspection PyMethodMayBeStatic
     def get_types(self) -> List[str]:
@@ -158,9 +162,9 @@ class ComponentContext(Configurable, Mapping[str, Component]):
 
     def get_all(self, *types: str | type) -> List[Component] | Component:
         return [
-            component for component in self._components.values()
+            component for component in self.__components.values()
             if (
-                any(t.startswith(component.get_type()) for t in types if isinstance(t, str))
+                any(t.startswith(component.type) for t in types if isinstance(t, str))
                 or any(isinstance(component, t) for t in types if isinstance(t, type))
             )
         ]

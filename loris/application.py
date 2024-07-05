@@ -15,51 +15,57 @@ import pandas as pd
 import pytz as tz
 from loris import Channel, Settings, System
 from loris.data.manager import DataManager
-from loris.util import floor_date, to_bool, to_timedelta
+from loris.util import floor_date, to_timedelta
 
 
-# noinspection PyUnresolvedReferences
-def load(name: str = "Loris", **kwargs) -> Application:
-    return Application.load(Settings(name, **kwargs))
+def load(name: str = "Loris", factory: Type[System] = System, **kwargs) -> Application:
+    return Application(Settings(name, **kwargs)).setup(factory)
 
 
 class Application(DataManager, Thread):
     _interval: int
-    _interrupt: Event = Event()
-
-    # noinspection PyProtectedMember
-    @classmethod
-    def load(cls, settings: Settings, factory: Type[System] = System) -> Application:
-        app = cls(settings)
-
-        systems_flat = to_bool(settings.get("system_flat", default=False))
-        system_dirs = settings.dirs.encode()
-        system_dirs["conf_dir"] = None
-        if to_bool(settings.get("system_scan", default=False)):
-            if to_bool(settings.get("system_copy", default=False)):
-                factory.copy(settings)
-            system_dirs["scan_dir"] = settings.dirs.data
-            for system in factory.scan(app, **system_dirs, flat=systems_flat):
-                app.components._add(system)
-        else:
-            app.components._add(factory.load(app, **system_dirs, flat=systems_flat))
-        app.configure()
-        return app
+    __interrupt: Event = Event()
 
     def __init__(self, settings: Settings, **kwargs) -> None:
         super().__init__(settings, name=settings.application, **kwargs)
-        self._interrupt = Event()
-        self._interrupt.set()
-
-    def __configure__(self, configs) -> None:
-        super().__configure__(configs)
-        self._interval = configs.get_int("interval", default=1)
+        self.__interrupt = Event()
+        self.__interrupt.set()
 
     def __eq__(self, other):
         return self is other
 
     def __hash__(self):
         return hash(id(self))
+
+    def configure(self, settings: Settings) -> None:
+        super().configure(settings)
+        self._interval = settings.get_int("interval", default=1)
+
+    def setup(self, factory: Type[System]) -> Application:
+        self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
+        self._do_load_systems(self.settings, factory)
+        self._do_configure()
+        return self
+
+    # noinspection PyProtectedMember
+    def _do_load_systems(self, settings: Settings, factory: Type[System]) -> None:
+        systems = []
+        systems_flat = settings.get_bool("system_flat", default=False)
+        system_dirs = settings.dirs.encode()
+        system_dirs["conf_dir"] = None
+        if settings.get_bool("system_scan", default=False):
+            if settings.get_bool("system_copy", default=False):
+                factory.copy(settings)
+            system_dirs["scan_dir"] = settings.dirs.data
+            for system in factory.scan(self, **system_dirs, flat=systems_flat):
+                systems.append(system)
+        else:
+            systems.append(factory.load(self, **system_dirs, flat=systems_flat))
+        for system in systems:
+            if system.id in self._components:
+                self._components.get(system.id).configs.update(system.configs)
+            else:
+                self._components._add(system)
 
     # noinspection PyTypeChecker
     @property
@@ -72,14 +78,14 @@ class Application(DataManager, Thread):
 
     def start(self) -> None:
         self._logger.info(f"Starting {type(self).__name__}: {self.name}")
-        self._interrupt.clear()
+        self.__interrupt.clear()
         super().start()
 
     def wait(self, **kwargs) -> None:
         self.join(**kwargs)
 
     def interrupt(self) -> None:
-        self._interrupt.set()
+        self.__interrupt.set()
 
     # noinspection PyShadowingBuiltins
     def run(self, *args, **kwargs) -> None:
@@ -87,13 +93,13 @@ class Application(DataManager, Thread):
         self._run(*args, **kwargs)
 
         interval = f"{self._interval}s"
-        while not self._interrupt.is_set():
+        while not self.__interrupt.is_set():
             try:
                 now = pd.Timestamp.now(tz.UTC)
                 next = _next(now, interval)
                 sleep = (next - now).total_seconds()
                 self._logger.debug(f"Sleeping until next execution in {sleep} seconds: {next}")
-                self._interrupt.wait(sleep)
+                self.__interrupt.wait(sleep)
 
             except KeyboardInterrupt:
                 self.interrupt()

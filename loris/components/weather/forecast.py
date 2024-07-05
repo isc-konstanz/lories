@@ -15,27 +15,39 @@ import pytz as tz
 from loris import Configurations
 from loris.components import Component
 from loris.components.weather.connector import WeatherConnector
-from loris.util import to_int
 
 
 class WeatherForecast(Component):
     TYPE: str = "weather_forecast"
     SECTION: str = "forecast"
 
-    connector: WeatherConnector
+    interval: int = 60
+    offset: int = 0
+
+    __connector: WeatherConnector
 
     def __init__(self, context, connector: WeatherConnector, configs: Configurations) -> None:
         super().__init__(context, configs)
-        self.connector = connector
+        self.__connector = connector
 
-    # noinspection PyProtectedMember
-    def __configure__(self, configs: Configurations) -> None:
-        super().__configure__(configs)
-        self.interval = to_int(configs.get("interval", default=60))
-        self.offset = to_int(configs.get("offset", default=0))
+    def configure(self, configs: Configurations) -> None:
+        super().configure(configs)
+        self.interval = configs.get_int("interval", default=WeatherForecast.interval)
+        self.offset = configs.get_int("offset", default=WeatherForecast.offset)
 
-    def get_type(self) -> str:
+    def activate(self):
+        pass
+
+    def deactivate(self):
+        pass
+
+    @property
+    def type(self) -> str:
         return self.TYPE
+
+    @property
+    def connector(self) -> WeatherConnector:
+        return self.__connector
 
     def get(
         self,

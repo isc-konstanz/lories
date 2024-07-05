@@ -11,37 +11,44 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 
-from loris import Channel, Configurable, ConfigurationException, Configurations, LocalResourceException
+from loris import Channel, Channels, ConfigurationException, Configurations, Configurator, LocalResourceException
 from loris.components import ComponentContext
 from loris.connectors import ConnectorContext
 from loris.data import DataMapping
 
 
-class DataContext(Configurable, DataMapping):
-    components: ComponentContext
-    connectors: ConnectorContext
+class DataContext(Configurator, DataMapping):
+    _components: ComponentContext
+    _connectors: ConnectorContext
 
     def __init__(self, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(configs, *args, **kwargs)
-        self.components = ComponentContext(self, configs)
-        self.connectors = ConnectorContext(self, configs)
+        self._components = ComponentContext(configs)
+        self._connectors = ConnectorContext(configs)
 
-    def __configure__(self, configs) -> None:
-        super().__configure__(self._configs)
-        self.components.configure()
-        self.connectors.configure()
-        self._load_file(configs.dirs.conf)
+    def configure(self, configs: Configurations) -> None:
+        super().configure(configs)
+        self._do_load_from_file(configs.dirs.conf)
 
     # noinspection PyTypeChecker, PyProtectedMember, PyUnresolvedReferences
-    def _load_file(self, configs_dir: str, configs_file: str = "channels.conf") -> None:
+    def _do_load_from_file(
+        self,
+        configs_dir: str,
+        configs_file: str = "channels.conf",
+        prefix_uuid: str = None
+    ) -> None:
         configs_path = os.path.join(configs_dir, configs_file)
         if os.path.isfile(configs_path):
             configs_dirs = self.configs.dirs.encode()
             configs_dirs["conf_dir"] = configs_dir
             configs = Configurations.load(configs_file, **configs_dirs)
-            self._load(configs)
+            self._do_load_sections(configs, prefix_uuid)
 
-    def _load(self, configs: Configurations, prefix_uuid: str = None) -> None:
+    def _do_load_sections(
+        self,
+        configs: Configurations,
+        prefix_uuid: str = None
+    ) -> None:
         channel_ids = [
             i for i in configs.keys() if (isinstance(configs[i], Mapping) and i not in ["logger", "connector"])
         ]
@@ -68,7 +75,17 @@ class DataContext(Configurable, DataMapping):
                     if connector_uuid in self.connectors.keys():
                         channel_configs[connector_type]["connector"] = connector_uuid
 
-            self._add(self._new(channel_configs))
+            channel = self._new(channel_configs)
+
+            # TODO: Implement channel config update
+            # if channel.uuid in self:
+            #     self.__get(channel.uuid).update(channel_configs)
+            # else:
+            #     self._add(channel)
+            self._add(channel)
+
+    def __get(self, uuid: str) -> Channel:
+        return self._channels.get(uuid)
 
     # noinspection PyMethodMayBeStatic
     def _new(self, configs: Configurations) -> Channel:
@@ -85,4 +102,16 @@ class DataContext(Configurable, DataMapping):
         self._channels[channel.uuid] = channel
 
     def _remove(self, uuid: str) -> None:
-        del self._connectors[uuid]
+        del self._channels[uuid]
+
+    @property
+    def components(self) -> ComponentContext:
+        return self._components
+
+    @property
+    def connectors(self) -> ConnectorContext:
+        return self._connectors
+
+    @property
+    def channels(self) -> Channels:
+        return self.values()

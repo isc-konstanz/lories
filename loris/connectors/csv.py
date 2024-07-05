@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 import os
-from typing import Optional
+from typing import Mapping, Optional
 
 import pandas as pd
 import pytz as tz
@@ -18,7 +18,7 @@ from loris.channels import Channels
 from loris.configs import ConfigurationException, Configurations
 from loris.connectors import Connector
 from loris.io import csv
-from loris.util import _parse_freq, resample
+from loris.util import _parse_freq, resample, to_timezone
 
 
 # noinspection PyShadowingBuiltins
@@ -26,8 +26,29 @@ class CsvConnector(Connector):
     TYPE: str = "csv"
 
     _data: Optional[pd.DataFrame] = None
+    _data_path: Optional[str] = None
+    _data_dir: str
 
-    def __configure__(self, configs: Configurations) -> None:
+    index_column: str = "timestamp"
+    index_unix: bool = False
+
+    resolution: int = None
+
+    override: bool = False
+    slice: bool = False
+
+    freq: str = "D"
+    format: str = None
+    suffix: Optional[str] = None
+
+    timezone: Optional[tz.BaseTzInfo] = None
+
+    decimal: str = "."
+    separator: str = ","
+
+    columns: Mapping[str, str] = {}
+
+    def configure(self, configs: Configurations) -> None:
         data_dir = configs.get("dir", default=os.getcwd())
         if "~" in data_dir:
             data_dir = os.path.expanduser(data_dir)
@@ -40,21 +61,21 @@ class CsvConnector(Connector):
             data_path = os.path.join(data_dir, data_path)
         self._data_path = data_path
 
-        self.index_column = configs.get("index_column", default="timestamp")
-        self.index_unix = configs.get_bool("index_unix", default=False)
+        self.index_column = configs.get("index_column", default=CsvConnector.index_column)
+        self.index_unix = configs.get_bool("index_unix", default=CsvConnector.index_unix)
 
         # TODO: Validate if minutely default resolution is sufficient
-        resolution = configs.get_int("resolution", default=None)
+        resolution = configs.get_int("resolution", default=CsvConnector.resolution)
         if resolution is not None:
             resolution *= 60
         self.resolution = resolution
 
-        self.override = configs.get_bool("override", default=False)
-        self.slice = configs.get_bool("slice", default=True)
+        self.override = configs.get_bool("override", default=CsvConnector.override)
+        self.slice = configs.get_bool("slice", default=CsvConnector.slice)
 
-        self.freq = _parse_freq(configs.get("freq", default="D"))
+        self.freq = _parse_freq(configs.get("freq", default=CsvConnector.freq))
 
-        format = configs.get("format", default=None)
+        format = configs.get("format", default=CsvConnector.format)
         if format is not None:
             self.format = format
         elif self.freq == "Y":
@@ -68,22 +89,22 @@ class CsvConnector(Connector):
         else:
             raise ConfigurationException(f"Invalid frequency: {self.freq}")
 
-        self.suffix = configs.get("suffix", default=None)
+        self.suffix = configs.get("suffix", default=CsvConnector.suffix)
         if self.suffix is not None:
             self.format += f"_{self.suffix}"
 
-        timezone = configs.get("timezone", None)
+        timezone = configs.get("timezone", CsvConnector.timezone)
         if isinstance(timezone, str):
             timezone = tz.timezone(timezone)
-        self.timezone = timezone
+        self.timezone = to_timezone(timezone)
 
-        self.decimal = configs.get("decimal", ".")
-        self.separator = configs.get("separator", ",")
+        self.decimal = configs.get("decimal", CsvConnector.decimal)
+        self.separator = configs.get("separator", CsvConnector.separator)
 
         # TODO: Implement flag if pretty printing should be used or not
-        self.columns = configs.get("columns", default={})
+        self.columns = configs.get("columns", default=CsvConnector.columns)
 
-    def __connect__(self, channels: Channels) -> None:
+    def connect(self, channels: Channels) -> None:
         if self._data_path is not None:
             self._data = csv.read_file(
                 self._data_path,
@@ -95,8 +116,11 @@ class CsvConnector(Connector):
                 rename=self.columns,
             )
 
-    def __disconnect__(self) -> None:
+    def disconnect(self) -> None:
         self._data = None
+
+    def is_connected(self) -> bool:
+        return True
 
     def read(
         self,
@@ -149,6 +173,3 @@ class CsvConnector(Connector):
 
                 csv_file = os.path.join(self._data_dir, data_time.strftime(self.format) + ".csv")
                 csv.write_file(data, csv_file, **kwargs)
-
-    def is_connected(self) -> bool:
-        return True

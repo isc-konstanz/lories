@@ -14,4 +14,7 @@ from .configurations import (  # noqa: F401
     ConfigurationUnavailableException,
 )
 
-from .configurable import Configurable  # noqa: F401
+from .configurator import (  # noqa: F401
+    ConfiguratorMeta,
+    Configurator,
+)

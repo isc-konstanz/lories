@@ -6,6 +6,11 @@ loris.components
 
 """
 
+from .activator import (  # noqa: F401
+    ActivatorMeta,
+    Activator,
+)
+
 from .component import (  # noqa: F401
     Component,
     ComponentException,
@@ -24,3 +29,5 @@ from .weather import (  # noqa: F401
     WeatherException,
     WeatherUnavailableException,
 )
+
+registry.register(Weather, Weather.TYPE)

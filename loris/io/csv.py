@@ -11,7 +11,7 @@ from __future__ import annotations
 import datetime as dt
 import glob
 import os
-from typing import Dict, List, Optional
+from typing import List, Mapping, Optional
 
 import pandas as pd
 import pytz as tz
@@ -71,7 +71,7 @@ def read_file(
     timezone: Optional[tz.tzinfo] = None,
     separator: str = ",",
     decimal: str = ".",
-    rename: Optional[Dict[str, str]] = None,
+    rename: Optional[Mapping[str, str]] = None,
     encoding: str = "utf-8-sig",
 ) -> pd.DataFrame:
     """
@@ -205,7 +205,7 @@ def write_file(
     timezone: Optional[tz.tzinfo] = None,
     separator: str = ",",
     decimal: str = ".",
-    rename: Optional[Dict[str, str]] = None,
+    rename: Optional[Mapping[str, str]] = None,
     override: bool = False,
     encoding: str = "utf-8-sig",
 ):

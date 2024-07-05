@@ -10,36 +10,31 @@ from __future__ import annotations
 
 from typing import Any
 
-from loris import Channel, Configurable, Configurations, ConfigurationUnavailableException
+from loris import Channel, Configurations, Configurator
 from loris.data import DataMapping
 
 
-class DataAccess(Configurable, DataMapping):
+class DataAccess(Configurator, DataMapping):
     SECTION: str = "data"
 
     def __init__(self, component, context, configs: Configurations, **channels: Channel) -> None:
         super().__init__(configs, **channels)
-        self._component = component
-        self._context = context
+        self.__component = component
+        self.__context = context
 
     # noinspection PyProtectedMember
-    def __configure__(self, configs: Configurations) -> None:
-        try:
-            self._context.connectors._load(configs.get_section("connectors"), self._component.uuid)
+    def configure(self, configs: Configurations) -> None:
+        super().configure(configs)
+        if configs.has_section("connectors"):
+            self.__context.connectors._do_load_sections(configs.get_section("connectors"), self.__component.uuid)
 
-        except ConfigurationUnavailableException:
-            self._logger.debug(f"No connectors configured for configuration: {configs.name}")
-
-        try:
-            self._context._load(configs.get_section("channels"), self._component.uuid)
-
-        except ConfigurationUnavailableException:
-            self._logger.debug(f"No channels configured for configuration: {configs.name}")
+        if configs.has_section("channels"):
+            self.__context._do_load_sections(configs.get_section("channels"), self.__component.uuid)
 
     # noinspection PyProtectedMember, PyShadowingBuiltins
     def add(self, id: str, **configs: Any) -> None:
-        channel = Channel(uuid=f"{self._component.uuid}.{id}", id=id, **configs)
-        self._context._add(channel)
+        channel = Channel(uuid=f"{self.__component.uuid}.{id}", id=id, **configs)
+        self.__context._add(channel)
         self._add(channel)
 
     def _add(self, channel: Channel) -> None:

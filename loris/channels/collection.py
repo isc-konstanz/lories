@@ -26,7 +26,8 @@ class Channels(Collection[Channel]):
         self._channels = [*channels]
 
     def __repr__(self) -> str:
-        return str(self.to_frame(states=True))
+        # return str(self.to_frame(states=True))
+        return str([c.id for c in self])
 
     def __contains__(self, __x: object) -> bool:
         return __x in self._channels

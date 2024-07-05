@@ -16,42 +16,31 @@ from typing import Optional
 
 import pandas as pd
 import pytz as tz
-from loris import Channel, Channels, ChannelState, Configurations
+from loris import Activator, Channel, Channels, ChannelState, Configurations
 from loris.connectors import ConnectorException
 from loris.connectors.tasks import ConnectTask, LogTask, ReadTask, WriteTask
 from loris.data.context import DataContext
 
 
-class DataManager(DataContext):
+class DataManager(Activator, DataContext):
     _executor: ThreadPoolExecutor
 
     def __init__(self, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(configs, *args, **kwargs)
         self._executor = ThreadPoolExecutor(
-            thread_name_prefix="DataManager",
-            max_workers=max(int((os.cpu_count() or 1) / 2), 1)
+            thread_name_prefix=self.name, max_workers=max(int((os.cpu_count() or 1) / 2), 1)
         )
 
     def __enter__(self) -> DataManager:
-        self.activate()
+        self._do_activate()
         return self
 
     # noinspection PyShadowingBuiltins
     def __exit__(self, type, value, traceback) -> None:
-        self.deactivate()
-
-    def __activate__(self) -> None:
-        pass
-
-    def __deactivate__(self) -> None:
-        pass
+        self._do_deactivate()
 
     def activate(self) -> None:
-        self._logger.info(f"Activating {type(self).__name__}")
         self.connect()
-
-        self.components.activate()
-        self.__activate__()
 
     def connect(self, channels: Optional[Channels] = None) -> None:
         if channels is None:
@@ -59,6 +48,10 @@ class DataManager(DataContext):
 
         connect_futures = []
         for uuid, connector in self.connectors.items():
+            if not connector.is_enabled():
+                self._logger.debug(f"Skipping connecting disabled {type(connector).__name__}: {uuid}")
+                continue
+
             connect_channels = channels.filter(lambda c: c.has_connector(uuid) or c.has_logger(uuid))
             connect_futures.append(self._executor.submit(ConnectTask(connector, connect_channels)))
 
@@ -71,12 +64,12 @@ class DataManager(DataContext):
                 self._logger.exception(e)
                 e.connector.set_states(ChannelState.UNKNOWN_ERROR)
 
+    # noinspection PyProtectedMember
     def disconnect(self):
         for uuid, connector in self.connectors.items():
             try:
-                self._logger.info(f"Closing {type(connector).__name__}: {uuid}")
                 connector.set_states(ChannelState.DISCONNECTING)
-                connector.disconnect()
+                connector._do_disconnect()
 
             except Exception as e:
                 self._logger.warning(f"Error closing connector '{uuid}': {e}")
@@ -88,9 +81,6 @@ class DataManager(DataContext):
         self._logger.info(f"Deactivating {type(self).__name__}")
         self._executor.shutdown(wait=True)
         self.disconnect()
-
-        self.components.deactivate()
-        self.__deactivate__()
 
     def notify(self, channels: Optional[Channels] = None) -> None:
         pass
@@ -194,7 +184,7 @@ class DataManager(DataContext):
             def has_update(channel: Channel) -> bool:
                 return pd.isna(channel.logger.timestamp) or channel.logger.timestamp < channel.timestamp
 
-            log_channels = channels.filter(lambda c: (c.has_logger(uuid) and has_update(c)))
+            log_channels = channels.filter(lambda c: (c.has_logger(uuid) and c.is_valid() and has_update(c)))
             if len(log_channels) == 0:
                 continue
 

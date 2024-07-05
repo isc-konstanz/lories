@@ -12,6 +12,7 @@ from typing import Optional
 
 import pytz as tz
 from loris import LocalResourceException, LocalResourceUnavailableException
+from loris.util import to_timezone
 
 
 class LocationException(LocalResourceException):
@@ -63,15 +64,7 @@ class Location:
     ) -> None:
         self.latitude = latitude
         self.longitude = longitude
-        if isinstance(timezone, str):
-            self._timezone = tz.timezone(timezone)
-        elif isinstance(timezone, tz.BaseTzInfo):
-            self._timezone = timezone
-        elif isinstance(timezone, (int, float)):
-            self._timezone = tz.FixedOffset(timezone * 60)
-        else:
-            raise TypeError("Invalid tz specification")
-
+        self._timezone = to_timezone(timezone)
         self._altitude = altitude
 
         # TODO: deduct country, state and timezone from latitude and longitude

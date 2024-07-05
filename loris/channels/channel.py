@@ -12,7 +12,7 @@ import logging
 from collections import OrderedDict
 from copy import deepcopy
 from pydoc import locate
-from typing import Any, Optional, Type
+from typing import Any, Mapping, Optional, Type
 
 import pandas as pd
 import pytz as tz
@@ -24,12 +24,12 @@ from loris.util import _parse_freq, parse_id, to_timedelta
 class Channel:
     _uuid: str
     _id: str
+    _name: str
 
-    name: str
     logger: ChannelConnector
     connector: ChannelConnector
 
-    _configs: OrderedDict[str, Any]
+    __configs: OrderedDict[str, Any]
 
     _timestamp: pd.Timestamp = pd.NaT
     _value: Optional[Any] = None
@@ -56,7 +56,7 @@ class Channel:
 
         if name is None:
             name = self.id
-        self.name = name
+        self._name = name
 
         self._value_type = value_type
         self._value_length = value_length
@@ -77,14 +77,14 @@ class Channel:
                 _logger = {"connector": _logger}
             self.logger = ChannelConnector(**_logger)
 
-        self._configs = OrderedDict(configs)
+        self.__configs = OrderedDict(configs)
 
     def __repr__(self) -> str:
         return (
             "Channel:\n\t"
             + f"\n\tid: {self.id}"
             + f"\n\tname: {self.name}"
-            + "\n\t".join(f"{key}: {str(val)}" for key, val in self._configs.items())
+            + "\n\t".join(f"{key}: {str(val)}" for key, val in self.__configs.items())
             + f"\n\tvalue type: {self.value_type}"
             + f"\n\tvalue length: {self._value_length}"
             + f"\n\tvalue: {str(self.value)}"
@@ -103,12 +103,12 @@ class Channel:
             "value",
             "state",
             "timestamp",
-        ] + list(self._configs.keys())
+        ] + list(self.__configs.keys())
 
     def __getattr__(self, attr):
         # __getattr__ gets called when the item is not found via __getattribute__
         # To avoid recursion, call __getattribute__ directly to get components dict
-        configs = Channel.__getattribute__(self, "_configs")
+        configs = Channel.__getattribute__(self, f"_{Channel.__name__}__configs")
         if attr in configs.keys():
             return configs[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
@@ -122,10 +122,14 @@ class Channel:
         return self._id
 
     @property
+    def name(self) -> str:
+        return self._name
+
+    @property
     def freq(self) -> Optional[str]:
         for k in ["freq", "frequency", "resolution"]:
-            if k in self._configs:
-                return _parse_freq(self._configs[k])
+            if k in self.__configs:
+                return _parse_freq(self.__configs[k])
         return None
 
     @property
@@ -170,6 +174,9 @@ class Channel:
     def state(self, state) -> None:
         self._set(pd.Timestamp.now(tz.UTC).floor(freq="s"), None, state)
 
+    def is_valid(self):
+        return self.state == ChannelState.VALID
+
     def set(
         self,
         timestamp: pd.Timestamp,
@@ -190,15 +197,18 @@ class Channel:
         self._state = state
 
     def copy(self) -> Channel:
-        configs = deepcopy(self._configs)
+        configs = self._copy_configs()
         configs["name"] = self.name
         configs["logger"] = self.logger.copy()
         configs["connector"] = self.connector.copy()
         return Channel(uuid=self._uuid, id=self._id, name=self.name, **configs)
 
+    def _copy_configs(self) -> Mapping[str, Any]:
+        return deepcopy(self.__configs)
+
     # noinspection PyProtectedMember
     def from_logger(self) -> Channel:
-        configs = deepcopy(self.logger._configs)
+        configs = self.logger._copy_configs()
         configs["logger"] = deepcopy(self.logger)
         configs["connector"] = deepcopy(self.connector)
         channel = Channel(uuid=self._uuid, id=self._id, name=self.name, **configs)

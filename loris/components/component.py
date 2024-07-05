@@ -10,25 +10,24 @@ from __future__ import annotations
 
 import datetime as dt
 import os
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from shutil import copytree, ignore_patterns
-from typing import Optional
+from typing import Collection, Optional
 
 import pandas as pd
 from loris import LocalResourceException, LocalResourceUnavailableException, Settings
-from loris.configs import Configurable, ConfigurationException, Configurations
+from loris.components import Activator
+from loris.configs import ConfigurationException, Configurations, Configurator
 from loris.data import DataAccess
 from loris.util import parse_id, to_date
 
 
-class Component(ABC, Configurable):
+class Component(Activator):
     _uuid: str
     _id: str
     _name: str
 
-    data: DataAccess
-
-    _active: bool = False
+    __data: DataAccess
 
     # noinspection PyShadowingBuiltins
     @classmethod
@@ -40,7 +39,7 @@ class Component(ABC, Configurable):
             id = parse_id(configs["name"])
             configs["id"] = id
         else:
-            raise ValueError("Invalid configuration, missing specified system name")
+            raise ConfigurationException("Invalid configuration, missing specified system name")
 
         configs.dirs._data = os.path.join(configs.dirs.data, id)
 
@@ -73,35 +72,28 @@ class Component(ABC, Configurable):
         else:
             raise ConfigurationException("Invalid configuration, missing specified component ID")
 
-        self._uuid = self._id if not isinstance(context, Component) else f"{context._uuid}.{configs['id']}"
-        self._context = context
+        self._uuid = self._id if not isinstance(context, Component) else f"{context.uuid}.{configs['id']}"
 
-        self.data = DataAccess(self, context.context, configs.get_section(DataAccess.SECTION, default={}))
+        def _get_data_context():
+            from loris.data.context import DataContext
 
-    def __activate__(self) -> None:
-        pass
+            _data_context = context
+            while not isinstance(_data_context, DataContext):
+                try:
+                    _data_context = _data_context.context
+                except AttributeError:
+                    return ComponentException(f"Invalid component context type: {type(context)}")
+            return _data_context
 
-    def __deactivate__(self) -> None:
-        pass
+        self.__context = context
+        self.__data = DataAccess(self, _get_data_context(), configs.get_section(DataAccess.SECTION, defaults={}))
 
-    def __enter__(self) -> Component:
-        self.activate()
-        return self
-
-    # noinspection PyShadowingBuiltins
-    def __exit__(self, type, value, traceback):
-        self.deactivate()
-
-    def __repr__(self) -> str:
-        return super().__repr__() + f"\tactive = {self.is_active()}\n"
-
-    # noinspection SpellCheckingInspection
-    def configure(self) -> None:
-        super().configure()
-
-        # Configure DataAccess object outsite of __configure__, to allow channel configuration in inherited functions
-        self.data.configs.update(self.configs.get_section(self.data.SECTION, default={}), replace=False)
-        self.data.configure()
+    def _do_configure_members(self, configurators: Collection[Configurator]) -> None:
+        super()._do_configure_members(configurators)
+        # Update DataAccess configurations before configuring it manually, as private members are not configured
+        # This ensures up-to-date channel configurations when data is configured.
+        self.__data.configs.update(self.configs.get_section(DataAccess.SECTION, defaults={}), replace=False)
+        self.__data._do_configure()
 
     @property
     def uuid(self) -> str:
@@ -128,10 +120,15 @@ class Component(ABC, Configurable):
 
     @property
     def context(self):
-        return self._context
+        return self.__context
 
+    @property
+    def data(self):
+        return self.__data
+
+    @property
     @abstractmethod
-    def get_type(self) -> str:
+    def type(self) -> str:
         pass
 
     # noinspection PyShadowingBuiltins
@@ -141,7 +138,7 @@ class Component(ABC, Configurable):
         end: Optional[pd.Timestamp, dt.datetime, str] = None,
         **kwargs,
     ) -> pd.DataFrame:
-        data = self.data.to_frame()
+        data = self.__data.to_frame()
         if start is not None:
             start = to_date(start, **kwargs)
             data = data[data.index >= start]
@@ -149,23 +146,6 @@ class Component(ABC, Configurable):
             end = to_date(end, **kwargs)
             data = data[data.index <= end]
         return data
-
-    def is_active(self) -> bool:
-        return self._active
-
-    def activate(self) -> None:
-        self._logger.info(f"Activating {type(self).__name__}: {self.name}")
-        # for component in self._class_objects(Component):
-        #     component.activate()
-        self.__activate__()
-        self._active = True
-
-    def deactivate(self) -> None:
-        self._logger.info(f"Deactivating {type(self).__name__}: {self.name}")
-        # for component in self._class_objects(Component):
-        #     component.deactivate()
-        self.__deactivate__()
-        self._active = False
 
 
 class ComponentException(LocalResourceException):

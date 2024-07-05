@@ -24,12 +24,12 @@ from loris.util import ceil_date, floor_date
 
 # noinspection SpellCheckingInspection
 class Brightsky(WeatherConnector):
-    def __configure__(self, configs: Configurations) -> None:
-        super().__configure__(configs)
+    address: str = "https://api.brightsky.dev/"
+    horizon: int = 5
 
-        # TODO: Add sanity check
-        self.address = configs.get("address", default="https://api.brightsky.dev/")
-        self.horizon = configs.get_int("horizon", default=5)
+    def configure(self, configs: Configurations) -> None:
+        self.address = configs.get("address", default=Brightsky.address)
+        self.horizon = configs.get_int("horizon", default=Brightsky.horizon)
         if -1 > self.horizon > 10:
             raise ValueError(f"Invalid forecast horizon: {self.horizon}")
 
@@ -63,10 +63,13 @@ class Brightsky(WeatherConnector):
     def has_forecast(self) -> bool:
         return True
 
+    def is_connected(self) -> bool:
+        return True
+
     def connect(self, channels: Channels) -> None:
         pass
 
-    def close(self) -> None:
+    def disconnect(self) -> None:
         pass
 
     def read(
@@ -212,6 +215,3 @@ class Brightsky(WeatherConnector):
 
     def write(self, channels: Channels) -> None:
         raise NotImplementedError("Brightsky connector does not support writing")
-
-    def is_connected(self) -> bool:
-        return True

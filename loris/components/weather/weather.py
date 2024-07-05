@@ -13,10 +13,10 @@ effective irradiance on defined, tilted photovoltaic systems.
 from __future__ import annotations
 
 import datetime as dt
-from typing import Optional
+from typing import Collection, Optional
 
 import pandas as pd
-from loris import Configurations, Location
+from loris import Configurations, Configurator, Location, LocationUnavailableException
 from loris.components import Component, ComponentException, ComponentUnavailableException
 from loris.components.weather import WeatherConnector, WeatherForecast
 
@@ -49,76 +49,77 @@ class Weather(Component):
     PRECIPITABLE_WATER = "precipitable_water"
     SNOW_FRACTION = "snow_fraction"
 
-    location: Location
+    _location: Location
 
     _forecast: Optional[WeatherForecast] = None
     _connector: Optional[WeatherConnector] = None
 
     # noinspection PyProtectedMember
-    def __configure__(self, configs: Configurations) -> None:
-        super().__configure__(configs)
-        self.__localize__(configs)
+    def configure(self, configs: Configurations) -> None:
+        super().configure(configs)
+        self.localize(configs.get_section(Location.SECTION, defaults={"enabled": False}))
 
-        connector_type = configs.get("type", default="default").lower()
-        connector_configs = configs.copy()
-        connector_configs["id"] = connector_configs.get("id", default=connector_type).lower()
-        connector_configs["uuid"] = f"{self._uuid}.{connector_configs['id']}"
-        connector_configs.pop("data", None)
-        connector_context = self._context.context.connectors
-
-        if connector_type in ["default", "virtual"]:
-            self._connector = None
-        elif connector_type in ["brightsky", "dwd"]:
-            from .dwd import Brightsky
-
-            self._connector = Brightsky(connector_context, connector_configs, self.location)
-
-        elif connector_type in ["meteoblue", "nmm"]:
-            from .meteoblue import Meteoblue
-
-            self._connector = Meteoblue(connector_context, connector_configs, self.location)
-
-        if self._connector is not None:
-            connector_context._add(self._connector)
-            self._connector.configure()
-            self._configs.update(self._connector._get_config_defaults(), replace=False)
-
-            if self._connector.has_forecast() and self._configs.has_section(WeatherForecast.SECTION):
-                self._configs[WeatherForecast.SECTION]["id"] = f"{self.id}.forecast"
+        connector_type = configs.get("type", default="virtual").lower()
+        connector_context = self.context.context.connectors
+        connector_configs = configs.get_section(connector_type, defaults={})
+        connector_configs["id"] = configs.get("id", default=connector_type).lower()
+        connector_configs["uuid"] = f"{self.uuid}.{configs['id']}"
+        if connector_type != "virtual":
+            self._connector = WeatherConnector.load(
+                connector_type,
+                connector_context,
+                connector_configs,
+                self._location
+            )
+            if self._connector.has_forecast() and configs.has_section(WeatherForecast.SECTION):
+                self.configs[WeatherForecast.SECTION]["id"] = f"{self.id}_forecast"
                 self._forecast = WeatherForecast(
-                    self._context,
+                    self,
                     self._connector,
                     configs.get_section(WeatherForecast.SECTION)
                 )
-                self._forecast.configure()
+            connector_context._add(self._connector)
 
         # TODO: configure default channels
 
-    # noinspection PyMethodMayBeStatic
-    def __localize__(self, configs: Configurations) -> None:
-        if hasattr(self._context, "location"):
-            location = getattr(self._context, "location")
-            if not isinstance(location, Location):
-                raise WeatherException(f"Invalid location type for weather '{self._uuid}': {type(location)}")
-            self.location = location
+    # noinspection PyProtectedMember
+    def _do_configure_members(self, configurators: Collection[Configurator]) -> None:
+        configurators = list(configurators)
 
-        elif configs.has_section(Location.SECTION):
-            location_configs = configs.get_section(Location.SECTION)
-            self.location = Location(
-                location_configs.get_float("latitude"),
-                location_configs.get_float("longitude"),
-                timezone=location_configs.get("timezone", default="UTC"),
-                altitude=location_configs.get_float("altitude", default=None),
-                country=location_configs.get("country", default=None),
-                state=location_configs.get("state", default=None),
+        # Update local configurator variables manually to ensure correct order
+        if self._has_connector():
+            self._connector._do_configure()
+            self.configs.update(self._connector._get_config_defaults(), replace=False)
+            configurators.remove(self._connector)
+        if self.has_forecast():
+            self._forecast._do_configure()
+            configurators.remove(self._forecast)
+
+        super()._do_configure_members(configurators)
+
+    def localize(self, configs: Configurations) -> None:
+        if configs.enabled:
+            self._location = Location(
+                configs.get_float("latitude"),
+                configs.get_float("longitude"),
+                timezone=configs.get("timezone", default="UTC"),
+                altitude=configs.get_float("altitude", default=None),
+                country=configs.get("country", default=None),
+                state=configs.get("state", default=None),
             )
         else:
-            raise WeatherException(f"Unable to find valid location for weather configuration: {self.configs.name}")
+            try:
+                self._location = self.context.location
+                if not isinstance(self._location, Location):
+                    raise WeatherException(f"Invalid location type for weather '{self.uuid}': {type(self._location)}")
+            except (LocationUnavailableException, AttributeError) as e:
+                raise WeatherException(f"Unable to find valid location for weather: {self.name}", e)
 
-    def __activate__(self) -> None:
-        super().__activate__()
-        if self.has_forecast():
-            self._forecast.activate()
+    def activate(self) -> None:
+        super().activate()
+
+    def deactivate(self) -> None:
+        super().deactivate()
 
     def has_forecast(self) -> bool:
         return self._forecast is not None
@@ -129,13 +130,17 @@ class Weather(Component):
             raise WeatherException(f"Weather '{self.name}' has no forecast configured")
         return self._forecast
 
+    def _has_connector(self) -> bool:
+        return self._connector is not None
+
     @property
     def connector(self) -> WeatherConnector:
         if not self._connector:
             raise WeatherException(f"Weather '{self.name}' has no connector available")
         return self._connector
 
-    def get_type(self) -> str:
+    @property
+    def type(self) -> str:
         return self.TYPE
 
     def get(
