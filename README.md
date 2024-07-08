@@ -35,7 +35,7 @@
     ·
     <a href="https://github.com/isc-konstanz/loris/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
     -->  
-</p>
+  </p>
 </div>
 
 

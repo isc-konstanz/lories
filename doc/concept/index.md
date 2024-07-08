@@ -8,4 +8,6 @@ hidden: true
 maxdepth: 1
 ---
 self
+architecture
+lifecycle
 ```

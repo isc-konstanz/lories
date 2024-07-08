@@ -1,8 +1,17 @@
 # Loris Software Framework
 
-## What is Loris?
-Loris is an open-source software package for the ***Lo**cal **R**esource **I**ntegration
-for several **S**ystems* of ISC Konstanz e.V.  
+```{image} _images/loris-logo.png
+:alt: Loris Logo
+:width: 256px
+:align: center
+```
+
+<div align="center">
+  <h3 align="center">Loris</h3>
+  <p align="center">
+    Loris is an open-source software package for the <em><b>Lo</b>cal <b>R</b>esource <b>I</b>ntegration for several <b>S</b>ystems</em> of ISC Konstanz e.V.
+  </p>
+</div>
 
 ```{toctree}
 ---
