@@ -63,8 +63,8 @@ class Activator(Configurator, metaclass=ActivatorMeta):
             return
         self._logger.info(f"Activating {type(self).__name__}: {self.name}")
 
-        self._do_activate_members(list(get_variables(self, Activator).values()))
         self.__activate()
+        self._do_activate_members(list(get_variables(self, Activator).values()))
         self._on_activate()
         self._active = True
 
@@ -91,8 +91,8 @@ class Activator(Configurator, metaclass=ActivatorMeta):
             return
         self._logger.info(f"Deactivating {type(self).__name__}: {self.name}")
 
-        self._do_deactivate_members(list(get_variables(self, Activator).values()))
         self.__deactivate()
+        self._do_deactivate_members(list(get_variables(self, Activator).values()))
         self._on_deactivate()
         self._active = False
 

@@ -40,6 +40,7 @@ class DataManager(Activator, DataContext):
         self._do_deactivate()
 
     def activate(self) -> None:
+        super().activate()
         self.connect()
 
     def connect(self, channels: Optional[Channels] = None) -> None:
@@ -78,6 +79,7 @@ class DataManager(Activator, DataContext):
                 connector.set_states(ChannelState.DISCONNECTED)
 
     def deactivate(self):
+        super().deactivate()
         self._logger.info(f"Deactivating {type(self).__name__}")
         self._executor.shutdown(wait=True)
         self.disconnect()
