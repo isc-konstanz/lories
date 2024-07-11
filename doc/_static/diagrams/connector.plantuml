@@ -1,0 +1,38 @@
+@startuml loris.connectors.connector.Connector
+set namespaceSeparator none
+class "Connector" as loris.connectors.connector.Connector {
+  uuid: str
+  id: str
+  channels: Channels
+  context: ConnectorContext
+  {abstract}is_connected() -> bool
+  {abstract}connect(channels: Channels) -> None
+  {abstract}disconnect() -> None
+  {abstract}read(channels: Channels, start: Optional[pd.Timestamp, dt.datetime], end: Optional[pd.Timestamp, dt.datetime]) -> None
+  {abstract}write(channels: Channels) -> None
+  set_states(channel_state: ChannelState) -> None
+}
+class "ConnectorContext" as loris.connectors.context.ConnectorContext {
+  get_types() -> List[str]
+  get_all(*types: str | type) -> List[Connector]
+  has_type(*types: str | type) -> bool
+}
+class "Channels" as loris.channels.collection.Channels {
+  copy() -> Channels
+  apply(apply: callable) -> None
+  filter(filter: callable) -> Channels
+  groupby(by: str) -> List[Tuple[Any, Channels]]
+  to_frame(unique: bool, states: bool) -> pd.DataFrame
+}
+class "Configurator" as loris.configs.configurator.Configurator {
+  name: str
+  configs: Configurations
+  {abstract}configure(configs: Configurations) -> None
+  is_configured() -> bool
+  is_enabled() -> bool
+}
+loris.connectors.connector.Connector --|> loris.configs.configurator.Configurator
+loris.connectors.context.ConnectorContext --|> loris.configs.configurator.Configurator
+loris.connectors.context.ConnectorContext --* loris.connectors.connector.Connector : __context
+loris.channels.collection.Channels --* loris.connectors.connector.Connector : __channels
+@enduml

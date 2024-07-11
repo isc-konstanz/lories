@@ -1,0 +1,57 @@
+@startuml loris.data.manager.DataManager
+set namespaceSeparator none
+class "DataManager" as loris.data.manager.DataManager {
+  connect(channels: Optional[Channels]) -> None
+  disconnect() -> None
+  read(channels: Optional[Channels], start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame
+  write(data: pd.DataFrame, channels: Optional[Channels]) -> None
+  log(channels: Optional[Channels]) -> None
+}
+class "DataContext" as loris.data.context.DataContext {
+  channels: Channels
+  components: ComponentContext
+  connectors: ConnectorContext
+}
+class "DataMapping" as loris.data.mapping.DataMapping {
+  values() -> Channels
+  filter(filter: callable) -> Channels
+  groupby(by: str) -> List[Tuple[Any, Channels]]
+  to_frame() -> pd.DataFrame
+}
+class "ComponentContext" as loris.components.context.ComponentContext {
+  get_types() -> List[str]
+  get_all(*types: str | type) -> List[Component]
+  has_type(*types: str | type) -> bool
+}
+class "ConnectorContext" as loris.connectors.context.ConnectorContext {
+  get_types() -> List[str]
+  get_all(*types: str | type) -> List[Connector]
+  has_type(*types: str | type) -> bool
+}
+class "Activator" as loris.components.activator.Activator {
+  {abstract}activate() -> None
+  {abstract}deactivate() -> None
+  is_active() -> bool
+}
+class "Configurator" as loris.configs.configurator.Configurator {
+  name: str
+  configs: Configurations
+  {abstract}configure(configs: Configurations) -> None
+  is_configured() -> bool
+  is_enabled() -> bool
+}
+class "ThreadPoolExecutor" as concurrent.futures.thread.ThreadPoolExecutor {
+  shutdown(wait)
+  submit()
+}
+loris.components.activator.Activator --|> loris.configs.configurator.Configurator
+loris.components.context.ComponentContext --|> loris.components.activator.Activator
+loris.connectors.context.ConnectorContext --|> loris.configs.configurator.Configurator
+loris.data.context.DataContext --|> loris.configs.configurator.Configurator
+loris.data.context.DataContext --|> loris.data.mapping.DataMapping
+loris.data.manager.DataManager --|> loris.components.activator.Activator
+loris.data.manager.DataManager --|> loris.data.context.DataContext
+loris.components.context.ComponentContext --* loris.data.context.DataContext : _components
+loris.connectors.context.ConnectorContext --* loris.data.context.DataContext : _connectors
+concurrent.futures.thread.ThreadPoolExecutor --* loris.data.manager.DataManager : _executor
+@enduml

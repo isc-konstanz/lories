@@ -1,0 +1,74 @@
+@startuml loris.data.access.DataAccess
+set namespaceSeparator none
+class "Channel" as loris.channels.channel.Channel {
+  uuid: str
+  id: str
+  name: str
+  connector: ChannelConnector
+  logger: ChannelConnector
+  freq: str
+  timedelta: pd.Timedelta
+  timestamp: pd.Timestamp
+  value: Any
+  state: ChannelState
+  value_length: int
+  value_type: str | type
+  set(timestamp: pd.Timestamp, value: Any, state: Optional[str | ChannelState]) -> None
+  is_valid() -> bool
+  has_connector(uuid: Optional[str]) -> bool
+  has_logger() -> bool
+  from_logger() -> Channel
+  copy() -> Channel
+  to_series(state: bool) -> pd.Series
+}
+class "ChannelConnector" as loris.channels.connector.ChannelConnector {
+  uuid: str
+  id: str
+  timestamp: pd.Timestamp
+  copy() -> ChannelConnector
+}
+class "Channels" as loris.channels.collection.Channels {
+  copy() -> Channels
+  apply(apply: callable) -> None
+  filter(filter: callable) -> Channels
+  groupby(by: str) -> List[Tuple[Any, Channels]]
+  to_frame(unique: bool, states: bool) -> pd.DataFrame
+}
+class "DataAccess" as loris.data.access.DataAccess {
+  add(id: str, **configs: Any) -> None
+}
+class "DataMapping" as loris.data.mapping.DataMapping {
+  values() -> Channels
+  filter(filter: callable) -> Channels
+  groupby(by: str) -> List[Tuple[Any, Channels]]
+  to_frame() -> pd.DataFrame
+}
+class _collections_abc.Mapping {
+  get(key: str, default: Any)
+  keys()
+  values()
+  items()
+}
+class collections.OrderedDict {
+  {abstract}move_to_end(key, last)
+}
+class "Configurator" as loris.configs.configurator.Configurator {
+  name: str
+  configs: Configurations
+  {abstract}configure(configs: Configurations) -> None
+  is_configured() -> bool
+  is_enabled() -> bool
+}
+loris.channels.connector.ChannelConnector --* loris.channels.channel.Channel : logger
+loris.channels.connector.ChannelConnector --* loris.channels.channel.Channel : connector
+loris.channels.collection.Channels --o loris.channels.channel.Channel : _channels
+loris.channels.collection.Channels --o loris.data.mapping.DataMapping : values()
+loris.channels.collection.Channels --o loris.data.mapping.DataMapping : filter()
+loris.channels.collection.Channels --o loris.data.mapping.DataMapping : groupby()
+loris.data.access.DataAccess --|> loris.configs.configurator.Configurator
+loris.data.access.DataAccess --|> loris.data.mapping.DataMapping
+loris.data.mapping.DataMapping --|> _collections_abc.Mapping
+collections.OrderedDict --* loris.channels.channel.Channel : __configs
+collections.OrderedDict --* loris.channels.connector.ChannelConnector : __configs
+collections.OrderedDict --* loris.data.mapping.DataMapping : _channels
+@enduml
