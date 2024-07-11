@@ -48,6 +48,10 @@ class CsvConnector(Connector):
 
     columns: Mapping[str, str] = {}
 
+    @property
+    def type(self) -> str:
+        return self.TYPE
+
     def configure(self, configs: Configurations) -> None:
         data_dir = configs.get("dir", default=os.getcwd())
         if "~" in data_dir:

@@ -160,7 +160,7 @@ class ComponentContext(Activator, Mapping[str, Component]):
     def has_type(self, *types: str | type) -> bool:
         return len(self.get_all(*types)) > 0
 
-    def get_all(self, *types: str | type) -> List[Component] | Component:
+    def get_all(self, *types: str | type) -> List[Component]:
         return [
             component for component in self.__components.values()
             if (

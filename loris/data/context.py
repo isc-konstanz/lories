@@ -18,13 +18,13 @@ from loris.data import DataMapping
 
 
 class DataContext(Configurator, DataMapping):
-    _components: ComponentContext
     _connectors: ConnectorContext
+    _components: ComponentContext
 
     def __init__(self, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(configs, *args, **kwargs)
-        self._components = ComponentContext(configs)
         self._connectors = ConnectorContext(configs)
+        self._components = ComponentContext(configs)
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)

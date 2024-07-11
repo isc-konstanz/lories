@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 from collections import OrderedDict
 from collections.abc import Mapping
-from typing import Collection, Dict, Iterator
+from typing import Collection, Dict, Iterator, List
 
 from loris import ConfigurationException, Configurations, Configurator
 from loris.connectors import Connector, ConnectorException, registry
@@ -103,3 +103,19 @@ class ConnectorContext(Configurator, Mapping[str, Connector]):
 
     def _remove(self, uuid: str) -> None:
         del self.__connectors[uuid]
+
+    # noinspection PyMethodMayBeStatic
+    def get_types(self) -> List[str]:
+        return list(registry.types.keys())
+
+    def has_type(self, *types: str | type) -> bool:
+        return len(self.get_all(*types)) > 0
+
+    def get_all(self, *types: str | type) -> List[Connector]:
+        return [
+            connector for connector in self.__connectors.values()
+            if (
+                any(t.startswith(connector.type) for t in types if isinstance(t, str))
+                or any(isinstance(connector, t) for t in types if isinstance(t, type))
+            )
+        ]
