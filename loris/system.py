@@ -9,18 +9,51 @@ loris.system
 from __future__ import annotations
 
 import os
+from shutil import copytree, ignore_patterns
 from typing import List, Optional
 
 import pandas as pd
-from loris import Configurations, Location, LocationUnavailableException
+from loris import Configurations, ConfigurationException, Location, LocationUnavailableException, Settings
 from loris.components import Component, ComponentContext, Weather, WeatherUnavailableException
 from loris.data.context import DataContext
+from loris.util import parse_id
 
 
 class System(ComponentContext, Component):
     TYPE: str = "system"
 
     _location: Optional[Location] = None
+
+    # noinspection PyShadowingBuiltins
+    @classmethod
+    def copy(cls, settings: Settings) -> bool:
+        configs = Configurations(f"{cls.__name__.lower()}.conf", **settings.dirs.encode())
+        if "id" in configs:
+            id = parse_id(configs["id"])
+        elif "name" in configs:
+            id = parse_id(configs["name"])
+            configs["id"] = id
+        else:
+            raise ConfigurationException("Invalid configuration, missing specified system name")
+
+        configs.dirs._data = os.path.join(configs.dirs.data, id)
+
+        if os.path.isdir(configs.dirs.data):
+            return False
+        os.makedirs(configs.dirs.data, exist_ok=True)
+
+        copytree(
+            settings.dirs.conf,
+            configs.dirs.conf,
+            ignore=ignore_patterns(
+                "*.default.conf",
+                "evaluations*",
+                "results*",
+                "settings*",
+                "logging*"
+            ),
+        )
+        return True
 
     # noinspection PyUnresolvedReferences
     @classmethod

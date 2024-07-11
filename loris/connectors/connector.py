@@ -73,6 +73,15 @@ class Connector(Configurator, metaclass=ConnectorMeta):
         return self._id
 
     @property
+    @abstractmethod
+    def type(self) -> str:
+        pass
+
+    @property
+    def context(self):
+        return self.__context
+
+    @property
     def channels(self) -> Channels:
         return self.__channels
 

@@ -13,13 +13,29 @@ import os
 from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
+from functools import wraps
 
 import pandas as pd
 import pytz as tz
 from loris import Activator, Channel, Channels, ChannelState, Configurations
+from loris.components import ActivatorMeta
 from loris.connectors import ConnectorException
 from loris.connectors.tasks import ConnectTask, LogTask, ReadTask, WriteTask
 from loris.data.context import DataContext
+
+
+class DataManagerMeta(ActivatorMeta):
+    # noinspection PyProtectedMember
+    def __call__(cls, *args, **kwargs):
+        manager = super().__call__(*args, **kwargs)
+
+        manager._DataManager__connect = manager.connect
+        manager.connect = manager._do_connect
+
+        manager._DataManager__disconnect = manager.disconnect
+        manager.disconnect = manager._do_disconnect
+
+        return manager
 
 
 class DataManager(Activator, DataContext):
@@ -41,12 +57,9 @@ class DataManager(Activator, DataContext):
 
     def activate(self) -> None:
         super().activate()
-        self.connect()
+        self._do_connect()
 
-    def connect(self, channels: Optional[Channels] = None) -> None:
-        if channels is None:
-            channels = self.values()
-
+    def connect(self, channels: Optional[Channels]) -> None:
         connect_futures = []
         for uuid, connector in self.connectors.items():
             if not connector.is_enabled():
@@ -65,8 +78,19 @@ class DataManager(Activator, DataContext):
                 self._logger.exception(e)
                 e.connector.set_states(ChannelState.UNKNOWN_ERROR)
 
+    @wraps(connect)
+    def _do_connect(self, channels: Optional[Channels] = None):
+        if channels is None:
+            channels = self.values()
+
+        self.__connect(channels)
+        self._on_connect(channels)
+
+    def _on_connect(self, channels: Optional[Channels]) -> None:
+        pass
+
     # noinspection PyProtectedMember
-    def disconnect(self):
+    def disconnect(self) -> None:
         for uuid, connector in self.connectors.items():
             try:
                 connector.set_states(ChannelState.DISCONNECTING)
@@ -78,11 +102,19 @@ class DataManager(Activator, DataContext):
             finally:
                 connector.set_states(ChannelState.DISCONNECTED)
 
-    def deactivate(self):
+    @wraps(disconnect)
+    def _do_disconnect(self):
+        self.__disconnet()
+        self._on_disconnect()
+
+    def _on_disconnect(self) -> None:
+        pass
+
+    def deactivate(self) -> None:
         super().deactivate()
         self._logger.info(f"Deactivating {type(self).__name__}")
         self._executor.shutdown(wait=True)
-        self.disconnect()
+        self._do_disconnect()
 
     def notify(self, channels: Optional[Channels] = None) -> None:
         pass

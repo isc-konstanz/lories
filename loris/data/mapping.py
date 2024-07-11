@@ -10,8 +10,9 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Mapping
-from typing import Iterator
+from typing import Iterator, List, Tuple, Any
 
+import numpy as np
 import pandas as pd
 from loris import Channel, Channels
 
@@ -45,8 +46,15 @@ class DataMapping(Mapping[str, Channel]):
         return Channels(self._channels.values())
 
     # noinspection PyShadowingBuiltins
-    def filter(self, filter: callable) -> DataMapping:
-        return DataMapping({i: c for i, c in self._channels.items() if filter(c)})
+    def filter(self, filter: callable) -> Channels:
+        return Channels([c for c in self._channels.values() if filter(c)])
+
+    # noinspection SpellCheckingInspection
+    def groupby(self, by: str) -> List[Tuple[Any, Channels]]:
+        groups = []
+        for group_by in np.unique([getattr(c, by) for c in self._channels.values()]):
+            groups.append((group_by, self.filter(lambda c: getattr(c, by) == group_by)))
+        return groups
 
     def to_frame(self, **kwargs) -> pd.DataFrame:
         return self.values().to_frame(**kwargs)

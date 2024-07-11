@@ -44,6 +44,10 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
     resolution: Optional[int] = None
 
     @property
+    def type(self) -> str:
+        return self.TYPE
+
+    @property
     def connection(self):
         if self._connection is None or not self._connection.is_connected():
             raise ConnectionException("MySQL Connection not open", connector=self)

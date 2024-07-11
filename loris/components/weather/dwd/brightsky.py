@@ -24,8 +24,14 @@ from loris.util import ceil_date, floor_date
 
 # noinspection SpellCheckingInspection
 class Brightsky(WeatherConnector):
+    TYPE: str = "brightsky"
+
     address: str = "https://api.brightsky.dev/"
     horizon: int = 5
+
+    @property
+    def type(self) -> str:
+        return self.TYPE
 
     def configure(self, configs: Configurations) -> None:
         self.address = configs.get("address", default=Brightsky.address)

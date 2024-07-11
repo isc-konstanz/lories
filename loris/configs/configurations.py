@@ -151,7 +151,7 @@ class Configurations(MutableMapping[str, Any]):
     def move_to_bottom(self, key: str) -> None:
         self.__configs.move_to_end(key, True)
 
-    def copy(self):
+    def copy(self) -> Configurations:
         return Configurations(self.name, self.path, self.dirs, deepcopy(self.__configs))
 
     @property
