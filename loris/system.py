@@ -13,7 +13,7 @@ from shutil import copytree, ignore_patterns
 from typing import List, Optional
 
 import pandas as pd
-from loris import Configurations, ConfigurationException, Location, LocationUnavailableException, Settings
+from loris import ConfigurationException, Configurations, Location, LocationUnavailableException, Settings
 from loris.components import Component, ComponentContext, Weather, WeatherUnavailableException
 from loris.data.context import DataContext
 from loris.util import parse_id

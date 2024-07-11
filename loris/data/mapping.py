@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Mapping
-from typing import Iterator, List, Tuple, Any
+from typing import Any, Iterator, List, Tuple
 
 import numpy as np
 import pandas as pd

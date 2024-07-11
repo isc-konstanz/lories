@@ -12,8 +12,8 @@ import datetime as dt
 import os
 from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional
 from functools import wraps
+from typing import Optional
 
 import pandas as pd
 import pytz as tz
