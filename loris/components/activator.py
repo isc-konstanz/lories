@@ -8,11 +8,12 @@ loris.components.activator
 
 from __future__ import annotations
 
+import logging
 from abc import abstractmethod
 from functools import wraps
 from typing import Collection
 
-from loris.configs import ConfigurationException, Configurator, ConfiguratorMeta
+from loris.configs import ConfigurationException, Configurations, Configurator, ConfiguratorMeta
 from loris.util import get_variables
 
 
@@ -32,6 +33,10 @@ class ActivatorMeta(ConfiguratorMeta):
 
 class Activator(Configurator, metaclass=ActivatorMeta):
     _active: bool = False
+
+    def __init__(self, configs: Configurations, *args, **kwargs) -> None:
+        super().__init__(configs, *args, **kwargs)
+        self.__logger = logging.getLogger(Activator.__module__)
 
     def __enter__(self) -> Activator:
         self._do_activate()
@@ -59,22 +64,22 @@ class Activator(Configurator, metaclass=ActivatorMeta):
         if not self.is_configured():
             raise ConfigurationException(f"Trying to activate unconfigured {type(self).__name__}: {self.name}")
         if self.is_active():
-            self._logger.warning(f"{type(self).__name__} '{self.name}' already active")
+            self.__logger.warning(f"{type(self).__name__} '{self.name}' already active")
             return
-        self._logger.info(f"Activating {type(self).__name__}: {self.name}")
+        self.__logger.info(f"Activating {type(self).__name__}: {self.name}")
 
         self.__activate()
         self._do_activate_members(list(get_variables(self, Activator).values()))
         self._on_activate()
         self._active = True
 
-        self._logger.debug(f"Activated {type(self).__name__}: {self.name}")
+        self.__logger.debug(f"Activated {type(self).__name__}: {self.name}")
 
     # noinspection PyProtectedMember
     def _do_activate_members(self, activators: Collection[Activator]) -> None:
         for activator in activators:
             if not activator.is_enabled():
-                self._logger.debug(f"Skipping activating disabled {type(activator).__name__}: {activator.name}")
+                self.__logger.debug(f"Skipping activating disabled {type(activator).__name__}: {activator.name}")
             activator._do_activate()
 
     def _on_activate(self) -> None:
@@ -89,14 +94,14 @@ class Activator(Configurator, metaclass=ActivatorMeta):
     def _do_deactivate(self) -> None:
         if not self.is_active():
             return
-        self._logger.info(f"Deactivating {type(self).__name__}: {self.name}")
+        self.__logger.info(f"Deactivating {type(self).__name__}: {self.name}")
 
         self.__deactivate()
         self._do_deactivate_members(list(get_variables(self, Activator).values()))
         self._on_deactivate()
         self._active = False
 
-        self._logger.debug(f"Deactivated {type(self).__name__}: {self.name}")
+        self.__logger.debug(f"Deactivated {type(self).__name__}: {self.name}")
 
     # noinspection PyProtectedMember
     def _do_deactivate_members(self, activators: Collection[Activator]) -> None:
@@ -105,8 +110,8 @@ class Activator(Configurator, metaclass=ActivatorMeta):
                 activator._do_deactivate()
 
             except Exception as e:
-                self._logger.warning(f"Error deactivating {type(self).__name__} '{activator.name}': {e}")
-                self._logger.exception(e)
+                self.__logger.warning(f"Error deactivating {type(self).__name__} '{activator.name}': {e}")
+                self.__logger.exception(e)
 
     def _on_deactivate(self) -> None:
         pass

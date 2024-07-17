@@ -13,6 +13,7 @@ from abc import abstractmethod
 from functools import wraps
 from typing import Optional
 
+import logging
 import pandas as pd
 import pytz as tz
 from loris import Channels, ChannelState, ConfigurationException, Configurations, Configurator, LocalResourceException
@@ -60,6 +61,7 @@ class Connector(Configurator, metaclass=ConnectorMeta):
 
         self.__channels = channels if channels is not None else Channels()
         self.__context = get_context(context, (ConnectorContext, DataContext))
+        self.__logger = logging.getLogger(Connector.__module__)
 
     def __enter__(self) -> Connector:
         self._do_connect(self.__channels)
@@ -113,16 +115,16 @@ class Connector(Configurator, metaclass=ConnectorMeta):
         if not self.is_configured():
             raise ConfigurationException(f"Trying to connect unconfigured {type(self).__name__}: {self.uuid}")
         if self._is_connected():
-            self._logger.warning(f"{type(self).__name__} '{self.uuid}' already connected")
+            self.__logger.warning(f"{type(self).__name__} '{self.uuid}' already connected")
             return
-        self._logger.info(f"Connecting {type(self).__name__}: {self.uuid}")
+        self.__logger.info(f"Connecting {type(self).__name__}: {self.uuid}")
 
         self.__connect(channels)
         self._on_connect(channels)
         self._connect_timestamp = pd.Timestamp.now(tz.UTC)
         self.__channels = channels
 
-        self._logger.debug(f"Connected {type(self).__name__}: {self.uuid}")
+        self.__logger.debug(f"Connected {type(self).__name__}: {self.uuid}")
 
     def _on_connect(self, channels: Channels) -> None:
         pass
@@ -136,13 +138,13 @@ class Connector(Configurator, metaclass=ConnectorMeta):
     def _do_disconnect(self) -> None:
         if self._is_connected():
             return
-        self._logger.info(f"Disconnecting {type(self).__name__}: {self.uuid}")
+        self.__logger.info(f"Disconnecting {type(self).__name__}: {self.uuid}")
 
         self.__disconnect()
         self._on_disconnect()
         self._disconnect_timestamp = pd.Timestamp.now(tz.UTC)
 
-        self._logger.debug(f"Disconnected {type(self).__name__}: {self.uuid}")
+        self.__logger.debug(f"Disconnected {type(self).__name__}: {self.uuid}")
 
     def _on_disconnect(self) -> None:
         pass

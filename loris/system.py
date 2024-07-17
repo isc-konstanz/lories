@@ -121,7 +121,7 @@ class System(ComponentContext, Component):
     def weather(self) -> Weather:
         if not self.has_component(Weather.TYPE):
             raise WeatherUnavailableException(f"System '{self.name}' has no weather configured")
-        return self.get_component_type(Weather.TYPE)[0]
+        return next(self.get_component_type(Weather.TYPE))
 
     @property
     def type(self) -> str:

@@ -12,6 +12,7 @@ import datetime as dt
 from abc import abstractmethod
 from typing import Optional
 
+import logging
 import pandas as pd
 from loris import Configurations, Connector
 from loris.components import ActivatorMeta, ComponentContext
@@ -26,8 +27,9 @@ class WeatherConnectorMeta(ConnectorMeta, ActivatorMeta):
     def __call__(cls, context: ComponentContext, *args, **kwargs):
         connector = super().__call__(context, *args, **kwargs)
         connector_context = get_context(context, DataContext).connectors
-        connector._Connector__context = connector_context
         connector_context._add(connector)
+        connector._Connector__context = connector_context
+        connector._Connector__logger = logging.getLogger(Connector.__module__)
         return connector
 
 
