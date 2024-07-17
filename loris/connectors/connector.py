@@ -97,7 +97,7 @@ class Connector(Configurator, metaclass=ConnectorMeta):
             channel.state = channel_state
 
     def _is_connected(self) -> bool:
-        return self.is_connected() and not pd.isna(self._connect_timestamp)
+        return self.is_connected() and self._connected
 
     @abstractmethod
     def is_connected(self) -> bool:
@@ -122,6 +122,7 @@ class Connector(Configurator, metaclass=ConnectorMeta):
         self.__connect(channels)
         self._on_connect(channels)
         self._connect_timestamp = pd.Timestamp.now(tz.UTC)
+        self._connected = True
         self.__channels = channels
 
         self.__logger.debug(f"Connected {type(self).__name__}: {self.uuid}")
@@ -143,6 +144,7 @@ class Connector(Configurator, metaclass=ConnectorMeta):
         self.__disconnect()
         self._on_disconnect()
         self._disconnect_timestamp = pd.Timestamp.now(tz.UTC)
+        self._connected = False
 
         self.__logger.debug(f"Disconnected {type(self).__name__}: {self.uuid}")
 
