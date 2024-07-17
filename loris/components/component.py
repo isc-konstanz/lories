@@ -99,18 +99,27 @@ class Component(Activator):
     def type(self) -> str:
         pass
 
-    # noinspection PyShadowingBuiltins
     def get(
         self,
         start: Optional[pd.Timestamp, dt.datetime, str] = None,
         end: Optional[pd.Timestamp, dt.datetime, str] = None,
         **kwargs,
     ) -> pd.DataFrame:
-        data = self.__data.to_frame()
+        return self._get_range(self.__data.to_frame(), start, end, **kwargs)
+
+    @staticmethod
+    def _get_range(
+        data: pd.DataFrame,
+        start: Optional[pd.Timestamp, dt.datetime, str] = None,
+        end: Optional[pd.Timestamp, dt.datetime, str] = None,
+        **kwargs,
+    ) -> pd.DataFrame:
+        if data.empty:
+            return data
         if start is not None:
             start = to_date(start, **kwargs)
             data = data[data.index >= start]
-        if start is not None:
+        if end is not None:
             end = to_date(end, **kwargs)
             data = data[data.index <= end]
         return data
