@@ -37,6 +37,7 @@ class Configurator(ABC, metaclass=ConfiguratorMeta):
     def __init__(self, configs: Optional[Configurations] = None, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._logger = logging.getLogger(self.__module__)
+        self.__logger = logging.getLogger(Configurator.__module__)
         self.__configs = configs
 
     def __repr__(self) -> str:
@@ -86,7 +87,7 @@ class Configurator(ABC, metaclass=ConfiguratorMeta):
             self._logger.warning(f"{type(self).__name__} '{configs.name}' already configured")
             return
 
-        self._logger.debug(f"Configuring {type(self).__name__}: {configs.name}")
+        self.__logger.debug(f"Configuring {type(self).__name__}: {configs.name}")
 
         self.__configure(configs)
         self._do_configure_members(get_variables(self, Configurator).values())
@@ -96,12 +97,12 @@ class Configurator(ABC, metaclass=ConfiguratorMeta):
         self._configured = True
 
         if self._logger.isEnabledFor(logging.DEBUG):
-            self._logger.debug(f"Configured {self}")
+            self.__logger.debug(f"Configured {self}")
 
     def _do_configure_members(self, configurators: Collection[Configurator]) -> None:
         for configurator in configurators:
             if not configurator.is_enabled():
-                self._logger.debug(
+                self.__logger.debug(
                     f"Skipping configuring disabled {type(configurator).__name__}: " f"{configurator.configs.name}"
                 )
                 continue

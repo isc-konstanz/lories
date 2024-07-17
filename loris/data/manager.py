@@ -92,6 +92,9 @@ class DataManager(Activator, DataContext, metaclass=DataManagerMeta):
     # noinspection PyProtectedMember
     def disconnect(self) -> None:
         for uuid, connector in self.connectors.items():
+            if not connector._is_connected():
+                self._logger.debug(f"Skipping disconnecting not connected {type(connector).__name__}: {uuid}")
+                continue
             try:
                 connector.set_states(ChannelState.DISCONNECTING)
                 connector._do_disconnect()

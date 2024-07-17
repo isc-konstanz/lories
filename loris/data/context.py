@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Collection
 
 from loris import Channel, Channels, ConfigurationException, Configurations, Configurator, LocalResourceException
 from loris.components import ComponentContext
@@ -30,6 +30,13 @@ class DataContext(Configurator, DataMapping):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
         self._do_load_from_file(configs.dirs.conf)
+
+    def _do_configure_members(self, configurators: Collection[Configurator]) -> None:
+        # Ensure components always being configured first
+        configurators = list(configurators)
+        configurators.remove(self._connectors)
+        configurators.remove(self._components)
+        super()._do_configure_members(configurators + [self._components, self._connectors])
 
     # noinspection PyTypeChecker, PyProtectedMember, PyUnresolvedReferences
     def _do_load_from_file(self, configs_dir: str, configs_file: str = "channels.conf") -> None:

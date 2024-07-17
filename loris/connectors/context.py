@@ -42,7 +42,11 @@ class ConnectorContext(Configurator, Mapping[str, Connector]):
     def _do_configure_members(self, configurators: Collection[Configurator]) -> None:
         configurators = list(configurators)
         configurators.extend([c for c in self.__connectors.values() if c not in configurators])
-        super()._do_configure_members(configurators)
+
+        # Do not configure components, to avoid them being configured twice
+        # TODO: Verify if this can be avoided or improved
+        from loris.components import Component
+        super()._do_configure_members([c for c in configurators if not isinstance(c, Component)])
 
     # noinspection PyTypeChecker, PyProtectedMember, PyUnresolvedReferences
     def _do_load_from_file(
