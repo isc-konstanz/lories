@@ -65,7 +65,7 @@ class Channel:
         if isinstance(_connector, ChannelConnector):
             self.connector = _connector
         else:
-            if isinstance(_connector, str):
+            if _connector is None or isinstance(_connector, str):
                 _connector = {"connector": _connector}
             self.connector = ChannelConnector(**_connector)
 
@@ -73,7 +73,7 @@ class Channel:
         if isinstance(_logger, ChannelConnector):
             self.logger = _logger
         else:
-            if isinstance(_logger, str):
+            if _logger is None or isinstance(_logger, str):
                 _logger = {"connector": _logger}
             self.logger = ChannelConnector(**_logger)
 

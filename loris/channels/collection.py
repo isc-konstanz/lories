@@ -63,6 +63,8 @@ class Channels(Collection[Channel]):
         columns = []
         data = []
         for channel in self._channels:
+            if pd.isna(channel.timestamp):
+                continue
             channel_id = channel.id if not unique else channel.uuid
             channel_data = channel.to_series(state=states)
             channel_data.name = channel_id
