@@ -6,8 +6,7 @@ loris.component.weather.dwd._channels
 
 """
 
-from collections import OrderedDict
-from typing import Any, Dict
+from typing import Any, Collection, Dict
 
 from loris.components.weather import WEATHER as CHANNEL_NAMES
 from loris.components.weather import Weather
@@ -16,12 +15,10 @@ CHANNEL_IDS = [
     Weather.GHI,
     Weather.TEMP_AIR,
     Weather.TEMP_DEW_POINT,
-    Weather.HUMIDITY_REL,
     Weather.PRESSURE_SEA,
     Weather.WIND_SPEED,
     Weather.WIND_SPEED_GUST,
     Weather.WIND_DIRECTION,
-    Weather.WIND_DIRECTION_GUST,
     Weather.CLOUD_COVER,
     Weather.SUNSHINE,
     Weather.VISIBILITY,
@@ -61,20 +58,18 @@ def _parse_value_type(channel_id: str) -> type:
     return CHANNEL_TYPE_DEFAULT if channel_id not in CHANNEL_TYPES else CHANNEL_TYPES[channel_id]
 
 
-def _parse_channel(channel_id: str) -> Dict[str, Any]:
-    channel = {
-        "id": channel_id,
-        "name": _parse_name(channel_id),
-        "address": _parse_address(channel_id),
-        "value_type": _parse_value_type(channel_id),
-    }
+def _parse_channel(channel_id: str, **channel: Any) -> Dict[str, Any]:
+    channel["id"] = channel_id
+    channel["name"] = _parse_name(channel_id)
+    channel["address"] = _parse_address(channel_id)
+    channel["value_type"] = _parse_value_type(channel_id)
     if channel["value_type"] == str:  # noqa: E721
         channel["value_length"] = 32
     return channel
 
 
-def parse_defaults(uuid: str) -> Dict[str, Any]:
-    channel_defaults = OrderedDict({"connector": uuid})
+def get_channels(**channel: Any) -> Collection[Dict[str, Any]]:
+    channels = []
     for channel_id in CHANNEL_IDS:
-        channel_defaults[channel_id] = _parse_channel(channel_id)
-    return channel_defaults
+        channels.append(_parse_channel(channel_id, **channel))
+    return channels

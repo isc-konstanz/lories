@@ -8,44 +8,88 @@ loris.components.weather.connector
 
 from __future__ import annotations
 
+import datetime as dt
 from abc import abstractmethod
-from typing import Any, Dict, Optional
+from typing import Optional
 
-from loris import ConfigurationException, Configurations, Connector, Location
-from loris.connectors import ConnectorContext
+import pandas as pd
+from loris import Configurations, Connector
+from loris.components import ActivatorMeta, ComponentContext
+from loris.components.weather import Weather, WeatherException, WeatherForecast
+from loris.connectors import ConnectorMeta
+from loris.data.context import DataContext
+from loris.util import get_context
 
 
-class WeatherConnector(Connector):
-    location: Location
+class WeatherConnectorMeta(ConnectorMeta, ActivatorMeta):
+    # noinspection PyProtectedMember
+    def __call__(cls, context: ComponentContext, *args, **kwargs):
+        connector = super().__call__(context, *args, **kwargs)
+        connector_context = get_context(context, DataContext).connectors
+        connector._Connector__context = connector_context
+        connector_context._add(connector)
+        return connector
 
-    # noinspection PyShadowingBuiltins, SpellCheckingInspection
-    @staticmethod
-    def load(
-        type: str,
-        context: ConnectorContext,
-        configs: Configurations,
-        location: Location
-    ) -> Optional[WeatherConnector]:
-        if type in ["brightsky", "dwd"]:
-            from .dwd import Brightsky
 
-            return Brightsky(context, configs, location)
+class WeatherConnector(Connector, Weather, metaclass=WeatherConnectorMeta):
+    _forecast: WeatherForecast = None
 
-        # elif type in ["meteoblue", "nmm"]:
-        #     from .meteoblue import Meteoblue
-        #
-        #     return Meteoblue(context, configs, location)
+    def __init__(self, context: ComponentContext, configs: Configurations, *args, **kwargs) -> None:
+        super(Connector, self).__init__(context, configs, *args, **kwargs)
 
-        raise ConfigurationException(f"Unknown weather type: {type}")
+    def configure(self, configs: Configurations) -> None:
+        super().configure(configs)
+        self._do_load_forecast(configs.get_section(WeatherForecast.SECTION, defaults={}))
 
-    def __init__(self, context: ConnectorContext, configs: Configurations, location: Location, *args, **kwargs) -> None:
-        super().__init__(context, configs, *args, **kwargs)
-        self.location = location
-
-    # noinspection PyMethodMayBeStatic
-    def _get_config_defaults(self) -> Dict[str, Any]:
-        return {}
+    def _do_load_forecast(self, configs: Configurations) -> None:
+        if self.has_forecast():
+            if "id" not in configs:
+                configs["id"] = "forecast"
+            self._forecast = WeatherForecast(self, configs)
 
     @abstractmethod
     def has_forecast(self) -> bool:
         pass
+
+    @property
+    def forecast(self) -> WeatherForecast:
+        if not self.has_forecast() or self._forecast is None:
+            raise WeatherException(f"Weather '{self.name}' has no forecast configured")
+        return self._forecast
+
+    @property
+    def context(self):
+        return super(Weather, self).context
+
+    def get(
+        self,
+        start: Optional[pd.Timestamp, dt.datetime, str] = None,
+        end: Optional[pd.Timestamp, dt.datetime, str] = None,
+        **kwargs,
+    ) -> pd.DataFrame:
+        """
+        Retrieves the weather data for a specified time interval
+
+        :param start:
+            the start timestamp for which weather data will be looked up for.
+            For many applications, passing datetime.datetime.now() will suffice.
+        :type start:
+            :class:`pandas.Timestamp` or datetime
+
+        :param end:
+            the end timestamp for which weather data will be looked up for.
+        :type end:
+            :class:`pandas.Timestamp` or datetime
+
+        :returns:
+            the weather data, indexed in a specific time interval.
+
+        :rtype:
+            :class:`pandas.DataFrame`
+        """
+        weather = super().get(start, end, **kwargs)
+        if self.has_forecast():
+            weather_forecast = self.forecast.get(start, end, **kwargs)
+            if not weather_forecast.empty:
+                weather = weather.combine_first(weather_forecast)
+        return weather

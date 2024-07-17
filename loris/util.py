@@ -12,11 +12,12 @@ import datetime as dt
 import re
 from copy import copy
 from dateutil.relativedelta import relativedelta
-from typing import Any, Callable, List, Mapping, Optional, Tuple, Type
+from typing import Any, Callable, Collection, List, Mapping, Optional, Tuple, Type
 
 import numpy as np
 import pandas as pd
 import pytz as tz
+from loris import LocalResourceException
 from pandas.tseries.frequencies import to_offset
 
 # noinspection SpellCheckingInspection
@@ -52,6 +53,17 @@ def get_members(object: Any, filter: Callable = None) -> Mapping[str, Any]:
             members[attr] = member
         processed.add(attr)
     return dict(sorted(members.items()))
+
+
+# noinspection PyShadowingBuiltins
+def get_context(object: Any, type: Type | Collection[Type]):
+    _context = object
+    while not isinstance(_context, type):
+        try:
+            _context = _context.context
+        except AttributeError:
+            raise LocalResourceException(f"Invalid component context type: {object.__class__}")
+    return _context
 
 
 # noinspection PyUnresolvedReferences, PyShadowingBuiltins, PyShadowingNames

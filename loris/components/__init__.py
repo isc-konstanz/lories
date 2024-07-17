@@ -30,4 +30,4 @@ from .weather import (  # noqa: F401
     WeatherUnavailableException,
 )
 
-registry.register(Weather, Weather.TYPE)
+registry.register(Weather, Weather.TYPE, factory=Weather.load)

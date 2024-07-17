@@ -15,7 +15,7 @@ import pandas as pd
 import pytz as tz
 from loris import Configurations
 from loris.components import Component
-from loris.components.weather.connector import WeatherConnector
+from loris.connectors import Connector
 from loris.util import floor_date, to_date, to_timezone
 
 
@@ -23,32 +23,41 @@ class WeatherForecast(Component):
     TYPE: str = "weather_forecast"
     SECTION: str = "forecast"
 
+    timezone: tz.BaseTzInfo
+
     interval: int = 60
     offset: int = 0
 
-    __connector: WeatherConnector
-
-    def __init__(self, context, connector: WeatherConnector, configs: Configurations) -> None:
-        super().__init__(context, configs)
+    def __init__(self, connector, configs: Configurations) -> None:
+        super().__init__(connector, configs)
         self.__connector = connector
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
+
+        from loris.components.weather import WeatherConnector, WeatherException
+        if isinstance(self.__connector, WeatherConnector):
+            self.timezone = self.__connector.location.timezone
+        elif "timezone" in configs:
+            self.timezone = to_timezone(configs.get("timezone"))
+        else:
+            raise WeatherException(f"Unable to determine timezone for weather forecast '{self.name}'")
+
         self.interval = configs.get_int("interval", default=WeatherForecast.interval)
         self.offset = configs.get_int("offset", default=WeatherForecast.offset)
 
     def activate(self):
-        pass
+        super().activate()
 
     def deactivate(self):
-        pass
+        super().deactivate()
 
     @property
     def type(self) -> str:
         return self.TYPE
 
     @property
-    def connector(self) -> WeatherConnector:
+    def connector(self) -> Connector:
         return self.__connector
 
     def get(
@@ -87,7 +96,7 @@ class WeatherForecast(Component):
 
         # Calculate the available forecast start and end times
         if timezone is None:
-            timezone = self.connector.location.timezone
+            timezone = self.timezone
         else:
             timezone = to_timezone(timezone)
         end = to_date(end, timezone=timezone)
@@ -98,7 +107,7 @@ class WeatherForecast(Component):
         if forecast.empty or forecast.index[0] > start:
             forecast_channels = self.data.filter(lambda c: c.has_logger() and c.has_connector(self.connector.uuid))
             if len(forecast_channels) > 0:
-                start_schedule = floor_date(start, self.connector.location.timezone, f"{self.interval}T")
+                start_schedule = floor_date(start, self.timezone, freq=f"{self.interval}T")
                 start_schedule += pd.Timedelta(minutes=self.offset)
                 if start_schedule > start:
                     start_schedule -= pd.Timedelta(minutes=self.interval)

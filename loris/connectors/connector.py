@@ -17,7 +17,7 @@ import pandas as pd
 import pytz as tz
 from loris import Channels, ChannelState, ConfigurationException, Configurations, Configurator, LocalResourceException
 from loris.configs import ConfiguratorMeta
-from loris.util import parse_id
+from loris.util import get_context, parse_id
 
 
 class ConnectorMeta(ConfiguratorMeta):
@@ -43,7 +43,7 @@ class Connector(Configurator, metaclass=ConnectorMeta):
     _disconnect_timestamp: pd.Timestamp = pd.NaT
     _reconnect_interval: pd.Timedelta = pd.Timedelta(minutes=1)
 
-    __channels: Channels
+    __channels: Channels = None
 
     def __init__(self, context, configs: Configurations, channels: Channels = None, *args, **kwargs) -> None:
         super().__init__(configs, *args, **kwargs)
@@ -51,10 +51,15 @@ class Connector(Configurator, metaclass=ConnectorMeta):
             raise ConfigurationException("Invalid configuration, missing specified connector ID")
 
         self._id = parse_id(configs.get("id"))
-        self._uuid = configs.pop("uuid") if "uuid" in configs else self.id
+        self._uuid = configs.pop("uuid") if "uuid" in configs else self._id
 
-        self.__context = context
+        from loris.data.context import DataContext
+        from loris.connectors.context import ConnectorContext
+        if not isinstance(context, (ConnectorContext, DataContext)):
+            raise ConnectorException(f"Invalid connector context type: {type(context)}")
+
         self.__channels = channels if channels is not None else Channels()
+        self.__context = get_context(context, (ConnectorContext, DataContext))
 
     def __enter__(self) -> Connector:
         self._do_connect(self.__channels)

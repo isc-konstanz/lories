@@ -55,7 +55,11 @@ from .components import (  # noqa: F401
 )
 
 from .components import weather  # noqa: F401
-from .components.weather import Weather  # noqa: F401
+from .components.weather import (  # noqa: F401
+    Weather,
+    WeatherException,
+    WeatherUnavailableException,
+)
 
 from . import system  # noqa: F401
 from .system import System  # noqa: F401

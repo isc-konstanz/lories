@@ -10,15 +10,15 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-from typing import Any, List, Mapping, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import requests
 
 import numpy as np
 import pandas as pd
-from loris import Channel, Channels, ChannelState, Configurations
+from loris import Channel, Channels, ChannelState, ConfigurationException, Configurations
 from loris.components.weather import Weather, WeatherConnector
-from loris.components.weather.dwd._channels import parse_defaults
+from loris.components.weather.dwd._channels import get_channels
 from loris.util import ceil_date, floor_date
 
 
@@ -34,37 +34,30 @@ class Brightsky(WeatherConnector):
         return self.TYPE
 
     def configure(self, configs: Configurations) -> None:
+        super().configure(configs)
+
         self.address = configs.get("address", default=Brightsky.address)
         self.horizon = configs.get_int("horizon", default=Brightsky.horizon)
         if -1 > self.horizon > 10:
-            raise ValueError(f"Invalid forecast horizon: {self.horizon}")
+            raise ConfigurationException(f"Invalid forecast horizon: {self.horizon}")
 
-    # noinspection PyTypeChecker
-    def _get_config_defaults(self) -> Mapping[str, Any]:
-        return {
-            "data": {
-                "channels": {
-                    "source": ("current", "historical"),
-                    **parse_defaults(self._uuid)
-                }
-            },
-            "forecast": {
-                "data": {
-                    "channels": {
-                        "horizon": self.horizon,
-                        "source": "forecast",
-                        "timestamp_creation": {
-                            "name": "Creation Timestamp",
-                            "address": "source_first_record",
-                            "value_type": pd.Timestamp,
-                            "primary": True,
-                            "nullable": False,
-                        },
-                        **parse_defaults(self._uuid),
-                    }
-                }
-            },
-        }
+        if self.forecast.is_enabled():
+            self.forecast.data.add(
+                id="timestamp_creation",
+                name="Creation Timestamp",
+                connector=self.uuid,
+                horizon=self.horizon,
+                source="forecast",
+                address="source_first_record",
+                value_type=pd.Timestamp,
+                primary=True,
+                nullable=False,
+            )
+            for channel in get_channels(connector=self.uuid, horizon=self.horizon, source="forecast"):
+                self.forecast.data.add(**channel)
+
+        for channel in get_channels(connector=self.uuid, source=("current", "historical")):
+            self.data.add(**channel)
 
     def has_forecast(self) -> bool:
         return True
@@ -73,10 +66,16 @@ class Brightsky(WeatherConnector):
         return True
 
     def connect(self, channels: Channels) -> None:
-        pass
+        super().connect(channels)
+
+    def activate(self) -> None:
+        super().activate()
 
     def disconnect(self) -> None:
-        pass
+        super().disconnect()
+
+    def deactivate(self) -> None:
+        super().deactivate()
 
     def read(
         self,

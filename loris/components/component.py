@@ -17,7 +17,7 @@ from loris import LocalResourceException, LocalResourceUnavailableException
 from loris.components import Activator
 from loris.configs import ConfigurationException, Configurations, Configurator
 from loris.data import DataAccess
-from loris.util import parse_id, to_date
+from loris.util import get_context, parse_id, to_date
 
 
 class Component(Activator):
@@ -45,18 +45,8 @@ class Component(Activator):
             raise ComponentException(f"Invalid component context type: {type(context)}")
 
         self._uuid = self._id if not isinstance(context, Component) else f"{context.uuid}.{self._id}"
-
-        def _get_context(_type):
-            _context = context
-            while not isinstance(_context, _type):
-                try:
-                    _context = _context.context
-                except AttributeError:
-                    raise ComponentException(f"Invalid component context type: {type(context)}")
-            return _context
-
-        self.__data = DataAccess(self, _get_context(DataContext))
-        self.__context = _get_context((ComponentContext, DataContext))
+        self.__data = DataAccess(self, get_context(context, DataContext))
+        self.__context = context
 
     # noinspection PyProtectedMember
     def _do_configure_members(self, configurators: Collection[Configurator]) -> None:

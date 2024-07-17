@@ -83,10 +83,10 @@ class System(ComponentContext, Component):
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self.localize(configs.get_section(Location.SECTION, defaults={"enabled": False}))
+        self.localize(configs.get_section(Location.SECTION, defaults={}))
 
     def localize(self, configs: Configurations) -> None:
-        if configs.enabled:
+        if configs.enabled and all(k in configs for k in ["latitude", "longitude"]):
             self._location = Location(
                 configs.get_float("latitude"),
                 configs.get_float("longitude"),
