@@ -34,7 +34,7 @@ class Configurator(ABC, metaclass=ConfiguratorMeta):
 
     _configured: bool = False
 
-    def __init__(self, configs: Configurations, *args, **kwargs) -> None:
+    def __init__(self, configs: Optional[Configurations] = None, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._logger = logging.getLogger(self.__module__)
         self.__configs = configs
@@ -60,7 +60,8 @@ class Configurator(ABC, metaclass=ConfiguratorMeta):
         return type(self).__name__
 
     def is_enabled(self) -> bool:
-        return self.__configs.enabled
+        return (self.__configs is not None and
+                self.__configs.enabled)
 
     def is_configured(self) -> bool:
         return self._configured
@@ -78,12 +79,13 @@ class Configurator(ABC, metaclass=ConfiguratorMeta):
     def _do_configure(self, configs: Optional[Configurations] = None) -> None:
         if configs is None:
             configs = self.__configs
-
-        if not configs.enabled:
+        if configs is None or not configs.enabled:
             raise ConfigurationException(f"Trying to configure disabled {type(self).__name__}: {configs.name}")
+
         if self.is_configured():
             self._logger.warning(f"{type(self).__name__} '{configs.name}' already configured")
             return
+
         self._logger.debug(f"Configuring {type(self).__name__}: {configs.name}")
 
         self.__configure(configs)
