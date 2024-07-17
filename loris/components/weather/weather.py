@@ -19,6 +19,7 @@ import pandas as pd
 from loris import Configurations, Configurator, Location, LocationUnavailableException
 from loris.components import Component, ComponentException, ComponentUnavailableException
 from loris.components.weather import WeatherConnector, WeatherForecast
+from loris.util import parse_id
 
 
 # noinspection SpellCheckingInspection
@@ -62,22 +63,17 @@ class Weather(Component):
         connector_type = configs.get("type", default="virtual").lower()
         connector_context = self.context.context.connectors
         connector_configs = configs.get_section(connector_type, defaults={})
-        connector_configs["id"] = configs.get("id", default=connector_type).lower()
-        connector_configs["uuid"] = f"{self.uuid}.{configs['id']}"
+        connector_id = parse_id(connector_configs.get("id", default=connector_type))
+
+        connector_configs["id"] = connector_id
+        connector_configs["uuid"] = f"{self.uuid}.{connector_id}"
         if connector_type != "virtual":
             self._connector = WeatherConnector.load(
-                connector_type,
-                connector_context,
-                connector_configs,
-                self._location
+                connector_type, connector_context, connector_configs, self._location
             )
             if self._connector.has_forecast() and configs.has_section(WeatherForecast.SECTION):
                 self.configs[WeatherForecast.SECTION]["id"] = f"{self.id}_forecast"
-                self._forecast = WeatherForecast(
-                    self,
-                    self._connector,
-                    configs.get_section(WeatherForecast.SECTION)
-                )
+                self._forecast = WeatherForecast(self, self._connector, configs.get_section(WeatherForecast.SECTION))
             connector_context._add(self._connector)
 
         # TODO: configure default channels
@@ -88,7 +84,6 @@ class Weather(Component):
 
         # Update local configurator variables manually to ensure correct order
         if self._has_connector():
-            self._connector._do_configure()
             self.configs.update(self._connector._get_config_defaults(), replace=False)
             configurators.remove(self._connector)
         if self.has_forecast():
@@ -140,14 +135,18 @@ class Weather(Component):
         return self._connector
 
     @property
+    def location(self) -> Location:
+        return self._location
+
+    @property
     def type(self) -> str:
         return self.TYPE
 
     def get(
         self,
-        start: pd.Timestamp | dt.datetime = None,
-        end: pd.Timestamp | dt.datetime = None,
-        **kwargs
+        start: Optional[pd.Timestamp, dt.datetime, str] = None,
+        end: Optional[pd.Timestamp, dt.datetime, str] = None,
+        **kwargs,
     ) -> pd.DataFrame:
         """
         Retrieves the weather data for a specified time interval
@@ -169,19 +168,12 @@ class Weather(Component):
         :rtype:
             :class:`pandas.DataFrame`
         """
-        return self._get_range(self.data.to_frame(), start, end)
-
-    @staticmethod
-    def _get_range(
-        data: pd.DataFrame,
-        start: pd.Timestamp | dt.datetime,
-        end: pd.Timestamp | dt.datetime
-    ) -> pd.DataFrame:
-        if start is not None:
-            data = data[data.index >= start]
-        if end is not None:
-            data = data[data.index <= end]
-        return data
+        weather = super().get(start, end, **kwargs)
+        if self.has_forecast():
+            weather_forecast = self.forecast.get(start, end, **kwargs)
+            if not weather_forecast.empty:
+                weather = weather.combine_first(weather_forecast)
+        return weather
 
 
 class WeatherException(ComponentException):
