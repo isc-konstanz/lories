@@ -52,17 +52,28 @@ class CsvConnector(Connector):
     def type(self) -> str:
         return self.TYPE
 
+    # noinspection PyTypeChecker
     def configure(self, configs: Configurations) -> None:
-        data_dir = configs.get("dir", default=os.getcwd())
-        if "~" in data_dir:
-            data_dir = os.path.expanduser(data_dir)
-        if not os.path.isabs(data_dir):
-            data_dir = os.path.join(configs.dirs.data, data_dir)
-        self._data_dir = data_dir
+        data_dir = configs.get("dir", default=None)
+        if data_dir is not None:
+            if "~" in data_dir:
+                data_dir = os.path.expanduser(data_dir)
+            if not os.path.isabs(data_dir):
+                data_dir = os.path.join(configs.dirs.data, data_dir)
 
         data_path = configs.get("file", default=None)
-        if data_path is not None and not os.path.isabs(data_path):
-            data_path = os.path.join(data_dir, data_path)
+        if data_path is not None:
+            if not os.path.isabs(data_path):
+                if data_dir is None:
+                    data_dir = configs.dirs.data
+                data_path = os.path.join(data_dir, data_path)
+            elif data_dir is None:
+                data_dir = os.path.dirname(data_path)
+
+        if data_dir is None:
+            data_dir = configs.dirs.data
+
+        self._data_dir = data_dir
         self._data_path = data_path
 
         self.index_column = configs.get("index_column", default=CsvConnector.index_column)
@@ -109,6 +120,8 @@ class CsvConnector(Connector):
         self.columns = configs.get("columns", default=CsvConnector.columns)
 
     def connect(self, channels: Channels) -> None:
+        if not os.path.isdir(self._data_dir):
+            os.makedirs(self._data_dir, exist_ok=True)
         if self._data_path is not None:
             self._data = csv.read_file(
                 self._data_path,
