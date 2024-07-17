@@ -32,34 +32,35 @@ class Component(Activator):
         super().__init__(configs, *args, **kwargs)
         if "id" in configs:
             self._id = parse_id(configs.get("id"))
-            self._name = configs.get("name", default=configs.get("id"))
+            self._name = configs.get("name", default=self._id)
         elif "name" in configs:
             self._id = parse_id(configs["id"] if "id" in configs else configs["name"])
             self._name = configs["name"]
         else:
             raise ConfigurationException("Invalid configuration, missing specified component ID")
 
-        self._uuid = self._id if not isinstance(context, Component) else f"{context.uuid}.{configs['id']}"
+        from loris.data.context import DataContext
+        from loris.components.context import ComponentContext
+        if not isinstance(context, (Component, ComponentContext, DataContext)):
+            raise ComponentException(f"Invalid component context type: {type(context)}")
 
-        def _get_data_context():
-            from loris.data.context import DataContext
+        self._uuid = self._id if not isinstance(context, Component) else f"{context.uuid}.{self._id}"
 
-            _data_context = context
-            while not isinstance(_data_context, DataContext):
+        def _get_context(_type):
+            _context = context
+            while not isinstance(_context, _type):
                 try:
-                    _data_context = _data_context.context
+                    _context = _context.context
                 except AttributeError:
-                    return ComponentException(f"Invalid component context type: {type(context)}")
-            return _data_context
+                    raise ComponentException(f"Invalid component context type: {type(context)}")
+            return _context
 
-        self.__context = context
-        self.__data = DataAccess(self, _get_data_context(), configs.get_section(DataAccess.SECTION, defaults={}))
+        self.__data = DataAccess(self, _get_context(DataContext))
+        self.__context = _get_context((ComponentContext, DataContext))
 
+    # noinspection PyProtectedMember
     def _do_configure_members(self, configurators: Collection[Configurator]) -> None:
         super()._do_configure_members(configurators)
-        # Update DataAccess configurations before configuring it manually, as private members are not configured
-        # This ensures up-to-date channel configurations when data is configured.
-        self.__data.configs.update(self.configs.get_section(DataAccess.SECTION, defaults={}), replace=False)
         self.__data._do_configure()
 
     @property
