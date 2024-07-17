@@ -38,7 +38,7 @@ class DataManagerMeta(ActivatorMeta):
         return manager
 
 
-class DataManager(Activator, DataContext):
+class DataManager(Activator, DataContext, metaclass=DataManagerMeta):
     _executor: ThreadPoolExecutor
 
     def __init__(self, configs: Configurations, *args, **kwargs) -> None:
@@ -104,7 +104,7 @@ class DataManager(Activator, DataContext):
 
     @wraps(disconnect)
     def _do_disconnect(self):
-        self.__disconnet()
+        self.__disconnect()
         self._on_disconnect()
 
     def _on_disconnect(self) -> None:

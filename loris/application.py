@@ -123,6 +123,7 @@ class Application(DataManager, Thread):
             self.log(channels)
         self.log()
 
+    # noinspection PyUnresolvedReferences
     def _run(self, *args, **kwargs) -> None:
         for system in self.components.get_all(System):
             try:

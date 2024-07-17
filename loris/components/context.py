@@ -138,7 +138,7 @@ class ComponentContext(Activator, Mapping[str, Component]):
         del self.__components[component_id]
 
     def activate(self) -> None:
-        pass
+        super().activate()
 
     def _do_activate_members(self, activators: Collection[Activator]) -> None:
         activators = list(activators)
@@ -146,7 +146,7 @@ class ComponentContext(Activator, Mapping[str, Component]):
         super()._do_activate_members(activators)
 
     def deactivate(self) -> None:
-        pass
+        super().deactivate()
 
     def _do_deactivate_members(self, activators: Collection[Activator]) -> None:
         activators = list(activators)

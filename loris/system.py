@@ -124,10 +124,6 @@ class System(ComponentContext, Component):
         return self.get_component_type(Weather.TYPE)[0]
 
     @property
-    def data(self):
-        return self.__data
-
-    @property
     def type(self) -> str:
         return self.TYPE
 

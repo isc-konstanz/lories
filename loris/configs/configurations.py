@@ -57,11 +57,14 @@ class Configurations(MutableMapping[str, Any]):
 
     def _load(self, require: bool = True) -> None:
         if os.path.isfile(self.__path):
-            # TODO: Implement other configuration parsers
-            self._load_toml(self.__path)
+            try:
+                # TODO: Implement other configuration parsers
+                self._load_toml(self.__path)
+            except Exception as e:
+                raise ConfigurationUnavailableException(f"Error loading configuration file '{self.__path}': {str(e)}")
 
         elif require:
-            raise ConfigurationUnavailableException(f'Invalid configuration file "{self.__path}"')
+            raise ConfigurationUnavailableException(f"Invalid configuration file '{self.__path}'")
 
         for section in self.sections:
             section._load(require=False)
@@ -187,6 +190,11 @@ class Configurations(MutableMapping[str, Any]):
         else:
             raise ConfigurationUnavailableException(f"Unknown configuration section: {section}")
         return section
+
+    def _add_section(self, section, configs: Mapping[str, Any]) -> None:
+        if self.has_section(section):
+            raise ConfigurationUnavailableException(f"Unable to add existing configuration section: {section}")
+        self[section] = self.__new_section(section, configs)
 
     def __new_section(self, section, configs: Mapping[str, Any]) -> Configurations:
         if not isinstance(configs, Mapping):
