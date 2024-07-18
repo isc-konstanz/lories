@@ -56,7 +56,7 @@ doc = [
     "myst-parser",
 ]
 dev = [
-    "loris[mysql, doc]",
+    # "loris[mysql, doc]",
     "pre-commit",
     "ruff"
 ]
