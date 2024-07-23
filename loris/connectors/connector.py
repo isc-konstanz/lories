@@ -71,6 +71,36 @@ class Connector(Configurator, metaclass=ConnectorMeta):
     def __exit__(self, type, value, traceback):
         self._do_disconnect()
 
+    # noinspection PyShadowingBuiltins
+    def _get_vars(self) -> Dict[str, Any]:
+        vars = super()._get_vars()
+        vars.pop("type", None)
+        return vars
+
+    # noinspection PyShadowingBuiltins
+    def _parse_vars(self, vars: Optional[Dict[str, Any]] = None, parse: callable = str) -> List[str]:
+        if vars is None:
+            vars = self._get_vars()
+        values = []
+
+        uuid = vars.pop("uuid", self.uuid)
+        id = vars.pop("id", self.id)
+        if uuid != id:
+            values.append(f"uuid={uuid}")
+        values.append(f"id={id}")
+
+        if "name" in vars:
+            values.append(f"name={vars.pop('name')}")
+
+        values += [f"{k}={v if not isinstance(v, (Channel, Configurator)) else parse(v)}" for k, v in vars.items()]
+
+        values.append(f"context={parse(self.context)}")
+        values.append(f"configurations={repr(self.configs)}")
+        values.append(f"configured={self.is_configured()}")
+        values.append(f"connected={self._is_connected()}")
+        values.append(f"enabled={self.is_enabled()}")
+        return values
+
     @property
     def uuid(self) -> str:
         return self._uuid

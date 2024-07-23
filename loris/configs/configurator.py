@@ -40,21 +40,61 @@ class Configurator(ABC, metaclass=ConfiguratorMeta):
         self.__logger = logging.getLogger(Configurator.__module__)
         self.__configs = configs
 
+    # noinspection PyShadowingBuiltins
+    def _get_vars(self) -> Dict[str, Any]:
+        return get_members(self, filter=lambda attr, var: not (
+            attr.startswith("_") or
+            attr.isupper() or
+            callable(var) or
+            isinstance(var, Context) or
+            isinstance(var, Configurations))
+        )
+
+    # noinspection PyShadowingBuiltins
+    def _parse_vars(self, vars: Optional[Dict[str, Any]] = None, parse: callable = str) -> List[str]:
+        if vars is None:
+            vars = self._get_vars()
+        values = [f"{k}={v if not isinstance(v, (Channel, Configurator, Location)) else parse(v)}"
+                  for k, v in vars.items()]
+
+        if self.context is not None:
+            values.append(f"context={parse(self.context)}")
+        if self.configs is not None:
+            values.append(f"configurations={repr(self.configs)}")
+            values.append(f"configured={self.is_configured()}")
+            values.append(f"enabled={self.is_enabled()}")
+        return values
+
+    # noinspection PyShadowingBuiltins
+    def _get_vars(self) -> Dict[str, Any]:
+        return get_members(self, filter=lambda attr, var: not (
+            attr.startswith("_") or
+            attr.isupper() or
+            callable(var) or
+            isinstance(var, Context) or
+            isinstance(var, Configurations))
+        )
+
+    # noinspection PyShadowingBuiltins
+    def _parse_vars(self, vars: Optional[Dict[str, Any]] = None, parse: callable = str) -> List[str]:
+        if vars is None:
+            vars = self._get_vars()
+        values = [f"{k}={v if not isinstance(v, (Channel, Configurator, Location)) else parse(v)}"
+                  for k, v in vars.items()]
+
+        if self.context is not None:
+            values.append(f"context={parse(self.context)}")
+        if self.configs is not None:
+            values.append(f"configurations={repr(self.configs)}")
+            values.append(f"configured={self.is_configured()}")
+            values.append(f"enabled={self.is_enabled()}")
+        return values
+
     def __repr__(self) -> str:
-        representation = f"{type(self).__name__}: \n"
-        for attr in dir(self):
-            if attr.startswith("_") or attr.isupper():
-                continue
-            try:
-                value = getattr(self, attr)
-                if value is None or callable(value) or isinstance(value, Configurations):
-                    continue
-                if isinstance(value, Configurator):
-                    value = value.name
-                representation += f"\t{attr} = {value}\n"
-            except (AttributeError, LocalResourceException):
-                pass
-        return representation + f"\tenabled = {self.is_enabled()}\n"
+        return f"{type(self).__name__}({', '.join(self._parse_vars(parse=lambda v: type(v).__name__))})"
+
+    def __str__(self) -> str:
+        return f"{type(self).__name__}:\n\t" + "\n\t".join(self._parse_vars(parse=repr))
 
     @property
     def name(self) -> str:

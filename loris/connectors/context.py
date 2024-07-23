@@ -36,6 +36,13 @@ class ConnectorContext(Configurator, Mapping[str, Connector]):
     def __contains__(self, uuid) -> bool:
         return uuid in self.__connectors.keys()
 
+    def __repr__(self) -> str:
+        # return str(self.to_frame(states=True))
+        return f"{type(self).__name__}({[c.uuid for c in self.__connectors.values()]})"
+
+    def __str__(self) -> str:
+        return f"{type(self).__name__}:\n\t" + "\n\t".join([f"{i} = {repr(c)}" for i, c in self.__connectors.items()])
+
     def configure(self, configs: Configurations) -> None:
         self._do_load_from_file(configs.dirs.conf)
 

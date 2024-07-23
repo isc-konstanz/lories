@@ -12,7 +12,7 @@ import logging
 from collections import OrderedDict
 from copy import deepcopy
 from pydoc import locate
-from typing import Any, Mapping, Optional, Type
+from typing import Any, Dict, Optional, Type
 
 import pandas as pd
 import pytz as tz
@@ -79,18 +79,32 @@ class Channel:
 
         self.__configs = OrderedDict(configs)
 
+    # noinspection PyShadowingBuiltins
     def __repr__(self) -> str:
-        return (
-            "Channel:\n\t"
-            + f"\n\tid: {self.id}"
-            + f"\n\tname: {self.name}"
-            + "\n\t".join(f"{key}: {str(val)}" for key, val in self.__configs.items())
-            + f"\n\tvalue type: {self.value_type}"
-            + f"\n\tvalue length: {self._value_length}"
-            + f"\n\tvalue: {str(self.value)}"
-            + f"\n\tstatus: {str(self.state)}"
-            + f"\n\ttimestamp: {str(self.timestamp)}"
-        )
+        vars = OrderedDict({
+            "id": self.id
+        })
+        if self.is_valid():
+            vars["value"] = str(self.value)
+        else:
+            vars["state"] = str(self.state)
+        vars["timestamp"] = str(self.timestamp)
+        return f"{type(self).__name__}({', '.join(f'{k}={v}' for k, v in vars.items())})"
+
+    # noinspection PyShadowingBuiltins
+    def __str__(self) -> str:
+        vars = OrderedDict({
+            "id": self.id
+        })
+        if self.id != self.name:
+            vars["name"] = self.name
+        vars.update(self.__configs)
+        vars["value type"] = self.value_type
+        vars["value length"] = self._value_length
+        vars["value"] = str(self.value)
+        vars["status"] = str(self.status)
+        vars["timestamp"] = str(self.timestamp)
+        return f"{type(self).__name__}:\n\t" + "\n\t".join(f"{k}={v}" for k, v in vars.items())
 
     def __contains__(self, attr):
         return attr in [
@@ -203,7 +217,7 @@ class Channel:
         configs["connector"] = self.connector.copy()
         return Channel(uuid=self._uuid, id=self._id, name=self.name, **configs)
 
-    def _copy_configs(self) -> Mapping[str, Any]:
+    def _copy_configs(self) -> Dict[str, Any]:
         return deepcopy(self.__configs)
 
     # noinspection PyProtectedMember

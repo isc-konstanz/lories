@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from copy import deepcopy
-from typing import Any, Mapping
+from typing import Any, Dict
 
 import pandas as pd
 from loris.util import parse_id
@@ -31,6 +31,9 @@ class ChannelConnector:
         self.__configs = OrderedDict(configs)
 
     def __repr__(self) -> str:
+        return f"{ChannelConnector.__name__}({self.uuid})"
+
+    def __str__(self) -> str:
         return (
             "ChannelConnector:\n\t"
             + f"\n\tid: {self.id}"
@@ -56,5 +59,5 @@ class ChannelConnector:
     def copy(self) -> ChannelConnector:
         return ChannelConnector(self._uuid, **self.__configs)
 
-    def _copy_configs(self) -> Mapping[str, Any]:
+    def _copy_configs(self) -> Dict[str, Any]:
         return deepcopy(self.__configs)

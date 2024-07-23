@@ -53,6 +53,12 @@ class Component(Activator):
         super()._do_configure_members(configurators)
         self.__data._do_configure()
 
+    # noinspection PyShadowingBuiltins
+    def _get_vars(self) -> Dict[str, Any]:
+        vars = super()._get_vars()
+        vars.pop("type", None)
+        return vars
+
     @property
     def uuid(self) -> str:
         return self._uuid

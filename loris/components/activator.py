@@ -46,8 +46,28 @@ class Activator(Configurator, metaclass=ActivatorMeta):
     def __exit__(self, type, value, traceback):
         self._do_deactivate()
 
-    def __repr__(self) -> str:
-        return super().__repr__() + f"\tactive = {self.is_active()}\n"
+    # noinspection PyShadowingBuiltins
+    def _parse_vars(self, vars: Optional[Dict[str, Any]] = None, parse: callable = str) -> List[str]:
+        if vars is None:
+            vars = self._get_vars()
+        values = []
+
+        uuid = vars.pop("uuid", self.uuid)
+        id = vars.pop("id", self.id)
+        if uuid != id:
+            values.append(f"uuid={uuid}")
+        values.append(f"id={id}")
+        values.append(f"name={vars.pop('name', self.name)}")
+
+        values += [f"{k}={v if not isinstance(v, (Channel, Configurator, Location)) else parse(v)}"
+                   for k, v in vars.items()]
+
+        values.append(f"context={parse(self.context)}")
+        values.append(f"configurations={repr(self.configs)}")
+        values.append(f"configured={self.is_configured()}")
+        values.append(f"active={self.is_active()}")
+        values.append(f"enabled={self.is_enabled()}")
+        return values
 
     def is_active(self) -> bool:
         return self._active

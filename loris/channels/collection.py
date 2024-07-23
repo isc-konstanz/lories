@@ -27,7 +27,12 @@ class Channels(Collection[Channel]):
 
     def __repr__(self) -> str:
         # return str(self.to_frame(states=True))
-        return str([c.id for c in self])
+        return f"{type(self).__name__}({[c.uuid for c in self._channels]})"
+
+    def __str__(self) -> str:
+        return f"{type(self).__name__}:\n\t" + "\n\t".join(
+            [f"{c.uuid} = {repr(c)}" for c in self._channels]
+        )
 
     def __contains__(self, __x: object) -> bool:
         return __x in self._channels

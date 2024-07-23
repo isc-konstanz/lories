@@ -94,24 +94,24 @@ class Configurations(MutableMapping[str, Any]):
         self.__dirs.join(self)
 
     def __repr__(self) -> str:
-        represent_header = self.name.replace(".conf", "")
-        represent_configs = deepcopy(self.__configs)
-        for represent_section in [s for s, c in self.__configs.items() if isinstance(c, Mapping)]:
-            represent_configs.move_to_end(represent_section)
+        return f"{Configurations.__name__}({self.__path})"
 
-        def represent_sections(header: str, section: Mapping[str, Any]) -> str:
-            representation = f"[{header}]\n"
+    def __str__(self) -> str:
+        configs = deepcopy(self.__configs)
+        for section in [s for s, c in self.__configs.items() if isinstance(c, Mapping)]:
+            configs.move_to_end(section)
+
+        # noinspection PyShadowingNames
+        def parse_section(header: str, section: Mapping[str, Any]) -> str:
+            string = f"[{header}]\n"
             for k, v in section.items():
                 if isinstance(v, Mapping):
-                    representation += "\n" + represent_sections(f"{header}.{k}", v)
+                    string += "\n" + parse_section(f"{header}.{k}", v)
                 else:
-                    representation += f"{k} = {v}\n"
-            return representation
+                    string += f"{k} = {v}\n"
+            return string
 
-        # representation_dirs = "\n" + str(self.dirs).replace(
-        #     f"[{Directories.SECTION}]", f"[{represent_header}.{Directories.SECTION}]"
-        # )
-        return represent_sections(represent_header, represent_configs)  # + representation_dirs
+        return parse_section(self.name.replace(".conf", ""), configs)
 
     def __delitem__(self, key: str) -> None:
         del self.__configs[key]

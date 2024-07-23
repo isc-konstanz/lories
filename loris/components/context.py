@@ -42,6 +42,14 @@ class ComponentContext(Activator, Mapping[str, Component]):
     def __contains__(self, component_id) -> bool:
         return component_id in self.__components.keys()
 
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({[c.uuid for c in self.__components.values()]})"
+
+    def __str__(self) -> str:
+        return f"{type(self).__name__}:\n\t" + "\n\t".join(
+            [f"{i} = {repr(c)}" for i, c in self.__components.items()]
+        )
+
     # noinspection PyTypeChecker
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
