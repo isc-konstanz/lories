@@ -27,7 +27,7 @@ class System(ComponentContext, Component):
     # noinspection PyShadowingBuiltins
     @classmethod
     def copy(cls, settings: Settings) -> bool:
-        configs = Configurations(f"{cls.__name__.lower()}.conf", **settings.dirs.encode())
+        configs = Configurations.load(f"{cls.__name__.lower()}.conf", **settings.dirs.encode())
         if "id" in configs:
             id = parse_id(configs["id"])
         elif "name" in configs:

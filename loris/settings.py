@@ -15,7 +15,7 @@ import sys
 from argparse import ArgumentParser
 from typing import Any, Dict
 
-from loris.configs import Configurations, Directories
+from loris.configs import Configurations, Directories, Directory
 
 
 class Settings(Configurations):
@@ -23,18 +23,12 @@ class Settings(Configurations):
 
     # noinspection PyProtectedMember, SpellCheckingInspection
     def __init__(self, app_name: str, app_file: str = "settings.conf", parser: ArgumentParser = None) -> None:
-        kwargs = _parse_kwargs(parser)
+        app_args = _parse_kwargs(parser)
+        app_dirs = Directories(**{d: app_args.pop(d, None) for d in Directories.KEYS})
 
-        conf_dirs = Directories(**{d: kwargs.pop(d, None) for d in Directories.KEYS})
-        conf_path = os.path.join(conf_dirs.conf, app_file)
-
-        super().__init__(app_file, conf_path, conf_dirs, **kwargs)
+        super().__init__(app_file, app_dirs, **app_args)
         self.application = app_name
         self._load(require=False)
-
-        self.dirs.join(self)
-        if self.dirs._conf is None:
-            self.dirs._conf = os.path.dirname(self.path)
 
         logging_file = os.path.join(self.dirs.conf, "logging.conf")
         if not os.path.isfile(logging_file):
@@ -45,7 +39,7 @@ class Settings(Configurations):
             logging.config.fileConfig(logging_file)
             for handler in logging.getLoggerClass().root.handlers:
                 if isinstance(handler, logging.FileHandler):
-                    self.dirs._log = os.path.dirname(handler.baseFilename)
+                    self.dirs.log = os.path.dirname(handler.baseFilename)
                     break
         else:
             handler_console = logging.StreamHandler(sys.stdout)
@@ -76,7 +70,9 @@ class Settings(Configurations):
         override_path = os.path.join(self.dirs.data, self.name)
         if os.path.isfile(override_path):
             self._load_toml(override_path)
-            self.dirs.join(self)
+            self.dirs.update(self.get_section(Directories.SECTION, defaults={}))
+        if self.dirs.conf._dir is None:
+            self.dirs._conf = Directory(os.path.dirname(self.path), default="conf")
 
     # def __getattr__(self, attr):
     #     if self.has_option(self.GENERAL, attr):
