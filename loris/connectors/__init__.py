@@ -16,9 +16,6 @@ from .connector import (  # noqa: F401
 from . import registry  # noqa: F401
 from .registry import ConnectorRegistration, register  # noqa: F401
 
-from . import context  # noqa: F401
-from .context import ConnectorContext  # noqa: F401
-
 from .csv import CsvConnector
 registry.types[CsvConnector.TYPE] = ConnectorRegistration(CsvConnector, CsvConnector.TYPE)
 

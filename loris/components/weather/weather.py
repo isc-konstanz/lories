@@ -12,8 +12,8 @@ effective irradiance on defined, tilted photovoltaic systems.
 
 from __future__ import annotations
 
-from loris import Configurations, Location, LocationUnavailableException
-from loris.components import Component, ComponentContext, ComponentException, ComponentUnavailableException
+from loris import Configurations, Context, Location, LocationUnavailableException
+from loris.components import Component, ComponentException, ComponentUnavailableException
 
 
 # noinspection SpellCheckingInspection
@@ -48,7 +48,7 @@ class Weather(Component):
 
     # noinspection PyShadowingBuiltins
     @classmethod
-    def load(cls, context: ComponentContext, configs: Configurations) -> Weather:
+    def load(cls, context: Context, configs: Configurations) -> Weather:
         type = configs.get("type", default="default").lower()
         if type in ["virtual", "default"]:
             return cls(context, configs)
@@ -63,7 +63,7 @@ class Weather(Component):
 
         raise WeatherException(f"Unknown weather type '{type}' in file: {configs.path}")
 
-    def __init__(self, context: ComponentContext, configs: Configurations, *args, **kwargs) -> None:
+    def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(context, configs, *args, **kwargs)
 
     # noinspection PyProtectedMember
@@ -88,12 +88,6 @@ class Weather(Component):
                     raise WeatherException(f"Invalid location type for weather '{self.uuid}': {type(self._location)}")
             except (LocationUnavailableException, AttributeError):
                 raise WeatherException(f"Missing location for weather '{self.uuid}'")
-
-    def activate(self) -> None:
-        super().activate()
-
-    def deactivate(self) -> None:
-        super().deactivate()
 
     @property
     def location(self) -> Location:

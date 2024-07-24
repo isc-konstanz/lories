@@ -33,8 +33,12 @@ class DataMapping(Mapping[str, Channel]):
     def __getitem__(self, channel_id: str) -> Channel:
         return self._channels[channel_id]
 
-    def __contains__(self, uuid) -> bool:
-        return uuid in self._channels.keys()
+    def __contains__(self, item: str | Channel) -> bool:
+        if isinstance(item, str):
+            return item in self._channels.keys()
+        if isinstance(item, Channel):
+            return item in self._channels.values()
+        return False
 
     def __len__(self) -> int:
         return len(self._channels)

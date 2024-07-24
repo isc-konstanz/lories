@@ -8,38 +8,70 @@ loris.data.context
 
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import Mapping
 from typing import Any, Collection
 
-from loris import Channel, Channels, ConfigurationException, Configurations, Configurator, LocalResourceException
-from loris.components import ComponentContext
-from loris.connectors import ConnectorContext
+from loris import (
+    Channel,
+    Channels,
+    ConfigurationException,
+    Configurations,
+    Configurator,
+    Context,
+    LocalResourceException,
+)
+from loris.components.component import Component
+from loris.components.context import ComponentContext
+from loris.connectors.connector import Connector
+from loris.connectors.context import ConnectorContext
 from loris.data import DataMapping
+from loris.util import get_variables
 
 
-class DataContext(Configurator, DataMapping):
+class DataContext(Configurator, DataMapping, Context[Channel]):
     _connectors: ConnectorContext
     _components: ComponentContext
 
     def __init__(self, configs: Configurations, *args, **kwargs) -> None:
-        super().__init__(configs, *args, **kwargs)
-        self._connectors = ConnectorContext(configs)
-        self._components = ComponentContext(configs)
+        super().__init__(configs=configs, *args, **kwargs)
+        self._connectors = ConnectorContext(self, configs)
+        self._components = ComponentContext(self, configs)
+
+    def __contains__(self, item: str | Channel | Connector | Component) -> bool:
+        if isinstance(item, str):
+            return item in self._channels.keys()
+        if isinstance(item, Channel):
+            return item in self._channels.values()
+        if isinstance(item, Connector) or isinstance(item, Component):
+            return (item in self._connectors.values() or
+                    item in self._components.values())
+        return False
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self._do_load_from_file(configs.dirs.conf)
+        self._load_from_file(str(configs.dirs.conf))
+        self._do_configure_member(get_variables(self._components.values(), include=ComponentContext))
+        self._do_configure_member(get_variables(self._components.values(), exclude=ComponentContext))
+        self._do_configure_member(get_variables(self._connectors.values(), exclude=Component))
 
-    def _do_configure_members(self, configurators: Collection[Configurator]) -> None:
-        # Ensure components always being configured first
-        configurators = list(configurators)
-        configurators.remove(self._connectors)
-        configurators.remove(self._components)
-        super()._do_configure_members(configurators + [self._components, self._connectors])
+    # noinspection PyProtectedMember
+    def _do_configure_member(self, configurators: Collection[Configurator]) -> None:
+        for configurator in configurators:
+            if not configurator.is_enabled():
+                self._logger.debug(
+                    f"Skipping configuring disabled {type(configurator).__name__}: " f"{configurator.configs.name}"
+                )
+                continue
+            self._logger.debug(f"Configuring {type(self).__name__}: {configurator.configs.path}")
+            configurator._do_configure()
 
-    # noinspection PyTypeChecker, PyProtectedMember, PyUnresolvedReferences
-    def _do_load_from_file(self, configs_dir: str, configs_file: str = "channels.conf") -> None:
+            if self._logger.isEnabledFor(logging.DEBUG):
+                self._logger.debug(f"Configured {configurator}")
+
+    # noinspection PyProtectedMember, PyTypeChecker, PyUnresolvedReferences
+    def _load_from_file(self, configs_dir: str, configs_file: str = "channels.conf") -> None:
         configs_path = os.path.join(configs_dir, configs_file)
         if os.path.isfile(configs_path):
             configs_dirs = self.configs.dirs.encode()
@@ -51,9 +83,9 @@ class DataContext(Configurator, DataMapping):
             else:
                 self.configs.get_section("data").update(configs, replace=False)
 
-            self._do_load_sections(self.configs.get_section("data"))
+            self._load_sections(self.configs.get_section("data"))
 
-    def _do_load_sections(self, configs: Configurations) -> None:
+    def _load_sections(self, configs: Configurations) -> None:
         channel_ids = [
             i for i in configs.keys() if (isinstance(configs[i], Mapping) and i not in ["logger", "connector"])
         ]
@@ -68,13 +100,26 @@ class DataContext(Configurator, DataMapping):
 
             # TODO: Implement channel config update
             # if channel.uuid in self:
-            #     self.__get(channel.uuid).update(channel_configs)
+            #     self._get(channel.uuid).update(channel_configs)
             # else:
-            #     self._add(channel)
+            #     self._set(channel.uuid, channel)
             self._add(channel)
 
-    def __get(self, uuid: str) -> Channel:
+    def _get(self, uuid: str) -> Channel:
         return self._channels.get(uuid)
+
+    def _set(self, uuid: str, channel: Channel) -> None:
+        self._channels[uuid] = channel
+
+    def _add(self, channel: Channel) -> None:
+        if not isinstance(channel, Channel):
+            raise LocalResourceException(f"Invalid channel type: {type(channel)}")
+
+        if channel.uuid in self._channels.keys():
+            raise ConfigurationException(f'Channel with UUID "{channel.uuid}" already exists')
+
+        # TODO: connector sanity check
+        self._set(channel.uuid, channel)
 
     # noinspection PyShadowingBuiltins
     def _new(self, id: str, uuid: str = None, **configs: Any) -> Channel:
@@ -92,16 +137,6 @@ class DataContext(Configurator, DataMapping):
                     configs[connector_type]["connector"] = connector_uuid
 
         return Channel(uuid, id, **configs)
-
-    def _add(self, channel: Channel) -> None:
-        if not isinstance(channel, Channel):
-            raise LocalResourceException(f"Invalid channel type: {type(channel)}")
-
-        if channel.uuid in self._channels.keys():
-            raise ConfigurationException(f'Channel with UUID "{channel.uuid}" already exists')
-
-        # TODO: connector sanity check
-        self._channels[channel.uuid] = channel
 
     def _remove(self, uuid: str) -> None:
         del self._channels[uuid]

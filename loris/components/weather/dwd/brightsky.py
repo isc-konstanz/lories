@@ -62,21 +62,6 @@ class Brightsky(WeatherConnector):
     def has_forecast(self) -> bool:
         return True
 
-    def is_connected(self) -> bool:
-        return True
-
-    def connect(self, channels: Channels) -> None:
-        super().connect(channels)
-
-    def activate(self) -> None:
-        super().activate()
-
-    def disconnect(self) -> None:
-        super().disconnect()
-
-    def deactivate(self) -> None:
-        super().deactivate()
-
     def read(
         self,
         channels: Channels,

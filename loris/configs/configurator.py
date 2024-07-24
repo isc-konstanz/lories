@@ -9,13 +9,14 @@ loris.configs.configurable
 from __future__ import annotations
 
 import logging
-from abc import ABC, ABCMeta, abstractmethod
+from abc import ABC, ABCMeta
 from functools import wraps
-from typing import Collection, Optional
+from typing import Any, Dict, List, Optional
 
-from loris import LocalResourceException
-from loris.configs import ConfigurationException, Configurations
-from loris.util import get_variables
+from loris.channels import Channel
+from loris.configs import ConfigurationException, Configurations, Context
+from loris.location import Location
+from loris.util import get_members
 
 
 class ConfiguratorMeta(ABCMeta):
@@ -29,16 +30,22 @@ class ConfiguratorMeta(ABCMeta):
         return configurator
 
 
-class Configurator(ABC, metaclass=ConfiguratorMeta):
+class Configurator(ABC, object, metaclass=ConfiguratorMeta):
+    __context: Context
     __configs: Configurations
 
     _configured: bool = False
 
-    def __init__(self, configs: Optional[Configurations] = None, *args, **kwargs) -> None:
+    def __init__(
+        self,
+        context: Optional[Context] = None,
+        configs: Optional[Configurations] = None,
+        *args, **kwargs
+    ) -> None:
         super().__init__(*args, **kwargs)
         self._logger = logging.getLogger(self.__module__)
-        self.__logger = logging.getLogger(Configurator.__module__)
         self.__configs = configs
+        self.__context = context
 
     # noinspection PyShadowingBuiltins
     def _get_vars(self) -> Dict[str, Any]:
@@ -97,8 +104,8 @@ class Configurator(ABC, metaclass=ConfiguratorMeta):
         return f"{type(self).__name__}:\n\t" + "\n\t".join(self._parse_vars(parse=repr))
 
     @property
-    def name(self) -> str:
-        return type(self).__name__
+    def context(self) -> Optional[Context]:
+        return self.__context
 
     def is_enabled(self) -> bool:
         return (self.__configs is not None and
@@ -108,10 +115,9 @@ class Configurator(ABC, metaclass=ConfiguratorMeta):
         return self._configured
 
     @property
-    def configs(self) -> Configurations:
+    def configs(self) -> Optional[Configurations]:
         return self.__configs
 
-    @abstractmethod
     def configure(self, configs: Configurations) -> None:
         pass
 
@@ -124,29 +130,14 @@ class Configurator(ABC, metaclass=ConfiguratorMeta):
             raise ConfigurationException(f"Trying to configure disabled {type(self).__name__}: {configs.name}")
 
         if self.is_configured():
-            self._logger.warning(f"{type(self).__name__} '{configs.name}' already configured")
+            self._logger.warning(f"{type(self).__name__} '{configs.path}' already configured")
             return
 
-        self.__logger.debug(f"Configuring {type(self).__name__}: {configs.name}")
-
         self.__configure(configs)
-        self._do_configure_members(get_variables(self, Configurator).values())
         self._on_configure(configs)
         if self.__configs != configs:
             self.__configs = configs
         self._configured = True
-
-        if self._logger.isEnabledFor(logging.DEBUG):
-            self.__logger.debug(f"Configured {self}")
-
-    def _do_configure_members(self, configurators: Collection[Configurator]) -> None:
-        for configurator in configurators:
-            if not configurator.is_enabled():
-                self.__logger.debug(
-                    f"Skipping configuring disabled {type(configurator).__name__}: " f"{configurator.configs.name}"
-                )
-                continue
-            configurator._do_configure()
 
     def _on_configure(self, configs: Configurations) -> None:
         pass

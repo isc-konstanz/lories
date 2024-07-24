@@ -11,10 +11,11 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod
 from functools import wraps
-from typing import Collection
+from typing import Any, Dict, List, Optional
 
-from loris.configs import ConfigurationException, Configurations, Configurator, ConfiguratorMeta
-from loris.util import get_variables
+from loris.channels import Channel
+from loris.configs import ConfigurationException, Configurations, Configurator, ConfiguratorMeta, Context
+from loris.location import Location
 
 
 class ActivatorMeta(ConfiguratorMeta):
@@ -34,8 +35,13 @@ class ActivatorMeta(ConfiguratorMeta):
 class Activator(Configurator, metaclass=ActivatorMeta):
     _active: bool = False
 
-    def __init__(self, configs: Configurations, *args, **kwargs) -> None:
-        super().__init__(configs, *args, **kwargs)
+    def __init__(
+        self,
+        context: Optional[Context] = None,
+        configs: Optional[Configurations] = None,
+        *args, **kwargs
+    ) -> None:
+        super().__init__(context, configs, *args, **kwargs)
         self.__logger = logging.getLogger(Activator.__module__)
 
     def __enter__(self) -> Activator:
@@ -69,10 +75,24 @@ class Activator(Configurator, metaclass=ActivatorMeta):
         values.append(f"enabled={self.is_enabled()}")
         return values
 
+    @property
+    @abstractmethod
+    def uuid(self) -> str:
+        pass
+
+    @property
+    @abstractmethod
+    def id(self) -> str:
+        pass
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        pass
+
     def is_active(self) -> bool:
         return self._active
 
-    @abstractmethod
     def activate(self) -> None:
         pass
 
@@ -84,28 +104,16 @@ class Activator(Configurator, metaclass=ActivatorMeta):
         if not self.is_configured():
             raise ConfigurationException(f"Trying to activate unconfigured {type(self).__name__}: {self.name}")
         if self.is_active():
-            self.__logger.warning(f"{type(self).__name__} '{self.name}' already active")
+            self._logger.warning(f"{type(self).__name__} '{self.uuid}' already active")
             return
-        self.__logger.info(f"Activating {type(self).__name__}: {self.name}")
 
         self.__activate()
-        self._do_activate_members(list(get_variables(self, Activator).values()))
         self._on_activate()
         self._active = True
-
-        self.__logger.debug(f"Activated {type(self).__name__}: {self.name}")
-
-    # noinspection PyProtectedMember
-    def _do_activate_members(self, activators: Collection[Activator]) -> None:
-        for activator in activators:
-            if not activator.is_enabled():
-                self.__logger.debug(f"Skipping activating disabled {type(activator).__name__}: {activator.name}")
-            activator._do_activate()
 
     def _on_activate(self) -> None:
         pass
 
-    @abstractmethod
     def deactivate(self) -> None:
         pass
 
@@ -114,24 +122,10 @@ class Activator(Configurator, metaclass=ActivatorMeta):
     def _do_deactivate(self) -> None:
         if not self.is_active():
             return
-        self.__logger.info(f"Deactivating {type(self).__name__}: {self.name}")
 
         self.__deactivate()
-        self._do_deactivate_members(list(get_variables(self, Activator).values()))
         self._on_deactivate()
         self._active = False
-
-        self.__logger.debug(f"Deactivated {type(self).__name__}: {self.name}")
-
-    # noinspection PyProtectedMember
-    def _do_deactivate_members(self, activators: Collection[Activator]) -> None:
-        for activator in activators:
-            try:
-                activator._do_deactivate()
-
-            except Exception as e:
-                self.__logger.warning(f"Error deactivating {type(self).__name__} '{activator.name}': {e}")
-                self.__logger.exception(e)
 
     def _on_deactivate(self) -> None:
         pass

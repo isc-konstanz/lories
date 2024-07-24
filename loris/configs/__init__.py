@@ -6,7 +6,12 @@ loris.configs
 
 """
 
-from .directories import Directories  # noqa: F401
+from .context import Context  # noqa: F401
+
+from .directories import (  # noqa: F401
+    Directory,
+    Directories,
+)
 
 from .configurations import (  # noqa: F401
     Configurations,

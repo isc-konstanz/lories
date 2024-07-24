@@ -9,13 +9,13 @@ loris.components.weather.connector
 from __future__ import annotations
 
 import datetime as dt
+import logging
 from abc import abstractmethod
 from typing import Optional
 
-import logging
 import pandas as pd
-from loris import Configurations, Connector
-from loris.components import ActivatorMeta, ComponentContext
+from loris import Configurations, Connector, Context
+from loris.components import ActivatorMeta
 from loris.components.weather import Weather, WeatherException, WeatherForecast
 from loris.connectors import ConnectorMeta
 from loris.data.context import DataContext
@@ -24,7 +24,7 @@ from loris.util import get_context
 
 class WeatherConnectorMeta(ConnectorMeta, ActivatorMeta):
     # noinspection PyProtectedMember
-    def __call__(cls, context: ComponentContext, *args, **kwargs):
+    def __call__(cls, context: Context, *args, **kwargs):
         connector = super().__call__(context, *args, **kwargs)
         connector_context = get_context(context, DataContext).connectors
         connector_context._add(connector)
@@ -36,18 +36,35 @@ class WeatherConnectorMeta(ConnectorMeta, ActivatorMeta):
 class WeatherConnector(Connector, Weather, metaclass=WeatherConnectorMeta):
     _forecast: WeatherForecast = None
 
-    def __init__(self, context: ComponentContext, configs: Configurations, *args, **kwargs) -> None:
+    def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
         super(Connector, self).__init__(context, configs, *args, **kwargs)
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self._do_load_forecast(configs.get_section(WeatherForecast.SECTION, defaults={}))
+        self._load_forecast(configs.get_section(WeatherForecast.SECTION, defaults={}))
 
-    def _do_load_forecast(self, configs: Configurations) -> None:
+    # noinspection PyProtectedMember
+    def _on_configure(self, configs: Configurations) -> None:
+        super()._on_configure(configs)
+        self._forecast._do_configure()
+
+    def _load_forecast(self, configs: Configurations) -> None:
         if self.has_forecast():
             if "id" not in configs:
                 configs["id"] = "forecast"
             self._forecast = WeatherForecast(self, configs)
+
+    def activate(self) -> None:
+        super().activate()
+        self._forecast.activate()
+
+    def deactivate(self) -> None:
+        super().deactivate()
+        self._forecast.deactivate()
+
+    @property
+    def context(self):
+        return super(Weather, self).context
 
     @abstractmethod
     def has_forecast(self) -> bool:
@@ -58,10 +75,6 @@ class WeatherConnector(Connector, Weather, metaclass=WeatherConnectorMeta):
         if not self.has_forecast() or self._forecast is None:
             raise WeatherException(f"Weather '{self.name}' has no forecast configured")
         return self._forecast
-
-    @property
-    def context(self):
-        return super(Weather, self).context
 
     def get(
         self,

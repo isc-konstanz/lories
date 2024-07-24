@@ -13,7 +13,7 @@ import os
 from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
-from typing import Optional
+from typing import Collection, Optional
 
 import pandas as pd
 import pytz as tz
@@ -22,6 +22,7 @@ from loris.components import ActivatorMeta
 from loris.connectors import ConnectorException
 from loris.connectors.tasks import ConnectTask, LogTask, ReadTask, WriteTask
 from loris.data.context import DataContext
+from loris.util import parse_id, parse_name
 
 
 class DataManagerMeta(ActivatorMeta):
@@ -38,11 +39,16 @@ class DataManagerMeta(ActivatorMeta):
         return manager
 
 
-class DataManager(Activator, DataContext, metaclass=DataManagerMeta):
+class DataManager(DataContext, Activator, metaclass=DataManagerMeta):
+    _id: str
+    _name: str
+
     _executor: ThreadPoolExecutor
 
-    def __init__(self, configs: Configurations, *args, **kwargs) -> None:
-        super().__init__(configs, *args, **kwargs)
+    def __init__(self, configs: Configurations, name: str, *args, **kwargs) -> None:
+        super().__init__(configs=configs, *args, **kwargs)
+        self._id = parse_id(name)
+        self._name = parse_name(name)
         self._executor = ThreadPoolExecutor(
             thread_name_prefix=self.name, max_workers=max(int((os.cpu_count() or 1) / 2), 1)
         )
@@ -55,9 +61,36 @@ class DataManager(Activator, DataContext, metaclass=DataManagerMeta):
     def __exit__(self, type, value, traceback) -> None:
         self._do_deactivate()
 
+    @property
+    def uuid(self) -> str:
+        return self.id
+
+    @property
+    def id(self) -> str:
+        return self._id
+
+    @property
+    def name(self) -> str:
+        return self._name
+
     def activate(self) -> None:
         super().activate()
         self._do_connect()
+        self._do_activate_members(self._components.values())
+
+    # noinspection PyProtectedMember
+    def _do_activate_members(self, activators: Collection[Activator]) -> None:
+        for activator in activators:
+            if not activator.is_enabled():
+                self._logger.debug(
+                    f"Skipping activating disabled {type(activator).__name__} '{activator.name}': {activator.uuid}"
+                )
+                continue
+
+            self._logger.info(f"Activating {type(activator).__name__} '{activator.name}': {activator.uuid}")
+            activator._do_activate()
+
+            self._logger.debug(f"Activated {type(activator).__name__} '{activator.name}': {activator.uuid}")
 
     def connect(self, channels: Optional[Channels]) -> None:
         connect_futures = []
@@ -66,12 +99,14 @@ class DataManager(Activator, DataContext, metaclass=DataManagerMeta):
                 self._logger.debug(f"Skipping connecting disabled {type(connector).__name__}: {uuid}")
                 continue
 
+            self._logger.info(f"Connecting {type(connector).__name__}: {connector.uuid}")
             connect_channels = channels.filter(lambda c: c.has_connector(uuid) or c.has_logger(uuid))
             connect_futures.append(self._executor.submit(ConnectTask(connector, connect_channels)))
 
         for connect_future in futures.as_completed(connect_futures):
             try:
-                connect_future.result()
+                connector = connect_future.result().connector
+                self._logger.debug(f"Connected {type(connector).__name__}: {connector.uuid}")
 
             except ConnectorException as e:
                 self._logger.warning(f"Error opening connector '{e.connector.uuid}': {e}")
@@ -91,13 +126,17 @@ class DataManager(Activator, DataContext, metaclass=DataManagerMeta):
 
     # noinspection PyProtectedMember
     def disconnect(self) -> None:
-        for uuid, connector in self.connectors.items():
+        for uuid in reversed(list(self.connectors.keys())):
+            connector = self.connectors.get(uuid)
             if not connector._is_connected():
                 self._logger.debug(f"Skipping disconnecting not connected {type(connector).__name__}: {uuid}")
                 continue
             try:
+                self._logger.info(f"Disconnecting {type(connector).__name__}: {connector.uuid}")
                 connector.set_states(ChannelState.DISCONNECTING)
                 connector._do_disconnect()
+
+                self._logger.debug(f"Disconnected {type(connector).__name__}: {connector.uuid}")
 
             except Exception as e:
                 self._logger.warning(f"Error closing connector '{uuid}': {e}")
@@ -115,9 +154,24 @@ class DataManager(Activator, DataContext, metaclass=DataManagerMeta):
 
     def deactivate(self) -> None:
         super().deactivate()
-        self._logger.info(f"Deactivating {type(self).__name__}")
         self._executor.shutdown(wait=True)
         self._do_disconnect()
+        self._do_deactivate_members(self._components.values())
+
+    # noinspection PyProtectedMember
+    def _do_deactivate_members(self, activators: Collection[Activator]) -> None:
+        for activator in reversed(list(activators)):
+            if not activator.is_active():
+                continue
+            try:
+                self._logger.info(f"Deactivating {type(activator).__name__} '{activator.name}': {activator.uuid}")
+                activator._do_deactivate()
+
+                self._logger.debug(f"Deactivated {type(activator).__name__} '{activator.name}': {activator.uuid}")
+
+            except Exception as e:
+                self._logger.warning(f"Error deactivating {type(activator).__name__} '{activator.uuid}': {e}")
+                self._logger.exception(e)
 
     def notify(self, channels: Optional[Channels] = None) -> None:
         pass

@@ -71,4 +71,8 @@ from . import io  # noqa: F401
 from . import data  # noqa: F401
 
 from . import application  # noqa: F401
-from .application import Application, load  # noqa: F401
+from .application import Application  # noqa: F401
+
+
+def load(name: str = "Loris", **kwargs) -> Application:
+    return Application.load(name, **kwargs)

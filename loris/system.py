@@ -14,7 +14,8 @@ from typing import List, Optional
 
 import pandas as pd
 from loris import ConfigurationException, Configurations, Location, LocationUnavailableException, Settings
-from loris.components import Component, ComponentContext, Weather, WeatherUnavailableException
+from loris.components import Component, Weather, WeatherUnavailableException
+from loris.components.context import ComponentContext
 from loris.data.context import DataContext
 from loris.util import parse_id
 
@@ -72,7 +73,7 @@ class System(ComponentContext, Component):
     def __init__(self, context: DataContext, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(context, configs, *args, **kwargs)
 
-    # noinspection PyShadowingNames
+    # noinspection PyShadowingNames, PyArgumentList
     def __getattr__(self, attr):
         # __getattr__ gets called when the item is not found via __getattribute__
         # To avoid recursion, call __getattribute__ directly to get components dict
@@ -80,6 +81,11 @@ class System(ComponentContext, Component):
         if attr in components.keys():
             return components[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no component '{attr}'")
+
+    # noinspection PyProtectedMember
+    def _add(self, component: Component) -> None:
+        super()._set(component.id, component)
+        self.context.components._set(component.uuid, component)
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
@@ -97,18 +103,6 @@ class System(ComponentContext, Component):
             )
         else:
             self._location = None
-
-    @property
-    def uuid(self) -> str:
-        return self._uuid
-
-    @property
-    def id(self) -> str:
-        return self._uuid
-
-    @property
-    def name(self) -> str:
-        return self._name
 
     @property
     def location(self) -> Location:

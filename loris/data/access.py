@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from loris import Channel, Configurations
+from loris import Channel, Configurations, Context
 from loris.data import DataMapping
 
 
@@ -20,9 +20,17 @@ class DataAccess(DataMapping):
     _configured: bool = False
 
     # noinspection PyProtectedMember
-    def __init__(self, component, context, **channels: Channel) -> None:
+    def __init__(self, component, context: Context, **channels: Channel) -> None:
         super().__init__(**channels)
+        from loris import Component, ComponentException
+        from loris.data.context import DataContext
+
+        if context is None or not isinstance(context, DataContext):
+            raise ComponentException(f"Invalid data context: {None if context is None else type(context)}")
         self.__context = context
+
+        if component is None or not isinstance(component, Component):
+            raise ComponentException(f"Invalid component: {None if component is None else type(component)}")
         self.__component = component
         if not self.__component.configs.has_section(self.SECTION):
             self.__component.configs._add_section(self.SECTION, {})
@@ -34,16 +42,16 @@ class DataAccess(DataMapping):
         return self._configured
 
     @property
-    def configs(self):
+    def configs(self) -> Configurations:
         return self.__component.configs.get_section(self.SECTION)
 
     # noinspection PyProtectedMember
     def configure(self, configs: Configurations) -> None:
         if configs.has_section("connectors"):
-            self.__context.connectors._do_load_sections(configs.get_section("connectors"), self.__component.uuid)
+            self.__context.connectors._load_sections(configs.get_section("connectors"), self.__component.uuid)
 
         if configs.has_section("channels"):
-            self._do_load_sections(configs.get_section("channels"))
+            self._load_sections(configs.get_section("channels"))
 
     def _do_configure(self) -> None:
         if self.is_configured():
@@ -51,10 +59,14 @@ class DataAccess(DataMapping):
             return
 
         self.configure(self.configs)
+        self._on_configure(self.configs)
         self._configured = True
 
+    def _on_configure(self, configs: Configurations) -> None:
+        pass
+
     # noinspection PyProtectedMember
-    def _do_load_sections(self, configs: Configurations) -> None:
+    def _load_sections(self, configs: Configurations) -> None:
         channel_defaults = self._parse_defaults(configs)
         for channel_id in [i for i in configs.keys() if i not in channel_defaults]:
             channel_configs = configs.get_section(channel_id)
@@ -66,7 +78,7 @@ class DataAccess(DataMapping):
 
             # TODO: Implement channel config update
             # if channel.uuid in self:
-            #     self.__get(channel.uuid).update(channel_configs)
+            #     self._get(channel.uuid).update(channel_configs)
             # else:
             #     self._add(channel)
             self._add(channel)
@@ -82,7 +94,7 @@ class DataAccess(DataMapping):
             data_configs["channels"][id].update(configs, replace=False)
 
         if self.is_configured():
-            channel_configs = self._parse_defaults(data_configs)
+            channel_configs = self._parse_defaults(data_configs["channels"])
             # Be wary of the order. First, update the channel configs with the default configs
             # of the configuration file, then update the function arguments. Last, override
             # everything with the channel specific configurations of the file.

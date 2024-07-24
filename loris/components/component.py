@@ -10,14 +10,14 @@ from __future__ import annotations
 
 import datetime as dt
 from abc import abstractmethod
-from typing import Collection, Optional
+from typing import Any, Dict, Optional
 
 import pandas as pd
 from loris import LocalResourceException, LocalResourceUnavailableException
 from loris.components import Activator
-from loris.configs import ConfigurationException, Configurations, Configurator
+from loris.configs import ConfigurationException, Configurations, Context
 from loris.data import DataAccess
-from loris.util import get_context, parse_id, to_date
+from loris.util import get_context, parse_id, parse_name, to_date
 
 
 class Component(Activator):
@@ -28,29 +28,31 @@ class Component(Activator):
     __data: DataAccess
 
     # noinspection PyProtectedMember
-    def __init__(self, context, configs: Configurations, *args, **kwargs) -> None:
-        super().__init__(configs, *args, **kwargs)
+    def __init__(self, context: Component | Context, configs: Configurations, *args, **kwargs) -> None:
+        super().__init__(get_context(context, Context), configs, *args, **kwargs)
+        from loris.data.context import DataContext
+        from loris.components.context import ComponentContext
+
+        if context is None or not isinstance(context, (Component, ComponentContext, DataContext)):
+            raise ComponentException(f"Invalid component context: {None if context is None else type(context)}")
+        if configs is None:
+            raise ConfigurationException("Invalid component for empty configuration")
+
         if "id" in configs:
-            self._id = parse_id(configs.get("id"))
-            self._name = configs.get("name", default=self._id)
+            self._id = parse_id(configs["id"])
+            self._name = parse_name(configs.get("name", default=configs["id"]))
         elif "name" in configs:
-            self._id = parse_id(configs["id"] if "id" in configs else configs["name"])
-            self._name = configs["name"]
+            self._id = parse_id(configs["name"])
+            self._name = parse_name(configs["name"])
         else:
             raise ConfigurationException("Invalid configuration, missing specified component ID")
 
-        from loris.data.context import DataContext
-        from loris.components.context import ComponentContext
-        if not isinstance(context, (Component, ComponentContext, DataContext)):
-            raise ComponentException(f"Invalid component context type: {type(context)}")
-
-        self._uuid = self._id if not isinstance(context, Component) else f"{context.uuid}.{self._id}"
+        self._uuid = self._id if not isinstance(context, Activator) else f"{context.uuid}.{self._id}"
         self.__data = DataAccess(self, get_context(context, DataContext))
-        self.__context = context
 
     # noinspection PyProtectedMember
-    def _do_configure_members(self, configurators: Collection[Configurator]) -> None:
-        super()._do_configure_members(configurators)
+    def _on_configure(self, configs: Configurations) -> None:
+        super()._on_configure(configs)
         self.__data._do_configure()
 
     # noinspection PyShadowingBuiltins
@@ -67,24 +69,17 @@ class Component(Activator):
     def id(self) -> str:
         return self._id
 
-    # @id.setter
-    # def id(self, s: str) -> None:
-    #     self._id = re.sub('[^A-Za-z0-9_]+', '', s.translate({ord(c): "_" for c in INVALID_CHARS}))
-
     @property
     def name(self) -> str:
         return self._name
 
-    # @name.setter
-    # def name(self, s: str) -> None:
-    #     if s is None:
-    #         self._name = s
-    #     else:
-    #         self._name = re.sub('[^0-9A-Za-zäöüÄÖÜß%&;:()\- ]+', '', s)
+    @property
+    def configs(self) -> Configurations:
+        return super().configs
 
     @property
-    def context(self):
-        return self.__context
+    def context(self) -> Context:
+        return super().context
 
     @property
     def data(self):

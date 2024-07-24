@@ -8,6 +8,7 @@ loris.application
 
 from __future__ import annotations
 
+import logging
 from threading import Event, Thread
 from typing import Type
 
@@ -18,18 +19,21 @@ from loris.data.manager import DataManager
 from loris.util import floor_date, to_timedelta
 
 
-def load(name: str = "Loris", factory: Type[System] = System, **kwargs) -> Application:
-    return Application(Settings(name, **kwargs)).setup(factory)
-
-
 class Application(DataManager, Thread):
     _interval: int
     __interrupt: Event = Event()
+
+    @classmethod
+    def load(cls, name: str, factory: Type[System] = System, **kwargs) -> Application:
+        app = cls(Settings(name, **kwargs))
+        app.setup(factory)
+        return app
 
     def __init__(self, settings: Settings, **kwargs) -> None:
         super().__init__(settings, name=settings.application, **kwargs)
         self.__interrupt = Event()
         self.__interrupt.set()
+        self._logger = logging.getLogger(self.id)
 
     def __eq__(self, other):
         return self is other
@@ -41,22 +45,17 @@ class Application(DataManager, Thread):
         super().configure(settings)
         self._interval = settings.get_int("interval", default=1)
 
-    def setup(self, factory: Type[System]) -> Application:
-        self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
-        self._do_load_systems(self.settings, factory)
-        self._do_configure()
-        return self
-
     # noinspection PyProtectedMember
-    def _do_load_systems(self, settings: Settings, factory: Type[System]) -> None:
+    def setup(self, factory: Type[System]) -> None:
+        self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
         systems = []
-        systems_flat = settings.get_bool("system_flat", default=False)
-        system_dirs = settings.dirs.encode()
+        systems_flat = self.settings.get_bool("system_flat", default=False)
+        system_dirs = self.settings.dirs.encode()
         system_dirs["conf_dir"] = None
-        if settings.get_bool("system_scan", default=False):
-            if settings.get_bool("system_copy", default=False):
-                factory.copy(settings)
-            system_dirs["scan_dir"] = settings.dirs.data
+        if self.settings.get_bool("system_scan", default=False):
+            if self.settings.get_bool("system_copy", default=False):
+                factory.copy(self.settings)
+            system_dirs["scan_dir"] = str(self.settings.dirs.data)
             for system in factory.scan(self, **system_dirs, flat=systems_flat):
                 systems.append(system)
         else:
@@ -66,15 +65,12 @@ class Application(DataManager, Thread):
                 self._components.get(system.id).configs.update(system.configs)
             else:
                 self._components._add(system)
+        self._do_configure()
 
     # noinspection PyTypeChecker
     @property
     def settings(self) -> Settings:
         return self.configs
-
-    @property
-    def name(self) -> str:
-        return self.settings.application
 
     def start(self) -> None:
         self._logger.info(f"Starting {type(self).__name__}: {self.name}")

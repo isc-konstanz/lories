@@ -11,12 +11,20 @@ from __future__ import annotations
 import datetime as dt
 from abc import abstractmethod
 from functools import wraps
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
-import logging
 import pandas as pd
 import pytz as tz
-from loris import Channels, ChannelState, ConfigurationException, Configurations, Configurator, LocalResourceException
+from loris import (
+    Channel,
+    Channels,
+    ChannelState,
+    ConfigurationException,
+    Configurations,
+    Configurator,
+    Context,
+    LocalResourceException,
+)
 from loris.configs import ConfiguratorMeta
 from loris.util import get_context, parse_id
 
@@ -46,22 +54,27 @@ class Connector(Configurator, metaclass=ConnectorMeta):
 
     __channels: Channels = None
 
-    def __init__(self, context, configs: Configurations, channels: Channels = None, *args, **kwargs) -> None:
-        super().__init__(configs, *args, **kwargs)
+    def __init__(self, context: Context, configs: Configurations, channels: Channels = None, *args, **kwargs) -> None:
+        super().__init__(get_context(context, Context), configs, *args, **kwargs)
+        from loris.components.activator import Activator
+        from loris.connectors.context import ConnectorContext
+        from loris.data.context import DataContext
+
+        if context is None or not isinstance(context, (ConnectorContext, DataContext)):
+            raise ConnectorException(f"Invalid connector context: {None if context is None else type(context)}")
+        if configs is None:
+            raise ConfigurationException("Invalid connector for empty configuration")
+
         if "id" not in configs:
             raise ConfigurationException("Invalid configuration, missing specified connector ID")
 
         self._id = parse_id(configs.get("id"))
-        self._uuid = configs.pop("uuid") if "uuid" in configs else self._id
-
-        from loris.data.context import DataContext
-        from loris.connectors.context import ConnectorContext
-        if not isinstance(context, (ConnectorContext, DataContext)):
-            raise ConnectorException(f"Invalid connector context type: {type(context)}")
+        if "uuid" in configs:
+            self._uuid = configs.pop("uuid")
+        else:
+            self._uuid = self._id if not isinstance(context, Activator) else f"{context.uuid}.{self._id}"
 
         self.__channels = channels if channels is not None else Channels()
-        self.__context = get_context(context, (ConnectorContext, DataContext))
-        self.__logger = logging.getLogger(Connector.__module__)
 
     def __enter__(self) -> Connector:
         self._do_connect(self.__channels)
@@ -115,10 +128,6 @@ class Connector(Configurator, metaclass=ConnectorMeta):
         pass
 
     @property
-    def context(self):
-        return self.__context
-
-    @property
     def channels(self) -> Channels:
         return self.__channels
 
@@ -129,11 +138,9 @@ class Connector(Configurator, metaclass=ConnectorMeta):
     def _is_connected(self) -> bool:
         return self.is_connected() and self._connected
 
-    @abstractmethod
     def is_connected(self) -> bool:
-        pass
+        return True
 
-    @abstractmethod
     def connect(self, channels: Channels) -> None:
         pass
 
@@ -145,9 +152,8 @@ class Connector(Configurator, metaclass=ConnectorMeta):
         if not self.is_configured():
             raise ConfigurationException(f"Trying to connect unconfigured {type(self).__name__}: {self.uuid}")
         if self._is_connected():
-            self.__logger.warning(f"{type(self).__name__} '{self.uuid}' already connected")
+            self._logger.warning(f"{type(self).__name__} '{self.uuid}' already connected")
             return
-        self.__logger.info(f"Connecting {type(self).__name__}: {self.uuid}")
 
         self.__connect(channels)
         self._on_connect(channels)
@@ -155,12 +161,9 @@ class Connector(Configurator, metaclass=ConnectorMeta):
         self._connected = True
         self.__channels = channels
 
-        self.__logger.debug(f"Connected {type(self).__name__}: {self.uuid}")
-
     def _on_connect(self, channels: Channels) -> None:
         pass
 
-    @abstractmethod
     def disconnect(self) -> None:
         pass
 
@@ -169,14 +172,11 @@ class Connector(Configurator, metaclass=ConnectorMeta):
     def _do_disconnect(self) -> None:
         if self._is_connected():
             return
-        self.__logger.info(f"Disconnecting {type(self).__name__}: {self.uuid}")
 
         self.__disconnect()
         self._on_disconnect()
         self._disconnect_timestamp = pd.Timestamp.now(tz.UTC)
         self._connected = False
-
-        self.__logger.debug(f"Disconnected {type(self).__name__}: {self.uuid}")
 
     def _on_disconnect(self) -> None:
         pass

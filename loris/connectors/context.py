@@ -13,15 +13,19 @@ from collections import OrderedDict
 from collections.abc import Mapping
 from typing import Collection, Dict, Iterator, List
 
-from loris import ConfigurationException, Configurations, Configurator
+from loris import ConfigurationException, Configurations, Configurator, Context
 from loris.connectors import Connector, ConnectorException, registry
 
 
-class ConnectorContext(Configurator, Mapping[str, Connector]):
+class ConnectorContext(Configurator, Context[Connector]):
     __connectors: Dict[str, Connector]
 
-    def __init__(self, configs: Configurations, *args, **kwargs) -> None:
-        super().__init__(configs, *args, **kwargs)
+    def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
+        super().__init__(context, configs, *args, **kwargs)
+        from loris.data.context import DataContext
+
+        if context is None or not isinstance(context, DataContext):
+            raise ConfigurationException(f"Invalid data context: {None if context is None else type(context)}")
         self.__connectors = OrderedDict()
 
     def __iter__(self) -> Iterator[str]:
@@ -30,22 +34,24 @@ class ConnectorContext(Configurator, Mapping[str, Connector]):
     def __len__(self) -> int:
         return len(self.__connectors)
 
-    def __getitem__(self, uuid: str) -> Connector:
-        return self.__get(uuid)
-
-    def __contains__(self, uuid) -> bool:
-        return uuid in self.__connectors.keys()
+    def __contains__(self, item: str | Connector) -> bool:
+        if isinstance(item, str):
+            return item in self.__connectors.keys()
+        if isinstance(item, Connector):
+            return item in self.__connectors.values()
+        return False
 
     def __repr__(self) -> str:
-        # return str(self.to_frame(states=True))
         return f"{type(self).__name__}({[c.uuid for c in self.__connectors.values()]})"
 
     def __str__(self) -> str:
         return f"{type(self).__name__}:\n\t" + "\n\t".join([f"{i} = {repr(c)}" for i, c in self.__connectors.items()])
 
     def configure(self, configs: Configurations) -> None:
-        self._do_load_from_file(configs.dirs.conf)
+        super().configure(configs)
+        self._load_from_file(str(configs.dirs.conf))
 
+    # noinspection PyProtectedMember
     def _do_configure_members(self, configurators: Collection[Configurator]) -> None:
         configurators = list(configurators)
         configurators.extend([c for c in self.__connectors.values() if c not in configurators])
@@ -55,8 +61,8 @@ class ConnectorContext(Configurator, Mapping[str, Connector]):
         from loris.components import Component
         super()._do_configure_members([c for c in configurators if not isinstance(c, Component)])
 
-    # noinspection PyTypeChecker, PyProtectedMember, PyUnresolvedReferences
-    def _do_load_from_file(
+    # noinspection PyProtectedMember, PyTypeChecker, PyUnresolvedReferences
+    def _load_from_file(
         self,
         configs_dir: str,
         configs_file: str = "connectors.conf",
@@ -67,9 +73,9 @@ class ConnectorContext(Configurator, Mapping[str, Connector]):
             configs_dirs = self.configs.dirs.encode()
             configs_dirs["conf_dir"] = configs_dir
             configs = Configurations.load(configs_file, **configs_dirs)
-            self._do_load_sections(configs, prefix_uuid)
+            self._load_sections(configs, prefix_uuid)
 
-    def _do_load_sections(
+    def _load_sections(
         self,
         configs: Configurations,
         prefix_uuid: str = None
@@ -84,12 +90,24 @@ class ConnectorContext(Configurator, Mapping[str, Connector]):
             connector_configs.set("uuid", connector_uuid)
             connector = self._new(connector_configs)
             if connector.uuid in self:
-                self.__get(connector.uuid).configs.update(connector_configs)
+                self._get(connector.uuid).configs.update(connector_configs)
             else:
                 self._add(connector)
 
-    def __get(self, uuid: str) -> Connector:
-        return self.__connectors.get(uuid)
+    def _get(self, uid: str) -> Connector:
+        return self.__connectors.get(uid)
+
+    def _set(self, uid: str, connector: Connector) -> None:
+        self.__connectors[uid] = connector
+
+    def _add(self, connector: Connector) -> None:
+        if not isinstance(connector, Connector):
+            raise ConnectorException(f"Invalid connector type: {type(connector)}")
+
+        if connector.uuid in self.__connectors.keys():
+            raise ConfigurationException(f'Connector with UUID "{connector.uuid}" already exists')
+
+        self._set(connector.uuid, connector)
 
     # noinspection SpellCheckingInspection
     def _new(self, configs: Configurations) -> Connector:
@@ -103,17 +121,8 @@ class ConnectorContext(Configurator, Mapping[str, Connector]):
 
         return registry.types[registration_type].initialize(self, configs)
 
-    def _add(self, connector: Connector) -> None:
-        if not isinstance(connector, Connector):
-            raise ConnectorException(f"Invalid connector type: {type(connector)}")
-
-        if connector.uuid in self.__connectors.keys():
-            raise ConfigurationException(f'Connector with UUID "{connector.uuid}" already exists')
-
-        self.__connectors[connector.uuid] = connector
-
-    def _remove(self, uuid: str) -> None:
-        del self.__connectors[uuid]
+    def _remove(self, uid: str) -> None:
+        del self.__connectors[uid]
 
     # noinspection PyMethodMayBeStatic
     def get_types(self) -> List[str]:

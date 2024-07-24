@@ -46,12 +46,6 @@ class WeatherForecast(Component):
         self.interval = configs.get_int("interval", default=WeatherForecast.interval)
         self.offset = configs.get_int("offset", default=WeatherForecast.offset)
 
-    def activate(self):
-        super().activate()
-
-    def deactivate(self):
-        super().deactivate()
-
     @property
     def type(self) -> str:
         return self.TYPE

@@ -8,8 +8,8 @@ loris.component.weather.dwd._channels
 
 from typing import Any, Collection, Dict
 
-from loris.components.weather import WEATHER as CHANNEL_NAMES
 from loris.components.weather import Weather
+from loris.components.weather.constants import WEATHER as CHANNEL_NAMES
 
 CHANNEL_IDS = [
     Weather.GHI,

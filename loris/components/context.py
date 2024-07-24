@@ -12,22 +12,25 @@ import itertools
 import os
 import re
 from collections import OrderedDict
-from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Collection, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
-from loris import Configurations, Configurator
-from loris.components import Activator, Component, ComponentException, registry
+from loris import ConfigurationException, Configurations, Configurator, Context
+from loris.components import Component, ComponentException, registry
 from loris.data import DataAccess
 
 
-class ComponentContext(Activator, Mapping[str, Component]):
+class ComponentContext(Configurator, Context[Component]):
     SECTION: str = "components"
 
     __components: Dict[str, Component]
 
-    def __init__(self, configs: Configurations, *args, **kwargs) -> None:
-        super().__init__(configs, *args, **kwargs)
+    def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
+        super().__init__(context, configs, *args, **kwargs)
+        from loris.data.context import DataContext
+
+        if context is None or not isinstance(context, DataContext):
+            raise ConfigurationException(f"Invalid data context: {None if context is None else type(context)}")
         self.__components = OrderedDict()
 
     def __iter__(self) -> Iterator[str]:
@@ -36,11 +39,12 @@ class ComponentContext(Activator, Mapping[str, Component]):
     def __len__(self) -> int:
         return len(self.__components)
 
-    def __getitem__(self, component_id: str) -> Component:
-        return self.__get(component_id)
-
-    def __contains__(self, component_id) -> bool:
-        return component_id in self.__components.keys()
+    def __contains__(self, item: str | Component) -> bool:
+        if isinstance(item, str):
+            return item in self.__components.keys()
+        if isinstance(item, Component):
+            return item in self.__components.values()
+        return False
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({[c.uuid for c in self.__components.values()]})"
@@ -62,24 +66,23 @@ class ComponentContext(Activator, Mapping[str, Component]):
             components = configs.get_section(ComponentContext.SECTION)
             config_defaults.update(components.pop(DataAccess.SECTION, {}))
 
-            self._do_load_sections(components, config_defaults)
-        self._do_load_from_dir(configs.dirs.cmpt, config_defaults)
+            self._load_sections(components, config_defaults)
+
+        context_dirs = [str(context.configs.dirs.conf)
+                        for context in self.context.components.values() if isinstance(context, ComponentContext)]
+        if configs.dirs.conf not in context_dirs:
+            self._load_from_dir(configs.dirs.conf, config_defaults)
         self.__components = OrderedDict(
             sorted(self.__components.items(), key=lambda e: [convert(t) for t in re.split("([0-9]+)", e[0])])
         )
 
-    def _do_configure_members(self, configurators: Collection[Configurator]) -> None:
-        configurators = list(configurators)
-        configurators.extend([c for c in self.__components.values() if c not in configurators])
-        super()._do_configure_members(configurators)
-
-    # noinspection PyTypeChecker, PyProtectedMember, PyUnresolvedReferences
-    def _do_load_sections(self, configs: Configurations, defaults: Optional[Mapping[str, Any]]) -> None:
-        component_ids = [s for s in configs.sections if s != DataAccess.SECTION]
-        for component_id in component_ids:
-            component_file = f"{component_id}.conf"
+    # noinspection PyProtectedMember, PyShadowingBuiltins, PyTypeChecker, PyUnresolvedReferences
+    def _load_sections(self, configs: Configurations, defaults: Optional[Mapping[str, Any]]) -> None:
+        ids = [s for s in configs.sections if s != DataAccess.SECTION]
+        for id in ids:
+            component_file = f"{id}.conf"
             component_section = deepcopy(defaults)
-            component_section.update(configs.get(component_id))
+            component_section.update(configs.get(id))
             component_configs = Configurations.load(
                 component_file,
                 **configs.dirs.encode(),
@@ -88,12 +91,12 @@ class ComponentContext(Activator, Mapping[str, Component]):
             )
             component = self._new(component_configs)
             if component.id in self:
-                self.__get(component.id).configs.update(component_configs)
+                self._get(component.id).configs.update(component_configs)
             else:
-                self._add(component)
+                self._set(component.id, component)
 
     # noinspection PyTypeChecker, PyProtectedMember, PyUnresolvedReferences
-    def _do_load_from_dir(self, configs_dir: str, defaults: Optional[Mapping[str, Any]]) -> None:
+    def _load_from_dir(self, configs_dir: str, defaults: Optional[Mapping[str, Any]]) -> None:
         if os.path.isdir(configs_dir):
             config_types = tuple(itertools.chain(*[[t.type, *t.alias] for t in registry.types.values()]))
             for configs_entry in os.scandir(configs_dir):
@@ -112,12 +115,18 @@ class ComponentContext(Activator, Mapping[str, Component]):
                     )
                     component = self._new(component_configs)
                     if component.id in self:
-                        self.__get(component.id).configs.update(component_configs)
+                        self._get(component.id).configs.update(component_configs)
                     else:
                         self._add(component)
 
-    def __get(self, component_id: str) -> Component:
-        return self.__components[component_id]
+    def _get(self, uid: str) -> Component:
+        return self.__components[uid]
+
+    def _set(self, uid: str, component: Component) -> None:
+        self.__components[uid] = component
+
+    def _add(self, component: Component) -> None:
+        self._set(component.uuid, component)
 
     # noinspection SpellCheckingInspection
     def _new(self, configs: Configurations) -> Component:
@@ -139,27 +148,8 @@ class ComponentContext(Activator, Mapping[str, Component]):
 
         return registry.types[registration_type].initialize(self, configs)
 
-    def _add(self, component: Component) -> None:
-        self.__components[component.id] = component
-
-    def _remove(self, component_id: str) -> None:
-        del self.__components[component_id]
-
-    def activate(self) -> None:
-        super().activate()
-
-    def _do_activate_members(self, activators: Collection[Activator]) -> None:
-        activators = list(activators)
-        activators.extend([c for c in self.__components.values() if c not in activators])
-        super()._do_activate_members(activators)
-
-    def deactivate(self) -> None:
-        super().deactivate()
-
-    def _do_deactivate_members(self, activators: Collection[Activator]) -> None:
-        activators = list(activators)
-        activators.extend([c for c in self.__components.values() if c not in activators])
-        super()._do_deactivate_members(activators)
+    def _remove(self, uid: str) -> None:
+        del self.__components[uid]
 
     # noinspection PyMethodMayBeStatic
     def get_types(self) -> List[str]:
