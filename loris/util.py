@@ -47,7 +47,7 @@ def get_variables(
     def _is_type(o) -> bool:
         return isinstance(o, include) and (exclude is None or not isinstance(o, exclude))
 
-    if isinstance(obj, Iterable):
+    if isinstance(obj, Collection):
         return [o for o in obj if _is_type(o)]
     return list(get_members(obj, lambda attr, member: _is_type(member)).values())
 

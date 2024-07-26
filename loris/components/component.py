@@ -40,10 +40,10 @@ class Component(Activator):
 
         if "id" in configs:
             self._id = parse_id(configs["id"])
-            self._name = parse_name(configs.get("name", default=configs["id"]))
+            self._name = configs.get("name", default=parse_name(configs["id"]))
         elif "name" in configs:
             self._id = parse_id(configs["name"])
-            self._name = parse_name(configs["name"])
+            self._name = configs["name"]
         else:
             raise ConfigurationException("Invalid configuration, missing specified component ID")
 

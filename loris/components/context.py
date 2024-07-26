@@ -69,8 +69,9 @@ class ComponentContext(Configurator, Context[Component]):
             self._load_sections(components, config_defaults)
 
         context_dirs = [str(context.configs.dirs.conf)
-                        for context in self.context.components.values() if isinstance(context, ComponentContext)]
-        if configs.dirs.conf not in context_dirs:
+                        for context in self.context.components.values()
+                        if context != self and isinstance(context, ComponentContext)]
+        if str(configs.dirs.conf) not in context_dirs:
             self._load_from_dir(configs.dirs.conf, config_defaults)
         self.__components = OrderedDict(
             sorted(self.__components.items(), key=lambda e: [convert(t) for t in re.split("([0-9]+)", e[0])])

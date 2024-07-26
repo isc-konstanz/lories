@@ -102,7 +102,7 @@ class Channel:
         vars["value type"] = self.value_type
         vars["value length"] = self._value_length
         vars["value"] = str(self.value)
-        vars["status"] = str(self.status)
+        vars["state"] = str(self.status)
         vars["timestamp"] = str(self.timestamp)
         return f"{type(self).__name__}:\n\t" + "\n\t".join(f"{k}={v}" for k, v in vars.items())
 

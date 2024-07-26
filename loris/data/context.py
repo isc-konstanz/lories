@@ -52,12 +52,17 @@ class DataContext(Configurator, DataMapping, Context[Channel]):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
         self._load_from_file(str(configs.dirs.conf))
-        self._do_configure_member(get_variables(self._components.values(), include=ComponentContext))
-        self._do_configure_member(get_variables(self._components.values(), exclude=ComponentContext))
-        self._do_configure_member(get_variables(self._connectors.values(), exclude=Component))
+
+        self._do_configure_member(self._connectors)
+
+        self._do_configure_member(*get_variables(self._components.values(), include=ComponentContext))
+        self._do_configure_member(self._components)
+
+        self._do_configure_member(*get_variables(self._components.values(), exclude=ComponentContext))
+        self._do_configure_member(*get_variables(self._connectors.values(), exclude=Component))
 
     # noinspection PyProtectedMember
-    def _do_configure_member(self, configurators: Collection[Configurator]) -> None:
+    def _do_configure_member(self, *configurators: Configurator) -> None:
         for configurator in configurators:
             if not configurator.is_enabled():
                 self._logger.debug(
