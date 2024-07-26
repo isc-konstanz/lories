@@ -10,15 +10,15 @@ from __future__ import annotations
 
 import datetime as dt
 import os
-from typing import Mapping, Optional
+from typing import Mapping, Optional, Tuple
 
 import pandas as pd
 import pytz as tz
-from loris.channels import Channels
+from loris.channels import Channels, ChannelState
 from loris.configs import ConfigurationException, Configurations
 from loris.connectors import Connector
 from loris.io import csv
-from loris.util import _parse_freq, resample, to_timezone
+from loris.util import _parse_freq, ceil_date, floor_date, resample, to_timezone
 
 
 # noinspection PyShadowingBuiltins
@@ -145,29 +145,61 @@ class CsvConnector(Connector):
         start: Optional[pd.Timestamp, dt.datetime] = None,
         end: Optional[pd.Timestamp, dt.datetime] = None,
     ) -> None:
-        columns = {c.name: c.id for c in channels if "name" in c}
+        columns = {c.name: c.id for c in self.channels if "name" in c}
         columns.update({column: key for key, column in self.columns.items()})
 
-        if self._data is not None:
-            data = self._data
-        else:
-            data = csv.read_files(
-                self._data_dir,
-                self.freq,
-                self.format,
-                start,
-                end,
-                index_column=self.index_column,
-                index_unix=self.index_unix,
-                timezone=self.timezone,
-                separator=self.separator,
-                decimal=self.decimal,
-                rename=columns,
-            )
+        def _infer_dates(s=start, e=end) -> Tuple[pd.Timestamp, pd.Timestamp]:
+            if all(pd.isna(d) for d in [s, e]):
+                n = pd.Timestamp.now(tz=self.timezone)
+                s = floor_date(n, timezone=self.timezone, freq=self.freq)
+                e = ceil_date(n, timezone=self.timezone, freq=self.freq)
+            return s, e
 
-        if self.resolution is not None:
-            data = resample(data, self.resolution)
-        return data.loc[start:end, :]
+        try:
+            if self._data is not None:
+                data = self._data
+            else:
+                data = csv.read_files(
+                    self._data_dir,
+                    self.freq,
+                    self.format,
+                    *_infer_dates(),
+                    index_column=self.index_column,
+                    index_unix=self.index_unix,
+                    timezone=self.timezone,
+                    separator=self.separator,
+                    decimal=self.decimal,
+                    rename=columns,
+                )
+
+            if self.resolution is not None:
+                data = resample(data, self.resolution)
+
+            if all(pd.isna(d) for d in [start, end]):
+                now = pd.Timestamp.now(tz=self.timezone)
+                index = data.index.tz_convert(self.timezone).get_indexer([now], method='nearest')
+                data = data.iloc[[index[-1]], :]
+
+            for channel in channels:
+                channel_column = channel.id if "column" not in channel else channel.column
+                if len(data.index) > 1:
+                    channel_data = data.loc[:, channel_column]
+                    channel.set(data.index[0], channel_data)
+
+                elif len(data.index) > 0:
+                    timestamp = data.index[-1]
+                    channel_data = data.loc[timestamp, channel_column]
+                    channel.set(timestamp, channel_data)
+
+                else:
+                    channel.state = ChannelState.NOT_AVAILABLE
+                    self._logger.warning(
+                        f"Unable to read nonexisting column: {channel_column}"
+                    )
+        except IOError:
+            # ToDo: Raise ConnectionException ?
+            for channel in channels:
+                channel.state = ChannelState.NOT_AVAILABLE
 
     def write(self, channels: Channels) -> None:
         columns = {c.id: c.name for c in channels if "name" in c}

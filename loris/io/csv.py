@@ -55,12 +55,12 @@ def read_files(
 
         data = read_file(file, timezone=timezone, **kwargs).combine_first(data)
 
-    if end is not None:
-        if start > end:
-            return data.truncate(before=start).head(1)
-
-        return data[(data.index >= start) & (data.index <= end)]
-
+    if data.empty:
+        return data
+    if pd.isna(start):
+        data = data[data.index >= start]
+    if pd.isna(end):
+        data = data[data.index <= end]
     return data
 
 
@@ -232,7 +232,7 @@ def write_file(
             if all(name in list(csv.columns) for name in list(data.columns)):
                 data = data.combine_first(csv)
             else:
-                data = pd.concat([csv, data], axis=1)
+                data = pd.concat([csv, data], axis="index")
 
     if rename:
         data = data.rename(columns=rename)
