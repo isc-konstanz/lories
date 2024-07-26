@@ -13,9 +13,7 @@ from abc import ABC, ABCMeta
 from functools import wraps
 from typing import Any, Dict, List, Optional
 
-from loris.channels import Channel
 from loris.configs import ConfigurationException, Configurations, Context
-from loris.location import Location
 from loris.util import get_members
 
 
@@ -61,32 +59,7 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
     def _parse_vars(self, vars: Optional[Dict[str, Any]] = None, parse: callable = str) -> List[str]:
         if vars is None:
             vars = self._get_vars()
-        values = [f"{k}={v if not isinstance(v, (Channel, Configurator, Location)) else parse(v)}"
-                  for k, v in vars.items()]
-
-        if self.context is not None:
-            values.append(f"context={parse(self.context)}")
-        if self.configs is not None:
-            values.append(f"configurations={repr(self.configs)}")
-            values.append(f"configured={self.is_configured()}")
-            values.append(f"enabled={self.is_enabled()}")
-        return values
-
-    # noinspection PyShadowingBuiltins
-    def _get_vars(self) -> Dict[str, Any]:
-        return get_members(self, filter=lambda attr, var: not (
-            attr.startswith("_") or
-            attr.isupper() or
-            callable(var) or
-            isinstance(var, Context) or
-            isinstance(var, Configurations))
-        )
-
-    # noinspection PyShadowingBuiltins
-    def _parse_vars(self, vars: Optional[Dict[str, Any]] = None, parse: callable = str) -> List[str]:
-        if vars is None:
-            vars = self._get_vars()
-        values = [f"{k}={v if not isinstance(v, (Channel, Configurator, Location)) else parse(v)}"
+        values = [f"{k}={v if not isinstance(type(v), type) else parse(v)}"
                   for k, v in vars.items()]
 
         if self.context is not None:

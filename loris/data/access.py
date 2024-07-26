@@ -36,7 +36,13 @@ class DataAccess(DataMapping):
             self.__component.configs._add_section(self.SECTION, {})
 
     def __repr__(self) -> str:
-        return str(self.values())
+        # return str(self.to_frame(states=True))
+        return f"{type(self).__name__}({[c.uuid for c in self._channels.values()]})"
+
+    def __str__(self) -> str:
+        return f"{type(self).__name__}:\n\t" + "\n\t".join(
+            [f"{i} = {repr(c)}" for i, c in self._channels.items()]
+        )
 
     def is_configured(self) -> bool:
         return self._configured

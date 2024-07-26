@@ -8,14 +8,13 @@ loris.components.activator
 
 from __future__ import annotations
 
+import inspect
 import logging
 from abc import abstractmethod
 from functools import wraps
 from typing import Any, Dict, List, Optional
 
-from loris.channels import Channel
 from loris.configs import ConfigurationException, Configurations, Configurator, ConfiguratorMeta, Context
-from loris.location import Location
 
 
 class ActivatorMeta(ConfiguratorMeta):
@@ -65,7 +64,7 @@ class Activator(Configurator, metaclass=ActivatorMeta):
         values.append(f"id={id}")
         values.append(f"name={vars.pop('name', self.name)}")
 
-        values += [f"{k}={v if not isinstance(v, (Channel, Configurator, Location)) else parse(v)}"
+        values += [f"{k}={v if not isinstance(type(v), type) else parse(v)}"
                    for k, v in vars.items()]
 
         values.append(f"context={parse(self.context)}")
