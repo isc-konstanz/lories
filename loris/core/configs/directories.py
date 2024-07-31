@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-loris.configs.directories
+loris.core.directories
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 

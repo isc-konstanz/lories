@@ -14,7 +14,7 @@ from typing import Any, Iterator, List, Tuple
 
 import numpy as np
 import pandas as pd
-from loris import Channel, Channels
+from loris.data.channels import Channel, Channels
 
 
 class DataMapping(Mapping[str, Channel]):

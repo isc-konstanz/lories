@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-loris.core.channels.state
+loris.data.channels.state
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 

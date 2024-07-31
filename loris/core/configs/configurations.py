@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-loris.configs.configurations
+loris.core.configurations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
@@ -18,8 +18,8 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 import pandas as pd
-from loris import LocalResourceException, LocalResourceUnavailableException
-from loris.configs import Directories
+from loris import ResourceException, ResourceUnavailableException
+from loris.core.configs import Directories
 from loris.util import to_bool, to_date, to_float, to_int
 
 
@@ -217,14 +217,14 @@ class Configurations(MutableMapping[str, Any]):
         self.__update(u, replace)
 
 
-class ConfigurationException(LocalResourceException):
+class ConfigurationException(ResourceException):
     """
     Raise if a configuration is invalid.
 
     """
 
 
-class ConfigurationUnavailableException(LocalResourceUnavailableException, ConfigurationException):
+class ConfigurationUnavailableException(ResourceUnavailableException, ConfigurationException):
     """
     Raise if a configuration file can not be found.
 

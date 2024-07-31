@@ -13,9 +13,9 @@ from abc import abstractmethod
 from typing import Any, Dict, Optional
 
 import pandas as pd
-from loris import LocalResourceException, LocalResourceUnavailableException
+from loris import ResourceException, ResourceUnavailableException
 from loris.components import Activator
-from loris.configs import ConfigurationException, Configurations, Context
+from loris.core import ConfigurationException, Configurations, Context
 from loris.data import DataAccess
 from loris.util import get_context, parse_id, parse_name, to_date
 
@@ -116,14 +116,14 @@ class Component(Activator):
         return data
 
 
-class ComponentException(LocalResourceException):
+class ComponentException(ResourceException):
     """
     Raise if an error occurred accessing the component.
 
     """
 
 
-class ComponentUnavailableException(LocalResourceUnavailableException, ComponentException):
+class ComponentUnavailableException(ResourceUnavailableException, ComponentException):
     """
     Raise if an accessed component can not be found.
 

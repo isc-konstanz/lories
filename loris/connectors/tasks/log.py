@@ -6,8 +6,8 @@ loris.connectors.tasks.write
 
 """
 
-from loris import Channels
 from loris.connectors.tasks.task import ConnectorTask
+from loris.data.channels import Channels
 
 
 class LogTask(ConnectorTask):
@@ -18,4 +18,4 @@ class LogTask(ConnectorTask):
         # Pass copied channels instead of actual objects, including parsed logger specific channel configurations
         channels = Channels([c.from_logger() for c in self.channels])
 
-        self.connector.write(channels)
+        self.connector.write(channels.to_frame())

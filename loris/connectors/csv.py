@@ -14,9 +14,8 @@ from typing import Mapping, Optional, Tuple
 
 import pandas as pd
 import pytz as tz
-from loris.channels import Channels, ChannelState
-from loris.configs import ConfigurationException, Configurations
 from loris.connectors import Connector
+from loris.core import ConfigurationException, Configurations, Resources
 from loris.io import csv
 from loris.util import _parse_freq, ceil_date, floor_date, resample, to_timezone
 
@@ -119,7 +118,7 @@ class CsvConnector(Connector):
         # TODO: Implement flag if pretty printing should be used or not
         self.columns = configs.get("columns", default=CsvConnector.columns)
 
-    def connect(self, channels: Channels) -> None:
+    def connect(self, resources: Resources) -> None:
         if not os.path.isdir(self._data_dir):
             os.makedirs(self._data_dir, exist_ok=True)
         if self._data_path is not None:
@@ -141,10 +140,10 @@ class CsvConnector(Connector):
 
     def read(
         self,
-        channels: Channels,
+        resources: Resources,
         start: Optional[pd.Timestamp, dt.datetime] = None,
         end: Optional[pd.Timestamp, dt.datetime] = None,
-    ) -> None:
+    ) -> pd.DataFrame:
         columns = {c.name: c.id for c in self.channels if "name" in c}
         columns.update({column: key for key, column in self.columns.items()})
 
@@ -177,32 +176,18 @@ class CsvConnector(Connector):
 
             if all(pd.isna(d) for d in [start, end]):
                 now = pd.Timestamp.now(tz=self.timezone)
-                index = data.index.tz_convert(self.timezone).get_indexer([now], method='nearest')
+                index = data.index.tz_convert(self.timezone).get_indexer([now], method="nearest")
                 data = data.iloc[[index[-1]], :]
 
-            for channel in channels:
-                channel_column = channel.id if "column" not in channel else channel.column
-                if len(data.index) > 1:
-                    channel_data = data.loc[:, channel_column]
-                    channel.set(data.index[0], channel_data)
+            data = data.rename(columns={r.id if "column" not in r else r.column: r.uuid for r in resources})
+            return data.loc[:, [r.uuid for r in resources if r.uuid in data.columns]]
 
-                elif len(data.index) > 0:
-                    timestamp = data.index[-1]
-                    channel_data = data.loc[timestamp, channel_column]
-                    channel.set(timestamp, channel_data)
-
-                else:
-                    channel.state = ChannelState.NOT_AVAILABLE
-                    self._logger.warning(
-                        f"Unable to read nonexisting column: {channel_column}"
-                    )
         except IOError:
-            # ToDo: Raise ConnectionException ?
-            for channel in channels:
-                channel.state = ChannelState.NOT_AVAILABLE
+            # TODO: Return more informative ChannelStates or raise ConnectionException (?)
+            return pd.DataFrame()
 
-    def write(self, channels: Channels) -> None:
-        columns = {c.id: c.name for c in channels if "name" in c}
+    def write(self, data: pd.DataFrame) -> None:
+        columns = {r.uuid: r.name for r in self.resources if "name" in r}
         columns.update(self.columns)
         kwargs = {
             "timezone": self.timezone,
@@ -211,14 +196,10 @@ class CsvConnector(Connector):
             "override": self.override,
             "rename": columns,
         }
-        if self.slice:
-            data = channels.to_frame()
-            data.index.name = self.index_column
-            csv.write_files(channels.to_frame(), self._data_dir, self.freq, self.format, **kwargs)
-        else:
-            for data_time, data_channels in channels.groupby("timestamp"):
-                data = data_channels.to_frame()
-                data.index.name = self.index_column
+        data.index.name = self.index_column
 
-                csv_file = os.path.join(self._data_dir, data_time.strftime(self.format) + ".csv")
-                csv.write_file(data, csv_file, **kwargs)
+        if self.slice:
+            csv.write_files(data, self._data_dir, self.freq, self.format, **kwargs)
+        else:
+            csv_file = os.path.join(self._data_dir, data.index[0].strftime(self.format) + ".csv")
+            csv.write_file(data, csv_file, **kwargs)

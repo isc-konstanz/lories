@@ -23,9 +23,11 @@ from loris import (
     Configurations,
     Configurator,
     Context,
-    LocalResourceException,
+    Resource,
+    ResourceException,
+    Resources,
 )
-from loris.configs import ConfiguratorMeta
+from loris.core import ConfiguratorMeta
 from loris.util import get_context, parse_id
 
 
@@ -52,9 +54,9 @@ class Connector(Configurator, metaclass=ConnectorMeta):
     _disconnect_timestamp: pd.Timestamp = pd.NaT
     _reconnect_interval: pd.Timedelta = pd.Timedelta(minutes=1)
 
-    __channels: Channels = None
+    __resources: Resources
 
-    def __init__(self, context: Context, configs: Configurations, channels: Channels = None, *args, **kwargs) -> None:
+    def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(get_context(context, Context), configs, *args, **kwargs)
         from loris.components.activator import Activator
         from loris.connectors.context import ConnectorContext
@@ -74,10 +76,10 @@ class Connector(Configurator, metaclass=ConnectorMeta):
         else:
             self._uuid = self._id if not isinstance(context, Activator) else f"{context.uuid}.{self._id}"
 
-        self.__channels = channels if channels is not None else Channels()
+        self.__resources = Resources()
 
     def __enter__(self) -> Connector:
-        self._do_connect(self.__channels)
+        self._do_connect(self.__resources)
         return self
 
     # noinspection PyShadowingBuiltins
@@ -105,7 +107,7 @@ class Connector(Configurator, metaclass=ConnectorMeta):
         if "name" in vars:
             values.append(f"name={vars.pop('name')}")
 
-        values += [f"{k}={v if not isinstance(v, (Channel, Configurator)) else parse(v)}" for k, v in vars.items()]
+        values += [f"{k}={v if not isinstance(v, (Resource, Configurator)) else parse(v)}" for k, v in vars.items()]
 
         values.append(f"context={parse(self.context)}")
         values.append(f"configurations={repr(self.configs)}")
@@ -128,12 +130,16 @@ class Connector(Configurator, metaclass=ConnectorMeta):
         pass
 
     @property
-    def channels(self) -> Channels:
-        return self.__channels
+    def resources(self) -> Resources:
+        return self.__resources
 
-    def set_states(self, channel_state: ChannelState) -> None:
-        for channel in self.__channels:
-            channel.state = channel_state
+    @property
+    def channels(self) -> Channels:
+        return Channels([resource for resource in self.__resources if isinstance(resource, Channel)])
+
+    def set_channels(self, state: ChannelState) -> None:
+        for channel in self.channels:
+            channel.state = state
 
     def _is_connected(self) -> bool:
         return self.is_connected() and self._connected
@@ -141,12 +147,12 @@ class Connector(Configurator, metaclass=ConnectorMeta):
     def is_connected(self) -> bool:
         return True
 
-    def connect(self, channels: Channels) -> None:
+    def connect(self, resources: Resources) -> None:
         pass
 
     # noinspection PyUnresolvedReferences
     @wraps(connect, updated=())
-    def _do_connect(self, channels: Channels) -> None:
+    def _do_connect(self, resources: Resources) -> None:
         if not self.is_enabled():
             raise ConfigurationException(f"Trying to connect disabled {type(self).__name__}: {self.uuid}")
         if not self.is_configured():
@@ -155,13 +161,13 @@ class Connector(Configurator, metaclass=ConnectorMeta):
             self._logger.warning(f"{type(self).__name__} '{self.uuid}' already connected")
             return
 
-        self.__connect(channels)
-        self._on_connect(channels)
+        self.__connect(resources)
+        self._on_connect(resources)
         self._connect_timestamp = pd.Timestamp.now(tz.UTC)
         self._connected = True
-        self.__channels = channels
+        self.__resources = resources
 
-    def _on_connect(self, channels: Channels) -> None:
+    def _on_connect(self, resources: Resources) -> None:
         pass
 
     def disconnect(self) -> None:
@@ -184,18 +190,18 @@ class Connector(Configurator, metaclass=ConnectorMeta):
     @abstractmethod
     def read(
         self,
-        channels: Channels,
+        resources: Resources,
         start: Optional[pd.Timestamp, dt.datetime] = None,
         end: Optional[pd.Timestamp, dt.datetime] = None,
-    ) -> None:
+    ) -> pd.DataFrame:
         pass
 
     @abstractmethod
-    def write(self, channels: Channels) -> None:
+    def write(self, data: pd.DataFrame) -> None:
         pass
 
 
-class ConnectorException(LocalResourceException):
+class ConnectorException(ResourceException):
     """
     Raise if an error occurred accessing the connector.
 

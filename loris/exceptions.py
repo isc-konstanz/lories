@@ -7,14 +7,14 @@ loris.exceptions
 """
 
 
-class LocalResourceException(Exception):
+class ResourceException(Exception):
     """
     Raise if an error occurred accessing a local resource.
 
     """
 
 
-class LocalResourceUnavailableException(LocalResourceException):
+class ResourceUnavailableException(ResourceException):
     """
     Raise if an accessed local resource can not be found.
 

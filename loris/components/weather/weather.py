@@ -59,7 +59,7 @@ class Weather(Component):
 
         # elif type in ["meteoblue", "nmm"]:
         #     from .meteoblue import Meteoblue
-        #     return Meteoblue(context, configs, location)
+        #     return Meteoblue(context, core, location)
 
         raise WeatherException(f"Unknown weather type '{type}' in file: {configs.path}")
 

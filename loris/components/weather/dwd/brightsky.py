@@ -10,16 +10,15 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 import requests
 
 import numpy as np
 import pandas as pd
-from loris import Channel, Channels, ChannelState, ConfigurationException, Configurations
+from loris import ConfigurationException, Configurations, Resources
 from loris.components.weather import Weather, WeatherConnector
 from loris.components.weather.dwd._channels import get_channels
-from loris.util import ceil_date, floor_date
 
 
 # noinspection SpellCheckingInspection
@@ -27,7 +26,7 @@ class Brightsky(WeatherConnector):
     TYPE: str = "brightsky"
 
     address: str = "https://api.brightsky.dev/"
-    horizon: int = 5
+    horizon: int = 10
 
     @property
     def type(self) -> str:
@@ -46,116 +45,64 @@ class Brightsky(WeatherConnector):
                 id="timestamp_creation",
                 name="Creation Timestamp",
                 connector=self.uuid,
-                horizon=self.horizon,
                 source="forecast",
                 address="source_first_record",
                 value_type=pd.Timestamp,
                 primary=True,
                 nullable=False,
             )
-            for channel in get_channels(connector=self.uuid, horizon=self.horizon, source="forecast"):
+            for channel in get_channels(connector=self.uuid, source="forecast"):
                 self.forecast.data.add(**channel)
 
-        for channel in get_channels(connector=self.uuid, source=("current", "historical")):
-            self.data.add(**channel)
+        for channel in get_channels(connector=self.uuid, source="current, historical"):
+            if channel["id"] not in [Weather.PRECIPITATION_PROB]:
+                self.data.add(**channel)
 
     def has_forecast(self) -> bool:
         return True
 
     def read(
         self,
-        channels: Channels,
+        resources: Resources,
         start: Optional[pd.Timestamp, dt.datetime] = None,
         end: Optional[pd.Timestamp, dt.datetime] = None,
-    ) -> None:
-        data, sources = self._request(start, end)
-        data_sources = sources.loc[data["source_id"], ["observation_type", "first_record", "last_record"]]
-        data_source_columns = ["source_type", "source_first_record", "source_last_record"]
-        data_sources.columns = data_source_columns
-        data_sources.index = data.index
-        data[data_source_columns] = data_sources
-        data_source_columns = ["source_id", *data_source_columns]
+    ) -> pd.DataFrame:
+        response, sources = self._request(start, end)
+        response_sources = sources.loc[response["source_id"], ["observation_type", "first_record", "last_record"]]
+        response_source_columns = ["source_type", "source_first_record", "source_last_record"]
+        response_sources.columns = response_source_columns
+        response_sources.index = response.index
+        response[response_source_columns] = response_sources
 
-        for channel in channels:
-            if channel.address not in data.columns:
-                channel.state = ChannelState.NOT_AVAILABLE
-                self._logger.warning("Unable to read nonexisting brightsky column: " + channel.address)
-                continue
-
-            channel_sources = channel.source if isinstance(channel.source, (Tuple, List)) else (channel.source,)
-            channel_data = data.loc[
-                data["source_type"].isin(channel_sources), np.unique([*data_source_columns, channel.address])
+        data = []
+        for source, source_resources in resources.groupby("source"):
+            source_data = response.loc[
+                response["source_type"].isin(source.split(",")),
+                np.unique(["source_id", "source_first_record", "source_last_record"] +
+                          [r.address for r in source_resources])
             ]
-            if channel_data.empty:
-                channel.state = ChannelState.UNKNOWN_ERROR
-                self._logger.warning(f"Unable to read {self._uuid} channel: {channel.id}")
+            if source_data.empty:
+                self._logger.warning(f"Unable to read {self._uuid} channels: {[r.uuid for r in source_resources]}")
                 continue
 
-            if any(source == "forecast" for source in channel_sources):
-                self._parse_forecast(channel_data, channel, start, end)
+            source_start = start if start is not None else min(source_data["source_first_record"].unique())
+            source_end = end if end is not None else max(source_data["source_last_record"].unique())
 
-            elif any(source in ["historical", "current"] for source in channel_sources):
-                if not all(t is None for t in [start, end]):
-                    self._parse_historical(channel_data, channel, start, end)
-                else:
-                    self._parse_current(channel_data, channel)
-            else:
-                channel.state = ChannelState.NOT_AVAILABLE
-                self._logger.warning("Unable to read nonexisting brightsky source: " + str(channel.source))
+            source_data = source_data.rename(columns={r.address: r.uuid for r in source_resources})
 
-    def _parse_forecast(
-        self,
-        data: pd.DataFrame,
-        channel: Channel,
-        start: Optional[pd.Timestamp, dt.datetime] = None,
-        end: Optional[pd.Timestamp, dt.datetime] = None,
-    ) -> None:
-        if start is None:
-            start = data.index[0]
-        else:
-            start = floor_date(start, freq="h")
-            if end is None:
-                end = start + pd.Timedelta(days=channel.horizon)
+            if source == "forecast":
+                source_end = source_start + pd.Timedelta(days=self.horizon)
 
-        if end is None:
-            end = data.index[-1]
-        else:
-            end = ceil_date(end, freq="h")
+            elif any(s in ["historical", "current"] for s in source.split(",")):
+                if all(t is None for t in [start, end]):
+                    source_start = source_end
 
-        timestamps = data["source_first_record"].unique()
-        if len(timestamps) > 1:
-            channel.state = ChannelState.UNKNOWN_ERROR
-            self._logger.warning(f"Unable to read {self._uuid} channel for inconsistend forecast dates: {channel.id}")
-            return
-        timestamp = timestamps[0].tz_convert(self.location.timezone)
-
-        data = data.loc[start:end, channel.address]
-        channel.set(timestamp, data)
-
-    def _parse_current(
-        self,
-        data: pd.DataFrame,
-        channel: Channel
-    ) -> None:
-        timestamp = data.index[-1].tz_convert(self.location.timezone)
-        data = data.loc[timestamp, channel.address]
-        channel.set(timestamp, data)
-
-    def _parse_historical(
-        self,
-        data: pd.DataFrame,
-        channel: Channel,
-        start: Optional[pd.Timestamp, dt.datetime] = None,
-        end: Optional[pd.Timestamp, dt.datetime] = None,
-    ) -> None:
-        timestamp = pd.Timestamp.now(tz=self.location.timezone).floor(freq="s")
-        if start is None:
-            start = pd.Timestamp(0, tz=self.location.timezone)
-        if end is None:
-            end = floor_date(timestamp, freq="h")
-
-        data = data.loc[start:end, channel.address]
-        channel.set(timestamp, data)
+            data.append(
+                source_data.loc[
+                    source_start:source_end, [r.uuid for r in source_resources if r.uuid in source_data.columns]
+                ]
+            )
+        return pd.concat(data, axis="index")
 
     # noinspection PyPackageRequirements
     def _request(
@@ -203,5 +150,5 @@ class Brightsky(WeatherConnector):
 
         return data.dropna(how="all", axis="columns"), sources
 
-    def write(self, channels: Channels) -> None:
+    def write(self, data: pd.DataFrame) -> None:
         raise NotImplementedError("Brightsky connector does not support writing")

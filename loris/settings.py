@@ -15,7 +15,7 @@ import sys
 from argparse import ArgumentParser
 from typing import Any, Dict
 
-from loris.configs import Configurations, Directories, Directory
+from loris.core import Configurations, Directories, Directory
 
 
 class Settings(Configurations):
@@ -29,18 +29,38 @@ class Settings(Configurations):
         super().__init__(app_file, app_dirs, **app_args)
         self.application = app_name
         self._load(require=False)
+        self._load_logging()
 
+        override_path = os.path.join(self.dirs.data, self.name)
+        if os.path.isfile(override_path):
+            self._load_toml(override_path)
+            self.dirs.update(self.get_section(Directories.SECTION, defaults={}))
+        if self.dirs.conf._dir is None:
+            self.dirs._conf = Directory(os.path.dirname(self.path), default="conf")
+
+    def __getattr__(self, attr):
+        # __getattr__ gets called when the item is not found via __getattribute__
+        # To avoid recursion, call __getattribute__ directly to get components dict
+        configs = Configurations.__getattribute__(self, f"_{Configurations.__name__}__configs")
+        if attr in configs.keys():
+            return configs[attr]
+        raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
+
+    def _load_logging(self) -> None:
         logging_file = os.path.join(self.dirs.conf, "logging.conf")
-        if not os.path.isfile(logging_file):
+        if not os.path.isfile(logging_file) and not self.dirs.conf.is_default():
             logging_default = logging_file.replace("logging.conf", "logging.default.conf")
             if os.path.isfile(logging_default):
                 shutil.copy(logging_default, logging_file)
+
         if os.path.isfile(logging_file):
             logging.config.fileConfig(logging_file)
             for handler in logging.getLoggerClass().root.handlers:
                 if isinstance(handler, logging.FileHandler):
                     self.dirs.log = os.path.dirname(handler.baseFilename)
                     break
+            if not os.path.isdir(self.dirs.log):
+                os.makedirs(self.dirs.log, exist_ok=True)
         else:
             handler_console = logging.StreamHandler(sys.stdout)
             handler_console.setLevel(logging.INFO)
@@ -64,25 +84,6 @@ class Settings(Configurations):
                     # handler_file,
                 ],
             )
-        if not os.path.isdir(self.dirs.log):
-            os.makedirs(self.dirs.log, exist_ok=True)
-
-        override_path = os.path.join(self.dirs.data, self.name)
-        if os.path.isfile(override_path):
-            self._load_toml(override_path)
-            self.dirs.update(self.get_section(Directories.SECTION, defaults={}))
-        if self.dirs.conf._dir is None:
-            self.dirs._conf = Directory(os.path.dirname(self.path), default="conf")
-
-    # def __getattr__(self, attr):
-    #     if self.has_option(self.GENERAL, attr):
-    #         return self.get(self.GENERAL, attr)
-    #     try:
-    #         # noinspection PyUnresolvedReferences
-    #         return super().__getattr__(attr)
-    #
-    #     except AttributeError:
-    #         raise AttributeError("'{0}' object has no attribute '{1}'".format(type(self).__name__, attr))
 
 
 def _parse_kwargs(parser: ArgumentParser) -> Dict[str, Any]:

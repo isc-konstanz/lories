@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-loris.configs.configurable
+loris.core.configurable
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
@@ -13,7 +13,8 @@ from abc import ABC, ABCMeta
 from functools import wraps
 from typing import Any, Dict, List, Optional
 
-from loris.configs import ConfigurationException, Configurations, Context
+from loris.core import Context
+from loris.core.configs import ConfigurationException, Configurations
 from loris.util import get_members
 
 
@@ -45,7 +46,6 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
         self.__configs = configs
         self.__context = context
 
-    # noinspection PyShadowingBuiltins
     def _get_vars(self) -> Dict[str, Any]:
         return get_members(self, filter=lambda attr, var: not (
             attr.startswith("_") or

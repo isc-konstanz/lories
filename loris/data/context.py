@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Mapping
-from typing import Any, Collection
+from typing import Any
 
 from loris import (
     Channel,
@@ -20,7 +20,7 @@ from loris import (
     Configurations,
     Configurator,
     Context,
-    LocalResourceException,
+    ResourceException,
 )
 from loris.components.component import Component
 from loris.components.context import ComponentContext
@@ -118,7 +118,7 @@ class DataContext(Configurator, DataMapping, Context[Channel]):
 
     def _add(self, channel: Channel) -> None:
         if not isinstance(channel, Channel):
-            raise LocalResourceException(f"Invalid channel type: {type(channel)}")
+            raise ResourceException(f"Invalid channel type: {type(channel)}")
 
         if channel.uuid in self._channels.keys():
             raise ConfigurationException(f'Channel with UUID "{channel.uuid}" already exists')

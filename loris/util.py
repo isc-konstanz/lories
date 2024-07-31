@@ -12,12 +12,12 @@ import datetime as dt
 import re
 from copy import copy
 from dateutil.relativedelta import relativedelta
-from typing import Any, Callable, Collection, Dict, Iterable, List, Optional, Tuple, Type, TypeVar
+from typing import Any, Callable, Collection, Dict, List, Optional, Tuple, Type, TypeVar
 
 import numpy as np
 import pandas as pd
 import pytz as tz
-from loris import LocalResourceException
+from loris import ResourceException
 from pandas.tseries.frequencies import to_offset
 
 # noinspection SpellCheckingInspection
@@ -34,7 +34,7 @@ def get_context(object: Any, type: Type[C] | Collection[Type[C]]) -> C:
         try:
             _context = _context.context
         except AttributeError:
-            raise LocalResourceException(f"Invalid context type: {object.__class__}")
+            raise ResourceException(f"Invalid context type: {object.__class__}")
     return _context
 
 
@@ -66,7 +66,7 @@ def get_members(
             # Handle duplicate attr
             if attr in processed:
                 raise AttributeError
-        except (AttributeError, LocalResourceException):
+        except (AttributeError, ResourceException):
             continue
         if (
             (private or "__" not in attr) and
@@ -352,7 +352,7 @@ def parse_id(id: str) -> str:
     return re.sub("[^\\w]+", "", id).lower()
 
 
-class ConversionException(LocalResourceException):
+class ConversionException(ResourceException):
     """
     Raise if a conversion failed
     """

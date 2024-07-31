@@ -16,7 +16,7 @@ from mysql.connector import FieldType
 
 import pandas as pd
 import pytz as tz
-from loris.configs import ConfigurationException
+from loris.core import ConfigurationException
 
 
 class MySqlColumn:

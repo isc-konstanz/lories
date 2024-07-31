@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Optional
 
 import pytz as tz
-from loris import LocalResourceException, LocalResourceUnavailableException
+from loris import ResourceException, ResourceUnavailableException
 from loris.util import to_timezone
 
 
@@ -77,14 +77,14 @@ class Location:
         return self._altitude
 
 
-class LocationException(LocalResourceException):
+class LocationException(ResourceException):
     """
     Raise if an error occurred accessing the location.
 
     """
 
 
-class LocationUnavailableException(LocalResourceUnavailableException, LocationException):
+class LocationUnavailableException(ResourceUnavailableException, LocationException):
     """
     Raise if a configured location access can not be found.
 

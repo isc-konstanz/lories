@@ -15,10 +15,9 @@ from typing import Any, Dict, Iterator, List, Optional
 from mysql import connector
 
 import pandas as pd
-from loris.channels import Channels, ChannelState
-from loris.configs import Configurations
 from loris.connectors import ConnectionException, Connector, ConnectorException
 from loris.connectors.mysql import MySqlColumn, MySqlTable
+from loris.core import Configurations, Resources
 from loris.util import resample
 
 
@@ -86,18 +85,18 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
 
         self.database = configs.get("database")
 
-    def connect(self, channels: Channels) -> None:
+    def connect(self, resources: Resources) -> None:
         self._logger.info(f"Connecting to MySQL database {self.database}@{self.host}:{self.port}")
         self._connection = connector.connect(
             host=self.host, port=self.port, user=self.user, passwd=self.password, database=self.database
         )
-        self._tables = self._load_tables(channels)
+        self._tables = self._load_tables(resources)
 
     def disconnect(self) -> None:
         if self._connection is not None:
             self._connection.close()
 
-    def _load_tables(self, channels: Channels) -> Dict[str, MySqlTable]:
+    def _load_tables(self, resources: Resources) -> Dict[str, MySqlTable]:
         tables = {}
         table_schemas = self._get_table_schemas()
         for table_schema in table_schemas:
@@ -117,18 +116,18 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
             )
             tables[table.name] = table
 
-        for table_name, table_channels in channels.groupby("table"):
+        for table_name, table_resources in resources.groupby("table"):
             if table_name in tables:
                 continue
             if self._tables_create:
-                table = self._create_table(table_name, table_channels)
+                table = self._create_table(table_name, table_resources)
                 tables[table.name] = table
             else:
                 raise ConnectorException(f"Unable to find configured table: {table_name}", connector=self)
 
         return tables
 
-    def _create_table(self, name: str, channels: Channels):
+    def _create_table(self, name: str, resources: Resources):
         index = MySqlColumn(
             self._table_index_column,
             self._table_index_type,
@@ -136,17 +135,17 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
             nullable=False
         )
         columns = []
-        for channel in channels:
-            column_name = channel.id if "column" not in channel else channel.column
+        for resource in resources:
+            column_name = resource.id if "column" not in resource else resource.column
             column_args = {}
-            if "nullable" in channel:
-                column_args["nullable"] = channel.nullable
-            if "primary" in channel:
-                column_args["primary"] = channel.primary
-            if "value_length" in channel:
-                column_args["type_length"] = channel.value_length
+            if "nullable" in resource:
+                column_args["nullable"] = resource.nullable
+            if "primary" in resource:
+                column_args["primary"] = resource.primary
+            if "value_length" in resource:
+                column_args["type_length"] = resource.value_length
 
-            column_type = channel.value_type if "value_type" in channel else self._table_data_type
+            column_type = resource.value_type if "value_type" in resource else self._table_data_type
             columns.append(MySqlColumn(column_name, column_type, **column_args))
 
         table = MySqlTable(self, name, index, columns)
@@ -200,28 +199,28 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
 
     def exists(
         self,
-        channels: Optional[Channels] = None,
+        resources: Optional[Resources] = None,
         start: Optional[pd.Timestamp, dt.datetime] = None,
         end: Optional[pd.Timestamp, dt.datetime] = None,
     ) -> bool:
         # TODO: Replace this placeholder more resource efficient
-        if channels is None:
-            channels = self.channels
-        containers = channels.copy()
-        self.read(containers, start, end)
-        return not containers.to_frame().empty
+        if resources is None:
+            resources = self.resources
+        return not self.read(resources, start, end).empty
 
     def read(
         self,
-        channels: Channels,
+        resources: Resources,
         start: Optional[pd.Timestamp, dt.datetime] = None,
         end: Optional[pd.Timestamp, dt.datetime] = None,
-    ) -> None:
-        for table_name, table_channels in channels.groupby("table"):
+    ) -> pd.DataFrame:
+        data = pd.DataFrame(columns=[r.uuid for r in resources])
+
+        for table_name, table_resources in resources.groupby("table"):
             if table_name not in self._tables:
                 raise ConnectorException(f"Table '{table_name}' not available", connector=self)
 
-            table_columns = [c.id if "column" not in c else c.column for c in table_channels]
+            table_columns = [c.id if "column" not in c else c.column for c in table_resources]
             table = self.get(table_name)
 
             if start is None and end is None:
@@ -235,32 +234,21 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
                     except TypeError as e:
                         self._logger.exception(str(e))
 
-            for table_channel in table_channels:
-                table_channel_column = table_channel.id if "column" not in table_channel else table_channel.column
-                if len(table_data.index) > 1:
-                    table_channel_data = table_data.loc[:, table_channel_column]
-                    table_channel.set(table_data.index[0], table_channel_data)
+            for table_resource in table_resources:
+                table_resource_column = table_resource.id if "column" not in table_resource else table_resource.column
+                data[table_resource.uuid] = table_data.loc[:, table_resource_column]
+        return data
 
-                elif len(table_data.index) > 0:
-                    timestamp = table_data.index[-1]
-                    table_channel_data = table_data.loc[timestamp, table_channel_column]
-                    table_channel.set(timestamp, table_channel_data)
-
-                else:
-                    table_channel.state = ChannelState.NOT_AVAILABLE
-                    self._logger.warning(
-                        f"Unable to read nonexisting column of table '{table_name}': {table_channel_column}"
-                    )
-
-    def write(self, channels: Channels) -> None:
-        for table_name, table_channels in self.channels.groupby("table"):
+    def write(self, data: pd.DataFrame) -> None:
+        for table_name, table_resources in self.resources.groupby("table"):
             if table_name not in self._tables:
                 raise ConnectorException(f"Table '{table_name}' not available", connector=self)
 
-            table_columns = {c.column: c.id for c in table_channels if "column" in c}
+            table_data = data.loc[:, [r.uuid for r in table_resources if r.uuid in data.columns]]
+            table_columns = {c.column: c.id for c in table_resources if "column" in c}
 
             table = self.get(table_name)
-            table.insert(table_channels.to_frame().rename(columns=table_columns))
+            table.insert(table_data.rename(columns=table_columns))
 
     def is_connected(self) -> bool:
         if self._connection is not None:

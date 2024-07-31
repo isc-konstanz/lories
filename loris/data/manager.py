@@ -111,7 +111,7 @@ class DataManager(DataContext, Activator, metaclass=DataManagerMeta):
             except ConnectorException as e:
                 self._logger.warning(f"Error opening connector '{e.connector.uuid}': {e}")
                 self._logger.exception(e)
-                e.connector.set_states(ChannelState.UNKNOWN_ERROR)
+                e.connector.set_channels(ChannelState.UNKNOWN_ERROR)
 
     @wraps(connect)
     def _do_connect(self, channels: Optional[Channels] = None):
@@ -133,7 +133,7 @@ class DataManager(DataContext, Activator, metaclass=DataManagerMeta):
                 continue
             try:
                 self._logger.info(f"Disconnecting {type(connector).__name__}: {connector.uuid}")
-                connector.set_states(ChannelState.DISCONNECTING)
+                connector.set_channels(ChannelState.DISCONNECTING)
                 connector._do_disconnect()
 
                 self._logger.debug(f"Disconnected {type(connector).__name__}: {connector.uuid}")
@@ -142,7 +142,7 @@ class DataManager(DataContext, Activator, metaclass=DataManagerMeta):
                 self._logger.warning(f"Error closing connector '{uuid}': {e}")
                 self._logger.exception(e)
             finally:
-                connector.set_states(ChannelState.DISCONNECTED)
+                connector.set_channels(ChannelState.DISCONNECTED)
 
     @wraps(disconnect)
     def _do_disconnect(self):

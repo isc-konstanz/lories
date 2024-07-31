@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-loris.configs.context
+loris.core.context
 ~~~~~~~~~~~~~~~~~~~~~
 
 

@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from loris import Channel, Configurations, Context
-from loris.data import DataMapping
+from loris import Configurations, Context
+from loris.data import Channel, DataMapping
 
 
 class DataAccess(DataMapping):
@@ -101,7 +101,7 @@ class DataAccess(DataMapping):
 
         if self.is_configured():
             channel_configs = self._parse_defaults(data_configs["channels"])
-            # Be wary of the order. First, update the channel configs with the default configs
+            # Be wary of the order. First, update the channel core with the default core
             # of the configuration file, then update the function arguments. Last, override
             # everything with the channel specific configurations of the file.
             channel_configs.update(configs)

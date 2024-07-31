@@ -8,13 +8,12 @@ loris.components.activator
 
 from __future__ import annotations
 
-import inspect
 import logging
 from abc import abstractmethod
 from functools import wraps
 from typing import Any, Dict, List, Optional
 
-from loris.configs import ConfigurationException, Configurations, Configurator, ConfiguratorMeta, Context
+from loris.core import ConfigurationException, Configurations, Configurator, ConfiguratorMeta, Context
 
 
 class ActivatorMeta(ConfiguratorMeta):

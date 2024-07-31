@@ -14,5 +14,4 @@ class WriteTask(ConnectorTask):
         self._logger.debug(
             f"Writing {len(self.channels)} channels of " f"{type(self.connector).__name__}: " f"{self.connector.uuid}"
         )
-
-        self.connector.write(self.channels)
+        self.connector.write(self.channels.to_frame())
