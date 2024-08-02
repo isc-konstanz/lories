@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, ABCMeta
+from collections import OrderedDict
 from functools import wraps
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from loris.core import Context
 from loris.core.configs import ConfigurationException, Configurations
@@ -56,25 +57,29 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
         )
 
     # noinspection PyShadowingBuiltins
-    def _parse_vars(self, vars: Optional[Dict[str, Any]] = None, parse: callable = str) -> List[str]:
+    def _parse_vars(self, vars: Optional[Dict[str, Any]] = None, parse: callable = str) -> Dict[str, str]:
         if vars is None:
             vars = self._get_vars()
-        values = [f"{k}={v if not isinstance(type(v), type) else parse(v)}"
-                  for k, v in vars.items()]
-
+        values = OrderedDict({
+            k: str(v) if not isinstance(v, (Configurator, Context)) else parse(v) for k, v in vars.items()
+        })
         if self.context is not None:
-            values.append(f"context={parse(self.context)}")
+            values["context"] = parse(self.context)
         if self.configs is not None:
-            values.append(f"configurations={repr(self.configs)}")
-            values.append(f"configured={self.is_configured()}")
-            values.append(f"enabled={self.is_enabled()}")
+            values["configurations"] = parse(self.configs)
+            values["configured"] = str(self.is_configured())
+            values["enabled"] = str(self.is_enabled())
         return values
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({', '.join(self._parse_vars(parse=lambda v: type(v).__name__))})"
+        return f"{type(self).__name__}(" + ", ".join([
+            f"{k}={v}" for k, v in self._parse_vars(parse=lambda v: f"<{type(v).__name__}>").items()
+        ]) + ")"
 
     def __str__(self) -> str:
-        return f"{type(self).__name__}:\n\t" + "\n\t".join(self._parse_vars(parse=repr))
+        return f"{type(self).__name__}:\n\t" + "\n\t".join([
+            f"{k} = {v}" for k, v in self._parse_vars(parse=repr).items()
+        ])
 
     @property
     def context(self) -> Optional[Context]:

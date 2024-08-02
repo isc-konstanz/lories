@@ -10,19 +10,15 @@ from __future__ import annotations
 
 import datetime as dt
 from abc import abstractmethod
+from collections import OrderedDict
 from functools import wraps
-from typing import Any, Collection, Dict, List, Optional
+from typing import Any, Collection, Dict, Optional
 
 import pandas as pd
 import pytz as tz
 from loris import Channel, Channels, ChannelState
 from loris.core import Context, Registrator, Resource, ResourceException, Resources
-from loris.core.configs import (
-    ConfigurationException,
-    Configurations,
-    Configurator,
-    ConfiguratorMeta,
-)
+from loris.core.configs import ConfigurationException, Configurations, Configurator, ConfiguratorMeta
 
 
 class ConnectorMeta(ConfiguratorMeta):
@@ -67,31 +63,38 @@ class Connector(Registrator, metaclass=ConnectorMeta):
     # noinspection PyShadowingBuiltins, PyProtectedMember
     def _get_vars(self) -> Dict[str, Any]:
         vars = super()._get_vars()
-        vars.pop("type", None)
+
+        # Channels are a subset of resources, hence omit them from printing
+        vars.pop("channels", None)
         return vars
 
     # noinspection PyShadowingBuiltins
-    def _parse_vars(self, vars: Optional[Dict[str, Any]] = None, parse: callable = str) -> List[str]:
+    def _parse_vars(self, vars: Optional[Dict[str, Any]] = None, parse: callable = str) -> Dict[str, str]:
         if vars is None:
             vars = self._get_vars()
-        values = []
-
-        uuid = vars.pop("uuid", self.uuid)
-        id = vars.pop("id", self.id)
-        if uuid != id:
-            values.append(f"uuid={uuid}")
-        values.append(f"id={id}")
+        values = OrderedDict()
+        try:
+            uuid = vars.pop("uuid", self.uuid)
+            id = vars.pop("id", self.id)
+            if uuid != id:
+                values["uuid"] = uuid
+            values["id"] = id
+        except (ResourceException, AttributeError):
+            # Abstract properties are not yet instanced
+            pass
 
         if "name" in vars:
-            values.append(f"name={vars.pop('name')}")
+            values["name"] = vars.pop('name')
 
-        values += [f"{k}={v if not isinstance(v, (Resource, Configurator)) else parse(v)}" for k, v in vars.items()]
-
-        values.append(f"context={parse(self.context)}")
-        values.append(f"configurations={repr(self.configs)}")
-        values.append(f"configured={self.is_configured()}")
-        values.append(f"connected={self._is_connected()}")
-        values.append(f"enabled={self.is_enabled()}")
+        values.update({
+            k: str(v) if not isinstance(v,  (Resource, Resources, Configurator, Context)) else parse(v)
+            for k, v in vars.items()
+        })
+        values["context"] = parse(self.context)
+        values["configurations"] = parse(self.configs)
+        values["configured"] = str(self.is_configured())
+        values["connected"] = str(self._is_connected())
+        values["enabled"] = str(self.is_enabled())
         return values
 
     @property

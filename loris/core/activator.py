@@ -8,10 +8,12 @@ loris.core.activator
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from functools import wraps
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-from loris.core import ConfigurationException, Configurations, ConfiguratorMeta, Context, Registrator, ResourceException
+from loris.core import Context, Registrator, Resource, Resources, ResourceException
+from loris.core.configs import ConfigurationException, Configurations, Configurator, ConfiguratorMeta
 from loris.util import parse_id, parse_name
 
 
@@ -68,28 +70,32 @@ class Activator(Registrator, metaclass=ActivatorMeta):
         self._do_deactivate()
 
     # noinspection PyShadowingBuiltins
-    def _parse_vars(self, vars: Optional[Dict[str, Any]] = None, parse: callable = str) -> List[str]:
+    def _parse_vars(self, vars: Optional[Dict[str, Any]] = None, parse: callable = str) -> Dict[str, str]:
         if vars is None:
             vars = self._get_vars()
-        values = []
+        values = OrderedDict()
         try:
             uuid = vars.pop("uuid", self.uuid)
             id = vars.pop("id", self.id)
             if uuid != id:
-                values.append(f"uuid={uuid}")
-            values.append(f"id={id}")
-            values.append(f"name={vars.pop('name', self.name)}")
+                values["uuid"] = uuid
+            values["id"] = id
+            values["name"] = vars.pop('name', self.name)
         except (ResourceException, AttributeError):
             # Abstract properties are not yet instanced
             pass
-        values += [f"{k}={v if not isinstance(type(v), type) else parse(v)}"
-                   for k, v in vars.items()]
 
-        values.append(f"context={parse(self.context)}")
-        values.append(f"configurations={repr(self.configs)}")
-        values.append(f"configured={self.is_configured()}")
-        values.append(f"active={self.is_active()}")
-        values.append(f"enabled={self.is_enabled()}")
+        from loris import Location
+
+        values.update({
+            k: str(v) if not isinstance(v,  (Resource, Resources, Configurator, Context, Location)) else parse(v)
+            for k, v in vars.items()
+        })
+        values["context"] = parse(self.context)
+        values["configurations"] = parse(self.configs)
+        values["configured"] = str(self.is_configured())
+        values["active"] = str(self.is_active())
+        values["enabled"] = str(self.is_enabled())
         return values
 
     @property

@@ -9,7 +9,7 @@ loris.core.register.registrator
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Collection, Optional
+from typing import Any, Collection, Dict, Optional
 
 from loris.core import ConfigurationException, Configurations, Configurator, Context, ResourceException
 from loris.util import get_context, parse_id
