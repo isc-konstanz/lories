@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-loris.connector.weather.dwd._connectors
+loris.connector.weather.dwd._channels
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
@@ -54,7 +54,7 @@ def _parse_address(channel_id: str) -> str:
     return channel_id if channel_id not in CHANNEL_ADDRESS_ALIAS else CHANNEL_ADDRESS_ALIAS[channel_id]
 
 
-def _parse_value_type(channel_id: str) -> type:
+def _parse_type(channel_id: str) -> type:
     return CHANNEL_TYPE_DEFAULT if channel_id not in CHANNEL_TYPES else CHANNEL_TYPES[channel_id]
 
 
@@ -62,9 +62,9 @@ def _parse_channel(channel_id: str, **channel: Any) -> Dict[str, Any]:
     channel["id"] = channel_id
     channel["name"] = _parse_name(channel_id)
     channel["address"] = _parse_address(channel_id)
-    channel["value_type"] = _parse_value_type(channel_id)
-    if channel["value_type"] == str:  # noqa: E721
-        channel["value_length"] = 32
+    channel["type"] = _parse_type(channel_id)
+    if channel["type"] == str:  # noqa: E721
+        channel["length"] = 32
     return channel
 
 

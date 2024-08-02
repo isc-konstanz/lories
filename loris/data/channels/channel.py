@@ -56,8 +56,6 @@ class Channel(Resource):
             *super()._get_attrs(),
             "logger",
             "connector",
-            "value_type",
-            "value_length",
             "value",
             "state",
             "timestamp",
@@ -66,10 +64,8 @@ class Channel(Resource):
     # noinspection PyShadowingBuiltins
     def _get_vars(self) -> Dict[str, Any]:
         vars = super()._get_vars()
-        vars["value type"] = self.value_type
-        vars["value length"] = self.value_length
         vars["value"] = self.value
-        vars["state"] = self.status
+        vars["state"] = self.state
         vars["timestamp"] = self.timestamp
         return vars
 

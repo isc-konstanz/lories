@@ -117,6 +117,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
             if table_name in tables:
                 continue
             if self._tables_create:
+                # noinspection PyTypeChecker
                 table = self._create_table(table_name, table_resources)
                 tables[table.name] = table
             else:
@@ -133,16 +134,16 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
         )
         columns = []
         for resource in resources:
-            column_name = resource.id if "column" not in resource else resource.column
+            column_name = resource.column if "column" in resource else resource.id
             column_args = {}
             if "nullable" in resource:
                 column_args["nullable"] = resource.nullable
             if "primary" in resource:
                 column_args["primary"] = resource.primary
-            if "value_length" in resource:
-                column_args["type_length"] = resource.value_length
+            if "length" in resource:
+                column_args["type_length"] = resource.length
 
-            column_type = resource.value_type if "value_type" in resource else self._table_data_type
+            column_type = resource.type if "type" in resource else self._table_data_type
             columns.append(MySqlColumn(column_name, column_type, **column_args))
 
         table = MySqlTable(self, name, index, columns)
@@ -242,7 +243,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
                 raise ConnectorException(f"Table '{table_name}' not available", connector=self)
 
             table_data = data.loc[:, [r.uuid for r in table_resources if r.uuid in data.columns]]
-            table_columns = {c.column: c.id for c in table_resources if "column" in c}
+            table_columns = {r.uuid: r.column if "column" in r else r.id for r in table_resources}
 
             table = self.get(table_name)
             table.insert(table_data.rename(columns=table_columns))
