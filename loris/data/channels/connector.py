@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.data.channels.channel
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.data.channels.connector
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """

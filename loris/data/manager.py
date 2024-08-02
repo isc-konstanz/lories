@@ -17,12 +17,11 @@ from typing import Collection, Optional
 
 import pandas as pd
 import pytz as tz
-from loris import Activator, Channel, Channels, ChannelState, Configurations
-from loris.components import ActivatorMeta
+from loris import Channel, Channels, ChannelState, Configurations
 from loris.connectors import ConnectorException
 from loris.connectors.tasks import ConnectTask, LogTask, ReadTask, WriteTask
+from loris.core import Activator, ActivatorMeta
 from loris.data.context import DataContext
-from loris.util import parse_id, parse_name
 
 
 class DataManagerMeta(ActivatorMeta):
@@ -40,15 +39,10 @@ class DataManagerMeta(ActivatorMeta):
 
 
 class DataManager(DataContext, Activator, metaclass=DataManagerMeta):
-    _id: str
-    _name: str
-
     _executor: ThreadPoolExecutor
 
     def __init__(self, configs: Configurations, name: str, *args, **kwargs) -> None:
         super().__init__(configs=configs, *args, **kwargs)
-        self._id = parse_id(name)
-        self._name = parse_name(name)
         self._executor = ThreadPoolExecutor(
             thread_name_prefix=self.name, max_workers=max(int((os.cpu_count() or 1) / 2), 1)
         )
@@ -60,18 +54,6 @@ class DataManager(DataContext, Activator, metaclass=DataManagerMeta):
     # noinspection PyShadowingBuiltins
     def __exit__(self, type, value, traceback) -> None:
         self._do_deactivate()
-
-    @property
-    def uuid(self) -> str:
-        return self.id
-
-    @property
-    def id(self) -> str:
-        return self._id
-
-    @property
-    def name(self) -> str:
-        return self._name
 
     def activate(self) -> None:
         super().activate()

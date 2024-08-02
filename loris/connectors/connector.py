@@ -11,24 +11,18 @@ from __future__ import annotations
 import datetime as dt
 from abc import abstractmethod
 from functools import wraps
-from typing import Any, Dict, List, Optional
+from typing import Any, Collection, Dict, List, Optional
 
 import pandas as pd
 import pytz as tz
-from loris import (
-    Channel,
-    Channels,
-    ChannelState,
+from loris import Channel, Channels, ChannelState
+from loris.core import Context, Registrator, Resource, ResourceException, Resources
+from loris.core.configs import (
     ConfigurationException,
     Configurations,
     Configurator,
-    Context,
-    Resource,
-    ResourceException,
-    Resources,
+    ConfiguratorMeta,
 )
-from loris.core import ConfiguratorMeta
-from loris.util import get_context, parse_id
 
 
 class ConnectorMeta(ConfiguratorMeta):
@@ -45,9 +39,9 @@ class ConnectorMeta(ConfiguratorMeta):
         return connector
 
 
-class Connector(Configurator, metaclass=ConnectorMeta):
-    _uuid: str
-    _id: str
+class Connector(Registrator, metaclass=ConnectorMeta):
+    SECTION: str = "component"
+    SECTIONS: Collection[str] = []
 
     _connected: bool = False
     _connect_timestamp: pd.Timestamp = pd.NaT
@@ -57,25 +51,9 @@ class Connector(Configurator, metaclass=ConnectorMeta):
     __resources: Resources
 
     def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
-        super().__init__(get_context(context, Context), configs, *args, **kwargs)
-        from loris.components.activator import Activator
-        from loris.connectors.context import ConnectorContext
-        from loris.data.context import DataContext
-
-        if context is None or not isinstance(context, (ConnectorContext, DataContext)):
-            raise ConnectorException(f"Invalid connector context: {None if context is None else type(context)}")
-        if configs is None:
-            raise ConfigurationException("Invalid connector for empty configuration")
-
-        if "id" not in configs:
-            raise ConfigurationException("Invalid configuration, missing specified connector ID")
-
-        self._id = parse_id(configs.get("id"))
-        if "uuid" in configs:
-            self._uuid = configs.pop("uuid")
-        else:
-            self._uuid = self._id if not isinstance(context, Activator) else f"{context.uuid}.{self._id}"
-
+        if context is None:
+            raise ConnectorException(f"Invalid connector context: {context}")
+        super().__init__(context, configs, *args, **kwargs)
         self.__resources = Resources()
 
     def __enter__(self) -> Connector:
@@ -86,7 +64,7 @@ class Connector(Configurator, metaclass=ConnectorMeta):
     def __exit__(self, type, value, traceback):
         self._do_disconnect()
 
-    # noinspection PyShadowingBuiltins
+    # noinspection PyShadowingBuiltins, PyProtectedMember
     def _get_vars(self) -> Dict[str, Any]:
         vars = super()._get_vars()
         vars.pop("type", None)
@@ -115,19 +93,6 @@ class Connector(Configurator, metaclass=ConnectorMeta):
         values.append(f"connected={self._is_connected()}")
         values.append(f"enabled={self.is_enabled()}")
         return values
-
-    @property
-    def uuid(self) -> str:
-        return self._uuid
-
-    @property
-    def id(self) -> str:
-        return self._id
-
-    @property
-    @abstractmethod
-    def type(self) -> str:
-        pass
 
     @property
     def resources(self) -> Resources:

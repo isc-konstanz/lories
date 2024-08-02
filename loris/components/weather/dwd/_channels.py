@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-loris.component.weather.dwd._channels
+loris.connector.weather.dwd._connectors
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 

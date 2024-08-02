@@ -15,12 +15,13 @@ from typing import Any, Dict, Iterator, List, Optional
 from mysql import connector
 
 import pandas as pd
-from loris.connectors import ConnectionException, Connector, ConnectorException
+from loris.connectors import ConnectionException, Connector, ConnectorException, register_connector_type
 from loris.connectors.mysql import MySqlColumn, MySqlTable
 from loris.core import Configurations, Resources
 from loris.util import resample
 
 
+@register_connector_type
 class MySqlConnector(Connector, Mapping[str, MySqlTable]):
     TYPE: str = "mysql"
 
@@ -41,10 +42,6 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
     port: int = 3306
 
     resolution: Optional[int] = None
-
-    @property
-    def type(self) -> str:
-        return self.TYPE
 
     @property
     def connection(self):

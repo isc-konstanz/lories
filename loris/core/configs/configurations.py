@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 import pandas as pd
-from loris import ResourceException, ResourceUnavailableException
+from loris.core import ResourceException, ResourceUnavailableException
 from loris.core.configs import Directories
 from loris.util import to_bool, to_date, to_float, to_int
 
@@ -41,11 +41,11 @@ class Configurations(MutableMapping[str, Any]):
             conf_dir = ""
 
         conf_dirs = Directories(lib_dir, log_dir, tmp_dir, data_dir, conf_dir)
-        conf_path = os.path.join(conf_dirs.conf, conf_file)
+        conf_path = Path(conf_dirs.conf, conf_file)
 
-        if os.path.isdir(conf_dirs.conf):
-            if not os.path.isfile(conf_path):
-                config_default = conf_path.replace(".conf", ".default.conf")
+        if conf_dirs.conf.is_dir():
+            if not conf_path.is_file():
+                config_default = str(conf_path).replace(".conf", ".default.conf")
                 if os.path.isfile(config_default):
                     shutil.copy(config_default, conf_path)
         elif require:
@@ -55,6 +55,7 @@ class Configurations(MutableMapping[str, Any]):
         configs._load(require)
         return configs
 
+    # noinspection PyProtectedMember
     def _load(self, require: bool = True) -> None:
         if self.__path.is_file():
             try:
@@ -67,7 +68,7 @@ class Configurations(MutableMapping[str, Any]):
             raise ConfigurationUnavailableException(f"Invalid configuration file '{self.__path}'")
 
         for section in self.sections:
-            section._load(require=False)
+            self[section]._load(require=False)
 
         self.__dirs.update(self.get_section(Directories.SECTION, defaults={}))
 
@@ -173,8 +174,8 @@ class Configurations(MutableMapping[str, Any]):
         return to_bool(self.get("enabled", default=True)) and not to_bool(self.get("disabled", default=False))
 
     @property
-    def sections(self) -> List[Configurations]:
-        return [v for v in self.values() if isinstance(v, Configurations)]
+    def sections(self) -> List[str]:
+        return [k for k, v in self.items() if isinstance(v, Configurations)]
 
     def has_section(self, section: str) -> bool:
         if section in [k for k, v in self.items() if isinstance(v, Configurations)]:

@@ -17,19 +17,21 @@ from typing import Any, Callable, Collection, Dict, List, Optional, Tuple, Type,
 import numpy as np
 import pandas as pd
 import pytz as tz
-from loris import ResourceException
+from loris.core import Context, ResourceException
 from pandas.tseries.frequencies import to_offset
 
 # noinspection SpellCheckingInspection
 INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
 
-C = TypeVar("C")
+C = TypeVar("C", bound=Context)
 V = TypeVar("V")
 
 
 # noinspection PyShadowingBuiltins
-def get_context(object: Any, type: Type[C] | Collection[Type[C]]) -> C:
+def get_context(object: Any, type: Type[C] | Collection[Type[C]]) -> Optional[C]:
     _context = object
+    if _context is None:
+        return _context
     while not isinstance(_context, type):
         try:
             _context = _context.context

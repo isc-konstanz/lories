@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.core.configurable
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.core.configs.configurable
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -98,7 +98,7 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
     @wraps(configure, updated=())
     def _do_configure(self, configs: Optional[Configurations] = None) -> None:
         if configs is None:
-            configs = self.__configs
+            configs = self.configs
         if configs is None or not configs.enabled:
             raise ConfigurationException(f"Trying to configure disabled {type(self).__name__}: {configs.name}")
 

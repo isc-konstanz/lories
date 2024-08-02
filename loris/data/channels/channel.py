@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Type
 
 import pandas as pd
 import pytz as tz
-from loris.core import Resource, Resources
+from loris.core import Resource
 from loris.data.channels import ChannelConnector, ChannelState
 from loris.util import _parse_freq, to_timedelta
 
@@ -173,31 +173,3 @@ class Channel(Resource):
             else:
                 data = self.value
             return pd.Series(index=[self.timestamp], data=[data], name=self.id)
-
-
-class Channels(Resources[Channel]):
-    def __str__(self) -> str:
-        return str(self.to_frame(unique=True, states=True))
-
-    def to_frame(self, unique: bool = False, states: bool = False) -> pd.DataFrame:
-        columns = []
-        data = []
-        for channel in self:
-            if pd.isna(channel.timestamp):
-                continue
-            channel_uid = channel.id if not unique else channel.uuid
-            channel_data = channel.to_series(state=states)
-            channel_data.name = channel_uid
-
-            if channel_data.index.tzinfo is None:
-                self._logger.warning(
-                    f'UTC will be presumed for channel "{channel.uuid}" timestamps, '
-                    f"as tz-naive with tz-aware DatetimeIndex cannot be joined: {channel_data}"
-                )
-                channel_data.index = channel_data.index.tz_localize(tz.UTC)
-
-            columns.append(channel_uid)
-            data.append(channel_data)
-        if len(data) > 0:
-            return pd.concat(data, axis="columns", keys=columns)  # .dropna(axis='columns', how='all')
-        return pd.DataFrame(columns=columns)

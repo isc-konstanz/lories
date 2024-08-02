@@ -30,7 +30,7 @@ from loris.data import DataMapping
 from loris.util import get_variables
 
 
-class DataContext(Configurator, DataMapping, Context[Channel]):
+class DataContext(DataMapping, Context[Channel], Configurator):
     _connectors: ConnectorContext
     _components: ComponentContext
 
@@ -49,17 +49,21 @@ class DataContext(Configurator, DataMapping, Context[Channel]):
                     item in self._components.values())
         return False
 
+    # noinspection PyProtectedMember
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
         self._load_from_file(str(configs.dirs.conf))
 
-        self._do_configure_member(self._connectors)
-
         self._do_configure_member(*get_variables(self._components.values(), include=ComponentContext))
+
+        self._do_configure_member(self._connectors)
         self._do_configure_member(self._components)
 
         self._do_configure_member(*get_variables(self._components.values(), exclude=ComponentContext))
         self._do_configure_member(*get_variables(self._connectors.values(), exclude=Component))
+
+        self._components._sort()
+        self._connectors._sort()
 
     # noinspection PyProtectedMember
     def _do_configure_member(self, *configurators: Configurator) -> None:
@@ -75,21 +79,6 @@ class DataContext(Configurator, DataMapping, Context[Channel]):
             if self._logger.isEnabledFor(logging.DEBUG):
                 self._logger.debug(f"Configured {configurator}")
 
-    # noinspection PyProtectedMember, PyTypeChecker, PyUnresolvedReferences
-    def _load_from_file(self, configs_dir: str, configs_file: str = "channels.conf") -> None:
-        configs_path = os.path.join(configs_dir, configs_file)
-        if os.path.isfile(configs_path):
-            configs_dirs = self.configs.dirs.encode()
-            configs_dirs["conf_dir"] = configs_dir
-            configs = Configurations.load(configs_file, **configs_dirs)
-
-            if "data" not in self.configs:
-                self.configs.add_section("data", configs)
-            else:
-                self.configs.get_section("data").update(configs, replace=False)
-
-            self._load_sections(self.configs.get_section("data"))
-
     def _load_sections(self, configs: Configurations) -> None:
         channel_ids = [
             i for i in configs.keys() if (isinstance(configs[i], Mapping) and i not in ["logger", "connector"])
@@ -103,12 +92,27 @@ class DataContext(Configurator, DataMapping, Context[Channel]):
             channel_uuid = f"{self.__component.uuid}.{channel_id}"
             channel = self._new(uuid=channel_uuid, id=channel_id, **channel_configs)
 
-            # TODO: Implement channel config update
-            # if channel.uuid in self:
-            #     self._get(channel.uuid).update(channel_configs)
+            # TODO: Implement connector config update
+            # if connector.uuid in self:
+            #     self._get(connector.uuid).update(channel_configs)
             # else:
-            #     self._set(channel.uuid, channel)
+            #     self._set(connector.uuid, connector)
             self._add(channel)
+
+    # noinspection PyProtectedMember, PyTypeChecker, PyUnresolvedReferences
+    def _load_from_file(self, configs_dir: str, configs_file: str = "channels.conf") -> None:
+        configs_path = os.path.join(configs_dir, configs_file)
+        if os.path.isfile(configs_path):
+            configs_dirs = self.configs.dirs.encode()
+            configs_dirs["conf_dir"] = configs_dir
+            configs = Configurations.load(configs_file, **configs_dirs)
+
+            if "data" not in self.configs:
+                self.configs._add_section("data", configs)
+            else:
+                self.configs.get_section("data").update(configs, replace=False)
+
+            self._load_sections(self.configs.get_section("data"))
 
     def _get(self, uuid: str) -> Channel:
         return self._channels.get(uuid)
@@ -137,9 +141,12 @@ class DataContext(Configurator, DataMapping, Context[Channel]):
             elif not isinstance(connector, Mapping):
                 raise ConfigurationException(f"Invalid channel {connector_type} type: " + str(connector))
             if "connector" in connector:
-                connector_uuid = connector["connector"] if id == uuid else uuid.replace(id, connector["connector"])
-                if connector_uuid in self.connectors.keys():
-                    configs[connector_type]["connector"] = connector_uuid
+                connector_uuid = connector["connector"]
+                if not connector_uuid.startswith(self.uuid):
+                    connector_uuid = uuid.replace(id, connector["connector"])
+                    if connector_uuid not in self.connectors.keys():
+                        connector_uuid = f"{self.uuid}.{connector['connector']}"
+                configs[connector_type]["connector"] = connector_uuid
 
         return Channel(uuid, id, **configs)
 

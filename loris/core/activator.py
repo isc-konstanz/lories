@@ -1,19 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-loris.components.activator
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.core.activator
+~~~~~~~~~~~~~~~~~~~~
 
 
 """
 
 from __future__ import annotations
 
-import logging
-from abc import abstractmethod
 from functools import wraps
 from typing import Any, Dict, List, Optional
 
-from loris.core import ConfigurationException, Configurations, Configurator, ConfiguratorMeta, Context
+from loris.core import ConfigurationException, Configurations, ConfiguratorMeta, Context, Registrator, ResourceException
+from loris.util import parse_id, parse_name
 
 
 class ActivatorMeta(ConfiguratorMeta):
@@ -30,17 +29,35 @@ class ActivatorMeta(ConfiguratorMeta):
         return activator
 
 
-class Activator(Configurator, metaclass=ActivatorMeta):
+# noinspection PyAbstractClass
+class Activator(Registrator, metaclass=ActivatorMeta):
+    _name: str
+
     _active: bool = False
 
+    # noinspection PyProtectedMember
     def __init__(
         self,
-        context: Optional[Context] = None,
-        configs: Optional[Configurations] = None,
+        context: Optional[Registrator | Context] = None,
+        configs: Configurations = None,
         *args, **kwargs
     ) -> None:
+        if configs is None:
+            raise ConfigurationException("Missing configuration")
+
+        if self.SECTION not in configs.sections:
+            configs._add_section(self.SECTION, {"type": self.TYPE})
+        section = configs.get_section(self.SECTION)
+        if "type" not in section:
+            section["id"] = self.TYPE
+        if "name" in configs:
+            section["name"] = configs.pop("name")
+        if "id" not in configs and "name" in section:
+            section["id"] = parse_id(section["name"])
+        elif "id" in configs:
+            section["name"] = parse_name(configs["id"])
         super().__init__(context, configs, *args, **kwargs)
-        self.__logger = logging.getLogger(Activator.__module__)
+        self._name = configs[self.SECTION].get("name")
 
     def __enter__(self) -> Activator:
         self._do_activate()
@@ -55,14 +72,16 @@ class Activator(Configurator, metaclass=ActivatorMeta):
         if vars is None:
             vars = self._get_vars()
         values = []
-
-        uuid = vars.pop("uuid", self.uuid)
-        id = vars.pop("id", self.id)
-        if uuid != id:
-            values.append(f"uuid={uuid}")
-        values.append(f"id={id}")
-        values.append(f"name={vars.pop('name', self.name)}")
-
+        try:
+            uuid = vars.pop("uuid", self.uuid)
+            id = vars.pop("id", self.id)
+            if uuid != id:
+                values.append(f"uuid={uuid}")
+            values.append(f"id={id}")
+            values.append(f"name={vars.pop('name', self.name)}")
+        except (ResourceException, AttributeError):
+            # Abstract properties are not yet instanced
+            pass
         values += [f"{k}={v if not isinstance(type(v), type) else parse(v)}"
                    for k, v in vars.items()]
 
@@ -74,19 +93,8 @@ class Activator(Configurator, metaclass=ActivatorMeta):
         return values
 
     @property
-    @abstractmethod
-    def uuid(self) -> str:
-        pass
-
-    @property
-    @abstractmethod
-    def id(self) -> str:
-        pass
-
-    @property
-    @abstractmethod
     def name(self) -> str:
-        pass
+        return self._name
 
     def is_active(self) -> bool:
         return self._active

@@ -13,14 +13,16 @@ from shutil import copytree, ignore_patterns
 from typing import List, Optional
 
 import pandas as pd
-from loris import ConfigurationException, Configurations, Location, LocationUnavailableException, Settings
+from loris import ConfigurationException, Configurations, Settings
 from loris.components import Component, Weather, WeatherUnavailableException
 from loris.components.context import ComponentContext
+from loris.core import Context, RegistratorContext
 from loris.data.context import DataContext
+from loris.location import Location, LocationUnavailableException
 from loris.util import parse_id
 
 
-class System(ComponentContext, Component):
+class System(Component, ComponentContext):
     TYPE: str = "system"
 
     _location: Optional[Location] = None
@@ -70,14 +72,17 @@ class System(ComponentContext, Component):
     def load(cls, context: DataContext = None, **kwargs) -> System:
         return cls(context, Configurations.load(f"{cls.__name__.lower()}.conf", **kwargs))
 
-    def __init__(self, context: DataContext, configs: Configurations, *args, **kwargs) -> None:
-        super().__init__(context, configs, *args, **kwargs)
+    def __repr__(self) -> str:
+        return Component.__repr__(self)
+
+    def __str__(self) -> str:
+        return Component.__str__(self)
 
     # noinspection PyShadowingNames, PyArgumentList
     def __getattr__(self, attr):
         # __getattr__ gets called when the item is not found via __getattribute__
         # To avoid recursion, call __getattribute__ directly to get components dict
-        components = ComponentContext.__getattribute__(self, f"_{ComponentContext.__name__}__components")
+        components = RegistratorContext.__getattribute__(self, f"_{RegistratorContext.__name__}__map")
         if attr in components.keys():
             return components[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no component '{attr}'")
@@ -87,8 +92,17 @@ class System(ComponentContext, Component):
         super()._set(component.id, component)
         self.context.components._set(component.uuid, component)
 
+    # noinspection PyProtectedMember
+    def _update(self, context: Context, configs: Configurations) -> None:
+        value = self._new(context, configs)
+        if value.id in self:
+            self._get(value.id).configs.update(configs)
+        else:
+            self._add(value)
+
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
+        self._sort()
         self.localize(configs.get_section(Location.SECTION, defaults={}))
 
     def localize(self, configs: Configurations) -> None:

@@ -14,13 +14,14 @@ from typing import Mapping, Optional, Tuple
 
 import pandas as pd
 import pytz as tz
-from loris.connectors import Connector
+from loris.connectors import Connector, register_connector_type
 from loris.core import ConfigurationException, Configurations, Resources
 from loris.io import csv
 from loris.util import _parse_freq, ceil_date, floor_date, resample, to_timezone
 
 
 # noinspection PyShadowingBuiltins
+@register_connector_type
 class CsvConnector(Connector):
     TYPE: str = "csv"
 

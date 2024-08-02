@@ -12,13 +12,38 @@ effective irradiance on defined, tilted photovoltaic systems.
 
 from __future__ import annotations
 
-from loris import Configurations, Context, Location, LocationUnavailableException
-from loris.components import Component, ComponentException, ComponentUnavailableException
+from typing import Type
+
+from loris.components import Component, ComponentException, ComponentUnavailableException, register_component_type
+from loris.core import ActivatorMeta, Configurations, Context
+from loris.location import Location, LocationUnavailableException
+
+
+class WeatherMeta(ActivatorMeta):
+    def __call__(cls, context: Context, configs: Configurations) -> Weather:
+        _type = configs.get("type", default="default").lower()
+        _cls = cls._get_class(_type)
+        if cls != _cls:
+            return _cls(context, configs)
+
+        return super().__call__(context, configs)
+
+    # noinspection PyShadowingBuiltins
+    def _get_class(cls: Type[Weather], type: str) -> Type[Weather]:
+        if type in ["virtual", "default"]:
+            return cls
+
+        elif type in ["brightsky", "dwd"]:
+            from loris.components.weather.dwd import Brightsky
+            return Brightsky
+
+        raise WeatherException(f"Unknown weather type '{type}'")
 
 
 # noinspection SpellCheckingInspection
-class Weather(Component):
-    TYPE = "weather"
+@register_component_type
+class Weather(Component, metaclass=WeatherMeta):
+    TYPE: str = "weather"
 
     GHI = "ghi"
     DNI = "dni"
@@ -46,26 +71,6 @@ class Weather(Component):
 
     _location: Location
 
-    # noinspection PyShadowingBuiltins
-    @classmethod
-    def load(cls, context: Context, configs: Configurations) -> Weather:
-        type = configs.get("type", default="default").lower()
-        if type in ["virtual", "default"]:
-            return cls(context, configs)
-
-        elif type in ["brightsky", "dwd"]:
-            from .dwd import Brightsky
-            return Brightsky(context, configs)
-
-        # elif type in ["meteoblue", "nmm"]:
-        #     from .meteoblue import Meteoblue
-        #     return Meteoblue(context, core, location)
-
-        raise WeatherException(f"Unknown weather type '{type}' in file: {configs.path}")
-
-    def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
-        super().__init__(context, configs, *args, **kwargs)
-
     # noinspection PyProtectedMember
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
@@ -92,10 +97,6 @@ class Weather(Component):
     @property
     def location(self) -> Location:
         return self._location
-
-    @property
-    def type(self) -> str:
-        return self.TYPE
 
 
 class WeatherException(ComponentException):

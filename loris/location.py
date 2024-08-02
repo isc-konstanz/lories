@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Optional
 
 import pytz as tz
-from loris import ResourceException, ResourceUnavailableException
+from loris.core import ResourceException, ResourceUnavailableException
 from loris.util import to_timezone
 
 

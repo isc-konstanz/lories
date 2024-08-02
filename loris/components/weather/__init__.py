@@ -9,6 +9,7 @@ loris.components.weather
 from . import weather  # noqa: F401
 from .weather import (  # noqa: F401
     Weather,
+    WeatherMeta,
     WeatherException,
     WeatherUnavailableException,
 )

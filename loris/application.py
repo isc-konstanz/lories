@@ -10,16 +10,22 @@ from __future__ import annotations
 
 import logging
 from threading import Event, Thread
-from typing import Type
+from typing import Collection, Type
 
 import pandas as pd
 import pytz as tz
 from loris import Channel, Settings, System
+from loris.components import ComponentContext
+from loris.connectors import ConnectorContext
 from loris.data.manager import DataManager
 from loris.util import floor_date, to_timedelta
 
 
 class Application(DataManager, Thread):
+    TYPE: str = "app"
+    SECTION: str = "application"
+    SECTIONS: Collection[str] = [ComponentContext.SECTION, ConnectorContext.SECTION]
+
     _interval: int
     __interrupt: Event = Event()
 
@@ -30,7 +36,7 @@ class Application(DataManager, Thread):
         return app
 
     def __init__(self, settings: Settings, **kwargs) -> None:
-        super().__init__(settings, name=settings.application, **kwargs)
+        super().__init__(settings, name=settings["name"], **kwargs)
         self.__interrupt = Event()
         self.__interrupt.set()
         self._logger = logging.getLogger(self.id)

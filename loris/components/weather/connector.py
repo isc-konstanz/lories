@@ -9,35 +9,31 @@ loris.components.weather.connector
 from __future__ import annotations
 
 import datetime as dt
-import logging
 from abc import abstractmethod
 from typing import Optional
 
 import pandas as pd
-from loris import Configurations, Connector, Context
-from loris.components import ActivatorMeta
-from loris.components.weather import Weather, WeatherException, WeatherForecast
-from loris.connectors import ConnectorMeta
+from loris.components.weather import Weather, WeatherException, WeatherForecast, WeatherMeta
+from loris.connectors import Connector, ConnectorMeta
+from loris.core import Configurations, Context
 from loris.data.context import DataContext
 from loris.util import get_context
 
 
-class WeatherConnectorMeta(ConnectorMeta, ActivatorMeta):
+class WeatherConnectorMeta(WeatherMeta, ConnectorMeta):
     # noinspection PyProtectedMember
     def __call__(cls, context: Context, *args, **kwargs):
         connector = super().__call__(context, *args, **kwargs)
         connector_context = get_context(context, DataContext).connectors
         connector_context._add(connector)
-        connector._Connector__context = connector_context
-        connector._Connector__logger = logging.getLogger(Connector.__module__)
         return connector
 
 
-class WeatherConnector(Connector, Weather, metaclass=WeatherConnectorMeta):
+class WeatherConnector(Weather, Connector, metaclass=WeatherConnectorMeta):
     _forecast: WeatherForecast = None
 
-    def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
-        super(Connector, self).__init__(context, configs, *args, **kwargs)
+    # def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
+    #     super(Connector, self).__init__(context, configs, *args, **kwargs)
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)

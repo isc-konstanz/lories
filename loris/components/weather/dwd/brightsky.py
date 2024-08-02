@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-loris.component.weather.dwd.brightsky
+loris.connector.weather.dwd.brightsky
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
@@ -19,9 +19,11 @@ import pandas as pd
 from loris import ConfigurationException, Configurations, Resources
 from loris.components.weather import Weather, WeatherConnector
 from loris.components.weather.dwd._channels import get_channels
+from loris.connectors import register_connector_type
 
 
 # noinspection SpellCheckingInspection
+@register_connector_type
 class Brightsky(WeatherConnector):
     TYPE: str = "brightsky"
 

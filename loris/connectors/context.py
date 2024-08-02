@@ -8,134 +8,77 @@ loris.connectors.context
 
 from __future__ import annotations
 
-import os
-from collections import OrderedDict
-from collections.abc import Mapping
-from typing import Collection, Dict, Iterator, List
+from typing import Callable, Optional, Type, TypeVar, overload
 
-from loris import ConfigurationException, Configurations, Configurator, Context
-from loris.connectors import Connector, ConnectorException, registry
+from loris.connectors import Connector
+from loris.core import Context, Registrator, RegistratorContext, Registry
+from loris.core.configs import ConfigurationException, Configurations, Configurator
+
+C = TypeVar("C", bound=Connector)
+
+registry = Registry[Connector]()
 
 
-class ConnectorContext(Configurator, Context[Connector]):
-    __connectors: Dict[str, Connector]
+@overload
+def register_connector_type(cls: Type[C]) -> Type[C]: ...
 
-    def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
-        super().__init__(context, configs, *args, **kwargs)
+
+@overload
+def register_connector_type(
+    *alias: Optional[str],
+    factory: Callable[..., Type[C]] = None,
+    replace: bool = False
+) -> Type[C]: ...
+
+
+def register_connector_type(
+    *args: Optional[Type[C], str],
+    **kwargs,
+) -> Type[C] | Callable[[Type[C]], Type[C]]:
+    args = list(args)
+    if len(args) > 0 and isinstance(args[0], type):
+        cls = args.pop(0)
+        registry.register(cls, *args, **kwargs)
+        return cls
+
+    # noinspection PyShadowingNames
+    def _register(cls: Type[C]) -> Type[C]:
+        registry.register(cls, *args, **kwargs)
+        return cls
+
+    return _register
+
+
+class ConnectorContext(RegistratorContext[Connector], Configurator):
+    SECTION: str = "connectors"
+
+    def __init__(self, context: Context, *args, **kwargs) -> None:
         from loris.data.context import DataContext
-
         if context is None or not isinstance(context, DataContext):
             raise ConfigurationException(f"Invalid data context: {None if context is None else type(context)}")
-        self.__connectors = OrderedDict()
 
-    def __iter__(self) -> Iterator[str]:
-        return iter(self.__connectors)
+        super().__init__(context, *args, **kwargs)
 
-    def __len__(self) -> int:
-        return len(self.__connectors)
-
-    def __contains__(self, item: str | Connector) -> bool:
-        if isinstance(item, str):
-            return item in self.__connectors.keys()
-        if isinstance(item, Connector):
-            return item in self.__connectors.values()
-        return False
-
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}({[c.uuid for c in self.__connectors.values()]})"
-
-    def __str__(self) -> str:
-        return f"{type(self).__name__}:\n\t" + "\n\t".join([f"{i} = {repr(c)}" for i, c in self.__connectors.items()])
+    @property
+    def _registry(self) -> Registry[Connector]:
+        return registry
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self._load_from_file(str(configs.dirs.conf))
+        self._load(self, configs)
 
-    # noinspection PyProtectedMember
-    def _do_configure_members(self, configurators: Collection[Configurator]) -> None:
-        configurators = list(configurators)
-        configurators.extend([c for c in self.__connectors.values() if c not in configurators])
-
-        # Do not configure components, to avoid them being configured twice
-        # TODO: Verify if this can be avoided or improved
-        from loris.components import Component
-        super()._do_configure_members([c for c in configurators if not isinstance(c, Component)])
-
-    # noinspection PyProtectedMember, PyTypeChecker, PyUnresolvedReferences
-    def _load_from_file(
-        self,
-        configs_dir: str,
-        configs_file: str = "connectors.conf",
-        prefix_uuid: str = None
+    def _load(
+         self,
+         context: Registrator | RegistratorContext,
+         configs: Configurations
     ) -> None:
-        configs_path = os.path.join(configs_dir, configs_file)
-        if os.path.isfile(configs_path):
-            configs_dirs = self.configs.dirs.encode()
-            configs_dirs["conf_dir"] = configs_dir
-            configs = Configurations.load(configs_file, **configs_dirs)
-            self._load_sections(configs, prefix_uuid)
+        defaults = {}
+        configs = configs.copy()
+        if configs.has_section(self.SECTION):
+            connectors = configs.get_section(self.SECTION)
+            for section in self._get_type().SECTIONS:
+                if section in connectors:
+                    defaults.update(connectors.pop(section))
 
-    def _load_sections(
-        self,
-        configs: Configurations,
-        prefix_uuid: str = None
-    ) -> None:
-        connector_ids = [i for i in configs.keys() if isinstance(configs[i], Mapping)]
-        connectors = {i: configs.pop(i) for i in connector_ids}
-        for connector_id, connector_section in connectors.items():
-            connector_uuid = connector_id if prefix_uuid is None else f"{prefix_uuid}.{connector_id}"
-            connector_configs = configs.copy()
-            connector_configs.update(connector_section)
-            connector_configs.set("id", connector_id)
-            connector_configs.set("uuid", connector_uuid)
-            connector = self._new(connector_configs)
-            if connector.uuid in self:
-                self._get(connector.uuid).configs.update(connector_configs)
-            else:
-                self._add(connector)
-
-    def _get(self, uid: str) -> Connector:
-        return self.__connectors.get(uid)
-
-    def _set(self, uid: str, connector: Connector) -> None:
-        self.__connectors[uid] = connector
-
-    def _add(self, connector: Connector) -> None:
-        if not isinstance(connector, Connector):
-            raise ConnectorException(f"Invalid connector type: {type(connector)}")
-
-        if connector.uuid in self.__connectors.keys():
-            raise ConfigurationException(f'Connector with UUID "{connector.uuid}" already exists')
-
-        self._set(connector.uuid, connector)
-
-    # noinspection SpellCheckingInspection
-    def _new(self, configs: Configurations) -> Connector:
-        if "id" not in configs:
-            configs.set("id", os.path.splitext(configs.name)[0])
-            configs.move_to_top("id")
-
-        registration_type = configs.get("type").lower()
-        if registration_type not in registry.types.keys():
-            raise ConnectorException(f"Invalid connector type: {registration_type}")
-
-        return registry.types[registration_type].initialize(self, configs)
-
-    def _remove(self, uid: str) -> None:
-        del self.__connectors[uid]
-
-    # noinspection PyMethodMayBeStatic
-    def get_types(self) -> List[str]:
-        return list(registry.types.keys())
-
-    def has_type(self, *types: str | type) -> bool:
-        return len(self.get_all(*types)) > 0
-
-    def get_all(self, *types: str | type) -> List[Connector]:
-        return [
-            connector for connector in self.__connectors.values()
-            if (
-                any(t.startswith(connector.type) for t in types if isinstance(t, str))
-                or any(isinstance(connector, t) for t in types if isinstance(t, type))
-            )
-        ]
+            self._load_sections(context, connectors, defaults)
+        self._load_from_file(context, configs.dirs, "connectors.conf", defaults)

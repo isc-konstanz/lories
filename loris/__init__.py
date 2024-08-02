@@ -11,21 +11,19 @@ from . import _version
 __version__ = _version.get_versions().get("version")
 del _version
 
-from .exceptions import (  # noqa: F401
-    ResourceException,
-    ResourceUnavailableException,
-)
 
 from .core import (  # noqa: F401
     Directory,
     Directories,
-    Configurator,
     Configurations,
     ConfigurationException,
     ConfigurationUnavailableException,
+    Configurator,
     Context,
     Resource,
     Resources,
+    ResourceException,
+    ResourceUnavailableException,
 )
 
 from .settings import Settings  # noqa: F401
@@ -51,8 +49,6 @@ from .location import (  # noqa: F401
 )
 
 from . import components  # noqa: F401
-from .components.activator import Activator  # noqa: F401
-
 from .components import (  # noqa: F401
     Component,
     ComponentException,

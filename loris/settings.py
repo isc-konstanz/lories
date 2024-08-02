@@ -24,10 +24,9 @@ class Settings(Configurations):
     # noinspection PyProtectedMember, SpellCheckingInspection
     def __init__(self, app_name: str, app_file: str = "settings.conf", parser: ArgumentParser = None) -> None:
         app_args = _parse_kwargs(parser)
+        app_args["name"] = app_name
         app_dirs = Directories(**{d: app_args.pop(d, None) for d in Directories.KEYS})
-
-        super().__init__(app_file, app_dirs, **app_args)
-        self.application = app_name
+        super().__init__(app_file, app_dirs, app_args)
         self._load(require=False)
         self._load_logging()
 

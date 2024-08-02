@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.core.directories
-~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.core.configs.directories
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """

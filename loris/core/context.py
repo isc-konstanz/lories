@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 loris.core.context
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -9,33 +9,24 @@ loris.core.context
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Generic, Iterator, Mapping, TypeVar
+from typing import Generic, Mapping, TypeVar
 
-C = TypeVar("C")
+T = TypeVar("T")
 
 
-class Context(ABC, Generic[C], Mapping[str, C]):
+class Context(ABC, Generic[T], Mapping[str, T]):
+    def __getitem__(self, __uid: str) -> T:
+        return self._get(__uid)
+
+    def __setitem__(self, __uid: str, __value: T) -> None:
+        self._set(__uid, __value)
+
     @abstractmethod
-    def __iter__(self) -> Iterator[str]:
+    def _get(self, __uid: str) -> T:
         pass
 
     @abstractmethod
-    def __len__(self) -> int:
-        pass
-
-    @abstractmethod
-    def __contains__(self, *args) -> bool:
-        pass
-
-    def __getitem__(self, *args) -> C:
-        return self._get(*args)
-
-    @abstractmethod
-    def _get(self, *args) -> C:
-        pass
-
-    @abstractmethod
-    def _set(self, *args, **kwargs) -> None:
+    def _set(self, __uid: str, __value: T) -> None:
         pass
 
     @abstractmethod
@@ -43,10 +34,5 @@ class Context(ABC, Generic[C], Mapping[str, C]):
         pass
 
     @abstractmethod
-    def _new(self, *args, **kwargs) -> C:
-        pass
-
-    # noinspection PyShadowingBuiltins
-    @abstractmethod
-    def _remove(self, id: str, **kwargs) -> None:
+    def _new(self, *args, **kwargs) -> T:
         pass
