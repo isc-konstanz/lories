@@ -13,6 +13,6 @@ from .channels import (  # noqa: F401
     Channels,
 )
 
-from .mapping import DataMapping  # noqa: F401
+from .context import DataContext  # noqa: F401
 
 from .access import DataAccess  # noqa: F401

@@ -54,6 +54,10 @@ class Component(Activator):
         return super().context
 
     @property
+    def connectors(self):
+        return self.__connectors
+
+    @property
     def data(self):
         return self.__data
 

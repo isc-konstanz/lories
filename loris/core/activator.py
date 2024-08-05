@@ -54,10 +54,12 @@ class Activator(Registrator, metaclass=ActivatorMeta):
             section["id"] = self.TYPE
         if "name" in configs:
             section["name"] = configs.pop("name")
-        if "id" not in configs and "name" in section:
+        if "id" in configs:
+            section["id"] = configs.pop("id")
+        if "id" not in section and "name" in section:
             section["id"] = parse_id(section["name"])
-        elif "id" in configs:
-            section["name"] = parse_name(configs["id"])
+        if "id" in section and "name" not in section:
+            section["name"] = parse_name(section["id"])
         super().__init__(context, configs, *args, **kwargs)
         self._name = configs[self.SECTION].get("name")
 

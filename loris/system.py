@@ -88,17 +88,19 @@ class System(Component, ComponentContext):
         raise AttributeError(f"'{type(self).__name__}' object has no component '{attr}'")
 
     # noinspection PyProtectedMember
-    def _add(self, component: Component) -> None:
-        super()._set(component.id, component)
-        self.context.components._set(component.uuid, component)
+    def _add(self, *components: Component) -> None:
+        for component in components:
+            super()._set(component.id, component)
+            self.context.components._set(component.uuid, component)
 
     # noinspection PyProtectedMember
-    def _update(self, context: Context, configs: Configurations) -> None:
-        value = self._new(context, configs)
-        if value.id in self:
-            self._get(value.id).configs.update(configs)
+    def _update(self, context: Context, configs: Configurations) -> Component:
+        component = self._new(context, configs)
+        if component.id in self:
+            self._get(component.id).configs.update(configs)
         else:
-            self._add(value)
+            self._add(component)
+        return component
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)

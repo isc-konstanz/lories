@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Collection
-from typing import Any, Generic, Iterator, List, Tuple, TypeVar
+from typing import Any, Generic, Iterable, Iterator, List, Tuple, TypeVar
 
 import numpy as np
 from loris.core import Resource
@@ -42,8 +42,11 @@ class Resources(Generic[R], Collection[R]):
     def __len__(self) -> int:
         return len(self._resources)
 
-    def _add(self, resource: R):
+    def append(self, resource: R):
         self._resources.append(resource)
+
+    def extend(self, resources: Iterable[R]):
+        self._resources.extend(resources)
 
     def copy(self):
         return type(self)([resource.copy() for resource in self._resources])

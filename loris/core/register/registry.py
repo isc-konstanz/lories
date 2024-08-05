@@ -50,6 +50,7 @@ class Registration(Generic[R]):
         return factory(*args, **kwargs)
 
 
+# noinspection PyShadowingBuiltins
 class Registry(Generic[R]):
     types: Mapping[Registration[R]]
 
@@ -58,12 +59,15 @@ class Registry(Generic[R]):
 
     # noinspection PyTypeChecker, PyUnresolvedReferences
     def register(self, cls: Type[R], *alias: str, factory: Callable = None, replace: bool = False) -> None:
-        _type = get_args(self.__orig_class__)[0]
-        if not issubclass(cls, _type):
+        type = get_args(self.__orig_class__)[0]
+        if not issubclass(cls, type):
             raise ValueError("Can only register Registrator types")
-        if any(t.is_type(cls.TYPE) for t in self.types.values()) and not replace:
+        if self.has_type(cls.TYPE) and not replace:
             raise ResourceException(
                 f"Registration '{cls.TYPE}' does already exist: "
                 f"{next(t for t in self.types.values() if cls.TYPE == t.type).name}"
             )
         self.types[cls.TYPE] = Registration(cls, *alias, factory=factory)
+
+    def has_type(self, type: str) -> bool:
+        return any(t.is_type(type) for t in self.types.values())

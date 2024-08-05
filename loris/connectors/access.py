@@ -36,17 +36,19 @@ class ConnectorAccess(ConnectorContext):
         raise AttributeError(f"'{type(self).__name__}' object has no connector '{attr}'")
 
     # noinspection PyProtectedMember
-    def _add(self, connector: Connector) -> None:
-        super()._set(connector.id, connector)
-        self.context.connector._set(connector.uuid, connector)
+    def _add(self, *connectors: Connector) -> None:
+        for connector in connectors:
+            super()._set(connector.id, connector)
+            self.context.connectors._set(connector.uuid, connector)
 
     # noinspection PyProtectedMember
-    def _update(self, context: Context, configs: Configurations) -> None:
-        value = self._new(context, configs)
-        if value.id in self:
-            self._get(value.id).configs.update(configs)
+    def _update(self, context: Context, configs: Configurations) -> Connector:
+        connector = self._new(context, configs)
+        if connector.id in self:
+            self._get(connector.id).configs.update(configs)
         else:
-            self._add(value)
+            self._add(connector)
+        return connector
 
     @property
     def configs(self) -> Configurations:
@@ -55,4 +57,4 @@ class ConnectorAccess(ConnectorContext):
     # noinspection PyProtectedMember
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self.context.connectors._load_sections(self.__component, configs)
+        self._add(*self.context.connectors._load_sections(self.__component, configs))

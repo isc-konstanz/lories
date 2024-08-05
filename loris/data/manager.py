@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 import os
+import logging
 from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
@@ -17,11 +18,15 @@ from typing import Collection, Optional
 
 import pandas as pd
 import pytz as tz
-from loris import Channel, Channels, ChannelState, Configurations
-from loris.connectors import ConnectorException
+from loris import Channel, Channels, ChannelState, Configurator, Configurations, Context
+from loris.components.component import Component
+from loris.components.context import ComponentContext
+from loris.connectors import Connector, ConnectorException
+from loris.connectors.context import ConnectorContext
 from loris.connectors.tasks import ConnectTask, LogTask, ReadTask, WriteTask
 from loris.core import Activator, ActivatorMeta
 from loris.data.context import DataContext
+from loris.util import get_variables
 
 
 class DataManagerMeta(ActivatorMeta):
@@ -41,11 +46,26 @@ class DataManagerMeta(ActivatorMeta):
 class DataManager(DataContext, Activator, metaclass=DataManagerMeta):
     _executor: ThreadPoolExecutor
 
-    def __init__(self, configs: Configurations, name: str, *args, **kwargs) -> None:
+    _connectors: ConnectorContext
+    _components: ComponentContext
+
+    def __init__(self, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(configs=configs, *args, **kwargs)
+        self._connectors = ConnectorContext(self, configs)
+        self._components = ComponentContext(self, configs)
         self._executor = ThreadPoolExecutor(
             thread_name_prefix=self.name, max_workers=max(int((os.cpu_count() or 1) / 2), 1)
         )
+
+    def __contains__(self, item: str | Channel | Connector | Component) -> bool:
+        if isinstance(item, str):
+            return item in self._channels.keys()
+        if isinstance(item, Channel):
+            return item in self._channels.values()
+        if isinstance(item, Connector) or isinstance(item, Component):
+            return (item in self._connectors.values() or
+                    item in self._components.values())
+        return False
 
     def __enter__(self) -> DataManager:
         self._do_activate()
@@ -54,6 +74,36 @@ class DataManager(DataContext, Activator, metaclass=DataManagerMeta):
     # noinspection PyShadowingBuiltins
     def __exit__(self, type, value, traceback) -> None:
         self._do_deactivate()
+
+    # noinspection PyProtectedMember
+    def configure(self, configs: Configurations) -> None:
+        super().configure(configs)
+        self._load(self, configs)
+
+        self._do_configure_member(*get_variables(self._components.values(), include=ComponentContext))
+
+        self._do_configure_member(self._connectors)
+        self._do_configure_member(self._components)
+
+        self._do_configure_member(*get_variables(self._components.values(), exclude=ComponentContext))
+        self._do_configure_member(*get_variables(self._connectors.values(), exclude=Component))
+
+        self._components._sort()
+        self._connectors._sort()
+
+    # noinspection PyProtectedMember
+    def _do_configure_member(self, *configurators: Configurator) -> None:
+        for configurator in configurators:
+            if not configurator.is_enabled():
+                self._logger.debug(
+                    f"Skipping configuring disabled {type(configurator).__name__}: " f"{configurator.configs.name}"
+                )
+                continue
+            self._logger.debug(f"Configuring {type(self).__name__}: {configurator.configs.path}")
+            configurator._do_configure()
+
+            if self._logger.isEnabledFor(logging.DEBUG):
+                self._logger.debug(f"Configured {configurator}")
 
     def activate(self) -> None:
         super().activate()
@@ -154,6 +204,18 @@ class DataManager(DataContext, Activator, metaclass=DataManagerMeta):
             except Exception as e:
                 self._logger.warning(f"Error deactivating {type(activator).__name__} '{activator.uuid}': {e}")
                 self._logger.exception(e)
+
+    @property
+    def components(self) -> ComponentContext:
+        return self._components
+
+    @property
+    def connectors(self) -> ConnectorContext:
+        return self._connectors
+
+    @property
+    def channels(self) -> Channels:
+        return self.values()
 
     def notify(self, channels: Optional[Channels] = None) -> None:
         pass
