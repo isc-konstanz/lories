@@ -67,7 +67,7 @@ def read_files(
 def read_file(
     path: str,
     index_column: str = "Timestamp",
-    index_unix: bool = False,
+    index_type: str = "Timestamp",
     timezone: Optional[tz.tzinfo] = None,
     separator: str = ",",
     decimal: str = ".",
@@ -87,10 +87,10 @@ def read_file(
     :type index_column:
         string
 
-    :param index_unix:
-        the flag, if the index column contains UNIX timestamps that need to be parsed accordingly.
-    :type index_unix:
-        boolean
+    :param index_type:
+        the index type, either "Timestamp", "UNIX" oder "None".
+    :type index_type:
+        string
 
     :param separator:
         the separator character of the CSV file.
@@ -131,25 +131,34 @@ def read_file(
             else:
                 index_column = index_column.lower()
 
-        if index_unix:
-            data[index_column] = pd.to_datetime(data[index_column], unit="ms")
-        else:
-            data[index_column] = pd.to_datetime(data[index_column])  # , utc=True)
-
-        data.set_index(index_column, verify_integrity=True, inplace=True)
-
-        if not hasattr(data.index, "tzinfo"):
-            data[index_column] = data.index
-            data[index_column] = data[index_column].apply(lambda t: t.astimezone(tz.UTC).replace(tzinfo=None))
-            data.set_index(index_column, verify_integrity=True, inplace=True)
-            data.index = data.index.tz_localize(tz.UTC)
-
-        if timezone is not None:
-            if hasattr(data.index, "tzinfo") and data.index.tzinfo is not None:
-                if data.index.tzinfo != timezone:
-                    data.index = data.index.tz_convert(timezone)
+        if index_type.lower() in ["timestamp", "unix"]:
+            if index_type.lower() == "timestamp":
+                data[index_column] = pd.to_datetime(data[index_column], unit="ms")
+            elif index_type.lower() == "unix":
+                data[index_column] = pd.to_datetime(data[index_column])  # , utc=True)
             else:
-                data.index = data.index.tz_localize(timezone, ambiguous="infer")
+                raise ValueError(f"Unknown index type: {index_type}")
+
+            data.set_index(index_column, verify_integrity=True, inplace=True)
+
+            if not hasattr(data.index, "tzinfo"):
+                data[index_column] = data.index
+                data[index_column] = data[index_column].apply(lambda t: t.astimezone(tz.UTC).replace(tzinfo=None))
+                data.set_index(index_column, verify_integrity=True, inplace=True)
+                data.index = data.index.tz_localize(tz.UTC)
+
+            if timezone is not None:
+                if hasattr(data.index, "tzinfo") and data.index.tzinfo is not None:
+                    if data.index.tzinfo != timezone:
+                        data.index = data.index.tz_convert(timezone)
+                else:
+                    data.index = data.index.tz_localize(timezone, ambiguous="infer")
+
+        elif index_type is None or index_type.lower() == "none":
+            # Prepare the index name, to be renamed below
+            data.index.name = "index"
+        else:
+            raise ValueError(f"Unknown index type: {index_type}")
 
     if rename:
         data = data.rename(columns=rename)

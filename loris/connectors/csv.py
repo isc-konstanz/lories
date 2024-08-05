@@ -30,7 +30,7 @@ class CsvConnector(Connector):
     _data_dir: str
 
     index_column: str = "timestamp"
-    index_unix: bool = False
+    index_type: str = "timestamp"
 
     resolution: int = None
 
@@ -77,7 +77,9 @@ class CsvConnector(Connector):
         self._data_path = data_path
 
         self.index_column = configs.get("index_column", default=CsvConnector.index_column)
-        self.index_unix = configs.get_bool("index_unix", default=CsvConnector.index_unix)
+        self.index_type = configs.get("index_type", default=CsvConnector.index_type).lower()
+        if self.index_type not in ["timestamp", "unix", "none", None]:
+            raise ConfigurationException(f"Unknown index type: {self.index_type}")
 
         # TODO: Validate if minutely default resolution is sufficient
         resolution = configs.get_int("resolution", default=CsvConnector.resolution)
@@ -122,15 +124,20 @@ class CsvConnector(Connector):
     def connect(self, resources: Resources) -> None:
         if not os.path.isdir(self._data_dir):
             os.makedirs(self._data_dir, exist_ok=True)
+
+        columns = {r.name: r.uuid for r in self.resources if "name" in r}
+        columns.update({r.name: r.uuid for r in resources if "name" in r})
+        columns.update({column: key for key, column in self.columns.items()})
+
         if self._data_path is not None:
             self._data = csv.read_file(
                 self._data_path,
                 index_column=self.index_column,
-                index_unix=self.index_unix,
+                index_type=self.index_type,
                 timezone=self.timezone,
                 separator=self.separator,
                 decimal=self.decimal,
-                rename=self.columns,
+                rename=columns,
             )
 
     def disconnect(self) -> None:
@@ -145,7 +152,8 @@ class CsvConnector(Connector):
         start: Optional[pd.Timestamp, dt.datetime] = None,
         end: Optional[pd.Timestamp, dt.datetime] = None,
     ) -> pd.DataFrame:
-        columns = {c.name: c.id for c in self.channels if "name" in c}
+        columns = {r.name: r.uuid for r in self.resources if "name" in r}
+        columns.update({r.name: r.uuid for r in resources if "name" in r})
         columns.update({column: key for key, column in self.columns.items()})
 
         def _infer_dates(s=start, e=end) -> Tuple[pd.Timestamp, pd.Timestamp]:
@@ -165,7 +173,7 @@ class CsvConnector(Connector):
                     self.format,
                     *_infer_dates(),
                     index_column=self.index_column,
-                    index_unix=self.index_unix,
+                    index_type=self.index_type,
                     timezone=self.timezone,
                     separator=self.separator,
                     decimal=self.decimal,
@@ -175,12 +183,12 @@ class CsvConnector(Connector):
             if self.resolution is not None:
                 data = resample(data, self.resolution)
 
-            if all(pd.isna(d) for d in [start, end]):
+            if self.index_type in ["timestamp", "unix"] and all(pd.isna(d) for d in [start, end]):
                 now = pd.Timestamp.now(tz=self.timezone)
                 index = data.index.tz_convert(self.timezone).get_indexer([now], method="nearest")
                 data = data.iloc[[index[-1]], :]
 
-            data = data.rename(columns={r.id if "column" not in r else r.column: r.uuid for r in resources})
+            data = data.rename(columns=columns)
             return data.loc[:, [r.uuid for r in resources if r.uuid in data.columns]]
 
         except IOError:

@@ -218,7 +218,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
             if table_name not in self._tables:
                 raise ConnectorException(f"Table '{table_name}' not available", connector=self)
 
-            table_columns = [c.id if "column" not in c else c.column for c in table_resources]
+            table_columns = [r.column if "column" in r else r.id for r in table_resources]
             table = self.get(table_name)
 
             if start is None and end is None:
