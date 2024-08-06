@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Collection
-from typing import Any, Generic, Iterable, Iterator, List, Tuple, TypeVar
+from typing import Any, Callable, Generic, Iterable, Iterator, List, Tuple, TypeVar
 
 import numpy as np
 from loris.core import Resource
@@ -29,9 +29,7 @@ class Resources(Generic[R], Collection[R]):
         return f"{type(self).__name__}({[c.uuid for c in self._resources]})"
 
     def __str__(self) -> str:
-        return f"{type(self).__name__}:\n\t" + "\n\t".join(
-            [f"{c.uuid} = {repr(c)}" for c in self._resources]
-        )
+        return f"{type(self).__name__}:\n\t" + "\n\t".join([f"{c.uuid} = {repr(c)}" for c in self._resources])
 
     def __contains__(self, __x: object) -> bool:
         return __x in self._resources
@@ -56,7 +54,7 @@ class Resources(Generic[R], Collection[R]):
             apply(resource)
 
     # noinspection PyShadowingBuiltins
-    def filter(self, filter: callable):
+    def filter(self, filter: Callable[[Resource], bool]):
         return type(self)([resource for resource in self._resources if filter(resource)])
 
     # noinspection SpellCheckingInspection

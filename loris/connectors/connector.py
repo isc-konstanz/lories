@@ -84,7 +84,7 @@ class Connector(Registrator, metaclass=ConnectorMeta):
             pass
 
         if "name" in vars:
-            values["name"] = vars.pop('name')
+            values["name"] = vars.pop("name")
 
         values.update({
             k: str(v) if not isinstance(v,  (Resource, Resources, Configurator, Context)) else parse(v)
@@ -106,8 +106,22 @@ class Connector(Registrator, metaclass=ConnectorMeta):
         return Channels([resource for resource in self.__resources if isinstance(resource, Channel)])
 
     def set_channels(self, state: ChannelState) -> None:
-        for channel in self.channels:
+        # Set only channel states for channels, that actively are getting read or written by this connector.
+        # Local channels may be logging channels as well, which need to be skipped.
+        for channel in self.channels.filter(lambda c: c.has_connector(self.uuid)):
             channel.state = state
+
+    def _is_disconnected(self) -> bool:
+        return not self._is_connected()
+
+    def _is_reconnectable(self) -> bool:
+        return (
+            self.is_enabled() and
+            self.is_configured() and
+            self._is_disconnected() and
+            (pd.isna(self._disconnect_timestamp) or
+             pd.Timestamp.now(tz.UTC) >= self._disconnect_timestamp + self._reconnect_interval)
+        )
 
     def _is_connected(self) -> bool:
         return self.is_connected() and self._connected
@@ -118,7 +132,7 @@ class Connector(Registrator, metaclass=ConnectorMeta):
     def connect(self, resources: Resources) -> None:
         pass
 
-    # noinspection PyUnresolvedReferences
+    # noinspection PyUnresolvedReferences, PyTypeChecker
     @wraps(connect, updated=())
     def _do_connect(self, resources: Resources) -> None:
         if not self.is_enabled():
@@ -131,6 +145,7 @@ class Connector(Registrator, metaclass=ConnectorMeta):
 
         self.__connect(resources)
         self._on_connect(resources)
+        self._disconnect_timestamp = pd.NaT
         self._connect_timestamp = pd.Timestamp.now(tz.UTC)
         self._connected = True
         self.__resources = resources
@@ -141,7 +156,7 @@ class Connector(Registrator, metaclass=ConnectorMeta):
     def disconnect(self) -> None:
         pass
 
-    # noinspection PyUnresolvedReferences
+    # noinspection PyUnresolvedReferences, PyTypeChecker
     @wraps(disconnect, updated=())
     def _do_disconnect(self) -> None:
         if self._is_connected():
@@ -150,6 +165,7 @@ class Connector(Registrator, metaclass=ConnectorMeta):
         self.__disconnect()
         self._on_disconnect()
         self._disconnect_timestamp = pd.Timestamp.now(tz.UTC)
+        self._connect_timestamp = pd.NaT
         self._connected = False
 
     def _on_disconnect(self) -> None:

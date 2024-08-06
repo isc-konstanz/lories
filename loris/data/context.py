@@ -11,11 +11,11 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Collection, Iterator, List, Optional, Tuple
+from typing import Any, Callable, Collection, Iterator, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from loris.core import Configurations, ConfigurationException, Context, Directories, Registrator, ResourceException
+from loris.core import ConfigurationException, Configurations, Context, Directories, Registrator, ResourceException
 from loris.data.channels import Channel, Channels
 
 
@@ -157,7 +157,7 @@ class DataContext(Context[Channel]):
         return Channels(self._channels.values())
 
     # noinspection PyShadowingBuiltins
-    def filter(self, filter: callable) -> Channels:
+    def filter(self, filter: Callable[[Channel], bool]) -> Channels:
         return Channels([c for c in self._channels.values() if filter(c)])
 
     # noinspection SpellCheckingInspection

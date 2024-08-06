@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from typing import Any, Dict, Iterator, List, Optional
 
 from mysql import connector
+from mysql.connector.errors import DatabaseError
 
 import pandas as pd
 from loris.connectors import ConnectionException, Connector, ConnectorException, register_connector_type
@@ -83,11 +84,14 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
         self.database = configs.get("database")
 
     def connect(self, resources: Resources) -> None:
-        self._logger.info(f"Connecting to MySQL database {self.database}@{self.host}:{self.port}")
-        self._connection = connector.connect(
-            host=self.host, port=self.port, user=self.user, passwd=self.password, database=self.database
-        )
-        self._tables = self._load_tables(resources)
+        self._logger.debug(f"Connecting to MySQL database {self.database}@{self.host}:{self.port}")
+        try:
+            self._connection = connector.connect(
+                host=self.host, port=self.port, user=self.user, passwd=self.password, database=self.database
+            )
+            self._tables = self._load_tables(resources)
+        except DatabaseError as e:
+            raise ConnectionException(e, connector=self)
 
     def disconnect(self) -> None:
         if self._connection is not None:
@@ -220,7 +224,6 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
 
             table_columns = [r.column if "column" in r else r.id for r in table_resources]
             table = self.get(table_name)
-
             if start is None and end is None:
                 table_data = table.select_last(table_columns)
             else:
@@ -243,6 +246,8 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
                 raise ConnectorException(f"Table '{table_name}' not available", connector=self)
 
             table_data = data.loc[:, [r.uuid for r in table_resources if r.uuid in data.columns]]
+            if table_data.empty:
+                continue
             table_columns = {r.uuid: r.column if "column" in r else r.id for r in table_resources}
 
             table = self.get(table_name)

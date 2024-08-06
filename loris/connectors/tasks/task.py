@@ -47,7 +47,3 @@ class ConnectorTask(ABC, Thread):
     @abstractmethod
     def run(self, **kwargs):
         pass
-
-    def set_channels(self, state: ChannelState) -> None:
-        for channel in self.channels:
-            channel.state = state

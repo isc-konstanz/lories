@@ -14,7 +14,7 @@ import re
 from abc import abstractmethod
 from collections import OrderedDict
 from copy import deepcopy
-from typing import Collection, Iterator, Optional, Type, TypeVar, get_args
+from typing import Callable, Collection, Iterator, Optional, Type, TypeVar, get_args
 
 from loris.core import Configurations, Context, Directories, ResourceException
 from loris.core.register import Registrator, Registry
@@ -146,6 +146,10 @@ class RegistratorContext(Context[R]):
         self.__map = OrderedDict(
             sorted(self.__map.items(), key=lambda e: [convert(t) for t in re.split("([0-9]+)", e[0])])
         )
+
+    # noinspection PyShadowingBuiltins
+    def filter(self, filter: Callable[[R], bool]) -> Collection[R]:
+        return [c for c in self.__map.values() if filter(c)]
 
     # noinspection PyUnresolvedReferences
     def _get_type(self) -> Type[R]:

@@ -13,7 +13,7 @@ from loris.data.channels import ChannelState
 class ConnectTask(ConnectorTask):
     # noinspection PyProtectedMember
     def run(self) -> None:
-        self.set_channels(ChannelState.CONNECTING)
+        self.connector.set_channels(ChannelState.CONNECTING)
         self.connector._do_connect(self.channels)
 
-        self.set_channels(ChannelState.CONNECTED)
+        self.connector.set_channels(ChannelState.CONNECTED)

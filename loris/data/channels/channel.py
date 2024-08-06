@@ -89,8 +89,8 @@ class Channel(Resource):
     @property
     def freq(self) -> Optional[str]:
         for k in ["freq", "frequency", "resolution"]:
-            if k in self.__configs:
-                return _parse_freq(self.__configs[k])
+            if k in self:
+                return _parse_freq(self._get(k))
         return None
 
     @property

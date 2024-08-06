@@ -12,7 +12,10 @@ import datetime as dt
 import logging
 from typing import List, Optional
 
+from mysql.connector.errors import DatabaseError
+
 import pandas as pd
+from loris.connectors import ConnectionException
 from loris.connectors.mysql import MySqlColumn
 
 
@@ -121,24 +124,28 @@ class MySqlTable:
         return self._select(columns, query)
 
     def _select(self, column_names: List[str], query: str) -> pd.DataFrame:
-        with self.connection.cursor(buffered=True) as cursor:
-            self._logger.debug(query)
-            if cursor.rowcount > 0:
-                cursor.execute(query)
-                columns = sorted([c for c in self.columns if c.name in column_names], key=lambda c: c.name)
+        try:
+            with self.connection.cursor(buffered=True) as cursor:
+                self._logger.debug(query)
+                if cursor.rowcount > 0:
+                    cursor.execute(query)
+                    columns = sorted([c for c in self.columns if c.name in column_names], key=lambda c: c.name)
 
-                timestamps = []
-                data = []
-                for row in cursor.fetchall():
-                    timestamps.append(self.index.decode(row[self.index.name]))
-                    data.append([c.decode(row[c.name]) for c in columns])
+                    timestamps = []
+                    data = []
+                    for row in cursor.fetchall():
+                        timestamps.append(self.index.decode(row[self.index.name]))
+                        data.append([c.decode(row[c.name]) for c in columns])
 
-                data = pd.DataFrame(columns=column_names, data=data, index=timestamps)
-            else:
-                data = pd.DataFrame(columns=column_names)
+                    data = pd.DataFrame(columns=column_names, data=data, index=timestamps)
+                else:
+                    data = pd.DataFrame(columns=column_names)
 
-            data.index.name = self.index.name
-        return data
+                data.index.name = self.index.name
+            return data
+
+        except DatabaseError as e:
+            raise ConnectionException(e, connector=self)
 
     def delete(self, start: pd.Timestamp | dt.datetime, end: pd.Timestamp | dt.datetime) -> None:
         if start is None or end is None:

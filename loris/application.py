@@ -89,7 +89,7 @@ class Application(DataManager, Thread):
     def interrupt(self) -> None:
         self.__interrupt.set()
 
-    # noinspection PyShadowingBuiltins
+    # noinspection PyProtectedMember, PyShadowingBuiltins
     def run(self, *args, **kwargs) -> None:
         self.read(*args, **kwargs)
         self._run(*args, **kwargs)
@@ -107,22 +107,27 @@ class Application(DataManager, Thread):
                 self.interrupt()
                 break
 
+            for connector in self.connectors.filter(lambda c: c._is_reconnectable()):
+                self.reconnect(connector)
+
             def is_reading(channel: Channel, timestamp: pd.Timestamp) -> bool:
                 freq = channel.freq
-                if freq is None or not channel.has_connector():
+                if (freq is None
+                        or not channel.has_connector()
+                        or not self.connectors.get(channel.connector.uuid).is_connected()):
                     return False
                 return pd.isna(channel.connector.timestamp) or timestamp >= _next(channel.connector.timestamp, freq)
 
             now = pd.Timestamp.now(tz.UTC)
-            channels = self.values().filter(lambda c: is_reading(c, now))
+            channels = self.channels.filter(lambda c: is_reading(c, now))
 
-            self._logger.debug(f"Reading {len(channels)} channels of application: {self.name}")
             if len(channels) > 0:
+                self._logger.debug(f"Reading {len(channels)} channels of application: {self.name}")
                 self.read(channels)
                 self.notify(channels)
 
             self._run()
-            self.log(channels)
+            self.log()
         self.log()
 
     # noinspection PyUnresolvedReferences

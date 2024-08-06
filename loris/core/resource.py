@@ -54,6 +54,20 @@ class Resource:
         self._type = type
         self.__configs = OrderedDict(configs)
 
+    def __contains__(self, attr: str) -> bool:
+        return attr in self._get_attrs()
+
+    def __getattr__(self, attr: str) -> Any:
+        # __getattr__ gets called when the item is not found via __getattribute__
+        # To avoid recursion, call __getattribute__ directly to get components dict
+        configs = Resource.__getattribute__(self, f"_{Resource.__name__}__configs")
+        if attr in configs.keys():
+            return configs[attr]
+        raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
+
+    def _get(self, attr: str) -> Any:
+        return self.__configs[attr]
+
     def _get_attrs(self) -> List[str]:
         return ["uuid", "id", "name", "type", *self.__configs.keys()]
 
@@ -65,17 +79,6 @@ class Resource:
 
     def __str__(self) -> str:
         return f"{type(self).__name__}:\n\t" + "\n\t".join(f"{k}={v}" for k, v in self._get_vars().items())
-
-    def __contains__(self, attr):
-        return attr in self._get_attrs()
-
-    def __getattr__(self, attr):
-        # __getattr__ gets called when the item is not found via __getattribute__
-        # To avoid recursion, call __getattribute__ directly to get components dict
-        configs = Resource.__getattribute__(self, f"_{Resource.__name__}__configs")
-        if attr in configs.keys():
-            return configs[attr]
-        raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
 
     @property
     def uuid(self) -> str:
