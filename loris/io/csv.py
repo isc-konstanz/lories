@@ -133,9 +133,9 @@ def read_file(
 
         if index_type.lower() in ["timestamp", "unix"]:
             if index_type.lower() == "timestamp":
-                data[index_column] = pd.to_datetime(data[index_column], unit="ms")
-            elif index_type.lower() == "unix":
                 data[index_column] = pd.to_datetime(data[index_column])  # , utc=True)
+            elif index_type.lower() == "unix":
+                data[index_column] = pd.to_datetime(data[index_column], unit="ms")
             else:
                 raise ValueError(f"Unknown index type: {index_type}")
 
