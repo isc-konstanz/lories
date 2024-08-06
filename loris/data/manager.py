@@ -180,10 +180,10 @@ class DataManager(DataContext, Activator):
     def deactivate(self) -> None:
         super().deactivate()
         self._executor.shutdown(wait=True)
-        self._do_disconnect()
-        self._do_deactivate_members(self._components.values())
+        self._disconnect(*self._connectors.values())
+        self._deactivate(*self._components.values())
 
-    def _do_deactivate_members(self, activators: Collection[Activator]) -> None:
+    def _deactivate(self, *activators: Activator) -> None:
         for activator in reversed(list(activators)):
             if not activator.is_active():
                 continue
