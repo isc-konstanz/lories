@@ -180,8 +180,8 @@ class DataManager(DataContext, Activator):
     def deactivate(self) -> None:
         super().deactivate()
         self._executor.shutdown(wait=True)
-        self._disconnect(*self._connectors.values())
         self._deactivate(*self._components.values())
+        self.disconnect(*self._connectors.values())
 
     def _deactivate(self, *activators: Activator) -> None:
         for activator in reversed(list(activators)):
