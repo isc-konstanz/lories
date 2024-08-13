@@ -25,7 +25,7 @@ from loris.connectors.context import ConnectorContext
 from loris.connectors.tasks import ConnectTask, LogTask, ReadTask, WriteTask
 from loris.core import Activator
 from loris.data.context import DataContext
-from loris.util import get_variables
+from loris.util import get_variables, floor_date
 
 
 # noinspection PyProtectedMember
@@ -306,7 +306,7 @@ class DataManager(DataContext, Activator):
                 write_task = write_tasks[e.connector.uuid]
                 write_task.channels.apply(update_state)
 
-    def log(self, channels: Optional[Channels] = None) -> None:
+    def log(self, channels: Optional[Channels] = None, force: bool = False) -> None:
         if channels is None:
             channels = self.channels
 
@@ -317,7 +317,14 @@ class DataManager(DataContext, Activator):
                 continue
 
             def has_update(channel: Channel) -> bool:
-                return pd.isna(channel.logger.timestamp) or channel.logger.timestamp < channel.timestamp
+                if force:
+                    return True
+                if channel.freq is None:
+                    return pd.isna(channel.logger.timestamp) or channel.timestamp > channel.logger.timestamp
+                if pd.isna(channel.logger.timestamp):
+                    channel.logger.timestamp = floor_date(channel.timestamp, freq=channel.freq)
+
+                return channel.timestamp >= channel.logger.timestamp + channel.timedelta
 
             log_channels = channels.filter(lambda c: (c.has_logger(uuid) and c.is_valid() and has_update(c)))
             if len(log_channels) == 0:
