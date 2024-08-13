@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.application
-~~~~~~~~~~~~~~~~~
+loris.app.application
+~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -10,21 +10,25 @@ from __future__ import annotations
 
 import logging
 from threading import Event, Thread
-from typing import Collection, Type
+from typing import Collection, Optional, Type
 
 import pandas as pd
 import pytz as tz
 from loris import Channel, Settings, System
+from loris.app import Server, ServerUnavailableException
 from loris.components import ComponentContext
 from loris.connectors import ConnectorContext
 from loris.data.manager import DataManager
 from loris.util import floor_date, to_timedelta
 
 
+# noinspection PyProtectedMember
 class Application(DataManager, Thread):
     TYPE: str = "app"
     SECTION: str = "application"
     SECTIONS: Collection[str] = [ComponentContext.SECTION, ConnectorContext.SECTION]
+
+    _server: Optional[Server] = None
 
     _interval: int
     __interrupt: Event = Event()
@@ -37,6 +41,9 @@ class Application(DataManager, Thread):
 
     def __init__(self, settings: Settings, **kwargs) -> None:
         super().__init__(settings, name=settings["name"], **kwargs)
+        if not settings.has_section("server"):
+            settings._add_section("server", {"enabled": False})
+        self._server = Server(self, settings.get_section("server"))
         self.__interrupt = Event()
         self.__interrupt.set()
         self._logger = logging.getLogger(self.id)
@@ -49,9 +56,10 @@ class Application(DataManager, Thread):
 
     def configure(self, settings: Settings) -> None:
         super().configure(settings)
+        if self._server is not None:
+            self._server._do_configure()
         self._interval = settings.get_int("interval", default=1)
 
-    # noinspection PyProtectedMember
     def setup(self, factory: Type[System]) -> None:
         self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
         systems = []
@@ -73,6 +81,12 @@ class Application(DataManager, Thread):
                 self._components._add(system)
         self._do_configure()
 
+    @property
+    def server(self) -> Server:
+        if self._server is None:
+            raise ServerUnavailableException(f"Application '{self.name}' has no server configured")
+        return self._server
+
     # noinspection PyTypeChecker
     @property
     def settings(self) -> Settings:
@@ -83,13 +97,16 @@ class Application(DataManager, Thread):
         self.__interrupt.clear()
         super().start()
 
+        if self._server is not None and self._server.is_enabled():
+            self._server.start()
+
     def wait(self, **kwargs) -> None:
         self.join(**kwargs)
 
     def interrupt(self) -> None:
         self.__interrupt.set()
 
-    # noinspection PyProtectedMember, PyShadowingBuiltins
+    # noinspection PyShadowingBuiltins
     def run(self, *args, **kwargs) -> None:
         self.read(*args, **kwargs)
         self._run(*args, **kwargs)
@@ -105,7 +122,7 @@ class Application(DataManager, Thread):
 
             except KeyboardInterrupt:
                 self.interrupt()
-                break
+                return
 
             for connector in self.connectors.filter(lambda c: c._is_reconnectable()):
                 self.reconnect(connector)
@@ -128,7 +145,7 @@ class Application(DataManager, Thread):
 
             self._run()
             self.log()
-        self.log()
+        self.log(force=True)
 
     # noinspection PyUnresolvedReferences
     def _run(self, *args, **kwargs) -> None:

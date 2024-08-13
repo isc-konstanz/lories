@@ -67,8 +67,8 @@ from .system import System  # noqa: F401
 
 from . import io  # noqa: F401
 
-from . import application  # noqa: F401
-from .application import Application  # noqa: F401
+from . import app  # noqa: F401
+from .app import Application  # noqa: F401
 
 
 def load(name: str = "Loris", **kwargs) -> Application:

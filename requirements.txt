@@ -3,4 +3,8 @@ python-dateutil>=2.9.0,~=2.9
 pytz>=2024.1,~=2024.1
 numpy>=2.0.0,~=2.0
 pandas>=2.2.2,~=2.2
+pillow>=10.4.0,~=10.4
 requests>=2.32.3,~=2.32
+flask>=3.0.3,~=3.0
+dash>=2.17.1,~=2.17
+dash-bootstrap-components>=1.6.0,~=1.6
