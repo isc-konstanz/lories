@@ -14,7 +14,6 @@ from dash_bootstrap_components import DropdownMenu, DropdownMenuItem
 
 from loris.app.view.pages import PageFooter, PageHeader, PageLayout
 from loris.app.view.pages.components import ComponentGroup, ComponentPage, ComponentRegistry
-from loris.app.view.pages.components.system import SystemPage
 from loris.components import Component, ComponentContext
 from loris.system import System
 
@@ -43,13 +42,14 @@ def register_component_page(
 # noinspection PyShadowingBuiltins
 def register_component_group(
     *types: Type[C],
+    name: Optional[str] = None,
     factory: Optional[Callable] = None,
     replace: bool = False
 ) -> Callable[[Type[G]], Type[G]]:
 
     # noinspection PyShadowingNames
     def _register(cls: Type[G]) -> Type[G]:
-        registry.register_group(cls, *types, factory=factory, replace=replace)
+        registry.register_group(cls, *types, name=name, factory=factory, replace=replace)
         return cls
 
     return _register
@@ -101,20 +101,16 @@ class View(ComponentGroup):
 
         return layout
 
+    # noinspection PyTypeChecker
     def _do_create_pages(self, components: ComponentContext) -> None:
         systems = [s for s in components.filter(lambda c: isinstance(c, System))]
         for system in systems:
-            self._new_system(system)
+            system_page = self._new_page(self, system)
+            for component in system.values():
+                self._new_page(system_page, component)
+
         for component in components.filter(lambda c: all(c != s and c not in s for s in systems)):
             self._new_page(self, component)
-
-    def _new_system(self, system: System) -> SystemPage:
-        system_page = SystemPage(system)
-        for component in system.values():
-            self._new_page(system_page, component)
-
-        self.append(system_page)
-        return system_page
 
     def _new_page(self, view: ComponentGroup, component: Component) -> Optional[ComponentPage]:
         _type = type(component)

@@ -11,9 +11,11 @@ from __future__ import annotations
 from dash import html
 
 from loris import System
-from loris.app.view.pages import ComponentGroup, ComponentPage, PageLayout
+from loris.app.view.pages import PageLayout, register_component_page
+from loris.app.view.pages.components import ComponentGroup, ComponentPage
 
 
+@register_component_page(System)
 class SystemPage(ComponentGroup, ComponentPage[System]):
     def __init__(self, system: System, *args, **kwargs) -> None:
         super().__init__(component=system, *args, **kwargs)
