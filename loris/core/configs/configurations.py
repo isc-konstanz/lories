@@ -185,6 +185,8 @@ class Configurations(MutableMapping[str, Any]):
     def get_section(self, section: str, defaults: Optional[Mapping[str, Any]] = None) -> Configurations:
         if self.has_section(section):
             section = self[section]
+            if defaults is not None:
+                section.update(defaults, replace=False)
         elif defaults is not None:
             section = self.__new_section(section, defaults)
         else:
