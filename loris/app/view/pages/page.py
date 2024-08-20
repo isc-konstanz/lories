@@ -15,7 +15,7 @@ from functools import wraps
 from typing import Collection, Optional
 
 import dash
-from dash.development.base_component import Component
+from dash.development.base_component import Component as DashComponent
 from dash_bootstrap_components import Container
 
 from loris.app import ServerException
@@ -150,16 +150,16 @@ class PageLayoutException(PageException):
 
 
 class PageLayout:
-    menu: Optional[Component]
-    focus: Optional[Component]
+    menu: Optional[DashComponent]
+    focus: Optional[DashComponent]
 
-    content: Component | Collection[Component]
+    content: DashComponent | Collection[DashComponent]
 
     def __init__(
         self,
-        content: Component | Collection[Component],
-        focus: Optional[Component] = None,
-        menu: Optional[Component] = None,
+        content: DashComponent | Collection[DashComponent],
+        focus: Optional[DashComponent] = None,
+        menu: Optional[DashComponent] = None,
     ) -> None:
         self.content = content
         self.focus = focus
