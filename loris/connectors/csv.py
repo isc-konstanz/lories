@@ -17,7 +17,7 @@ import pytz as tz
 from loris.connectors import Connector, register_connector_type
 from loris.core import ConfigurationException, Configurations, Resources
 from loris.io import csv
-from loris.util import _parse_freq, ceil_date, floor_date, resample, to_timezone
+from loris.util import _parse_freq, ceil_date, floor_date, to_timezone
 
 
 # noinspection PyShadowingBuiltins
@@ -31,8 +31,6 @@ class CsvConnector(Connector):
 
     index_column: str = "timestamp"
     index_type: str = "timestamp"
-
-    resolution: int = None
 
     override: bool = False
     slice: bool = False
@@ -80,12 +78,6 @@ class CsvConnector(Connector):
         self.index_type = configs.get("index_type", default=CsvConnector.index_type).lower()
         if self.index_type not in ["timestamp", "unix", "none", None]:
             raise ConfigurationException(f"Unknown index type: {self.index_type}")
-
-        # TODO: Validate if minutely default resolution is sufficient
-        resolution = configs.get_int("resolution", default=CsvConnector.resolution)
-        if resolution is not None:
-            resolution *= 60
-        self.resolution = resolution
 
         self.override = configs.get_bool("override", default=CsvConnector.override)
         self.slice = configs.get_bool("slice", default=CsvConnector.slice)
@@ -179,9 +171,6 @@ class CsvConnector(Connector):
                     decimal=self.decimal,
                     rename=columns,
                 )
-
-            if self.resolution is not None:
-                data = resample(data, self.resolution)
 
             if self.index_type in ["timestamp", "unix"] and all(pd.isna(d) for d in [start, end]):
                 now = pd.Timestamp.now(tz=self.timezone)

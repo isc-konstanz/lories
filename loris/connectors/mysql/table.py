@@ -10,36 +10,62 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
-from typing import List, Optional
-
-from mysql.connector.errors import DatabaseError
+from collections.abc import Sequence
+from itertools import chain
+from typing import Any, Optional
 
 import pandas as pd
-from loris.connectors import ConnectionException
-from loris.connectors.mysql import MySqlColumn
+from loris.connectors.mysql import Column, Columns, Index
+from loris.core import Configurations, Resources
 
 
-class MySqlTable:
-    SECTION = "table"
+class MySqlTable(Sequence[Column]):
+    SECTION = "tables"
 
-    DEFAULT_INDEX_COLUMN = "timestamp"
-    DEFAULT_INDEX_TYPE = "TIMESTAMP"
-    DEFAULT_INDEX = MySqlColumn(DEFAULT_INDEX_COLUMN, DEFAULT_INDEX_TYPE, nullable=False, primary=True)
+    index: Index
 
-    DEFAULT_DATA_COLUMN = "data"
-    DEFAULT_DATA_TYPE = "FLOAT"
-    DEFAULT_COLUMNS = [MySqlColumn(DEFAULT_DATA_COLUMN, DEFAULT_DATA_TYPE)]
+    columns: Columns
 
-    index: MySqlColumn
+    # noinspection PyProtectedMember
+    @classmethod
+    def from_configs(cls, connector, name: str, configs: Configurations, resources: Resources) -> MySqlTable:
+        index = Index.from_configs(configs.get_section("index", defaults={}), timezone=connector._timezone)
 
-    columns: List[MySqlColumn]
+        columns_configs = configs.get_section("columns", defaults={})
+        columns_type = columns_configs.get("type", default=Column.DEFAULT_TYPE)
+        columns = Columns()
+
+        for column_name in columns_configs.sections:
+            column = columns_configs[column_name]
+            column_type = column.pop("type", columns_type)
+            if column.get_bool("primary", default=False) or "attribute" in column:
+                del column["primary"]
+                index.add(column_name, column_type, **column)
+            else:
+                columns.add(column_name, column_type, **column)
+
+        for resource in resources:
+            column_name = resource.column if "column" in resource else resource.id
+            column_args = {}
+            if "length" in resource:
+                column_args["length"] = resource.length
+            if "primary" in resource and resource.primary:
+                index.add(column_name, resource.type, **column_args)
+            else:
+                if "nullable" in resource:
+                    column_args["nullable"] = resource.nullable
+
+                column_type = resource.type if "type" in resource else columns_type
+                columns.add(column_name, column_type, **column_args)
+
+        return MySqlTable(connector, name, index, columns)
 
     def __init__(
         self,
         connector,
         name: str,
-        index: Optional[MySqlColumn] = None,
-        columns: Optional[List[MySqlColumn]] = None,
+        index: Optional[Index] = None,
+        columns: Optional[Columns] = None,
         engine: str = None,  # 'MyISAM'
     ):
         self._connector = connector
@@ -47,29 +73,33 @@ class MySqlTable:
         self.name = name
 
         if index is None:
-            index = MySqlTable.DEFAULT_INDEX
+            index = Index.from_defaults()
         self.index = index
         if columns is None:
-            columns = MySqlTable.DEFAULT_COLUMNS
+            columns = Columns.from_defaults()
         self.columns = columns
 
         self.engine = engine
 
         self._logger = logging.getLogger(__name__)
 
+    def __getitem__(self, index: int) -> Column:
+        columns = [*self.index, *self.columns]
+        return columns[index]
+
+    def __len__(self):
+        return len(self.index) + len(self.columns)
+
     @property
     def connection(self):
         return self._connector.connection
 
     def create(self):
-        columns = [self.index] + self.columns
-        primary = [c.name for c in columns if c.primary]
-
+        columns = [*self.index, *self.columns]
         query = (
             f"CREATE TABLE IF NOT EXISTS {self.name} "
-            f"({', '.join([str(c) for c in columns])}, PRIMARY KEY ({', '.join(primary)}))"
+            f"({', '.join([str(c) for c in columns])}, PRIMARY KEY ({', '.join(self.index.names)}))"
         )
-
         if self.engine is not None:
             query += f" ENGINE={self.engine}"
 
@@ -82,105 +112,80 @@ class MySqlTable:
 
     def exists(
         self,
-        columns: Optional[List[str]] = None,
+        resources: Optional[Resources] = None,
         start: Optional[pd.Timestamp, dt.datetime] = None,
         end: Optional[pd.Timestamp, dt.datetime] = None,
     ) -> bool:
-        if columns is None:
-            columns = [c.name for c in self.columns]
-
         # TODO: Replace this placeholder more resource efficient
-        return not self.select(columns, start, end).empty
+        return not self.select(resources, start, end).empty
 
     def select(
         self,
-        columns: Optional[List[str]] = None,
+        resources: Resources,
         start: pd.Timestamp | dt.datetime = None,
         end: pd.Timestamp | dt.datetime = None,
     ) -> pd.DataFrame:
-        if columns is None:
-            columns = [c.name for c in self.columns]
-        query = f"SELECT {', '.join([self.index.name] + columns)} FROM {self.name}"
-        where = []
-        if start is not None:
-            where.append(f"{self.index.name} >= {self.index.encode(start)}")
-        if end is not None:
-            where.append(f"{self.index.name} <= {self.index.encode(end)}")
-        if len(where) > 0:
-            query += " WHERE" + " AND".join(where)
-        query += f" ORDER BY {self.index.name} ASC"
-        return self._select(columns, query)
+        columns = [r.column if "column" in r else r.id for r in resources]
+        query = f"SELECT {self.index}, {', '.join([f'`{c}`' for c in columns])} FROM {self.name}"
+        query, params = self.index.where(query, start, end)
+        query += f" {self.index.order_by('ASC')}"
 
-    def select_first(self, columns: Optional[List[str]] = None) -> pd.DataFrame:
-        if columns is None:
-            columns = [c.name for c in self.columns]
-        query = f"SELECT {', '.join([self.index.name] + columns)} FROM {self.name} ORDER BY timestamp ASC LIMIT 1;"
-        return self._select(columns, query)
+        return self._select(resources, query, params)
 
-    def select_last(self, columns: Optional[List[str]] = None) -> pd.DataFrame:
-        if columns is None:
-            columns = [c.name for c in self.columns]
-        query = f"SELECT {', '.join([self.index.name] + columns)} FROM {self.name} ORDER BY timestamp DESC LIMIT 1;"
-        return self._select(columns, query)
+    def select_first(self, resources: Resources) -> pd.DataFrame:
+        columns = [r.column if "column" in r else r.id for r in resources]
+        query = (
+            f"SELECT {self.index}, {', '.join([f'`{c}`' for c in columns])} FROM {self.name} "
+            f"{self.index.order_by('ASC')} LIMIT 1;"
+        )
+        return self._select(resources, query)
 
-    def _select(self, column_names: List[str], query: str) -> pd.DataFrame:
-        try:
-            with self.connection.cursor(buffered=True) as cursor:
-                self._logger.debug(query)
-                if cursor.rowcount > 0:
-                    cursor.execute(query)
-                    columns = sorted([c for c in self.columns if c.name in column_names], key=lambda c: c.name)
+    def select_last(self, resources: Resources) -> pd.DataFrame:
+        columns = [r.column if "column" in r else r.id for r in resources]
+        query = (
+            f"SELECT {self.index}, {', '.join([f'`{c}`' for c in columns])} FROM {self.name} "
+            f"{self.index.order_by('DESC')} LIMIT 1;"
+        )
+        return self._select(resources, query)
 
-                    timestamps = []
-                    data = []
-                    for row in cursor.fetchall():
-                        timestamps.append(self.index.decode(row[self.index.name]))
-                        data.append([c.decode(row[c.name]) for c in columns])
-
-                    data = pd.DataFrame(columns=column_names, data=data, index=timestamps)
-                else:
-                    data = pd.DataFrame(columns=column_names)
-
-                data.index.name = self.index.name
-            return data
-
-        except DatabaseError as e:
-            raise ConnectionException(e, connector=self)
+    def _select(
+        self,
+        resources: Resources,
+        query: str,
+        parameters: Sequence[Any] = ()
+    ) -> pd.DataFrame:
+        with self.connection.cursor(buffered=True, dictionary=True) as cursor:
+            self._logger.debug(query)
+            cursor.execute(query, parameters)
+            if cursor.rowcount > 0:
+                data = pd.DataFrame.from_dict(cursor.fetchall())
+            else:
+                data = pd.DataFrame()
+        return self.index.process(resources, data)
 
     def delete(self, start: pd.Timestamp | dt.datetime, end: pd.Timestamp | dt.datetime) -> None:
-        if start is None or end is None:
-            return
-
-        # TODO: Implement deleting only from specific columns ?
+        # TODO: Implement deleting only from specific columns?
         query = f"DELETE FROM {self.name}"
-        where = []
-        if start is not None:
-            where.append(f"{self.index.name} >= {self.index.encode(start)}")
-        if end is not None:
-            where.append(f"{self.index.name} <= {self.index.encode(end)}")
-        query += " WHERE" + " AND".join(where)
-
+        query, params = self.index.where(query, start, end)
         with self.connection.cursor() as cursor:
             self._logger.debug(query)
-            cursor.execute(query)
+            cursor.execute(query, params)
+            self.connection.commit()
 
     # noinspection PyUnresolvedReferences
-    def insert(self, data: pd.DataFrame) -> None:
-        columns = [c for c in self.columns if c.name in data.columns]
+    def insert(self, resources: Resources, data: pd.DataFrame) -> None:
+        query = (f"INSERT INTO {self.name} ({self.index}, {self.columns}) "
+                 f"VALUES ({', '.join(['%s'] * (len(self.index) + len(self.columns)))}) "
+                 f"ON DUPLICATE KEY UPDATE {', '.join([f'`{c.name}`=VALUES(`{c.name}`)' for c in self.columns])}")
 
-        query = f"INSERT INTO {self.name} (`{self.index.name}`, " + ", ".join([f"`{c.name}`" for c in columns]) + ")"
-        query += " VALUES (%s, " + ", ".join(["%s"] * (len(columns))) + ")"
-        query += " ON DUPLICATE KEY UPDATE " + ", ".join(
-            [f"`{c.name}`=VALUES(`{c.name}`)" for c in columns if not c.primary]
-        )
         with self.connection.cursor() as cursor:
             self._logger.debug(query)
-            params = []
-            for timestamp, values in data.iterrows():
-                params.append((self.index.encode(timestamp), *[c.encode(values[c.name]) for c in columns]))
 
+            def _extract(d: pd.DataFrame) -> Sequence[Any]:
+                return d.apply(lambda r: self.index.extract(r) + self.columns.extract(r), axis="columns").values
+
+            params = list(chain.from_iterable(_extract(d) for d in self.index.prepare(resources, data)))
             cursor.executemany(query, params)
-
             self.connection.commit()
 
     def _get_column_type(self, column: str) -> str:
