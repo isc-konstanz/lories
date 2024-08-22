@@ -49,7 +49,7 @@ class Resources(Generic[R], Collection[R]):
     def copy(self):
         return type(self)([resource.copy() for resource in self._resources])
 
-    def apply(self, apply: callable) -> None:
+    def apply(self, apply: Callable[[Resource], None]) -> None:
         for resource in self:
             apply(resource)
 
@@ -58,8 +58,6 @@ class Resources(Generic[R], Collection[R]):
         return type(self)([resource for resource in self._resources if filter(resource)])
 
     # noinspection SpellCheckingInspection
-    def groupby(self, by: str) -> List[Tuple[Any, Collection[R]]]:
-        groups = []
+    def groupby(self, by: str) -> Iterator[Tuple[Any, Collection[R]]]:
         for group_by in np.unique([getattr(r, by) for r in self]):
-            groups.append((group_by, self.filter(lambda r: getattr(r, by) == group_by)))
-        return groups
+            yield group_by, self.filter(lambda r: getattr(r, by) == group_by)
