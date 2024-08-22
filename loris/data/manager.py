@@ -318,7 +318,10 @@ class DataManager(DataContext, Activator):
                 if channel.freq is None:
                     return pd.isna(channel.logger.timestamp) or channel.timestamp > channel.logger.timestamp
                 if pd.isna(channel.logger.timestamp):
-                    channel.logger.timestamp = floor_date(channel.timestamp, freq=channel.freq)
+                    logger_timestamp = floor_date(channel.timestamp, freq=channel.freq)
+                    if logger_timestamp == channel.timestamp:
+                        logger_timestamp -= channel.timedelta
+                    channel.logger.timestamp = logger_timestamp
 
                 return channel.timestamp >= channel.logger.timestamp + channel.timedelta
 
