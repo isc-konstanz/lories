@@ -13,7 +13,7 @@ import logging
 import os
 from concurrent import futures
 from concurrent.futures import Future, ThreadPoolExecutor
-from typing import Collection, Optional
+from typing import Optional
 
 import pandas as pd
 import pytz as tz
@@ -25,7 +25,7 @@ from loris.connectors.context import ConnectorContext
 from loris.connectors.tasks import ConnectTask, LogTask, ReadTask, WriteTask
 from loris.core import Activator
 from loris.data.context import DataContext
-from loris.util import get_variables, floor_date
+from loris.util import floor_date, get_variables
 
 
 # noinspection PyProtectedMember
@@ -204,10 +204,6 @@ class DataManager(DataContext, Activator):
     @property
     def connectors(self) -> ConnectorContext:
         return self._connectors
-
-    @property
-    def channels(self) -> Channels:
-        return self.values()
 
     def notify(self, channels: Optional[Channels] = None) -> None:
         pass

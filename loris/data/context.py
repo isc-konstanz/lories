@@ -153,7 +153,8 @@ class DataContext(Context[Channel]):
     def _remove(self, uuid: str) -> None:
         del self._channels[uuid]
 
-    def values(self) -> Channels:
+    @property
+    def channels(self) -> Channels:
         return Channels(self._channels.values())
 
     # noinspection PyShadowingBuiltins
@@ -168,4 +169,4 @@ class DataContext(Context[Channel]):
         return groups
 
     def to_frame(self, **kwargs) -> pd.DataFrame:
-        return self.values().to_frame(**kwargs)
+        return self.channels.to_frame(**kwargs)
