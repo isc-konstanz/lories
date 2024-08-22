@@ -107,7 +107,7 @@ class ComponentPage(Page, Generic[C]):
 
     def _get_data(self) -> Collection[dbc.AccordionItem]:
         channel_group = []
-        for channel in self.data.values():
+        for channel in self.data.channels:
             channel_group.append(self._parse_channel(channel))
         return channel_group
 
