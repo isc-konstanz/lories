@@ -9,6 +9,7 @@ loris.application
 from __future__ import annotations
 
 import logging
+import signal
 from threading import Event, Thread
 from typing import Collection, Type
 
@@ -41,6 +42,9 @@ class Application(DataManager, Thread):
         self.__interrupt.set()
         self._logger = logging.getLogger(self.id)
 
+        signal.signal(signal.SIGINT, self.interrupt)
+        signal.signal(signal.SIGTERM, self.terminate)
+
     def __eq__(self, other):
         return self is other
 
@@ -50,6 +54,8 @@ class Application(DataManager, Thread):
     def configure(self, settings: Settings) -> None:
         super().configure(settings)
         self._interval = settings.get_int("interval", default=1)
+        if self._server is not None and self._server.is_enabled():
+            self._server._do_configure()
 
     # noinspection PyProtectedMember
     def setup(self, factory: Type[System]) -> None:
@@ -86,10 +92,18 @@ class Application(DataManager, Thread):
     def wait(self, **kwargs) -> None:
         self.join(**kwargs)
 
-    def interrupt(self) -> None:
+    def interrupt(self, *_) -> None:
         self.__interrupt.set()
 
-    # noinspection PyProtectedMember, PyShadowingBuiltins
+    def terminate(self, *_) -> None:
+        self.interrupt()
+        self.wait()
+
+    def deactivate(self) -> None:
+        super().deactivate()
+        self.terminate()
+
+    # noinspection PyShadowingBuiltins
     def run(self, *args, **kwargs) -> None:
         self.read(*args, **kwargs)
         self._run(*args, **kwargs)
@@ -139,7 +153,7 @@ class Application(DataManager, Thread):
                 system.run(*args, **kwargs)
 
             except Exception as e:
-                self._logger.warning(f"Error running system '{system.id}': ", str(e))
+                self._logger.warning(f"Error running system '{system.id}': ", repr(e))
 
 
 # noinspection PyShadowingBuiltins
