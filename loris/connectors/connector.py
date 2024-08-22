@@ -36,7 +36,7 @@ class ConnectorMeta(ConfiguratorMeta):
 
 
 class Connector(Registrator, metaclass=ConnectorMeta):
-    SECTION: str = "component"
+    SECTION: str = "connector"
     SECTIONS: Collection[str] = []
 
     _connected: bool = False

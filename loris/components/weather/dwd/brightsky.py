@@ -49,7 +49,7 @@ class Brightsky(WeatherConnector):
                 connector=self.uuid,
                 source="forecast",
                 address="source_first_record",
-                value_type=pd.Timestamp,
+                type=pd.Timestamp,
                 primary=True,
                 nullable=False,
             )
