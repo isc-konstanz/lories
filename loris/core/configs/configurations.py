@@ -130,16 +130,16 @@ class Configurations(MutableMapping[str, Any]):
             return self.__configs.get(key)
         return self.__configs.get(key, default)
 
-    def get_bool(self, key, default: bool = None) -> bool:
+    def get_bool(self, key: str, default: bool = None) -> bool:
         return to_bool(self.get(key, default))
 
-    def get_int(self, key, default: int = None) -> int:
+    def get_int(self, key: str, default: int = None) -> int:
         return to_int(self.get(key, default))
 
-    def get_float(self, key, default: float = None) -> float:
+    def get_float(self, key: str, default: float = None) -> float:
         return to_float(self.get(key, default))
 
-    def get_date(self, key, default: dt.datetime | pd.Timestamp = None) -> pd.Timestamp:
+    def get_date(self, key: str, default: dt.datetime | pd.Timestamp = None) -> pd.Timestamp:
         return to_date(self.get(key, default))
 
     def __iter__(self):
