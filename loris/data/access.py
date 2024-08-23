@@ -47,15 +47,15 @@ class DataAccess(DataContext, Configurator):
             self._load_sections(self.__component, configs.get_section("channels"), defaults)
         self._load_from_file(self.__component, configs.dirs, defaults=defaults)
 
-    # noinspection PyUnresolvedReferences, PyShadowingBuiltins
-    def add(self, id: str, **configs: Any) -> None:
+    # noinspection PyUnresolvedReferences
+    def add(self, key: str, **configs: Any) -> None:
         data_configs = self.configs
         if not data_configs.has_section("channels"):
             data_configs._add_section("channels", {})
-        if not data_configs["channels"].has_section(id):
-            data_configs["channels"]._add_section(id, configs)
+        if not data_configs["channels"].has_section(key):
+            data_configs["channels"]._add_section(key, configs)
         else:
-            data_configs["channels"][id].update(configs, replace=False)
+            data_configs["channels"][key].update(configs, replace=False)
 
         if self.is_configured():
             channel_configs = self._parse_defaults(data_configs["channels"])
@@ -63,14 +63,14 @@ class DataAccess(DataContext, Configurator):
             # of the configuration file, then update the function arguments. Last, override
             # everything with the channel specific configurations of the file.
             channel_configs.update(configs)
-            channel_configs.update(data_configs["channels"][id])
-            channel_uuid = f"{self.__component.uuid}.{id}"
-            self._update(uuid=channel_uuid, id=id, **channel_configs)
+            channel_configs.update(data_configs["channels"][key])
+            channel_id = f"{self.__component.id}.{key}"
+            self._update(id=channel_id, key=key, **channel_configs)
 
     def _add(self, channel: Channel) -> None:
         self.context._add(channel)
-        self._set(channel.id, channel)
+        self._set(channel.key, channel)
 
     # noinspection PyShadowingBuiltins
-    def _new(self, uuid: str, id: str, **configs: Any) -> Channel:
-        return self.context._new(uuid=uuid, id=id, **configs)
+    def _new(self, id: str, key: str, **configs: Any) -> Channel:
+        return self.context._new(id=id, key=key, **configs)

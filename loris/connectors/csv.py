@@ -17,7 +17,7 @@ import pytz as tz
 from loris.connectors import Connector, register_connector_type
 from loris.core import ConfigurationException, Configurations, Resources
 from loris.io import csv
-from loris.util import _parse_freq, ceil_date, floor_date, resample, to_timezone
+from loris.util import _parse_freq, ceil_date, floor_date, to_timezone
 
 
 # noinspection PyShadowingBuiltins
@@ -32,8 +32,6 @@ class CsvConnector(Connector):
     index_column: str = "timestamp"
     index_type: str = "timestamp"
 
-    resolution: int = None
-
     override: bool = False
     slice: bool = False
 
@@ -47,10 +45,6 @@ class CsvConnector(Connector):
     separator: str = ","
 
     columns: Mapping[str, str] = {}
-
-    @property
-    def type(self) -> str:
-        return self.TYPE
 
     # noinspection PyTypeChecker
     def configure(self, configs: Configurations) -> None:
@@ -80,12 +74,6 @@ class CsvConnector(Connector):
         self.index_type = configs.get("index_type", default=CsvConnector.index_type).lower()
         if self.index_type not in ["timestamp", "unix", "none", None]:
             raise ConfigurationException(f"Unknown index type: {self.index_type}")
-
-        # TODO: Validate if minutely default resolution is sufficient
-        resolution = configs.get_int("resolution", default=CsvConnector.resolution)
-        if resolution is not None:
-            resolution *= 60
-        self.resolution = resolution
 
         self.override = configs.get_bool("override", default=CsvConnector.override)
         self.slice = configs.get_bool("slice", default=CsvConnector.slice)
@@ -125,8 +113,8 @@ class CsvConnector(Connector):
         if not os.path.isdir(self._data_dir):
             os.makedirs(self._data_dir, exist_ok=True)
 
-        columns = {r.name: r.uuid for r in self.resources if "name" in r}
-        columns.update({r.name: r.uuid for r in resources if "name" in r})
+        columns = {r.name: r.id for r in self.resources if "name" in r}
+        columns.update({r.name: r.id for r in resources if "name" in r})
         columns.update({column: key for key, column in self.columns.items()})
 
         if self._data_path is not None:
@@ -152,8 +140,8 @@ class CsvConnector(Connector):
         start: Optional[pd.Timestamp, dt.datetime] = None,
         end: Optional[pd.Timestamp, dt.datetime] = None,
     ) -> pd.DataFrame:
-        columns = {r.name: r.uuid for r in self.resources if "name" in r}
-        columns.update({r.name: r.uuid for r in resources if "name" in r})
+        columns = {r.name: r.id for r in self.resources if "name" in r}
+        columns.update({r.name: r.id for r in resources if "name" in r})
         columns.update({column: key for key, column in self.columns.items()})
 
         def _infer_dates(s=start, e=end) -> Tuple[pd.Timestamp, pd.Timestamp]:
@@ -180,23 +168,20 @@ class CsvConnector(Connector):
                     rename=columns,
                 )
 
-            if self.resolution is not None:
-                data = resample(data, self.resolution)
-
             if self.index_type in ["timestamp", "unix"] and all(pd.isna(d) for d in [start, end]):
                 now = pd.Timestamp.now(tz=self.timezone)
                 index = data.index.tz_convert(self.timezone).get_indexer([now], method="nearest")
                 data = data.iloc[[index[-1]], :]
 
             data = data.rename(columns=columns)
-            return data.loc[:, [r.uuid for r in resources if r.uuid in data.columns]]
+            return data.loc[:, [r.id for r in resources if r.id in data.columns]]
 
         except IOError:
             # TODO: Return more informative ChannelStates or raise ConnectionException (?)
             return pd.DataFrame()
 
     def write(self, data: pd.DataFrame) -> None:
-        columns = {r.uuid: r.name for r in self.resources if "name" in r}
+        columns = {r.id: r.name for r in self.resources if "name" in r}
         columns.update(self.columns)
         kwargs = {
             "timezone": self.timezone,

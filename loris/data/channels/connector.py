@@ -16,7 +16,8 @@ from loris.util import parse_id
 
 
 class ChannelConnector:
-    _uuid: str
+    _id: str
+    _key: str
 
     __configs: OrderedDict[str, Any]
 
@@ -24,17 +25,18 @@ class ChannelConnector:
 
     # noinspection PyShadowingBuiltins
     def __init__(self, connector: str = None, **configs: Any) -> None:
-        self._uuid = connector
+        self._id = connector
+        self._key = parse_id(connector.split(".")[-1]) if connector is not None else None
         self.__configs = OrderedDict(configs)
 
     # noinspection PyShadowingBuiltins
     def _get_vars(self) -> Dict[str, Any]:
-        vars = OrderedDict(uuid=self.uuid, **self.__configs)
+        vars = OrderedDict(id=self.id, **self.__configs)
         vars["timestamp"] = self.timestamp
         return vars
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.id})"
+        return f"{type(self).__name__}({self.key})"
 
     def __str__(self) -> str:
         return f"{type(self).__name__}:\n\t" + "\n\t".join(f"{k}={v}" for k, v in self._get_vars().items())
@@ -48,12 +50,12 @@ class ChannelConnector:
         raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
 
     @property
-    def uuid(self) -> str:
-        return self._uuid
+    def id(self) -> str:
+        return self._id
 
     @property
-    def id(self) -> str:
-        return parse_id(self._uuid.split(".")[-1]) if self._uuid is not None else None
+    def key(self) -> str:
+        return self._key
 
     def copy(self) -> ChannelConnector:
         return type(self)(**self._get_vars())

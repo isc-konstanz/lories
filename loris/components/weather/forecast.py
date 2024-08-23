@@ -99,7 +99,7 @@ class WeatherForecast(Component):
             start = pd.Timestamp.now(tz=timezone)
 
         if forecast.empty or forecast.index[0] > start:
-            forecast_channels = self.data.filter(lambda c: c.has_logger() and c.has_connector(self.connector.uuid))
+            forecast_channels = self.data.filter(lambda c: c.has_logger() and c.has_connector(self.connector.id))
             if len(forecast_channels) > 0:
                 start_schedule = floor_date(start, self.timezone, freq=f"{self.interval}T")
                 start_schedule += pd.Timedelta(minutes=self.offset)

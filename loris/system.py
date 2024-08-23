@@ -31,15 +31,15 @@ class System(Component, ComponentContext):
     @classmethod
     def copy(cls, settings: Settings) -> bool:
         configs = Configurations.load(f"{cls.__name__.lower()}.conf", **settings.dirs.encode())
-        if "id" in configs:
-            id = parse_id(configs["id"])
+        if "key" in configs:
+            key = parse_id(configs["key"])
         elif "name" in configs:
-            id = parse_id(configs["name"])
-            configs["id"] = id
+            key = parse_id(configs["name"])
+            configs["key"] = key
         else:
             raise ConfigurationException("Invalid configuration, missing specified system name")
 
-        configs.dirs._data = os.path.join(configs.dirs.data, id)
+        configs.dirs._data = os.path.join(configs.dirs.data, key)
 
         if os.path.isdir(configs.dirs.data):
             return False
@@ -90,14 +90,14 @@ class System(Component, ComponentContext):
     # noinspection PyProtectedMember
     def _add(self, *components: Component) -> None:
         for component in components:
-            super()._set(component.id, component)
-            self.context.components._set(component.uuid, component)
+            super()._set(component.key, component)
+            self.context.components._set(component.id, component)
 
     # noinspection PyProtectedMember
     def _update(self, context: Context, configs: Configurations) -> Component:
         component = self._new(context, configs)
-        if component.id in self:
-            self._get(component.id).configs.update(configs)
+        if component.key in self:
+            self._get(component.key).configs.update(configs)
         else:
             self._add(component)
         return component

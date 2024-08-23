@@ -10,16 +10,16 @@ from __future__ import annotations
 
 import datetime as dt
 from collections.abc import Mapping
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, Optional
 
 from mysql import connector
 from mysql.connector.errors import DatabaseError
 
 import pandas as pd
+import pytz as tz
 from loris.connectors import ConnectionException, Connector, ConnectorException, register_connector_type
-from loris.connectors.mysql import MySqlColumn, MySqlTable
+from loris.connectors.mysql import MySqlTable
 from loris.core import Configurations, Resources
-from loris.util import resample
 
 
 @register_connector_type
@@ -29,11 +29,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
     _connection = None
     _tables: Dict[str, MySqlTable] = {}
 
-    _table_index_column: str = MySqlTable.DEFAULT_INDEX_COLUMN
-    _table_index_type: str = MySqlTable.DEFAULT_INDEX_TYPE
-    _table_data_column: str = MySqlTable.DEFAULT_DATA_COLUMN
-    _table_data_type: str = MySqlTable.DEFAULT_DATA_TYPE
-    _tables_create: bool = True
+    _timezone: tz.BaseTzInfo
 
     user: str
     password: str
@@ -41,8 +37,6 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
 
     host: str = "127.0.0.1"
     port: int = 3306
-
-    resolution: Optional[int] = None
 
     @property
     def connection(self):
@@ -61,19 +55,6 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        if configs.has_section(MySqlTable.SECTION):
-            table = configs.get_section(MySqlTable.SECTION)
-            self._table_index_column = table.get("index_column", default=MySqlConnector._table_index_column)
-            self._table_index_type = table.get("index_type", default=MySqlConnector._table_index_type)
-            self._table_data_column = table.get("data_column", default=MySqlConnector._table_data_column)
-            self._table_data_type = table.get("data_type", default=MySqlConnector._table_data_type)
-            self._tables_create = table.get_bool("create", default=MySqlConnector._tables_create)
-
-        # TODO: Validate if minutely default resolution is sufficient
-        resolution = configs.get_int("resolution", default=MySqlConnector.resolution)
-        if resolution is not None:
-            resolution *= 60
-        self.resolution = resolution
 
         self.host = configs.get("host", MySqlConnector.host)
         self.port = configs.get_int("port", MySqlConnector.port)
@@ -89,115 +70,90 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
             self._connection = connector.connect(
                 host=self.host, port=self.port, user=self.user, passwd=self.password, database=self.database
             )
-            self._tables = self._load_tables(resources)
+            self._timezone = self._select_timezone()
+            self._tables = self._connect_tables(resources)
+
         except DatabaseError as e:
-            raise ConnectionException(e, connector=self)
+            raise ConnectionException(repr(e), connector=self)
 
     def disconnect(self) -> None:
         if self._connection is not None:
             self._connection.close()
 
-    def _load_tables(self, resources: Resources) -> Dict[str, MySqlTable]:
+    # noinspection PyTypeChecker
+    def _connect_tables(self, resources: Resources) -> Dict[str, MySqlTable]:
         tables = {}
-        table_schemas = self._get_table_schemas()
-        for table_schema in table_schemas:
-            table_columns = []
-            for table_column in self._get_column_schemas(table_schema["table_name"]):
-                table_columns.append(
-                    MySqlColumn(
-                        table_column["column_name"],
-                        table_column["data_type"],
-                        primary="PRI" in table_column["column_key"],
-                        nullable="YES" == table_column["is_nullable"],
-                    )
-                )
-            table_index = table_columns.pop(0)
-            table = MySqlTable(
-                self, table_schema["table_name"], table_index, table_columns, engine=table_schema["engine"]
-            )
-            tables[table.name] = table
+        table_schemas = self._select_table_schemas()
+        tables_configs = self.configs.get_section(MySqlTable.SECTION, defaults={})
 
         for table_name, table_resources in resources.groupby("table"):
-            if table_name in tables:
-                continue
-            if self._tables_create:
-                # noinspection PyTypeChecker
-                table = self._create_table(table_name, table_resources)
-                tables[table.name] = table
+            table_configs = tables_configs.get_section(table_name, defaults={
+                "index":   tables_configs.get_section("index", defaults={}),
+                "columns": tables_configs.get_section("columns", defaults={}),
+            })
+            table = MySqlTable.from_configs(self, table_name, table_configs, table_resources)
+            tables[table.name] = table
+            if table.name not in table_schemas:
+                if table_configs.get_bool("create", default=True):
+                    table.create()
+                else:
+                    raise ConnectorException(f"Unable to find configured table: {table_name}", connector=self)
             else:
-                raise ConnectorException(f"Unable to find configured table: {table_name}", connector=self)
+                table_schema = table_schemas[table.name]
+                if table.engine is not None and table.engine != table_schema["engine"]:
+                    raise ConnectorException(
+                        f"Mismatching table engine for configured table '{table_name}': {table_schema['engine']}",
+                        connector=self,
+                    )
+                column_schemas = self._select_column_schemas(table.name)
+                for column in table:
+                    if column.name not in column_schemas:
+                        # TODO: Implement column creation if configured
+                        raise ConnectorException(f"Unable to find configured column: {column.name}", connector=self)
+                    # column_schema = column_schemas[column.name]
+                    # TODO: Implement column validation
 
         return tables
 
-    def _create_table(self, name: str, resources: Resources):
-        index = MySqlColumn(
-            self._table_index_column,
-            self._table_index_type,
-            primary=True,
-            nullable=False
-        )
-        columns = []
-        for resource in resources:
-            column_name = resource.column if "column" in resource else resource.id
-            column_args = {}
-            if "nullable" in resource:
-                column_args["nullable"] = resource.nullable
-            if "primary" in resource:
-                column_args["primary"] = resource.primary
-            if "length" in resource:
-                column_args["type_length"] = resource.length
-
-            column_type = resource.type if "type" in resource else self._table_data_type
-            columns.append(MySqlColumn(column_name, column_type, **column_args))
-
-        table = MySqlTable(self, name, index, columns)
-        table.create()
-
-        return table
-
-    def _get_column_schemas(self, table: str, select=None) -> List[Dict[str, Any]]:
-        if select is None:
-            select = ["column_name", "is_nullable", "data_type", "column_key"]
+    def _select_table_schemas(self, columns=None) -> Dict[str, Dict[str, Any]]:
+        # columns = ['table_name', 'table_rows', 'engine', 'create_time', 'update_time']
+        if columns is None:
+            columns = ["table_name", "engine"]
 
         cursor = self.connection.cursor()
         cursor.execute(
-            f"SELECT {','.join(f'`{c}`' for c in select)} "
+            f"SELECT {','.join(f'`{c}`' for c in columns)} "
+            f"FROM information_schema.tables WHERE `table_schema`='{self.database}'"
+        )
+
+        table_schemas = {}
+        for table_params in cursor.fetchall():
+            table_schema = dict(zip(columns, table_params))
+            table_schemas[table_schema["table_name"]] = table_schema
+        return table_schemas
+
+    def _select_column_schemas(self, table: str, columns=None) -> Dict[str, Dict[str, Any]]:
+        if columns is None:
+            columns = ["column_name", "is_nullable", "data_type", "column_key"]
+
+        cursor = self.connection.cursor()
+        cursor.execute(
+            f"SELECT {','.join(f'`{c}`' for c in columns)} "
             f"FROM information_schema.columns "
             f"WHERE `table_schema`='{self.database}' AND `table_name`='{table}'"
         )
 
-        columns = []
+        column_schemas = {}
         for table_params in cursor.fetchall():
-            columns.append(dict(zip(select, table_params)))
-        return columns
+            column_schema = dict(zip(columns, table_params))
+            column_schemas[column_schema["column_name"]] = column_schema
+        return column_schemas
 
-    def _get_table_schemas(self, select=None) -> List[Dict[str, Any]]:
-        # select = ['table_name', 'table_rows', 'engine', 'create_time', 'update_time']
-        if select is None:
-            select = ["table_name", "engine"]
-
+    def _select_timezone(self) -> tz.BaseTzInfo:
         cursor = self.connection.cursor()
-        cursor.execute(
-            f"SELECT {','.join(f'`{c}`' for c in select)} "
-            f"FROM information_schema.tables WHERE `table_schema`='{self.database}'"
-        )
-
-        tables = []
-        for table_params in cursor.fetchall():
-            tables.append(dict(zip(select, table_params)))
-        return tables
-
-    def create(
-        self,
-        name: str,
-        columns: Optional[List[MySqlColumn]] = None,
-        engine: str = None,  # 'MyISAM'
-    ) -> MySqlTable:
-        table = MySqlTable(self, name, columns, engine)
-        table.create()
-
-        self._tables[table.name] = table
-        return table
+        cursor.execute("SELECT @@system_time_zone as tz")
+        for row in cursor.fetchall():
+            return tz.timezone(row[0])
 
     def exists(
         self,
@@ -210,48 +166,42 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
             resources = self.resources
         return not self.read(resources, start, end).empty
 
+    # noinspection PyTypeChecker
     def read(
         self,
         resources: Resources,
         start: Optional[pd.Timestamp, dt.datetime] = None,
         end: Optional[pd.Timestamp, dt.datetime] = None,
     ) -> pd.DataFrame:
-        data = pd.DataFrame(columns=[r.uuid for r in resources])
+        data = pd.DataFrame()
+        try:
+            for table_name, table_resources in resources.groupby("table"):
+                if table_name not in self._tables:
+                    raise ConnectorException(f"Table '{table_name}' not available", connector=self)
 
-        for table_name, table_resources in resources.groupby("table"):
-            if table_name not in self._tables:
-                raise ConnectorException(f"Table '{table_name}' not available", connector=self)
+                table = self.get(table_name)
+                if start is None and end is None:
+                    table_data = table.select_last(table_resources)
+                else:
+                    table_data = table.select(table_resources, start, end)
 
-            table_columns = [r.column if "column" in r else r.id for r in table_resources]
-            table = self.get(table_name)
-            if start is None and end is None:
-                table_data = table.select_last(table_columns)
-            else:
-                table_data = table.select(table_columns, start, end)
-                if self.resolution is not None:
-                    try:
-                        table_data = resample(table_data, self.resolution)
-
-                    except TypeError as e:
-                        self._logger.exception(str(e))
-
-            for table_resource in table_resources:
-                table_resource_column = table_resource.id if "column" not in table_resource else table_resource.column
-                data[table_resource.uuid] = table_data.loc[:, table_resource_column]
+                data = data.merge(table_data, how="outer", left_index=True, right_index=True)
+        except DatabaseError as e:
+            # TODO: Differentiate between syntax- and connection failures.
+            raise ConnectionException(repr(e), connector=self)
         return data
 
+    # noinspection PyTypeChecker
     def write(self, data: pd.DataFrame) -> None:
-        for table_name, table_resources in self.resources.groupby("table"):
-            if table_name not in self._tables:
-                raise ConnectorException(f"Table '{table_name}' not available", connector=self)
+        try:
+            for table_name, table_resources in self.resources.groupby("table"):
+                if table_name not in self._tables:
+                    raise ConnectorException(f"Table '{table_name}' not available", connector=self)
+                table = self.get(table_name)
+                table.insert(table_resources, data)
 
-            table_data = data.loc[:, [r.uuid for r in table_resources if r.uuid in data.columns]]
-            if table_data.empty:
-                continue
-            table_columns = {r.uuid: r.column if "column" in r else r.id for r in table_resources}
-
-            table = self.get(table_name)
-            table.insert(table_data.rename(columns=table_columns))
+        except DatabaseError as e:
+            raise ConnectionException(repr(e), connector=self)
 
     def is_connected(self) -> bool:
         if self._connection is not None:

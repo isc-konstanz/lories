@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 loris.core.resource
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -19,8 +19,8 @@ from loris.util import parse_id, parse_name
 
 
 class Resource:
-    _uuid: str
     _id: str
+    _key: str
     _name: str
 
     _type: Optional[Type]
@@ -30,23 +30,23 @@ class Resource:
     # noinspection PyShadowingBuiltins
     def __init__(
         self,
-        uuid: str = None,
         id: str = None,
+        key: str = None,
         name: Optional[str] = None,
         type: Optional[str | Type] = None,
         **configs: Any,
     ) -> None:
         self._logger = logging.getLogger(__name__)
 
-        if id is None:
-            raise ConfigurationException(f"Invalid configuration, missing specified {builtins.type(self).__name__} ID")
-        self._id = parse_id(id)
-        self._uuid = uuid if uuid is not None else self._id
-        if self._id != id:
-            self._logger.warning(f"{builtins.type(self).__name__} ID contains invalid characters: {id}")
+        if key is None:
+            raise ConfigurationException(f"Invalid configuration, missing specified {builtins.type(self).__name__} Key")
+        self._key = parse_id(key)
+        self._id = id if id is not None else self._key
+        if self._key != key:
+            self._logger.warning(f"{builtins.type(self).__name__} Key contains invalid characters: {key}")
 
         if name is None:
-            name = parse_name(self.id)
+            name = parse_name(self.key)
         self._name = name
 
         if isinstance(type, str):
@@ -65,28 +65,28 @@ class Resource:
             return configs[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
 
-    def _get(self, attr: str) -> Any:
-        return self.__configs[attr]
+    def get(self, attr: str, default: Optional[Any] = None) -> Any:
+        return self.__configs.get(attr, default)
 
     def _get_attrs(self) -> List[str]:
-        return ["uuid", "id", "name", "type", *self.__configs.keys()]
+        return ["id", "key", "name", "type", *self.__configs.keys()]
 
     def _get_vars(self) -> Dict[str, Any]:
-        return OrderedDict(uuid=self.uuid, id=self.id, name=self.name, type=self.type, **self.__configs)
+        return OrderedDict(id=self.id, key=self.key, name=self.name, type=self.type, **self.__configs)
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.uuid})"
+        return f"{type(self).__name__}({self.id})"
 
     def __str__(self) -> str:
         return f"{type(self).__name__}:\n\t" + "\n\t".join(f"{k}={v}" for k, v in self._get_vars().items())
 
     @property
-    def uuid(self) -> str:
-        return self._uuid
-
-    @property
     def id(self) -> str:
         return self._id
+
+    @property
+    def key(self) -> str:
+        return self._key
 
     @property
     def name(self) -> str:

@@ -119,27 +119,27 @@ class Configurations(MutableMapping[str, Any]):
     def __setitem__(self, key: str, value: Any) -> None:
         self.set(key, value)
 
-    def set(self, key: str, value: Any) -> None:
+    def set(self, key: str, value: Any, replace: bool = True) -> None:
+        if key in self.__configs and not replace:
+            return
         self.__configs[key] = value
 
     def __getitem__(self, key: str) -> Any:
         return self.__configs[key]
 
     def get(self, key: str, default: Any = None) -> Any:
-        if default is None:
-            return self.__configs.get(key)
         return self.__configs.get(key, default)
 
-    def get_bool(self, key, default: bool = None) -> bool:
+    def get_bool(self, key: str, default: bool = None) -> bool:
         return to_bool(self.get(key, default))
 
-    def get_int(self, key, default: int = None) -> int:
+    def get_int(self, key: str, default: int = None) -> int:
         return to_int(self.get(key, default))
 
-    def get_float(self, key, default: float = None) -> float:
+    def get_float(self, key: str, default: float = None) -> float:
         return to_float(self.get(key, default))
 
-    def get_date(self, key, default: dt.datetime | pd.Timestamp = None) -> pd.Timestamp:
+    def get_date(self, key: str, default: dt.datetime | pd.Timestamp = None) -> pd.Timestamp:
         return to_date(self.get(key, default))
 
     def __iter__(self):
