@@ -154,9 +154,11 @@ class Channel(Resource):
         channel.set(self._timestamp, self._value, self._state)
         return channel
 
+    # noinspection PyShadowingBuiltins
     def has_logger(self, *ids: Optional[str]) -> bool:
         return any(self.logger.id == id for id in ids) if len(ids) > 0 else self.logger.id is not None
 
+    # noinspection PyShadowingBuiltins
     def has_connector(self, id: Optional[str] = None) -> bool:
         return self.connector.id == id if id is not None else self.connector.id is not None
 
