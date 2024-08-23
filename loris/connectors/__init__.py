@@ -22,10 +22,11 @@ from .context import (  # noqa: F401
 
 from .access import ConnectorAccess  # noqa: F401
 
-from .csv import CsvConnector
+from .rnd import Randomizer  # noqa: F401
+from .csv import CsvConnector  # noqa: F401
 
 try:
-    from .mysql import MySqlConnector
+    from .mysql import MySqlConnector  # noqa: F401
 
 except ImportError:
     pass
