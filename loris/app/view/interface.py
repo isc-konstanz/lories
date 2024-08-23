@@ -13,8 +13,8 @@ from typing import Optional
 
 # import logging
 import dash
-from dash import Dash
-from dash_bootstrap_components import Container, themes
+from dash import Dash, html
+from dash_bootstrap_components import themes
 
 from loris import Configurations
 from loris.app import Application
@@ -63,10 +63,9 @@ class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
         super().configure(configs)
         self._do_create_view()
 
-    def create_view_layout(self) -> Container:
-        return Container(
+    def create_view_layout(self) -> html.Div:
+        return html.Div(
             id=f"{self.context.id}",
-            fluid=True,
             children=[
                 self.view.header.navbar,
                 dash.page_container
