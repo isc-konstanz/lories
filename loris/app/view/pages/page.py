@@ -18,7 +18,7 @@ import dash
 from dash.development.base_component import Component as DashComponent
 from dash_bootstrap_components import Container
 
-from loris.app import ServerException
+from loris.app import InterfaceException
 
 
 class PageMeta(ABCMeta):
@@ -135,7 +135,7 @@ class Page(ABC, metaclass=PageMeta):
         return re.sub("[^\\w]+", "-", id).lower()
 
 
-class PageException(ServerException):
+class PageException(InterfaceException):
     """
     Raise if an error occurred accessing a page.
 

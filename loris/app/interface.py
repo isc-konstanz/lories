@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.app.server
-~~~~~~~~~~~~~~~~
+loris.app.interface
+~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -15,9 +15,9 @@ from loris.core import Context, ResourceException, ResourceUnavailableException
 from loris.core.configs import ConfigurationException, Configurations, Configurator, ConfiguratorMeta
 
 
-class ServerMeta(ConfiguratorMeta):
+class InterfaceMeta(ConfiguratorMeta):
     # noinspection PyProtectedMember
-    def __call__(cls, context: Context, configs: Configurations) -> Optional[Server]:
+    def __call__(cls, context: Context, configs: Configurations) -> Optional[Interface]:
         # try:
         _cls = cls._get_class(configs)
         if cls != _cls:
@@ -29,13 +29,12 @@ class ServerMeta(ConfiguratorMeta):
         #     pass
 
     # noinspection PyMethodMayBeStatic, PyUnusedLocal
-    def _get_class(self, configs: Configurations) -> Type[Server]:
-        from loris.app.view import ViewServer
-        return ViewServer
+    def _get_class(self, configs: Configurations) -> Type[Interface]:
+        from loris.app.view import ViewInterface
+        return ViewInterface
 
 
-class Server(Configurator, metaclass=ServerMeta):
-
+class Interface(Configurator, metaclass=InterfaceMeta):
     def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
         from loris.app import Application
         if context is None or not isinstance(context, Application):
@@ -49,15 +48,15 @@ class Server(Configurator, metaclass=ServerMeta):
         pass
 
 
-class ServerException(ResourceException):
+class InterfaceException(ResourceException):
     """
-    Raise if an error occurred accessing the server.
+    Raise if an error occurred accessing the interface.
 
     """
 
 
-class ServerUnavailableException(ResourceUnavailableException, ServerException):
+class InterfaceUnavailableException(ResourceUnavailableException, InterfaceException):
     """
-    Raise if a configured server access can not be found.
+    Raise if a configured interface access can not be found.
 
     """

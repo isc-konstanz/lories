@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.app.view.server
-~~~~~~~~~~~~~~~~~~~~~
+loris.app.view.interface
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -18,13 +18,13 @@ from dash_bootstrap_components import Container, themes
 
 from loris import Configurations
 from loris.app import Application
-from loris.app.server import Server, ServerMeta
+from loris.app.interface import Interface, InterfaceMeta
 from loris.app.view.pages import PageFooter, PageHeader, View
 
 
-class ViewServerMeta(ServerMeta):
+class ViewInterfaceMeta(InterfaceMeta):
     # noinspection PyProtectedMember
-    def __call__(cls, context: Application, configs: Configurations) -> Server:
+    def __call__(cls, context: Application, configs: Configurations) -> Interface:
         global _instance
         if _instance is None:
             _instance = super().__call__(context, configs)
@@ -32,8 +32,7 @@ class ViewServerMeta(ServerMeta):
 
 
 # noinspection PyProtectedMember
-class ViewServer(Server, Dash, metaclass=ViewServerMeta):
-
+class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
     def __init__(self, context: Application, configs: Configurations) -> None:
         view_path = resources.files("loris.app.view")
         super().__init__(
@@ -85,4 +84,4 @@ class ViewServer(Server, Dash, metaclass=ViewServerMeta):
         self.run()  # debug=self._logger.isEnabledFor(logging.DEBUG))
 
 
-_instance: Optional[ViewServer] = None
+_instance: Optional[ViewInterface] = None

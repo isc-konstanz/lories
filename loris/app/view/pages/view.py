@@ -113,6 +113,12 @@ class View(ComponentGroup):
             self._new_page(self, component)
 
     def _new_page(self, view: ComponentGroup, component: Component) -> Optional[ComponentPage]:
+        if not component.is_enabled():
+            self._logger.debug(
+                f"Skipping page creation for disabled {type(component).__name__} '{component.id}'"
+            )
+            return
+
         _type = type(component)
         if not registry.has_page(_type):
             return
@@ -151,7 +157,8 @@ class View(ComponentGroup):
     def _do_register(self) -> None:
         groups = self.groups.values()
         for page in [p for p in self if p not in groups]:
-            page._do_register()
+            if page.is_active():
+                page._do_register()
         for group in groups:
             group._do_register()
         return super()._do_register()

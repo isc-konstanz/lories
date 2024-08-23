@@ -16,7 +16,7 @@ from typing import Collection, Optional, Type
 import pandas as pd
 import pytz as tz
 from loris import Channel, Settings, System
-from loris.app import Server, ServerUnavailableException
+from loris.app import Interface, InterfaceUnavailableException
 from loris.components import ComponentContext
 from loris.connectors import ConnectorContext
 from loris.data.manager import DataManager
@@ -29,7 +29,7 @@ class Application(DataManager, Thread):
     SECTION: str = "application"
     SECTIONS: Collection[str] = [ComponentContext.SECTION, ConnectorContext.SECTION]
 
-    _server: Optional[Server] = None
+    _interface: Optional[Interface] = None
 
     _interval: int
     __interrupt: Event = Event()
@@ -42,9 +42,9 @@ class Application(DataManager, Thread):
 
     def __init__(self, settings: Settings, **kwargs) -> None:
         super().__init__(settings, name=settings["name"], **kwargs)
-        if not settings.has_section("server"):
-            settings._add_section("server", {"enabled": False})
-        self._server = Server(self, settings.get_section("server"))
+        if not settings.has_section("interface"):
+            settings._add_section("interface", {"enabled": False})
+        self._interface = Interface(self, settings.get_section("interface"))
         self.__interrupt = Event()
         self.__interrupt.set()
         self._logger = logging.getLogger(self.key)
@@ -60,8 +60,8 @@ class Application(DataManager, Thread):
 
     def configure(self, settings: Settings) -> None:
         super().configure(settings)
-        if self._server is not None:
-            self._server._do_configure()
+        if self._interface is not None:
+            self._interface._do_configure()
         self._interval = settings.get_int("interval", default=1)
 
     def setup(self, factory: Type[System]) -> None:
@@ -86,10 +86,10 @@ class Application(DataManager, Thread):
         self._do_configure()
 
     @property
-    def server(self) -> Server:
-        if self._server is None:
-            raise ServerUnavailableException(f"Application '{self.name}' has no server configured")
-        return self._server
+    def server(self) -> Interface:
+        if self._interface is None:
+            raise InterfaceUnavailableException(f"Application '{self.name}' has no server configured")
+        return self._interface
 
     # noinspection PyTypeChecker
     @property
@@ -101,8 +101,8 @@ class Application(DataManager, Thread):
         self.__interrupt.clear()
         super().start()
 
-        if self._server is not None and self._server.is_enabled():
-            self._server.start()
+        if self._interface is not None and self._interface.is_enabled():
+            self._interface.start()
 
     def wait(self, **kwargs) -> None:
         self.join(**kwargs)

@@ -22,7 +22,7 @@ class SystemPage(ComponentGroup, ComponentPage[System]):
 
     @property
     def path(self) -> str:
-        return f"/{self._component.TYPE}/{self._encode_id(self._component.id)}"
+        return f"/{self._component.TYPE}/{self._encode_id(self._component.key)}"
 
     def _create_content_layout(self) -> html.Div:
         div = super()._create_content_layout()

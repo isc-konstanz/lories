@@ -15,4 +15,4 @@ from .pages import (  # noqa: F401
     ComponentGroup,
 )
 
-from .server import ViewServer  # noqa: F401
+from .interface import ViewInterface  # noqa: F401

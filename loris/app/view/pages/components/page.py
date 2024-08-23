@@ -26,7 +26,7 @@ class ComponentPage(Page, Generic[C]):
 
     def __init__(self, component: C, *args, **kwargs) -> None:
         super().__init__(
-            id=component.uuid,
+            id=component.id,
             name=component.name,
             *args, **kwargs
         )
@@ -47,10 +47,13 @@ class ComponentPage(Page, Generic[C]):
     @property
     def path(self) -> str:
         if isinstance(self._component.context, Component):
-            return (f"/{self._encode_id(self._component.context.id)}"
-                    f"/{self._encode_id(self._component.id)}")
+            return (f"/{self._encode_id(self._component.context.key)}"
+                    f"/{self._encode_id(self._component.key)}")
         else:
-            return f"/{self._encode_id(self._component.id)}"
+            return f"/{self._encode_id(self._component.key)}"
+
+    def is_active(self) -> bool:
+        return self._component.is_active()
 
     def create_layout(self) -> PageLayout:
         return PageLayout(
