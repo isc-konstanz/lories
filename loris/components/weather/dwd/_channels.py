@@ -46,23 +46,23 @@ CHANNEL_TYPES = {
 }
 
 
-def _parse_name(channel_id: str) -> str:
-    return channel_id.replace("_", " ").title() if channel_id not in CHANNEL_NAMES else CHANNEL_NAMES[channel_id]
+def _parse_name(key: str) -> str:
+    return key.replace("_", " ").title() if key not in CHANNEL_NAMES else CHANNEL_NAMES[key]
 
 
-def _parse_address(channel_id: str) -> str:
-    return channel_id if channel_id not in CHANNEL_ADDRESS_ALIAS else CHANNEL_ADDRESS_ALIAS[channel_id]
+def _parse_address(key: str) -> str:
+    return key if key not in CHANNEL_ADDRESS_ALIAS else CHANNEL_ADDRESS_ALIAS[key]
 
 
-def _parse_type(channel_id: str) -> type:
-    return CHANNEL_TYPE_DEFAULT if channel_id not in CHANNEL_TYPES else CHANNEL_TYPES[channel_id]
+def _parse_type(key: str) -> type:
+    return CHANNEL_TYPE_DEFAULT if key not in CHANNEL_TYPES else CHANNEL_TYPES[key]
 
 
-def _parse_channel(channel_id: str, **channel: Any) -> Dict[str, Any]:
-    channel["id"] = channel_id
-    channel["name"] = _parse_name(channel_id)
-    channel["address"] = _parse_address(channel_id)
-    channel["type"] = _parse_type(channel_id)
+def _parse_channel(key: str, **channel: Any) -> Dict[str, Any]:
+    channel["key"] = key
+    channel["name"] = _parse_name(key)
+    channel["address"] = _parse_address(key)
+    channel["type"] = _parse_type(key)
     if channel["type"] == str:  # noqa: E721
         channel["length"] = 32
     return channel
@@ -70,6 +70,6 @@ def _parse_channel(channel_id: str, **channel: Any) -> Dict[str, Any]:
 
 def get_channels(**channel: Any) -> Collection[Dict[str, Any]]:
     channels = []
-    for channel_id in CHANNEL_IDS:
-        channels.append(_parse_channel(channel_id, **channel))
+    for channel_key in CHANNEL_IDS:
+        channels.append(_parse_channel(channel_key, **channel))
     return channels

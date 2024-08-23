@@ -37,7 +37,7 @@ class RegistratorContext(Context[R]):
         self.__map = OrderedDict[str, R]()
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({[c.uuid for c in self.__map.values()]})"
+        return f"{type(self).__name__}({[c.id for c in self.__map.values()]})"
 
     def __str__(self) -> str:
         return f"{type(self).__name__}:\n\t" + "\n\t".join([f"{i} = {repr(c)}" for i, c in self.__map.items()])
@@ -191,18 +191,18 @@ class RegistratorContext(Context[R]):
 
     def _add(self, *__values: R) -> None:
         for __value in __values:
-            self._set(__value.uuid, __value)
+            self._set(__value.id, __value)
 
     # noinspection PyProtectedMember, SpellCheckingInspection
     def _new(self, context: Context, configs: Configurations) -> R:
         registrator_type = self._get_type()
         registration_name = "_".join(os.path.splitext(configs.name)[:-1])
         if registrator_type.SECTION not in configs.sections:
-            configs._add_section(registrator_type.SECTION, {"id": registration_name})
+            configs._add_section(registrator_type.SECTION, {"key": registration_name})
         registrator_section = configs[registrator_type.SECTION]
-        if "id" not in configs[registrator_type.SECTION]:
-            registrator_section["id"] = registration_name
-            registrator_section.move_to_top("id")
+        if "key" not in configs[registrator_type.SECTION]:
+            registrator_section["key"] = registration_name
+            registrator_section.move_to_top("key")
 
         registration_type = re.split(r"[^a-zA-Z0-9\s]", registration_name)[0]
         if "type" in registrator_section:
@@ -226,8 +226,8 @@ class RegistratorContext(Context[R]):
 
     def _update(self, context: Context, configs: Configurations) -> R:
         value = self._new(context, configs)
-        if value.uuid in self:
-            self._get(value.uuid).configs.update(configs)
+        if value.id in self:
+            self._get(value.id).configs.update(configs)
         else:
             self._add(value)
         return value

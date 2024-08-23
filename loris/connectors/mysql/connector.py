@@ -102,7 +102,8 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
                 table_schema = table_schemas[table.name]
                 if table.engine is not None and table.engine != table_schema["engine"]:
                     raise ConnectorException(
-                        f"Mismatching table engine for configured table '{table_name}': {table_schema['engine']}"
+                        f"Mismatching table engine for configured table '{table_name}': {table_schema['engine']}",
+                        connector=self,
                     )
                 column_schemas = self._select_column_schemas(table.name)
                 for column in table:
@@ -187,7 +188,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
                 data = data.merge(table_data, how="outer", left_index=True, right_index=True)
         except DatabaseError as e:
             # TODO: Differentiate between syntax- and connection failures.
-            raise ConnectionException(e, connector=self)
+            raise ConnectionException(repr(e), connector=self)
         return data
 
     # noinspection PyTypeChecker
@@ -200,7 +201,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
                 table.insert(table_resources, data)
 
         except DatabaseError as e:
-            raise ConnectionException(e, connector=self)
+            raise ConnectionException(repr(e), connector=self)
 
     def is_connected(self) -> bool:
         if self._connection is not None:

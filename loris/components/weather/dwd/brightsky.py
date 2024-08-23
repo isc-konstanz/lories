@@ -44,20 +44,20 @@ class Brightsky(WeatherConnector):
 
         if self.forecast.is_enabled():
             self.forecast.data.add(
-                id="timestamp_creation",
+                key="timestamp_creation",
                 name="Creation Timestamp",
-                connector=self.uuid,
+                connector=self.id,
                 source="forecast",
                 address="source_first_record",
                 type=pd.Timestamp,
                 primary=True,
                 nullable=False,
             )
-            for channel in get_channels(connector=self.uuid, source="forecast"):
+            for channel in get_channels(connector=self.id, source="forecast"):
                 self.forecast.data.add(**channel)
 
-        for channel in get_channels(connector=self.uuid, source="current, historical"):
-            if channel["id"] not in [Weather.PRECIPITATION_PROB]:
+        for channel in get_channels(connector=self.id, source="current, historical"):
+            if channel["key"] not in [Weather.PRECIPITATION_PROB]:
                 self.data.add(**channel)
 
     def has_forecast(self) -> bool:
@@ -84,13 +84,13 @@ class Brightsky(WeatherConnector):
                           [r.address for r in source_resources])
             ]
             if source_data.empty:
-                self._logger.warning(f"Unable to read {self._uuid} channels: {[r.uuid for r in source_resources]}")
+                self._logger.warning(f"Unable to read {self._id} channels: {[r.id for r in source_resources]}")
                 continue
 
             source_start = start if start is not None else min(source_data["source_first_record"].unique())
             source_end = end if end is not None else max(source_data["source_last_record"].unique())
 
-            source_data = source_data.rename(columns={r.address: r.uuid for r in source_resources})
+            source_data = source_data.rename(columns={r.address: r.id for r in source_resources})
 
             if source == "forecast":
                 source_end = source_start + pd.Timedelta(days=self.horizon)
@@ -101,7 +101,7 @@ class Brightsky(WeatherConnector):
 
             data.append(
                 source_data.loc[
-                    source_start:source_end, [r.uuid for r in source_resources if r.uuid in source_data.columns]
+                    source_start:source_end, [r.id for r in source_resources if r.id in source_data.columns]
                 ]
             )
         return pd.concat(data, axis="index")

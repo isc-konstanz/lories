@@ -51,15 +51,15 @@ class Activator(Registrator, metaclass=ActivatorMeta):
             configs._add_section(self.SECTION, {"type": self.TYPE})
         section = configs.get_section(self.SECTION)
         if "type" not in section:
-            section["id"] = self.TYPE
+            section["key"] = self.TYPE
         if "name" in configs:
             section["name"] = configs.pop("name")
-        if "id" in configs:
-            section["id"] = configs.pop("id")
-        if "id" not in section and "name" in section:
-            section["id"] = parse_id(section["name"])
-        if "id" in section and "name" not in section:
-            section["name"] = parse_name(section["id"])
+        if "key" in configs:
+            section["key"] = configs.pop("key")
+        if "key" not in section and "name" in section:
+            section["key"] = parse_id(section["name"])
+        if "key" in section and "name" not in section:
+            section["name"] = parse_name(section["key"])
         super().__init__(context, configs, *args, **kwargs)
         self._name = configs[self.SECTION].get("name")
 
@@ -77,11 +77,11 @@ class Activator(Registrator, metaclass=ActivatorMeta):
             vars = self._get_vars()
         values = OrderedDict()
         try:
-            uuid = vars.pop("uuid", self.uuid)
-            id = vars.pop("id", self.id)
-            if uuid != id:
-                values["uuid"] = uuid
-            values["id"] = id
+            id = vars.pop("key", self.id)
+            key = vars.pop("key", self.key)
+            if id != key:
+                values["key"] = id
+            values["key"] = key
             values["name"] = vars.pop('name', self.name)
         except (ResourceException, AttributeError):
             # Abstract properties are not yet instanced
@@ -118,7 +118,7 @@ class Activator(Registrator, metaclass=ActivatorMeta):
         if not self.is_configured():
             raise ConfigurationException(f"Trying to activate unconfigured {type(self).__name__}: {self.name}")
         if self.is_active():
-            self._logger.warning(f"{type(self).__name__} '{self.uuid}' already active")
+            self._logger.warning(f"{type(self).__name__} '{self.id}' already active")
             return
 
         self.__activate()

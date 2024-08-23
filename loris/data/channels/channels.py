@@ -24,13 +24,13 @@ class Channels(Resources[Channel]):
         for channel in self:
             if pd.isna(channel.timestamp):
                 continue
-            channel_uid = channel.id if not unique else channel.uuid
+            channel_uid = channel.key if not unique else channel.id
             channel_data = channel.to_series(state=states)
             channel_data.name = channel_uid
 
             if channel_data.index.tzinfo is None:
                 self._logger.warning(
-                    f'UTC will be presumed for channel "{channel.uuid}" timestamps, '
+                    f'UTC will be presumed for channel "{channel.id}" timestamps, '
                     f"as tz-naive with tz-aware DatetimeIndex cannot be joined: {channel_data}"
                 )
                 channel_data.index = channel_data.index.tz_localize(tz.UTC)

@@ -46,8 +46,7 @@ class WeatherConnector(Weather, Connector, metaclass=WeatherConnectorMeta):
 
     def _load_forecast(self, configs: Configurations) -> None:
         if self.has_forecast():
-            if "id" not in configs:
-                configs["id"] = "forecast"
+            configs.set("key", "forecast", replace=False)
             self._forecast = WeatherForecast(self, configs)
 
     def activate(self) -> None:

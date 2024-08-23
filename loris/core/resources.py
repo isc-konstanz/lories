@@ -26,10 +26,10 @@ class Resources(Generic[R], Collection[R]):
         self._resources = [*resources]
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({[c.uuid for c in self._resources]})"
+        return f"{type(self).__name__}({[c.id for c in self._resources]})"
 
     def __str__(self) -> str:
-        return f"{type(self).__name__}:\n\t" + "\n\t".join([f"{c.uuid} = {repr(c)}" for c in self._resources])
+        return f"{type(self).__name__}:\n\t" + "\n\t".join([f"{c.id} = {repr(c)}" for c in self._resources])
 
     def __contains__(self, __x: object) -> bool:
         return __x in self._resources
@@ -49,12 +49,12 @@ class Resources(Generic[R], Collection[R]):
     def copy(self):
         return type(self)([resource.copy() for resource in self._resources])
 
-    def apply(self, apply: Callable[[Resource], None]) -> None:
+    def apply(self, apply: Callable[[R], None]) -> None:
         for resource in self:
             apply(resource)
 
     # noinspection PyShadowingBuiltins
-    def filter(self, filter: Callable[[Resource], bool]):
+    def filter(self, filter: Callable[[R], bool]):
         return type(self)([resource for resource in self._resources if filter(resource)])
 
     # noinspection SpellCheckingInspection

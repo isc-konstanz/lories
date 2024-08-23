@@ -30,15 +30,15 @@ class Channel(Resource):
     # noinspection PyShadowingBuiltins
     def __init__(
         self,
-        uuid: str = None,
         id: str = None,
+        key: str = None,
         name: Optional[str] = None,
         **configs: Any,
     ) -> None:
         connector = self.__parse_connector(configs.pop("connector", {}))
         logger = self.__parse_connector(configs.pop("logger", {}))
 
-        super().__init__(uuid, id, name, **configs)
+        super().__init__(id, key, name, **configs)
         self.connector = connector
         self.logger = logger
 
@@ -71,7 +71,7 @@ class Channel(Resource):
 
     # noinspection PyShadowingBuiltins
     def __repr__(self) -> str:
-        vars = OrderedDict(id=self.id)
+        vars = OrderedDict(key=self.key)
         if self.is_valid():
             vars["value"] = str(self.value)
         else:
@@ -147,18 +147,18 @@ class Channel(Resource):
 
     # noinspection PyProtectedMember
     def from_logger(self) -> Channel:
-        configs = {k: v for k, v in self.logger._get_vars().items() if k not in ["uuid", "timestamp"]}
+        configs = {k: v for k, v in self.logger._get_vars().items() if k not in ["id", "timestamp"]}
         configs["logger"] = deepcopy(self.logger)
         configs["connector"] = deepcopy(self.connector)
-        channel = Channel(uuid=self._uuid, id=self._id, name=self.name, **configs)
+        channel = Channel(id=self._id, key=self._key, name=self.name, **configs)
         channel.set(self._timestamp, self._value, self._state)
         return channel
 
-    def has_logger(self, *uuids: Optional[str]) -> bool:
-        return any(self.logger.uuid == uuid for uuid in uuids) if len(uuids) > 0 else self.logger.uuid is not None
+    def has_logger(self, *ids: Optional[str]) -> bool:
+        return any(self.logger.id == id for id in ids) if len(ids) > 0 else self.logger.id is not None
 
-    def has_connector(self, uuid: Optional[str] = None) -> bool:
-        return self.connector.uuid == uuid if uuid is not None else self.connector.uuid is not None
+    def has_connector(self, id: Optional[str] = None) -> bool:
+        return self.connector.id == id if id is not None else self.connector.id is not None
 
     def to_series(self, state: bool = False) -> pd.Series:
         if isinstance(self.value, pd.Series):
@@ -168,4 +168,4 @@ class Channel(Resource):
                 data = self.state
             else:
                 data = self.value
-            return pd.Series(index=[self.timestamp], data=[data], name=self.id)
+            return pd.Series(index=[self.timestamp], data=[data], name=self.key)

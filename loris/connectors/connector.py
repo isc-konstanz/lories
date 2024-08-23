@@ -48,7 +48,7 @@ class Connector(Registrator, metaclass=ConnectorMeta):
 
     def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
         if context is None:
-            raise ConnectorException(f"Invalid connector context: {context}")
+            raise ConnectorException(f"Invalid connector context: {context}", connector=self)
         super().__init__(context, configs, *args, **kwargs)
         self.__resources = Resources()
 
@@ -74,11 +74,11 @@ class Connector(Registrator, metaclass=ConnectorMeta):
             vars = self._get_vars()
         values = OrderedDict()
         try:
-            uuid = vars.pop("uuid", self.uuid)
             id = vars.pop("id", self.id)
-            if uuid != id:
-                values["uuid"] = uuid
-            values["id"] = id
+            key = vars.pop("key", self.key)
+            if id != key:
+                values["id"] = id
+            values["key"] = key
         except (ResourceException, AttributeError):
             # Abstract properties are not yet instanced
             pass
@@ -108,7 +108,7 @@ class Connector(Registrator, metaclass=ConnectorMeta):
     def set_channels(self, state: ChannelState) -> None:
         # Set only channel states for channels, that actively are getting read or written by this connector.
         # Local channels may be logging channels as well, which need to be skipped.
-        for channel in self.channels.filter(lambda c: c.has_connector(self.uuid)):
+        for channel in self.channels.filter(lambda c: c.has_connector(self.id)):
             channel.state = state
 
     def _is_disconnected(self) -> bool:
@@ -136,11 +136,11 @@ class Connector(Registrator, metaclass=ConnectorMeta):
     @wraps(connect, updated=())
     def _do_connect(self, resources: Resources) -> None:
         if not self.is_enabled():
-            raise ConfigurationException(f"Trying to connect disabled {type(self).__name__}: {self.uuid}")
+            raise ConfigurationException(f"Trying to connect disabled {type(self).__name__}: {self.id}")
         if not self.is_configured():
-            raise ConfigurationException(f"Trying to connect unconfigured {type(self).__name__}: {self.uuid}")
+            raise ConfigurationException(f"Trying to connect unconfigured {type(self).__name__}: {self.id}")
         if self._is_connected():
-            self._logger.warning(f"{type(self).__name__} '{self.uuid}' already connected")
+            self._logger.warning(f"{type(self).__name__} '{self.id}' already connected")
             return
 
         self.__connect(resources)

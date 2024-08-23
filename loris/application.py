@@ -40,7 +40,7 @@ class Application(DataManager, Thread):
         super().__init__(settings, name=settings["name"], **kwargs)
         self.__interrupt = Event()
         self.__interrupt.set()
-        self._logger = logging.getLogger(self.id)
+        self._logger = logging.getLogger(self.key)
 
         signal.signal(signal.SIGINT, self.interrupt)
         signal.signal(signal.SIGTERM, self.terminate)
@@ -54,8 +54,6 @@ class Application(DataManager, Thread):
     def configure(self, settings: Settings) -> None:
         super().configure(settings)
         self._interval = settings.get_int("interval", default=1)
-        if self._server is not None and self._server.is_enabled():
-            self._server._do_configure()
 
     # noinspection PyProtectedMember
     def setup(self, factory: Type[System]) -> None:
@@ -73,8 +71,8 @@ class Application(DataManager, Thread):
         else:
             systems.append(factory.load(self, **system_dirs, flat=systems_flat))
         for system in systems:
-            if system.id in self._components:
-                self._components.get(system.id).configs.update(system.configs)
+            if system.key in self._components:
+                self._components.get(system.key).configs.update(system.configs)
             else:
                 self._components._add(system)
         self._do_configure()
@@ -103,7 +101,7 @@ class Application(DataManager, Thread):
         super().deactivate()
         self.terminate()
 
-    # noinspection PyShadowingBuiltins
+    # noinspection PyShadowingBuiltins, PyProtectedMember
     def run(self, *args, **kwargs) -> None:
         self.read(*args, **kwargs)
         self._run(*args, **kwargs)
@@ -128,7 +126,7 @@ class Application(DataManager, Thread):
                 freq = channel.freq
                 if (freq is None
                         or not channel.has_connector()
-                        or not self.connectors.get(channel.connector.uuid).is_connected()):
+                        or not self.connectors.get(channel.connector.id).is_connected()):
                     return False
                 return pd.isna(channel.connector.timestamp) or timestamp >= _next(channel.connector.timestamp, freq)
 
@@ -153,7 +151,7 @@ class Application(DataManager, Thread):
                 system.run(*args, **kwargs)
 
             except Exception as e:
-                self._logger.warning(f"Error running system '{system.id}': ", repr(e))
+                self._logger.warning(f"Error running system '{system.key}': ", repr(e))
 
 
 # noinspection PyShadowingBuiltins

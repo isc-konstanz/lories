@@ -98,23 +98,23 @@ class DataManager(DataContext, Activator):
         for activator in activators:
             if not activator.is_enabled():
                 self._logger.debug(
-                    f"Skipping activating disabled {type(activator).__name__} '{activator.name}': {activator.uuid}"
+                    f"Skipping activating disabled {type(activator).__name__} '{activator.name}': {activator.id}"
                 )
                 continue
 
-            self._logger.info(f"Activating {type(activator).__name__} '{activator.name}': {activator.uuid}")
+            self._logger.info(f"Activating {type(activator).__name__} '{activator.name}': {activator.id}")
             activator._do_activate()
 
-            self._logger.debug(f"Activated {type(activator).__name__} '{activator.name}': {activator.uuid}")
+            self._logger.debug(f"Activated {type(activator).__name__} '{activator.name}': {activator.id}")
 
     def connect(self, *connectors: Connector) -> None:
         connect_futures = []
         for connector in connectors:
             if not connector.is_enabled():
-                self._logger.debug(f"Skipping connecting disabled {type(connector).__name__}: {connector.uuid}")
+                self._logger.debug(f"Skipping connecting disabled {type(connector).__name__}: {connector.id}")
                 continue
             if connector._is_connected():
-                self._logger.debug(f"Skipping already connected {type(connector).__name__}: {connector.uuid}")
+                self._logger.debug(f"Skipping already connected {type(connector).__name__}: {connector.id}")
                 continue
             connect_futures.append(self._connect(connector))
         for connect_future in futures.as_completed(connect_futures):
@@ -123,19 +123,19 @@ class DataManager(DataContext, Activator):
         #     connect_future.add_done_callback(self._connect_callback)
 
     def _connect(self, connector: Connector) -> Future:
-        self._logger.info(f"Connecting {type(connector).__name__}: {connector.uuid}")
-        connect_channels = self.channels.filter(lambda c: (c.has_connector(connector.uuid) or
-                                                           c.has_logger(connector.uuid)))
+        self._logger.info(f"Connecting {type(connector).__name__}: {connector.id}")
+        connect_channels = self.channels.filter(lambda c: (c.has_connector(connector.id) or
+                                                           c.has_logger(connector.id)))
 
         return self._executor.submit(ConnectTask(connector, connect_channels))
 
     def _connect_callback(self, future: Future) -> None:
         try:
             connector = future.result().connector
-            self._logger.debug(f"Connected {type(connector).__name__}: {connector.uuid}")
+            self._logger.debug(f"Connected {type(connector).__name__}: {connector.id}")
 
         except ConnectorException as e:
-            self._logger.warning(f"Error opening connector '{e.connector.uuid}': {repr(e)}")
+            self._logger.warning(f"Error opening connector '{e.connector.id}': {repr(e)}")
             if self._logger.isEnabledFor(logging.DEBUG):
                 self._logger.exception(e)
 
@@ -143,7 +143,7 @@ class DataManager(DataContext, Activator):
         connect_futures = []
         for connector in connectors:
             if not connector.is_enabled():
-                self._logger.debug(f"Skipping reconnecting disabled {type(connector).__name__}: {connector.uuid}")
+                self._logger.debug(f"Skipping reconnecting disabled {type(connector).__name__}: {connector.id}")
                 continue
             if not connector._is_connected() and connector._connected:
                 # Connection aborted and not yet disconnected properly
@@ -158,20 +158,20 @@ class DataManager(DataContext, Activator):
     def disconnect(self, *connectors: Connector) -> None:
         for connector in reversed(connectors):
             if not connector._is_connected():
-                self._logger.debug(f"Skipping disconnecting not connected {type(connector).__name__}: {connector.uuid}")
+                self._logger.debug(f"Skipping disconnecting not connected {type(connector).__name__}: {connector.id}")
                 continue
             self._disconnect(connector)
 
     def _disconnect(self, connector: Connector) -> None:
         try:
-            self._logger.info(f"Disconnecting {type(connector).__name__}: {connector.uuid}")
+            self._logger.info(f"Disconnecting {type(connector).__name__}: {connector.id}")
             connector.set_channels(ChannelState.DISCONNECTING)
             connector._do_disconnect()
 
-            self._logger.debug(f"Disconnected {type(connector).__name__}: {connector.uuid}")
+            self._logger.debug(f"Disconnected {type(connector).__name__}: {connector.id}")
 
         except Exception as e:
-            self._logger.warning(f"Error closing connector '{connector.uuid}': {repr(e)}")
+            self._logger.warning(f"Error closing connector '{connector.id}': {repr(e)}")
             if self._logger.isEnabledFor(logging.DEBUG):
                 self._logger.exception(e)
         finally:
@@ -188,13 +188,13 @@ class DataManager(DataContext, Activator):
             if not activator.is_active():
                 continue
             try:
-                self._logger.info(f"Deactivating {type(activator).__name__} '{activator.name}': {activator.uuid}")
+                self._logger.info(f"Deactivating {type(activator).__name__} '{activator.name}': {activator.id}")
                 activator._do_deactivate()
 
-                self._logger.debug(f"Deactivated {type(activator).__name__} '{activator.name}': {activator.uuid}")
+                self._logger.debug(f"Deactivated {type(activator).__name__} '{activator.name}': {activator.id}")
 
             except Exception as e:
-                self._logger.warning(f"Error deactivating {type(activator).__name__} '{activator.uuid}': {e}")
+                self._logger.warning(f"Error deactivating {type(activator).__name__} '{activator.id}': {e}")
                 self._logger.exception(e)
 
     @property
@@ -208,6 +208,7 @@ class DataManager(DataContext, Activator):
     def notify(self, channels: Optional[Channels] = None) -> None:
         pass
 
+    # noinspection PyShadowingBuiltins
     def read(
         self,
         channels: Optional[Channels] = None,
@@ -220,15 +221,15 @@ class DataManager(DataContext, Activator):
 
         read_tasks = {}
         read_futures = []
-        for uuid, connector in self.connectors.items():
+        for id, connector in self.connectors.items():
             if not connector._is_connected():
                 continue
 
-            read_channels = channels.filter(lambda c: c.has_connector(uuid))
+            read_channels = channels.filter(lambda c: c.has_connector(id))
             if len(read_channels) == 0:
                 continue
             read_task = ReadTask(connector, read_channels)
-            read_tasks[uuid] = read_task
+            read_tasks[id] = read_task
             read_futures.append(self._executor.submit(read_task, start=start, end=end))
 
         read_data = []
@@ -243,19 +244,20 @@ class DataManager(DataContext, Activator):
                 read_channels.apply(update_connector)
 
             except ConnectorException as e:
-                self._logger.warning(f"Error reading connector '{e.connector.uuid}': {e}")
+                self._logger.warning(f"Error reading connector '{e.connector.id}': {e}")
                 self._logger.exception(e)
 
                 def update_state(read_channel: Channel) -> None:
                     read_channel.state = ChannelState.UNKNOWN_ERROR
 
-                read_task = read_tasks[e.connector.uuid]
+                read_task = read_tasks[e.connector.id]
                 read_task.channels.apply(update_state)
 
         if len(read_data) > 0:
             return pd.concat(read_data, axis="columns")
         return pd.DataFrame()
 
+    # noinspection PyShadowingBuiltins
     def write(self, data: pd.DataFrame, channels: Optional[Channels] = None) -> None:
         time = pd.Timestamp.now(tz=tz.UTC)
         if channels is None:
@@ -263,22 +265,22 @@ class DataManager(DataContext, Activator):
 
         write_tasks = {}
         write_futures = []
-        for uuid, connector in self.connectors.items():
+        for id, connector in self.connectors.items():
             if not connector._is_connected():
                 continue
 
-            write_channels = channels.filter(lambda c: (c.has_connector(uuid) and c.id in data.columns))
+            write_channels = channels.filter(lambda c: (c.has_connector(id) and c.key in data.columns))
             if len(write_channels) == 0:
                 continue
             for write_channel in write_channels:
                 if len(data.index) > 1:
-                    write_channel.set(data.index[0], data.loc[:, write_channel.id])
+                    write_channel.set(data.index[0], data.loc[:, write_channel.key])
                 elif len(data.index) > 0:
                     timestamp = data.index[-1]
-                    write_channel.set(timestamp, data.loc[timestamp, write_channel.id])
+                    write_channel.set(timestamp, data.loc[timestamp, write_channel.key])
 
             write_task = WriteTask(connector, write_channels)
-            write_tasks[uuid] = write_task
+            write_tasks[id] = write_task
             write_futures.append(self._executor.submit(write_task))
 
         for write_future in futures.as_completed(write_futures):
@@ -292,23 +294,24 @@ class DataManager(DataContext, Activator):
                 write_task.channels.apply(update_connector)
 
             except ConnectorException as e:
-                self._logger.warning(f"Error writing connector '{e.connector.uuid}': {e}")
+                self._logger.warning(f"Error writing connector '{e.connector.id}': {repr(e)}")
                 self._logger.exception(e)
 
                 # noinspection PyShadowingNames
                 def update_state(write_channel: Channel) -> None:
                     write_channel.state = ChannelState.UNKNOWN_ERROR
 
-                write_task = write_tasks[e.connector.uuid]
+                write_task = write_tasks[e.connector.id]
                 write_task.channels.apply(update_state)
 
+    # noinspection PyShadowingBuiltins
     def log(self, channels: Optional[Channels] = None, force: bool = False) -> None:
         if channels is None:
             channels = self.channels
 
         log_tasks = {}
         log_futures = []
-        for uuid, connector in self.connectors.items():
+        for id, connector in self.connectors.items():
             if not connector._is_connected():
                 continue
 
@@ -325,12 +328,12 @@ class DataManager(DataContext, Activator):
 
                 return channel.timestamp >= channel.logger.timestamp + channel.timedelta
 
-            log_channels = channels.filter(lambda c: (c.has_logger(uuid) and c.is_valid() and has_update(c)))
+            log_channels = channels.filter(lambda c: (c.has_logger(id) and c.is_valid() and has_update(c)))
             if len(log_channels) == 0:
                 continue
 
             log_task = LogTask(connector, log_channels)
-            log_tasks[uuid] = log_task
+            log_tasks[id] = log_task
             log_futures.append(self._executor.submit(log_task))
 
         for write_future in futures.as_completed(log_futures):
@@ -343,5 +346,5 @@ class DataManager(DataContext, Activator):
                 log_task.channels.apply(update_logger)
 
             except ConnectorException as e:
-                self._logger.warning(f"Error logging connector '{e.connector.uuid}': {e}")
+                self._logger.warning(f"Error logging connector '{e.connector.id}': {repr(e)}")
                 self._logger.exception(e)

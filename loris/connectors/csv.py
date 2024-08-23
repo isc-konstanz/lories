@@ -46,10 +46,6 @@ class CsvConnector(Connector):
 
     columns: Mapping[str, str] = {}
 
-    @property
-    def type(self) -> str:
-        return self.TYPE
-
     # noinspection PyTypeChecker
     def configure(self, configs: Configurations) -> None:
         data_dir = configs.get("dir", default=None)
@@ -117,8 +113,8 @@ class CsvConnector(Connector):
         if not os.path.isdir(self._data_dir):
             os.makedirs(self._data_dir, exist_ok=True)
 
-        columns = {r.name: r.uuid for r in self.resources if "name" in r}
-        columns.update({r.name: r.uuid for r in resources if "name" in r})
+        columns = {r.name: r.id for r in self.resources if "name" in r}
+        columns.update({r.name: r.id for r in resources if "name" in r})
         columns.update({column: key for key, column in self.columns.items()})
 
         if self._data_path is not None:
@@ -144,8 +140,8 @@ class CsvConnector(Connector):
         start: Optional[pd.Timestamp, dt.datetime] = None,
         end: Optional[pd.Timestamp, dt.datetime] = None,
     ) -> pd.DataFrame:
-        columns = {r.name: r.uuid for r in self.resources if "name" in r}
-        columns.update({r.name: r.uuid for r in resources if "name" in r})
+        columns = {r.name: r.id for r in self.resources if "name" in r}
+        columns.update({r.name: r.id for r in resources if "name" in r})
         columns.update({column: key for key, column in self.columns.items()})
 
         def _infer_dates(s=start, e=end) -> Tuple[pd.Timestamp, pd.Timestamp]:
@@ -178,14 +174,14 @@ class CsvConnector(Connector):
                 data = data.iloc[[index[-1]], :]
 
             data = data.rename(columns=columns)
-            return data.loc[:, [r.uuid for r in resources if r.uuid in data.columns]]
+            return data.loc[:, [r.id for r in resources if r.id in data.columns]]
 
         except IOError:
             # TODO: Return more informative ChannelStates or raise ConnectionException (?)
             return pd.DataFrame()
 
     def write(self, data: pd.DataFrame) -> None:
-        columns = {r.uuid: r.name for r in self.resources if "name" in r}
+        columns = {r.id: r.name for r in self.resources if "name" in r}
         columns.update(self.columns)
         kwargs = {
             "timezone": self.timezone,

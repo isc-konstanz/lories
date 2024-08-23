@@ -9,7 +9,7 @@ loris.core.register.registrator
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Any, Collection, Dict, Optional
+from typing import Collection, Optional
 
 from loris.core import ConfigurationException, Configurations, Configurator, Context, ResourceException
 from loris.util import get_context, parse_id
@@ -56,20 +56,20 @@ class Registrator(Configurator):
         if self.SECTION not in configs.sections:
             configs._add_section(self.SECTION, {"type": self.TYPE})
         elif "type" not in configs[self.SECTION]:
-            configs[self.SECTION]["id"] = self.TYPE
+            configs[self.SECTION]["type"] = self.TYPE
 
-        if "id" in configs:
-            configs[self.SECTION]["id"] = configs.pop("id")
-        if "id" not in configs[self.SECTION]:
-            raise ConfigurationException(f"Invalid configuration, missing specified {self.SECTION} ID")
+        if "key" in configs:
+            configs[self.SECTION]["key"] = configs.pop("key")
+        if "key" not in configs[self.SECTION]:
+            raise ConfigurationException(f"Invalid configuration, missing specified {self.SECTION} Key")
 
-        self._id = parse_id(configs[self.SECTION].get("id"))
-        self._uuid = self._id if self._registrator is None else f"{self._registrator.uuid}.{self._id}"
-
-    @property
-    def uuid(self) -> str:
-        return self._uuid
+        self._key = parse_id(configs[self.SECTION].get("key"))
+        self._id = self._key if self._registrator is None else f"{self._registrator.id}.{self._key}"
 
     @property
     def id(self) -> str:
         return self._id
+
+    @property
+    def key(self) -> str:
+        return self._key

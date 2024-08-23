@@ -45,7 +45,7 @@ class MySqlTable(Sequence[Column]):
                 columns.add(column_name, column_type, **column)
 
         for resource in resources:
-            column_name = resource.column if "column" in resource else resource.id
+            column_name = resource.column if "column" in resource else resource.key
             column_args = {}
             if "length" in resource:
                 column_args["length"] = resource.length
@@ -125,7 +125,7 @@ class MySqlTable(Sequence[Column]):
         start: pd.Timestamp | dt.datetime = None,
         end: pd.Timestamp | dt.datetime = None,
     ) -> pd.DataFrame:
-        columns = [r.column if "column" in r else r.id for r in resources]
+        columns = [r.column if "column" in r else r.key for r in resources]
         query = f"SELECT {self.index}, {', '.join([f'`{c}`' for c in columns])} FROM {self.name}"
         query, params = self.index.where(query, start, end)
         query += f" {self.index.order_by('ASC')}"
@@ -133,7 +133,7 @@ class MySqlTable(Sequence[Column]):
         return self._select(resources, query, params)
 
     def select_first(self, resources: Resources) -> pd.DataFrame:
-        columns = [r.column if "column" in r else r.id for r in resources]
+        columns = [r.column if "column" in r else r.key for r in resources]
         query = (
             f"SELECT {self.index}, {', '.join([f'`{c}`' for c in columns])} FROM {self.name} "
             f"{self.index.order_by('ASC')} LIMIT 1;"
@@ -141,7 +141,7 @@ class MySqlTable(Sequence[Column]):
         return self._select(resources, query)
 
     def select_last(self, resources: Resources) -> pd.DataFrame:
-        columns = [r.column if "column" in r else r.id for r in resources]
+        columns = [r.column if "column" in r else r.key for r in resources]
         query = (
             f"SELECT {self.index}, {', '.join([f'`{c}`' for c in columns])} FROM {self.name} "
             f"{self.index.order_by('DESC')} LIMIT 1;"

@@ -119,15 +119,15 @@ class Configurations(MutableMapping[str, Any]):
     def __setitem__(self, key: str, value: Any) -> None:
         self.set(key, value)
 
-    def set(self, key: str, value: Any) -> None:
+    def set(self, key: str, value: Any, replace: bool = True) -> None:
+        if key in self.__configs and not replace:
+            return
         self.__configs[key] = value
 
     def __getitem__(self, key: str) -> Any:
         return self.__configs[key]
 
     def get(self, key: str, default: Any = None) -> Any:
-        if default is None:
-            return self.__configs.get(key)
         return self.__configs.get(key, default)
 
     def get_bool(self, key: str, default: bool = None) -> bool:

@@ -135,7 +135,7 @@ class Index(Columns[IndexColumn]):
             self.append(SurrogateKeyColumn(name, type, attribute, length=length, default=default, **kwargs))
 
     def process(self, resources: Resources, data: pd.DataFrame) -> pd.DataFrame:
-        result_columns = [r.uuid for r in resources]
+        result_columns = [r.id for r in resources]
         results = []
         if data.empty:
             return pd.DataFrame(columns=result_columns)
@@ -168,7 +168,7 @@ class Index(Columns[IndexColumn]):
                 group_data.loc[:, [index_column]] = pd.to_datetime(group_data[index_column], unit="s")
                 group_data = group_data.set_index(index_column).tz_localize(tz.UTC).tz_convert(self.timezone)
 
-            group_columns = {r.column if "column" in r else r.id: r.uuid for r in group_resources}
+            group_columns = {r.column if "column" in r else r.key: r.id for r in group_resources}
             group_data = group_data[group_columns.keys()].dropna(axis="index", how="all").rename(columns=group_columns)
             results.append(group_data)
 
@@ -179,7 +179,7 @@ class Index(Columns[IndexColumn]):
 
     def prepare(self, resources: Resources, data: pd.DataFrame) -> Iterator[pd.DataFrame]:
         for group, group_resources in self._groupby(resources):
-            group_columns = {r.uuid: r.column if "column" in r else r.id for r in group_resources}
+            group_columns = {r.id: r.column if "column" in r else r.key for r in group_resources}
             group_data = data[group_columns.keys()].dropna(axis="index", how="all").rename(columns=group_columns)
             for group_column, group_value in group.items():
                 group_data.loc[:, [group_column]] = group_value
@@ -220,7 +220,7 @@ class Index(Columns[IndexColumn]):
             for column in self._get_surrogate_keys():
                 if not hasattr(resource, column.attribute):
                     raise ResourceException(
-                        f"MySQL resource '{resource.uuid}' missing surrugate key attribute: {column.attribute}"
+                        f"MySQL resource '{resource.id}' missing surrugate key attribute: {column.attribute}"
                     )
                 attributes[column.name] = getattr(resource, column.attribute)
             for group in groups:

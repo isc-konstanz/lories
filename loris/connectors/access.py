@@ -38,14 +38,14 @@ class ConnectorAccess(ConnectorContext):
     # noinspection PyProtectedMember
     def _add(self, *connectors: Connector) -> None:
         for connector in connectors:
-            super()._set(connector.id, connector)
-            self.context.connectors._set(connector.uuid, connector)
+            super()._set(connector.key, connector)
+            self.context.connectors._set(connector.id, connector)
 
     # noinspection PyProtectedMember
     def _update(self, context: Context, configs: Configurations) -> Connector:
         connector = self._new(context, configs)
-        if connector.id in self:
-            self._get(connector.id).configs.update(configs)
+        if connector.key in self:
+            self._get(connector.key).configs.update(configs)
         else:
             self._add(connector)
         return connector

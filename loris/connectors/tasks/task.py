@@ -40,7 +40,7 @@ class ConnectorTask(ABC, Thread):
         except ConnectorException as e:
             raise e
         except Exception as e:
-            raise ConnectorException(e, connector=self.connector)
+            raise ConnectorException(repr(e), connector=self.connector)
 
         return self
 

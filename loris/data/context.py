@@ -29,13 +29,13 @@ class DataContext(Context[Channel]):
         self._channels = OrderedDict(channels)
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({[c.id for c in self._channels.values()]})"
+        return f"{type(self).__name__}({[c.key for c in self._channels.values()]})"
 
     def __str__(self) -> str:
         return f"{type(self).__name__}:\n\t" + "\n\t".join([f"{i} = {repr(c)}" for i, c in self._channels.items()])
 
-    def __getitem__(self, uid: str) -> Channel:
-        return self._get(uid)
+    def __getitem__(self, key: str) -> Channel:
+        return self._get(key)
 
     def __contains__(self, channel: str | Channel) -> bool:
         if isinstance(channel, str):
@@ -74,13 +74,13 @@ class DataContext(Context[Channel]):
         if defaults is None:
             defaults = {}
         defaults.update(self._parse_defaults(configs))
-        for channel_id in [i for i in configs.keys() if i not in defaults]:
+        for channel_key in [i for i in configs.keys() if i not in defaults]:
             channel_configs = deepcopy(defaults)
-            channel_configs.update(configs.get_section(channel_id))
+            channel_configs.update(configs.get_section(channel_key))
 
-            channel_id = channel_configs.pop("id", channel_id)
-            channel_uuid = f"{context.uuid}.{channel_id}"
-            channels.append(self._update(uuid=channel_uuid, id=channel_id, **channel_configs))
+            channel_key = channel_configs.pop("key", channel_key)
+            channel_id = f"{context.id}.{channel_key}"
+            channels.append(self._update(id=channel_id, key=channel_key, **channel_configs))
         return channels
 
     # noinspection PyProtectedMember
@@ -102,24 +102,24 @@ class DataContext(Context[Channel]):
     def _parse_defaults(configs: Configurations) -> Mapping[str, Any]:
         return {k: v for k, v in configs.items() if not isinstance(v, Mapping) or k in ["logger", "connector"]}
 
-    def _get(self, uuid: str) -> Channel:
-        return self._channels.get(uuid)
+    def _get(self, key: str) -> Channel:
+        return self._channels.get(key)
 
-    def _set(self, uuid: str, channel: Channel) -> None:
-        self._channels[uuid] = channel
+    def _set(self, key: str, channel: Channel) -> None:
+        self._channels[key] = channel
 
     def _add(self, channel: Channel) -> None:
         if not isinstance(channel, Channel):
             raise ResourceException(f"Invalid channel type: {type(channel)}")
 
-        if channel.uuid in self._channels.keys():
-            raise ConfigurationException(f'Channel with UUID "{channel.uuid}" already exists')
+        if channel.id in self._channels.keys():
+            raise ConfigurationException(f'Channel with UUID "{channel.id}" already exists')
 
         # TODO: connector sanity check
-        self._set(channel.uuid, channel)
+        self._set(channel.id, channel)
 
     # noinspection PyShadowingBuiltins
-    def _new(self, id: str, uuid: str = None, **configs: Any) -> Channel:
+    def _new(self, key: str, id: str = None, **configs: Any) -> Channel:
         for connector_type in ["logger", "connector"]:
             connector = configs.get(connector_type, None)
             if not connector:
@@ -129,29 +129,29 @@ class DataContext(Context[Channel]):
             elif not isinstance(connector, Mapping):
                 raise ConfigurationException(f"Invalid channel {connector_type} type: " + str(connector))
             if "connector" in connector:
-                connector_uuid = connector["connector"]
-                if not connector_uuid.startswith(self.uuid):
-                    connector_uuid = uuid.replace(id, connector["connector"])
-                    if connector_uuid not in self.connectors.keys():
-                        connector_uuid = f"{self.uuid}.{connector['connector']}"
-                configs[connector_type]["connector"] = connector_uuid
+                connector_id = connector["connector"]
+                if not connector_id.startswith(self.id):
+                    connector_id = id.replace(key, connector["connector"])
+                    if connector_id not in self.connectors.keys():
+                        connector_id = f"{self.id}.{connector['connector']}"
+                configs[connector_type]["connector"] = connector_id
 
-        return Channel(uuid, id, **configs)
+        return Channel(id, key, **configs)
 
     # noinspection PyShadowingBuiltins
-    def _update(self, uuid: str, id: str, **configs: Any) -> Channel:
-        channel = self._new(uuid=uuid, id=id, **configs)
+    def _update(self, id: str, key: str, **configs: Any) -> Channel:
+        channel = self._new(id=id, key=key, **configs)
 
         # TODO: Implement connector config update
-        # if channel.id in self:
-        #     self._get(channel.id).configs.update(configs)
+        # if channel.key in self:
+        #     self._get(channel.key).configs.update(configs)
         # else:
         #     self._add(channel)
         self._add(channel)
         return channel
 
-    def _remove(self, uuid: str) -> None:
-        del self._channels[uuid]
+    def _remove(self, key: str) -> None:
+        del self._channels[key]
 
     @property
     def channels(self) -> Channels:

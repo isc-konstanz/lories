@@ -23,20 +23,20 @@ class ReadTask(ConnectorTask):
         end: Optional[pd.Timestamp | dt.datetime] = None
     ) -> None:
         self._logger.debug(
-            f"Reading {len(self.channels)} channels of " f"{type(self.connector).__name__}: " f"{self.connector.uuid}"
+            f"Reading {len(self.channels)} channels of " f"{type(self.connector).__name__}: " f"{self.connector.id}"
         )
         data = self.connector.read(self.channels, start, end)
 
         for channel in self.channels:
-            if channel.uuid not in data.columns or all(pd.isna(data.loc[:, channel.uuid])):
+            if channel.id not in data.columns or all(pd.isna(data.loc[:, channel.id])):
                 channel.state = ChannelState.NOT_AVAILABLE
                 self._logger.warning(
-                    f"Unable to read nonexisting channel: {channel.uuid}"
+                    f"Unable to read nonexisting channel: {channel.id}"
                 )
                 continue
 
-            channel_data = data.loc[:, channel.uuid].dropna()
-            channel_data.name = channel.id
+            channel_data = data.loc[:, channel.id].dropna()
+            channel_data.name = channel.key
             if len(channel_data.index) > 1:
                 channel.set(channel_data.index[0], channel_data)
 

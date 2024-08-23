@@ -90,9 +90,9 @@ class Weather(Component, metaclass=WeatherMeta):
             try:
                 self._location = self.context.location
                 if not isinstance(self._location, Location):
-                    raise WeatherException(f"Invalid location type for weather '{self.uuid}': {type(self._location)}")
+                    raise WeatherException(f"Invalid location type for weather '{self.id}': {type(self._location)}")
             except (LocationUnavailableException, AttributeError):
-                raise WeatherException(f"Missing location for weather '{self.uuid}'")
+                raise WeatherException(f"Missing location for weather '{self.id}'")
 
     @property
     def location(self) -> Location:
