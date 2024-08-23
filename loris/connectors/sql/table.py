@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.connectors.mysql.table
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.connectors.sql.table
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -15,11 +15,11 @@ from itertools import chain
 from typing import Any, Optional
 
 import pandas as pd
-from loris.connectors.mysql import Column, Columns, Index
+from loris.connectors.sql import Column, Columns, Index
 from loris.core import Configurations, Resources
 
 
-class MySqlTable(Sequence[Column]):
+class Table(Sequence[Column]):
     SECTION = "tables"
 
     index: Index
@@ -28,7 +28,7 @@ class MySqlTable(Sequence[Column]):
 
     # noinspection PyProtectedMember
     @classmethod
-    def from_configs(cls, connector, name: str, configs: Configurations, resources: Resources) -> MySqlTable:
+    def from_configs(cls, connector, name: str, configs: Configurations, resources: Resources) -> Table:
         index = Index.from_configs(configs.get_section("index", defaults={}), timezone=connector._timezone)
 
         columns_configs = configs.get_section("columns", defaults={})
@@ -58,7 +58,7 @@ class MySqlTable(Sequence[Column]):
                 column_type = resource.type if "type" in resource else columns_type
                 columns.add(column_name, column_type, **column_args)
 
-        return MySqlTable(connector, name, index, columns)
+        return Table(connector, name, index, columns)
 
     def __init__(
         self,

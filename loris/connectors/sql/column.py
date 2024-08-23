@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.connectors.mysql.column
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.connectors.sql.column
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """

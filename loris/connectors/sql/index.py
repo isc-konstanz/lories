@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.connectors.mysql.index
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.connectors.sql.index
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -16,7 +16,7 @@ from typing import Any, AnyStr, Dict, Optional, Sequence, Tuple, Type
 import numpy as np
 import pandas as pd
 import pytz as tz
-from loris.connectors.mysql.column import Column, Columns
+from loris.connectors.sql.column import Column, Columns
 from loris.core import Configurations, Resource, ResourceException, Resources
 
 

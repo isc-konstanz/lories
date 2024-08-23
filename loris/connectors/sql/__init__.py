@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.connectors.mysql
-~~~~~~~~~~~~~~~~~~~~~~
+loris.connectors.sql
+~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -15,6 +15,6 @@ from .index import (  # noqa: F401
     IndexColumn,
     DatetimeIndexType,
 )
-from .table import MySqlTable  # noqa: F401
+from .table import Table  # noqa: F401
 
-from .connector import MySqlConnector  # noqa: F401
+from .connector import SqlConnector  # noqa: F401

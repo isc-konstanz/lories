@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.connectors.mysql.connector
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.connectors.sql.connector
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -18,16 +18,16 @@ from mysql.connector.errors import DatabaseError
 import pandas as pd
 import pytz as tz
 from loris.connectors import ConnectionException, Connector, ConnectorException, register_connector_type
-from loris.connectors.mysql import MySqlTable
+from loris.connectors.sql import Table
 from loris.core import Configurations, Resources
 
 
 @register_connector_type
-class MySqlConnector(Connector, Mapping[str, MySqlTable]):
-    TYPE: str = "mysql"
+class SqlConnector(Connector, Mapping[str, Table]):
+    TYPE: str = "sql"
 
     _connection = None
-    _tables: Dict[str, MySqlTable] = {}
+    _tables: Dict[str, Table] = {}
 
     _timezone: tz.BaseTzInfo
 
@@ -44,7 +44,7 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
             raise ConnectionException("MySQL Connection not open", connector=self)
         return self._connection
 
-    def __getitem__(self, table_name: str) -> MySqlTable:
+    def __getitem__(self, table_name: str) -> Table:
         return self._tables[table_name]
 
     def __iter__(self) -> Iterator[str]:
@@ -56,8 +56,8 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        self.host = configs.get("host", MySqlConnector.host)
-        self.port = configs.get_int("port", MySqlConnector.port)
+        self.host = configs.get("host", SqlConnector.host)
+        self.port = configs.get_int("port", SqlConnector.port)
 
         self.user = configs.get("user")
         self.password = configs.get("password")
@@ -81,17 +81,17 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
             self._connection.close()
 
     # noinspection PyTypeChecker
-    def _connect_tables(self, resources: Resources) -> Dict[str, MySqlTable]:
+    def _connect_tables(self, resources: Resources) -> Dict[str, Table]:
         tables = {}
         table_schemas = self._select_table_schemas()
-        tables_configs = self.configs.get_section(MySqlTable.SECTION, defaults={})
+        tables_configs = self.configs.get_section(Table.SECTION, defaults={})
 
         for table_name, table_resources in resources.groupby("table"):
             table_configs = tables_configs.get_section(table_name, defaults={
                 "index":   tables_configs.get_section("index", defaults={}),
                 "columns": tables_configs.get_section("columns", defaults={}),
             })
-            table = MySqlTable.from_configs(self, table_name, table_configs, table_resources)
+            table = Table.from_configs(self, table_name, table_configs, table_resources)
             tables[table.name] = table
             if table.name not in table_schemas:
                 if table_configs.get_bool("create", default=True):
