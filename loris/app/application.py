@@ -60,7 +60,7 @@ class Application(DataManager, Thread):
 
     def configure(self, settings: Settings) -> None:
         super().configure(settings)
-        if self._interface is not None:
+        if self._interface.is_enabled():
             self._interface._do_configure()
         self._interval = settings.get_int("interval", default=1)
 

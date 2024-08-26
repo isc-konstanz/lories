@@ -18,15 +18,17 @@ from loris.core.configs import ConfigurationException, Configurations, Configura
 class InterfaceMeta(ConfiguratorMeta):
     # noinspection PyProtectedMember
     def __call__(cls, context: Context, configs: Configurations) -> Optional[Interface]:
-        # try:
-        _cls = cls._get_class(configs)
+        _cls = cls
+        try:
+            _cls = cls._get_class(configs)
+
+        except ImportError:
+            # TODO: Find better way to differentiate between interface model to use
+            pass
+
         if cls != _cls:
             return _cls(context, configs)
-
         return super().__call__(context, configs)
-        # except ImportError as e:
-        #     # Return None
-        #     pass
 
     # noinspection PyMethodMayBeStatic, PyUnusedLocal
     def _get_class(self, configs: Configurations) -> Type[Interface]:
@@ -43,7 +45,6 @@ class Interface(Configurator, metaclass=InterfaceMeta):
             raise ConfigurationException("Missing configuration")
         super().__init__(context, configs, *args, **kwargs)
 
-    @abstractmethod
     def start(self) -> None:
         pass
 
