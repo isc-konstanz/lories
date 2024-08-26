@@ -88,10 +88,10 @@ class Channel(Resource):
 
     @property
     def freq(self) -> Optional[str]:
-        for k in ["freq", "frequency", "resolution"]:
-            if k in self:
-                return _parse_freq(self._get(k))
-        return None
+        freq = self.get(next((k for k in ["freq", "frequency", "resolution"] if k in self), None), default=None)
+        if freq is not None:
+            freq = _parse_freq(freq)
+        return freq
 
     @property
     def timedelta(self) -> Optional[pd.Timedelta]:
@@ -154,9 +154,11 @@ class Channel(Resource):
         channel.set(self._timestamp, self._value, self._state)
         return channel
 
+    # noinspection PyShadowingBuiltins
     def has_logger(self, *ids: Optional[str]) -> bool:
         return any(self.logger.id == id for id in ids) if len(ids) > 0 else self.logger.id is not None
 
+    # noinspection PyShadowingBuiltins
     def has_connector(self, id: Optional[str] = None) -> bool:
         return self.connector.id == id if id is not None else self.connector.id is not None
 
