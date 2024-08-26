@@ -153,7 +153,12 @@ class SqlConnector(Connector, Mapping[str, Table]):
         cursor = self.connection.cursor()
         cursor.execute("SELECT @@system_time_zone as tz")
         for row in cursor.fetchall():
-            return tz.timezone(row[0])
+            try:
+                return tz.timezone(row[0])
+            except tz.UnknownTimeZoneError:
+                # Handle the case where the timezone is not recognized
+                if row[0] == 'CEST':
+                    return tz.timezone('Europe/Berlin')
 
     def exists(
         self,

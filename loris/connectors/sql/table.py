@@ -97,7 +97,7 @@ class Table(Sequence[Column]):
     def create(self):
         columns = [*self.index, *self.columns]
         query = (
-            f"CREATE TABLE IF NOT EXISTS {self.name} "
+            f"CREATE TABLE IF NOT EXISTS `{self.name}` "
             f"({', '.join([str(c) for c in columns])}, PRIMARY KEY ({', '.join(self.index.names)}))"
         )
         if self.engine is not None:
@@ -126,7 +126,7 @@ class Table(Sequence[Column]):
         end: pd.Timestamp | dt.datetime = None,
     ) -> pd.DataFrame:
         columns = [r.column if "column" in r else r.key for r in resources]
-        query = f"SELECT {self.index}, {', '.join([f'`{c}`' for c in columns])} FROM {self.name}"
+        query = f"SELECT {self.index}, {', '.join([f'`{c}`' for c in columns])} FROM `{self.name}`"
         query, params = self.index.where(query, start, end)
         query += f" {self.index.order_by('ASC')}"
 
@@ -135,7 +135,7 @@ class Table(Sequence[Column]):
     def select_first(self, resources: Resources) -> pd.DataFrame:
         columns = [r.column if "column" in r else r.key for r in resources]
         query = (
-            f"SELECT {self.index}, {', '.join([f'`{c}`' for c in columns])} FROM {self.name} "
+            f"SELECT {self.index}, {', '.join([f'`{c}`' for c in columns])} FROM `{self.name}` "
             f"{self.index.order_by('ASC')} LIMIT 1;"
         )
         return self._select(resources, query)
@@ -143,7 +143,7 @@ class Table(Sequence[Column]):
     def select_last(self, resources: Resources) -> pd.DataFrame:
         columns = [r.column if "column" in r else r.key for r in resources]
         query = (
-            f"SELECT {self.index}, {', '.join([f'`{c}`' for c in columns])} FROM {self.name} "
+            f"SELECT {self.index}, {', '.join([f'`{c}`' for c in columns])} FROM `{self.name}` "
             f"{self.index.order_by('DESC')} LIMIT 1;"
         )
         return self._select(resources, query)
@@ -165,7 +165,7 @@ class Table(Sequence[Column]):
 
     def delete(self, start: pd.Timestamp | dt.datetime, end: pd.Timestamp | dt.datetime) -> None:
         # TODO: Implement deleting only from specific columns?
-        query = f"DELETE FROM {self.name}"
+        query = f"DELETE FROM `{self.name}`"
         query, params = self.index.where(query, start, end)
         with self.connection.cursor() as cursor:
             self._logger.debug(query)
@@ -174,7 +174,7 @@ class Table(Sequence[Column]):
 
     # noinspection PyUnresolvedReferences
     def insert(self, resources: Resources, data: pd.DataFrame) -> None:
-        query = (f"INSERT INTO {self.name} ({self.index}, {self.columns}) "
+        query = (f"INSERT INTO `{self.name}` ({self.index}, {self.columns}) "
                  f"VALUES ({', '.join(['%s'] * (len(self.index) + len(self.columns)))}) "
                  f"ON DUPLICATE KEY UPDATE {', '.join([f'`{c.name}`=VALUES(`{c.name}`)' for c in self.columns])}")
 
@@ -193,7 +193,7 @@ class Table(Sequence[Column]):
             select = (
                 f"SELECT data_type FROM information_schema.COLUMNS "
                 f"WHERE table_schema = '{self.connection.database}' "
-                f"AND table_name = '{self.name}' "
+                f"AND table_name = '`{self.name}`' "
                 f"AND column_name = '{column}'"
             )
             cursor.execute(select)
