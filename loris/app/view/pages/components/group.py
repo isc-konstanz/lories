@@ -26,32 +26,19 @@ class ComponentGroup(PageGroup[ComponentPage[C]], Generic[C]):
     def components(self) -> Collection[C]:
         return [p._component for p in self]
 
-    def create_layout(self) -> PageLayout:
-        return PageLayout(
-            content=self._create_content_layout(),
-            focus=self._create_focus_layout(),
-            menu=self._create_menu_item()
-        )
-
-    def _create_content_layout(self) -> html.Div:
-        return html.Div(
-            [
-                html.H4(f"{self.name}"),
-                html.Hr(),
-                dbc.ListGroup(
-                    [dbc.ListGroupItem(p.layout.focus, href=p.path) for p in self._pages if p.layout.has_focus_view()],
-                    flush=True,
-                ),
-            ]
-        )
-
-    def _create_focus_layout(self) -> html.Div:
-        return html.Div(
+    def create_layout(self, layout: PageLayout) -> None:
+        super().create_layout(layout)
+        layout.menu = dbc.NavItem(dbc.NavLink(self.name, href=self.path))
+        layout.card = html.Div(
             [
                 html.H4(self.name),
-                dbc.Alert(f"This is a placeholder for the {self.name} focus view", color="secondary"),
+                dbc.Alert(f"This is a placeholder for the {self.name} card view", color="secondary"),
             ]
         )
 
-    def _create_menu_item(self) -> dbc.NavItem:
-        return dbc.NavItem(dbc.NavLink(self.name, href=self.path))
+        layout.append(
+            dbc.ListGroup(
+                [dbc.ListGroupItem(p.layout.card, href=p.path) for p in self._pages if p.layout.has_card_view()],
+                flush=True,
+            ),
+        )

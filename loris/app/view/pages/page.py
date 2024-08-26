@@ -11,8 +11,9 @@ from __future__ import annotations
 import logging
 import re
 from abc import ABC, ABCMeta, abstractmethod
+from collections.abc import MutableSequence
 from functools import wraps
-from typing import Collection, Optional
+from typing import Collection, List, Optional
 
 import dash
 from dash.development.base_component import Component as DashComponent
@@ -72,7 +73,7 @@ class Page(ABC, metaclass=PageMeta):
         return self._created
 
     @abstractmethod
-    def create_layout(self) -> PageLayout:
+    def create_layout(self, layout: PageLayout) -> None:
         pass
 
     # noinspection PyUnresolvedReferences
@@ -83,7 +84,8 @@ class Page(ABC, metaclass=PageMeta):
         if self.is_created():
             self._logger.warning(f"{type(self).__name__} '{self.id}' layout already created")
         else:
-            self.layout = self.__create_layout()
+            self.layout = PageLayout()
+            self.__create_layout(self.layout)
             self._on_create_layout(self.layout)
             self._created = True
 
@@ -104,8 +106,8 @@ class Page(ABC, metaclass=PageMeta):
             title=self.title,
             description=self.description,
             layout=Container(
-                self.layout.content,
-                id=f"{self.id}-content",
+                id=f"{self.id}-container",
+                children=self.layout.children,
                 style={"padding-top": "1rem", "padding-bottom": "1rem"},
             ),
             **kwargs,
@@ -149,24 +151,39 @@ class PageLayoutException(PageException):
     """
 
 
-class PageLayout:
+class PageLayout(MutableSequence[DashComponent]):
     menu: Optional[DashComponent]
-    focus: Optional[DashComponent]
+    card: List[DashComponent] | DashComponent
 
-    content: DashComponent | Collection[DashComponent]
+    children: List[DashComponent]
 
     def __init__(
         self,
-        content: DashComponent | Collection[DashComponent],
-        focus: Optional[DashComponent] = None,
+        children: Collection[DashComponent] = (),
+        card: Collection[DashComponent] = (),
         menu: Optional[DashComponent] = None,
     ) -> None:
-        self.content = content
-        self.focus = focus
+        self.children = list[DashComponent](children)
+        self.card = list[DashComponent](card)
         self.menu = menu
+
+    def __len__(self) -> int:
+        return len(self.children)
+
+    def __getitem__(self, index: int) -> DashComponent:
+        return self.children[index]
+
+    def __setitem__(self, index: int, value: DashComponent) -> None:
+        self.children[index] = value
+
+    def __delitem__(self, index: int) -> None:
+        del self.children[index]
+
+    def insert(self, index: int, value: DashComponent) -> None:
+        self.children.insert(index, value)
+
+    def has_card_view(self) -> bool:
+        return self.card is not None and len(self.card) > 0
 
     def has_menu_item(self) -> bool:
         return self.menu is not None
-
-    def has_focus_view(self) -> bool:
-        return self.focus is not None

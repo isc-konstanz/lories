@@ -24,11 +24,6 @@ class SystemPage(ComponentGroup, ComponentPage[System]):
     def path(self) -> str:
         return f"/{self._component.TYPE}/{self._encode_id(self._component.key)}"
 
-    def _create_content_layout(self) -> html.Div:
-        div = super()._create_content_layout()
-        div.children.append(self._create_data_layout())
-        return div
-
     def _do_create_layout(self) -> PageLayout:
         for page in self:
             page._do_create_layout()

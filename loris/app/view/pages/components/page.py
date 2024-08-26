@@ -55,31 +55,24 @@ class ComponentPage(Page, Generic[C]):
     def is_active(self) -> bool:
         return self._component.is_active()
 
-    def create_layout(self) -> PageLayout:
-        return PageLayout(
-            content=self._create_content_layout(),
-            focus=self._create_focus_layout(),
-        )
-
-    def _create_focus_layout(self) -> html.Div:
-        return html.Div(
+    def create_layout(self, layout: PageLayout) -> None:
+        super().create_layout(layout)
+        layout.card = html.Div(
             [
                 html.H4(self.name),
-                dbc.Alert(f"This is a placeholder for the {self.name} focus view", color="secondary"),
+                dbc.Alert(f"This is a placeholder for the {self.name} card view", color="secondary"),
             ]
         )
 
-    def _create_content_layout(self) -> html.Div:
-        return html.Div(
-            [
-                html.H4(f"{self.name}:"),
-                html.Hr(),
-                dbc.Alert(f"This is a placeholder for the {self.name} component view", color="secondary"),
-                self._create_data_layout(),
-            ]
-        )
+        layout.append(html.H4(f"{self.name}:"))
+        layout.append(html.Hr())
+        layout.append(dbc.Alert(f"This is a placeholder for the {self.name} component view", color="secondary"))
 
-    def _create_data_layout(self, title: Optional[str] = "Data") -> html.Div:
+    def _on_create_layout(self, layout: PageLayout) -> None:
+        super()._on_create_layout(layout)
+        self._create_data_layout(layout)
+
+    def _create_data_layout(self, layout: PageLayout, title: Optional[str] = "Data") -> None:
 
         @callback(Output(f"{self.id}-data", "children"),
                   Input(f"{self.id}-data-update-interval", "n_intervals"))
@@ -106,7 +99,7 @@ class ComponentPage(Page, Generic[C]):
                 n_intervals=0,
             )
         )
-        return html.Div(children)
+        layout.append(html.Div(children))
 
     def _get_data(self) -> Collection[dbc.AccordionItem]:
         channel_group = []
