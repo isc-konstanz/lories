@@ -126,6 +126,7 @@ class Application(DataManager, Thread):
                 freq = channel.freq
                 if (freq is None
                         or not channel.has_connector()
+                        or not self.connectors.get(channel.connector.id, False)
                         or not self.connectors.get(channel.connector.id).is_connected()):
                     return False
                 return pd.isna(channel.connector.timestamp) or timestamp >= _next(channel.connector.timestamp, freq)
