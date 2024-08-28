@@ -120,11 +120,13 @@ class ComponentRegistry:
     ) -> None:
         if not issubclass(cls, ComponentPage):
             raise ValueError("Can only register ComponentPage types")
-        if self.has_page(type) and not replace:
-            raise ResourceException(
-                f"Registration for '{type.TYPE}' does already exist: "
-                f"{next(p for p in self.pages if type == p.type)}"
-            )
+        existing = self._get_pages(type)
+        if len(existing) > 0:
+            if replace:
+                for page in existing:
+                    self.pages.remove(page)
+            else:
+                raise ResourceException(f"Registration for '{type.TYPE}' does already exist: " + ", ".join(existing))
         self.pages.append(PageRegistration(cls, type, factory=factory))
 
     # noinspection PyTypeChecker, PyUnresolvedReferences
@@ -138,16 +140,20 @@ class ComponentRegistry:
     ) -> None:
         if not issubclass(cls, ComponentGroup):
             raise ValueError("Can only register ComponentGroup types")
-        if self.has_group(*types) and not replace:
-            raise ResourceException(
-                f"Registration does already exist for types: " +
-                ", ".join([self.get_group(t) for t in types if self.has_group(t)])
-            )
+        existing = self._get_groups(*types)
+        if len(existing) > 0:
+            if replace:
+                for group in existing:
+                    self.groups.remove(group)
+            else:
+                raise ResourceException("Registration does already exist for types: " + ", ".join(existing))
         self.groups.append(GroupRegistration(cls, *types, name=name, factory=factory))
 
     def has_page(self, *types: Type[C]) -> bool:
-        pages = [p for p in self.pages if p.has_type(*types)]
-        return len(pages) > 0
+        return len(self._get_pages(*types)) > 0
+
+    def _get_pages(self, *types: Type[C]) -> Collection[PageRegistration]:
+        return [p for p in self.pages if p.has_type(*types)]
 
     def get_page(self, type: Type[C]) -> PageRegistration:
         for page in self.pages:
@@ -156,8 +162,10 @@ class ComponentRegistry:
         raise ValueError(f"Registration '{type}' does not exist")
 
     def has_group(self, *types: Type[C]) -> bool:
-        groups = [g for g in self.groups if g.has_type(*types)]
-        return len(groups) > 0
+        return len(self._get_groups(*types)) > 0
+
+    def _get_groups(self, *types: Type[C]) -> Collection[GroupRegistration]:
+        return [g for g in self.groups if g.has_type(*types)]
 
     def get_group(self, type: Type[C]) -> GroupRegistration:
         for group in self.groups:
