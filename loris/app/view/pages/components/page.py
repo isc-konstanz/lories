@@ -8,7 +8,8 @@ loris.app.view.pages.components.page
 
 from __future__ import annotations
 
-from typing import Collection, Generic, Optional, TypeVar
+from collections.abc import Sequence
+from typing import Generic, Optional, TypeVar
 
 import dash_bootstrap_components as dbc
 from dash import Input, Output, callback, dcc, html
@@ -16,6 +17,7 @@ from dash import Input, Output, callback, dcc, html
 import pandas as pd
 from loris import Channel, Component, Configurations
 from loris.app.view.pages import Page, PageLayout
+from loris.connectors import ConnectorAccess
 from loris.data import DataAccess
 
 C = TypeVar("C", bound=Component)
@@ -32,17 +34,17 @@ class ComponentPage(Page, Generic[C]):
         )
         self._component = component
 
-    # @property
-    # def component(self) -> C:
-    #     return self._component
+    @property
+    def configs(self) -> Configurations:
+        return self._component.configs
+
+    @property
+    def connectors(self) -> ConnectorAccess:
+        return self._component.connectors
 
     @property
     def data(self) -> DataAccess:
         return self._component.data
-
-    @property
-    def configs(self) -> Configurations:
-        return self._component.configs
 
     @property
     def path(self) -> str:
@@ -56,64 +58,55 @@ class ComponentPage(Page, Generic[C]):
         return self._component.is_active()
 
     def create_layout(self, layout: PageLayout) -> None:
-        super().create_layout(layout)
-        layout.card = html.Div(
-            [
-                html.H4(self.name),
-                dbc.Alert(f"This is a placeholder for the {self.name} card view", color="secondary"),
-            ]
-        )
-
+        layout.card.add_title(self.name)
+        layout.card.add_footer(href=self.path)
         layout.append(html.H4(f"{self.name}:"))
-        layout.append(html.Hr())
-        layout.append(dbc.Alert(f"This is a placeholder for the {self.name} component view", color="secondary"))
 
     def _on_create_layout(self, layout: PageLayout) -> None:
         super()._on_create_layout(layout)
         self._create_data_layout(layout)
 
     def _create_data_layout(self, layout: PageLayout, title: Optional[str] = "Data") -> None:
+        if len(self.data.channels) > 0:
+            layout.append(html.Hr())
+
+            data = []
+            if title is not None:
+                data.append(html.H5(f"{title}:"))
+            data.append(self._build_data())
+
+            layout.append(dbc.Row(data))
+
+    def _build_data(self) -> html.Div:
 
         @callback(Output(f"{self.id}-data", "children"),
-                  Input(f"{self.id}-data-update-interval", "n_intervals"))
-        def _update_data(n_intervals: int):
-            return self._get_data()
+                  Input(f"{self.id}-data-update", "n_intervals"))
+        def _update_data(*_) -> Sequence[dbc.AccordionItem]:
+            return [self._build_channel(channel) for channel in self.data.channels]
 
-        children = [html.Hr()]
-        if title is not None:
-            children.append(html.H5(f"{title}:"))
-
-        children.append(
-            dbc.Accordion(
-                id=f"{self.id}-data",
-                children=self._get_data(),
-                start_collapsed=True,
-                always_open=True,
-                flush=True,
-            )
+        return html.Div(
+            [
+                dbc.Accordion(
+                    id=f"{self.id}-data",
+                    children=_update_data(),
+                    start_collapsed=True,
+                    always_open=True,
+                    flush=True,
+                ),
+                dcc.Interval(
+                    id=f"{self.id}-data-update",
+                    interval=1000,
+                    n_intervals=0,
+                ),
+            ]
         )
-        children.append(
-            dcc.Interval(
-                id=f"{self.id}-data-update-interval",
-                interval=1000,
-                n_intervals=0,
-            )
-        )
-        layout.append(html.Div(children))
 
-    def _get_data(self) -> Collection[dbc.AccordionItem]:
-        channel_group = []
-        for channel in self.data.channels:
-            channel_group.append(self._parse_channel(channel))
-        return channel_group
-
-    def _parse_channel(self, channel: Channel) -> dbc.AccordionItem:
-        channel_id = self._encode_id(channel.id)
+    def _build_channel(self, channel: Channel) -> dbc.AccordionItem:
         return dbc.AccordionItem(
             title=dbc.Row(
                 [
-                    dbc.Col(self._parse_channel_title(channel), width="auto"),
-                    dbc.Col(self._parse_channel_state(channel), width="auto"),
+                    dbc.Col(self._build_channel_title(channel), width="auto"),
+                    dbc.Col(self._build_channel_state(channel), width="auto"),
                 ],
                 justify="between",
                 className="w-100",
@@ -122,28 +115,28 @@ class ComponentPage(Page, Generic[C]):
                 dbc.Row(
                     [
                         dbc.Col(html.Span("Value:", className="text-muted"), width=1),
-                        dbc.Col(self._parse_channel_value(channel), width="auto"),
+                        dbc.Col(self._build_channel_value(channel), width="auto"),
                     ],
                     justify="start",
                 ),
                 dbc.Row(
                     [
                         dbc.Col(None, width=1),
-                        dbc.Col(self._parse_channel_timestamp(channel), width="auto"),
+                        dbc.Col(self._build_channel_timestamp(channel), width="auto"),
                     ],
                     justify="start",
                 ),
             ],
-            id=f"{self.id}-data-{channel_id}",
+            id=f"{self.id}-data-{self._encode_id(channel.key)}",
         )
 
     # noinspection PyMethodMayBeStatic
-    def _parse_channel_title(self, channel: Channel) -> html.Span:
+    def _build_channel_title(self, channel: Channel) -> html.Span:
         # TODO: Implement future improvements like the separation of name and unit
         return html.Span(channel.name, className="mb-1")
 
     # noinspection PyMethodMayBeStatic
-    def _parse_channel_value(self, channel: Channel) -> html.Span:
+    def _build_channel_value(self, channel: Channel) -> html.Span:
         # TODO: Implement further type validation, e.g. implementing a Graph for pandas Series types
         value = channel.value
         if not pd.isna(value):
@@ -152,11 +145,14 @@ class ComponentPage(Page, Generic[C]):
         return html.Span(html.B(value), className="mb-1")
 
     # noinspection PyMethodMayBeStatic
-    def _parse_channel_timestamp(self, channel: Channel) -> html.Small:
-        return html.Small(channel.timestamp, className="text-muted")
+    def _build_channel_timestamp(self, channel: Channel) -> html.Small:
+        timestamp = channel.timestamp
+        if not pd.isna(timestamp):
+            timestamp = timestamp.strftime("%Y-%m-%d %H:%M:%S%:z")
+        return html.Small(timestamp, className="text-muted")
 
     # noinspection PyMethodMayBeStatic
-    def _parse_channel_state(self, channel: Channel) -> html.Small:
+    def _build_channel_state(self, channel: Channel) -> html.Small:
         state = str(channel.state).replace("_", " ")
         color = "success" if channel.is_valid() else "warning"
         if state.lower().endswith("error") or state.lower() == "disabled":

@@ -1,11 +1,11 @@
 /* override accordion style */
 .accordion-button:not(.collapsed) {
   color: unset;
-  background-color: #f8f9fa;
+  background-color: var(--page-gray-100);
 }
 .accordion-button:focus {
   box-shadow: unset;
 }
 .accordion-button:hover {
-  background-color: #f5f5f5;
+  background-color: var(--page-gray-200);
 }

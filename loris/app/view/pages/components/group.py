@@ -27,18 +27,19 @@ class ComponentGroup(PageGroup[ComponentPage[C]], Generic[C]):
         return [p._component for p in self]
 
     def create_layout(self, layout: PageLayout) -> None:
-        super().create_layout(layout)
+        layout.container.class_name = "card-container"
+
         layout.menu = dbc.NavItem(dbc.NavLink(self.name, href=self.path))
-        layout.card = html.Div(
-            [
-                html.H4(self.name),
-                dbc.Alert(f"This is a placeholder for the {self.name} card view", color="secondary"),
-            ]
-        )
+        layout.card.add_title(self.name)
+        layout.card.add_footer(href=self.path)
 
         layout.append(
-            dbc.ListGroup(
-                [dbc.ListGroupItem(p.layout.card, href=p.path) for p in self._pages if p.layout.has_card_view()],
-                flush=True,
-            ),
+            dbc.Row(dbc.Col(html.H4(f"{self.name}:")))
         )
+        for page in self._pages:
+            if page.layout.has_card_items():
+                layout.append(
+                    dbc.Row(
+                        dbc.Col(page.layout.card, width="auto")
+                    )
+                )

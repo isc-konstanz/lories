@@ -22,7 +22,8 @@ class InterfaceMeta(ConfiguratorMeta):
         try:
             _cls = cls._get_class(configs)
 
-        except ImportError:
+        except ImportError as e:
+            print(e)
             # TODO: Find better way to differentiate between interface model to use
             pass
 

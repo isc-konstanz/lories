@@ -6,11 +6,14 @@ loris.app.view.pages
 
 """
 
+from .layout import (  # noqa: F401
+    PageCard,
+    PageLayout,
+)
+
 from .page import (  # noqa: F401
     Page,
-    PageLayout,
     PageException,
-    PageLayoutException,
 )
 from .group import PageGroup  # noqa: F401
 

@@ -8,7 +8,7 @@ loris.app.view.pages.components.system
 
 from __future__ import annotations
 
-from dash import html
+import dash_bootstrap_components as dbc
 
 from loris import System
 from loris.app.view.pages import PageLayout, register_component_page
@@ -23,6 +23,16 @@ class SystemPage(ComponentGroup, ComponentPage[System]):
     @property
     def path(self) -> str:
         return f"/{self._component.TYPE}/{self._encode_id(self._component.key)}"
+
+    def _create_data_layout(self, layout: PageLayout, **_) -> None:
+        if len(self.data.channels) > 0:
+            layout.append(
+                dbc.Row(
+                    dbc.Col(
+                        dbc.Card(dbc.CardBody(self._build_data())),
+                    ),
+                ),
+            )
 
     def _do_create_layout(self) -> PageLayout:
         for page in self:
