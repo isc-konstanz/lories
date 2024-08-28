@@ -9,18 +9,15 @@ loris.app.view.pages.layout.page
 from __future__ import annotations
 
 from collections.abc import MutableSequence
-from typing import Collection, Optional, TypeVar
+from typing import Any, Collection, Optional
 
-from dash.development.base_component import Component
 from dash_bootstrap_components import Container
 
 from loris.app.view.pages.layout import PageCard
 
-C = TypeVar("C", bound=Component)
 
-
-class PageLayout(MutableSequence[C]):
-    menu: Optional[C]
+class PageLayout(MutableSequence[Any]):
+    menu: Optional[Any]
     card: PageCard
 
     container: Container
@@ -28,10 +25,10 @@ class PageLayout(MutableSequence[C]):
     # noinspection PyPep8Naming
     def __init__(
         self,
-        children: Collection[C] = (),
+        children: Collection[Any] = (),
         class_name: Optional[str] = None,
         className: Optional[str] = None,
-        menu: Optional[C] = None,
+        menu: Optional[Any] = None,
         **kwargs,
     ) -> None:
         if class_name is None or len(class_name) == 0:
@@ -42,7 +39,7 @@ class PageLayout(MutableSequence[C]):
             class_name = f"{class_name} page-container"
 
         self.container = Container(
-            children=list[C](children),
+            children=list(children),
             class_name=class_name,
             **kwargs,
         )
@@ -52,16 +49,16 @@ class PageLayout(MutableSequence[C]):
     def __len__(self) -> int:
         return len(self.container)
 
-    def __getitem__(self, index: int) -> C:
+    def __getitem__(self, index: int) -> Any:
         return self.container[index]
 
-    def __setitem__(self, index: int, value: C) -> None:
+    def __setitem__(self, index: int, value: Any) -> None:
         self.container[index] = value
 
     def __delitem__(self, index: int) -> None:
         del self.container[index]
 
-    def insert(self, index: int, value: C) -> None:
+    def insert(self, index: int, value: Any) -> None:
         self.container.children.insert(index, value)
 
     def has_card_items(self) -> bool:

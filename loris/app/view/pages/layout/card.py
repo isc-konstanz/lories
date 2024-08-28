@@ -9,13 +9,10 @@ loris.app.view.pages.layout.card
 from __future__ import annotations
 
 from collections.abc import MutableSequence
-from typing import Any, Collection, Dict, List, Optional, TypeVar
+from typing import Any, Dict, List, Optional
 
 import dash_bootstrap_components as dbc
 from dash import html
-from dash.development.base_component import Component as DashComponent
-
-C = TypeVar("C", bound=DashComponent)
 
 
 class PageCardItem(dbc.ListGroupItem):
@@ -24,7 +21,7 @@ class PageCardItem(dbc.ListGroupItem):
     # noinspection PyPep8Naming
     def __init__(
         self,
-        children: Collection[C],
+        children: Any,
         class_name: Optional[str] = None,
         className: Optional[str] = None,
         focus: bool = False,
@@ -71,7 +68,7 @@ class PageCard(dbc.Card, MutableSequence[PageCardItem]):
     def insert(self, index: int, item: PageCardItem) -> None:
         self.items.insert(index, item)
 
-    def append(self, *children: C, focus: bool = False) -> None:
+    def append(self, *children: Any, focus: bool = False) -> None:
         self.items.append(PageCardItem(list(children), focus=focus))
 
     def has_items(self) -> bool:
@@ -80,11 +77,11 @@ class PageCard(dbc.Card, MutableSequence[PageCardItem]):
     def add_title(self, title: str) -> None:
         self._body.children.insert(0, html.H4(title, className="card-title"))
 
-    def add_header(self, *children: C, **kwargs) -> None:
+    def add_header(self, *children: Any, **kwargs) -> None:
         children = list(children)
         self.children.insert(0, dbc.CardHeader(children, **kwargs))
 
-    def add_footer(self, *children: C, href: Optional[str] = None, **kwargs) -> None:
+    def add_footer(self, *children: Any, href: Optional[str] = None, **kwargs) -> None:
         children = list(children)
         if href is not None and len(href) > 0:
             children.append(dbc.Button("More", class_name="card-button", href=href))
