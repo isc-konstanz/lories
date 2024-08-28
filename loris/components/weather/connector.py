@@ -61,15 +61,15 @@ class WeatherConnector(Weather, Connector, metaclass=WeatherConnectorMeta):
     def context(self):
         return super(Weather, self).context
 
-    @abstractmethod
-    def has_forecast(self) -> bool:
-        pass
-
     @property
     def forecast(self) -> WeatherForecast:
         if not self.has_forecast() or self._forecast is None:
             raise WeatherException(f"Weather '{self.name}' has no forecast configured")
         return self._forecast
+
+    @abstractmethod
+    def has_forecast(self) -> bool:
+        pass
 
     def get(
         self,
