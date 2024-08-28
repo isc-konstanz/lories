@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Type
 
 from loris.components import Component, ComponentException, ComponentUnavailableException, register_component_type
+from loris.components.weather import WeatherForecast
 from loris.core import ActivatorMeta, Configurations, Context
 from loris.location import Location, LocationUnavailableException
 
@@ -97,6 +98,13 @@ class Weather(Component, metaclass=WeatherMeta):
     @property
     def location(self) -> Location:
         return self._location
+
+    @property
+    def forecast(self) -> WeatherForecast:
+        raise WeatherException(f"Weather '{self.name}' cannot forecast")
+
+    def has_forecast(self) -> bool:
+        return False
 
 
 class WeatherException(ComponentException):
