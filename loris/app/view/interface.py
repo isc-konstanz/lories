@@ -8,7 +8,10 @@ loris.app.view.interface
 
 from __future__ import annotations
 
+import os
+import shutil
 from importlib import resources
+from pathlib import Path
 from typing import Optional
 
 # import logging
@@ -35,20 +38,52 @@ class ViewInterfaceMeta(InterfaceMeta):
 class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
     def __init__(self, context: Application, configs: Configurations) -> None:
         view_path = resources.files("loris.app.view")
+
+        def get_custom_path(key: str) -> Path:
+            custom_path = view_path.joinpath(key)
+            if "pages" in configs:
+                if os.path.isabs(configs[key]):
+                    custom_path = Path(configs[key])
+                else:
+                    custom_path = Path(configs.dirs.data, configs[key])
+            if not custom_path.exists():
+                custom_path.mkdir(exist_ok=True)
+            return custom_path
+
+        pages_path = get_custom_path("pages")
+        assets_path = get_custom_path("assets")
+        assets_default = view_path.joinpath("assets")
+        if assets_default != assets_path:
+
+            def copy_assets(src, dest):
+                dest = Path(dest)
+                if dest.is_dir():
+                    return
+                if dest.exists() or dest.suffix not in [".ico", ".png", ".jpg", ".jpeg", ".css"]:
+                    return
+                shutil.copy2(src, dest)
+
+            shutil.copytree(
+                str(assets_default),
+                str(assets_path),
+                dirs_exist_ok=True,
+                copy_function=copy_assets
+            )
+
         super().__init__(
             name=context.name,
             title=context.name,
             context=context,
             configs=configs,
             external_stylesheets=[themes.BOOTSTRAP],
-            assets_folder=str(view_path.joinpath("assets")),
-            pages_folder=str(view_path.joinpath("pages")),
+            assets_folder=str(assets_path),
+            pages_folder=str(pages_path),
             use_pages=True,
             server=True,  # TODO: Probably replace this with local Flask server, to create custom REST API ?
         )
         theme = configs.get_section("theme", defaults={
             "name": context.name,
-            "logo": view_path.joinpath("assets", "logo.png")
+            "logo": assets_path.joinpath("logo.png")
         })
         header = PageHeader(**theme)
         footer = PageFooter()
