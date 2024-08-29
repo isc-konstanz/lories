@@ -14,8 +14,10 @@ import re
 from abc import abstractmethod
 from collections import OrderedDict
 from copy import deepcopy
-from typing import Callable, Collection, Iterator, Optional, Type, TypeVar, get_args
+from itertools import chain
+from typing import Any, Callable, Collection, Iterator, Optional, Tuple, Type, TypeVar, get_args
 
+import pandas as pd
 from loris.core import Configurations, Context, Directories, ResourceException
 from loris.core.register import Registrator, Registry
 
@@ -140,11 +142,14 @@ class RegistratorContext(Context[R]):
         return values
 
     def _sort(self):
-        def convert(text: str) -> int | str:
-            return int(text) if text.isdigit() else text
+        def order(text: str) -> Tuple[Any, ...]:
+            elements = re.split(r"[^0-9A-Za-zäöüÄÖÜß]+", text)
+            elements = list(chain(*[re.split(r"([0-9])+", t) for t in elements]))
+            elements = [int(t) if t.isdigit() else t for t in elements if pd.notna(t) and t.strip()]
+            return tuple(elements)
 
         self.__map = OrderedDict(
-            sorted(self.__map.items(), key=lambda e: [convert(t) for t in re.split("([0-9]+)", e[0])])
+            sorted(self.__map.items(), key=lambda e: order(e[0]))
         )
 
     # noinspection PyShadowingBuiltins
