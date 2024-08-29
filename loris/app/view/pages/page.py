@@ -17,6 +17,7 @@ from typing import Optional, TypeVar
 import dash
 from dash.development.base_component import Component
 
+import pandas as pd
 from loris.app import InterfaceException
 from loris.app.view.pages.layout import PageLayout
 
@@ -44,6 +45,8 @@ class Page(ABC, metaclass=PageMeta):
     title: str
     description: Optional[str]
 
+    order: int = 100
+
     layout: PageLayout
 
     _created: bool = False
@@ -55,7 +58,9 @@ class Page(ABC, metaclass=PageMeta):
         name: str,
         title: Optional[str] = None,
         description: Optional[str] = None,
-        *args, **kwargs
+        order: Optional[int] = None,
+        *args,
+        **kwargs,
     ) -> None:
         super().__init__()
         self._logger = logging.getLogger(self.__module__)
@@ -64,6 +69,9 @@ class Page(ABC, metaclass=PageMeta):
         self.name = name
         self.title = title if title is not None else name
         self.description = description
+
+        if not pd.isna(order):
+            self.order = order
 
     @property
     @abstractmethod

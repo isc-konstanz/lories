@@ -8,9 +8,12 @@ loris.app.view.pages.group
 
 from __future__ import annotations
 
-from collections.abc import MutableSequence
-from typing import Collection, Generic, Iterator, List, Optional, TypeVar
+import re
+from collections.abc import MutableSequence, Sequence
+from itertools import chain
+from typing import Any, Collection, Generic, Iterator, List, Optional, Tuple, TypeVar
 
+import pandas as pd
 from loris.app.view.pages import Page
 
 P = TypeVar("P", bound=Page)
@@ -19,6 +22,8 @@ P = TypeVar("P", bound=Page)
 # noinspection PyAbstractClass
 class PageGroup(Page, MutableSequence[P], Generic[P]):
     _pages: List[P]
+
+    order: int = 1000
 
     # noinspection PyShadowingBuiltins
     def __init__(self, pages: Optional[Collection[P]] = None, *args, **kwargs) -> None:
@@ -47,6 +52,16 @@ class PageGroup(Page, MutableSequence[P], Generic[P]):
 
     def insert(self, index, value) -> None:
         self._pages.insert(index, value)
+
+    def sort(self) -> Sequence[Page]:
+        def order(page: Page) -> Tuple[Any, ...]:
+            elements = re.split(r"[^0-9A-Za-zäöüÄÖÜß]+", page.id)
+            elements = list(chain(*[re.split(r"([0-9])+", t) for t in elements]))
+            elements = [int(t) if t.isdigit() else t for t in elements if pd.notna(t) and t.strip()]
+            return page.order, *elements
+
+        self._pages.sort(key=lambda p: order(p))
+        return self._pages
 
     @property
     def path(self) -> str:

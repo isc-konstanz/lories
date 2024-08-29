@@ -8,7 +8,10 @@ loris.app.view.pages.components.system
 
 from __future__ import annotations
 
+from typing import Optional
+
 import dash_bootstrap_components as dbc
+from dash import html
 
 from loris import System
 from loris.app.view.pages import PageLayout, register_component_page
@@ -24,14 +27,18 @@ class SystemPage(ComponentGroup, ComponentPage[System]):
     def path(self) -> str:
         return f"/{self._component.TYPE}/{self._encode_id(self._component.key)}"
 
-    def _create_data_layout(self, layout: PageLayout, **_) -> None:
+    def _create_data_layout(self, layout: PageLayout, title: Optional[str] = "Data") -> None:
         if len(self.data.channels) > 0:
+            data = []
+            if title is not None:
+                data.append(html.H5(f"{title}:"))
+            data.append(self._build_data())
             layout.append(
                 dbc.Row(
                     dbc.Col(
-                        dbc.Card(dbc.CardBody(self._build_data())),
-                    ),
-                ),
+                        dbc.Card(dbc.CardBody(data))
+                    )
+                )
             )
 
     def _do_create_layout(self) -> PageLayout:

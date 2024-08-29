@@ -36,7 +36,8 @@ class ComponentGroup(PageGroup[ComponentPage[C]], Generic[C]):
         layout.append(
             dbc.Row(dbc.Col(html.H4(f"{self.name}:")))
         )
-        for page in self._pages:
+
+        for page in self.sort():
             if page.layout.has_card_items():
                 layout.append(
                     dbc.Row(
