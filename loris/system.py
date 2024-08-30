@@ -13,13 +13,16 @@ from shutil import copytree, ignore_patterns
 from typing import List, Optional
 
 import pandas as pd
-from loris import Configurations, ConfigurationException, Location, LocationUnavailableException, Settings
-from loris.components import Component, ComponentContext, Weather, WeatherUnavailableException
+from loris import ConfigurationException, Configurations, Settings
+from loris.components import Component, Weather, WeatherUnavailableException
+from loris.components.context import ComponentContext
+from loris.core import Context, RegistratorContext
 from loris.data.context import DataContext
+from loris.location import Location, LocationUnavailableException
 from loris.util import parse_id
 
 
-class System(ComponentContext, Component):
+class System(Component, ComponentContext):
     TYPE: str = "system"
 
     _location: Optional[Location] = None
@@ -27,16 +30,16 @@ class System(ComponentContext, Component):
     # noinspection PyShadowingBuiltins
     @classmethod
     def copy(cls, settings: Settings) -> bool:
-        configs = Configurations(f"{cls.__name__.lower()}.conf", **settings.dirs.encode())
-        if "id" in configs:
-            id = parse_id(configs["id"])
+        configs = Configurations.load(f"{cls.__name__.lower()}.conf", **settings.dirs.encode())
+        if "key" in configs:
+            key = parse_id(configs["key"])
         elif "name" in configs:
-            id = parse_id(configs["name"])
-            configs["id"] = id
+            key = parse_id(configs["name"])
+            configs["key"] = key
         else:
             raise ConfigurationException("Invalid configuration, missing specified system name")
 
-        configs.dirs._data = os.path.join(configs.dirs.data, id)
+        configs.dirs._data = os.path.join(configs.dirs.data, key)
 
         if os.path.isdir(configs.dirs.data):
             return False
@@ -69,24 +72,43 @@ class System(ComponentContext, Component):
     def load(cls, context: DataContext = None, **kwargs) -> System:
         return cls(context, Configurations.load(f"{cls.__name__.lower()}.conf", **kwargs))
 
-    def __init__(self, context: DataContext, configs: Configurations, *args, **kwargs) -> None:
-        super().__init__(context, configs, *args, **kwargs)
+    def __repr__(self) -> str:
+        return Component.__repr__(self)
 
-    # noinspection PyShadowingNames
+    def __str__(self) -> str:
+        return Component.__str__(self)
+
+    # noinspection PyShadowingNames, PyArgumentList
     def __getattr__(self, attr):
         # __getattr__ gets called when the item is not found via __getattribute__
         # To avoid recursion, call __getattribute__ directly to get components dict
-        components = ComponentContext.__getattribute__(self, f"_{ComponentContext.__name__}__components")
+        components = RegistratorContext.__getattribute__(self, f"_{RegistratorContext.__name__}__map")
         if attr in components.keys():
             return components[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no component '{attr}'")
 
+    # noinspection PyProtectedMember
+    def _add(self, *components: Component) -> None:
+        for component in components:
+            super()._set(component.key, component)
+            self.context.components._set(component.id, component)
+
+    # noinspection PyProtectedMember
+    def _update(self, context: Context, configs: Configurations) -> Component:
+        component = self._new(context, configs)
+        if component.key in self:
+            self._get(component.key).configs.update(configs)
+        else:
+            self._add(component)
+        return component
+
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self.localize(configs.get_section(Location.SECTION, defaults={"enabled": False}))
+        self._sort()
+        self.localize(configs.get_section(Location.SECTION, defaults={}))
 
     def localize(self, configs: Configurations) -> None:
-        if configs.enabled:
+        if configs.enabled and all(k in configs for k in ["latitude", "longitude"]):
             self._location = Location(
                 configs.get_float("latitude"),
                 configs.get_float("longitude"),
@@ -99,18 +121,6 @@ class System(ComponentContext, Component):
             self._location = None
 
     @property
-    def uuid(self) -> str:
-        return self._uuid
-
-    @property
-    def id(self) -> str:
-        return self._uuid
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @property
     def location(self) -> Location:
         if self._location is None:
             raise LocationUnavailableException(f"System '{self.name}' has no location configured")
@@ -121,11 +131,7 @@ class System(ComponentContext, Component):
     def weather(self) -> Weather:
         if not self.has_component(Weather.TYPE):
             raise WeatherUnavailableException(f"System '{self.name}' has no weather configured")
-        return self.get_component_type(Weather.TYPE)[0]
-
-    @property
-    def data(self):
-        return self.__data
+        return next(self.get_component_type(Weather.TYPE))
 
     @property
     def type(self) -> str:

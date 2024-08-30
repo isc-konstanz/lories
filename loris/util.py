@@ -12,43 +12,69 @@ import datetime as dt
 import re
 from copy import copy
 from dateutil.relativedelta import relativedelta
-from typing import Any, Callable, List, Mapping, Optional, Tuple, Type
+from typing import Any, Callable, Collection, Dict, List, Optional, Tuple, Type, TypeVar
 
 import numpy as np
 import pandas as pd
 import pytz as tz
+from loris.core import Context, ResourceException
 from pandas.tseries.frequencies import to_offset
 
 # noinspection SpellCheckingInspection
 INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
 
-
-# noinspection PyShadowingBuiltins
-def get_variables(object: Any, type: Type) -> Mapping[str, Any]:
-    private = _get_variables(object, lambda attr, member: isinstance(member, type) and "__" in attr)
-    return _get_variables(object, lambda attr, member: isinstance(member, type) and member not in private.values())
+C = TypeVar("C", bound=Context)
+V = TypeVar("V")
 
 
 # noinspection PyShadowingBuiltins
-def _get_variables(object: Any, filter: Callable) -> Mapping[str, Any]:
-    return get_members(object, lambda attr, member: not callable(member) and filter(attr, member))
+def get_context(object: Any, type: Type[C] | Collection[Type[C]]) -> Optional[C]:
+    _context = object
+    if _context is None:
+        return _context
+    while not isinstance(_context, type):
+        try:
+            _context = _context.context
+        except AttributeError:
+            raise ResourceException(f"Invalid context type: {object.__class__}")
+    return _context
+
+
+# noinspection PyShadowingBuiltins, PyShadowingNames
+def get_variables(
+    obj: Any,
+    include: Optional[Type[V]] = object,
+    exclude: Optional[Type | Tuple[Type, ...]] = None
+) -> List[V]:
+    def _is_type(o) -> bool:
+        return isinstance(o, include) and (exclude is None or not isinstance(o, exclude))
+
+    if isinstance(obj, Collection):
+        return [o for o in obj if _is_type(o)]
+    return list(get_members(obj, lambda attr, member: _is_type(member)).values())
 
 
 # noinspection PyShadowingBuiltins
-def get_members(object: Any, filter: Callable = None) -> Mapping[str, Any]:
-    from loris import LocalResourceException
-
+def get_members(
+    obj: Any,
+    filter: Optional[Callable] = None,
+    private: bool = False
+) -> Dict[str, Any]:
     members = dict()
     processed = set()
-    for attr in dir(object):
+    for attr in dir(obj):
         try:
-            member = getattr(object, attr)
+            member = getattr(obj, attr)
             # Handle duplicate attr
             if attr in processed:
                 raise AttributeError
-        except (AttributeError, LocalResourceException):
+        except (AttributeError, ResourceException):
             continue
-        if member not in members.values() and (filter and filter(attr, member)):
+        if (
+            (private or "__" not in attr) and
+            (filter is None or filter(attr, member)) and
+            member not in members.values()
+        ):
             members[attr] = member
         processed.add(attr)
     return dict(sorted(members.items()))
@@ -312,14 +338,23 @@ def _parse_freq(f: str) -> str:
         raise ValueError(f"Invalid frequency: {f}")
 
 
-def parse_id(s: str) -> str:
+def parse_name(name: str) -> str:
+    return " ".join(
+        [
+            s.upper() if len(s) <= 3 else s.title()
+            for s in re.sub(r"[,._\- ]", " ", re.sub(r"[^0-9A-Za-zäöüÄÖÜß%&;:()_.\- ]+", "", name)).split()
+        ]
+    )
+
+
+# noinspection PyShadowingBuiltins
+def parse_id(id: str) -> str:
     for c in INVALID_CHARS:
-        s = s.replace(c, "_")
-    return re.sub("[^\\w]+", "", s).lower()
+        id = id.replace(c, "_")
+    return re.sub("[^\\w]+", "", id).lower()
 
 
-class ConversionException(Exception):
+class ConversionException(ResourceException):
     """
     Raise if a conversion failed
-
     """

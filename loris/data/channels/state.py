@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-loris.core.channels.state
+loris.data.channels.state
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
@@ -23,3 +23,6 @@ class ChannelState(Enum):
 
     UNKNOWN_ERROR = "UNKNOWN_ERROR"
     ARGUMENT_SYNTAX_ERROR = "ARGUMENT_SYNTAX_ERROR"
+
+    def __str__(self):
+        return str(self.value)

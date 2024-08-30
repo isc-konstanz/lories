@@ -11,22 +11,8 @@ from __future__ import annotations
 from typing import Optional
 
 import pytz as tz
-from loris import LocalResourceException, LocalResourceUnavailableException
+from loris.core import ResourceException, ResourceUnavailableException
 from loris.util import to_timezone
-
-
-class LocationException(LocalResourceException):
-    """
-    Raise if an error occurred accessing the location.
-
-    """
-
-
-class LocationUnavailableException(LocalResourceUnavailableException, LocationException):
-    """
-    Raise if a configured location access can not be found.
-
-    """
 
 
 class Location:
@@ -74,7 +60,11 @@ class Location:
 
     def __repr__(self):
         attrs = ["latitude", "longitude", "altitude", "timezone"]
-        return f"\t{Location.SECTION}: \n" + "\t\n".join(f"{attr}: {str(getattr(self, attr))}" for attr in attrs)
+        return f"{type(self).__name__}({', '.join(f'{attr}={str(getattr(self, attr))}' for attr in attrs)})"
+
+    def __str__(self):
+        attrs = ["latitude", "longitude", "altitude", "timezone"]
+        return f"{type(self).__name__}:\n" + "\n\t".join(f"{attr} = {str(getattr(self, attr))}" for attr in attrs)
 
     @property
     def timezone(self) -> tz.BaseTzInfo:
@@ -85,3 +75,17 @@ class Location:
         if self._altitude is None:
             return 0.0
         return self._altitude
+
+
+class LocationException(ResourceException):
+    """
+    Raise if an error occurred accessing the location.
+
+    """
+
+
+class LocationUnavailableException(ResourceUnavailableException, LocationException):
+    """
+    Raise if a configured location access can not be found.
+
+    """

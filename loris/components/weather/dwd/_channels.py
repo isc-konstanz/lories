@@ -1,27 +1,24 @@
 # -*- coding: utf-8 -*-
 """
-loris.component.weather.dwd._channels
+loris.connector.weather.dwd._channels
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
 
-from collections import OrderedDict
-from typing import Any, Dict
+from typing import Any, Collection, Dict
 
-from loris.components.weather import WEATHER as CHANNEL_NAMES
 from loris.components.weather import Weather
+from loris.components.weather.constants import WEATHER as CHANNEL_NAMES
 
 CHANNEL_IDS = [
     Weather.GHI,
     Weather.TEMP_AIR,
     Weather.TEMP_DEW_POINT,
-    Weather.HUMIDITY_REL,
     Weather.PRESSURE_SEA,
     Weather.WIND_SPEED,
     Weather.WIND_SPEED_GUST,
     Weather.WIND_DIRECTION,
-    Weather.WIND_DIRECTION_GUST,
     Weather.CLOUD_COVER,
     Weather.SUNSHINE,
     Weather.VISIBILITY,
@@ -49,32 +46,30 @@ CHANNEL_TYPES = {
 }
 
 
-def _parse_name(channel_id: str) -> str:
-    return channel_id.replace("_", " ").title() if channel_id not in CHANNEL_NAMES else CHANNEL_NAMES[channel_id]
+def _parse_name(key: str) -> str:
+    return key.replace("_", " ").title() if key not in CHANNEL_NAMES else CHANNEL_NAMES[key]
 
 
-def _parse_address(channel_id: str) -> str:
-    return channel_id if channel_id not in CHANNEL_ADDRESS_ALIAS else CHANNEL_ADDRESS_ALIAS[channel_id]
+def _parse_address(key: str) -> str:
+    return key if key not in CHANNEL_ADDRESS_ALIAS else CHANNEL_ADDRESS_ALIAS[key]
 
 
-def _parse_value_type(channel_id: str) -> type:
-    return CHANNEL_TYPE_DEFAULT if channel_id not in CHANNEL_TYPES else CHANNEL_TYPES[channel_id]
+def _parse_type(key: str) -> type:
+    return CHANNEL_TYPE_DEFAULT if key not in CHANNEL_TYPES else CHANNEL_TYPES[key]
 
 
-def _parse_channel(channel_id: str) -> Dict[str, Any]:
-    channel = {
-        "id": channel_id,
-        "name": _parse_name(channel_id),
-        "address": _parse_address(channel_id),
-        "value_type": _parse_value_type(channel_id),
-    }
-    if channel["value_type"] == str:  # noqa: E721
-        channel["value_length"] = 32
+def _parse_channel(key: str, **channel: Any) -> Dict[str, Any]:
+    channel["key"] = key
+    channel["name"] = _parse_name(key)
+    channel["address"] = _parse_address(key)
+    channel["type"] = _parse_type(key)
+    if channel["type"] == str:  # noqa: E721
+        channel["length"] = 32
     return channel
 
 
-def parse_defaults(uuid: str) -> Dict[str, Any]:
-    channel_defaults = OrderedDict({"connector": uuid})
-    for channel_id in CHANNEL_IDS:
-        channel_defaults[channel_id] = _parse_channel(channel_id)
-    return channel_defaults
+def get_channels(**channel: Any) -> Collection[Dict[str, Any]]:
+    channels = []
+    for channel_key in CHANNEL_IDS:
+        channels.append(_parse_channel(channel_key, **channel))
+    return channels

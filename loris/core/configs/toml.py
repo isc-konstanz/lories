@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.configs.toml
-~~~~~~~~~~~~~~~~~~
+loris.core.configs.toml
+~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """

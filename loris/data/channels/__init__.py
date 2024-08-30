@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.channels
-~~~~~~~~~~~~~~
+loris.data.channels
+~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -12,4 +12,4 @@ from .connector import ChannelConnector  # noqa: F401
 
 from .channel import Channel  # noqa: F401
 
-from .collection import Channels  # noqa: F401
+from .channels import Channels  # noqa: F401

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-loris.data.context
+loris.data.mapping
 ~~~~~~~~~~~~~~~~~~
 
 
@@ -8,110 +8,165 @@ loris.data.context
 
 from __future__ import annotations
 
-import os
+from collections import OrderedDict
 from collections.abc import Mapping
+from copy import deepcopy
+from typing import Any, Callable, Collection, Iterator, List, Optional, Tuple
 
-from loris import Channel, Channels, ConfigurationException, Configurations, Configurator, LocalResourceException
-from loris.components import ComponentContext
-from loris.connectors import ConnectorContext
-from loris.data import DataMapping
+import numpy as np
+import pandas as pd
+from loris.core import ConfigurationException, Configurations, Context, Directories, Registrator, ResourceException
+from loris.data.channels import Channel, Channels
 
 
-class DataContext(Configurator, DataMapping):
-    _connectors: ConnectorContext
-    _components: ComponentContext
+class DataContext(Context[Channel]):
+    SECTION: str = "data"
 
-    def __init__(self, configs: Configurations, *args, **kwargs) -> None:
-        super().__init__(configs, *args, **kwargs)
-        self._connectors = ConnectorContext(configs)
-        self._components = ComponentContext(configs)
+    _channels: OrderedDict[str, Channel]
 
-    def configure(self, configs: Configurations) -> None:
-        super().configure(configs)
-        self._do_load_from_file(configs.dirs.conf)
+    def __init__(self, channels=(), *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._channels = OrderedDict(channels)
 
-    # noinspection PyTypeChecker, PyProtectedMember, PyUnresolvedReferences
-    def _do_load_from_file(
-        self,
-        configs_dir: str,
-        configs_file: str = "channels.conf",
-        prefix_uuid: str = None
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({[c.key for c in self._channels.values()]})"
+
+    def __str__(self) -> str:
+        return f"{type(self).__name__}:\n\t" + "\n\t".join([f"{i} = {repr(c)}" for i, c in self._channels.items()])
+
+    def __getitem__(self, key: str) -> Channel:
+        return self._get(key)
+
+    def __contains__(self, channel: str | Channel) -> bool:
+        if isinstance(channel, str):
+            return channel in self._channels.keys()
+        if isinstance(channel, Channel):
+            return channel in self._channels.values()
+        return False
+
+    def __len__(self) -> int:
+        return len(self._channels)
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._channels)
+
+    def _load(
+         self,
+         context: Registrator,
+         configs: Configurations
     ) -> None:
-        configs_path = os.path.join(configs_dir, configs_file)
-        if os.path.isfile(configs_path):
-            configs_dirs = self.configs.dirs.encode()
-            configs_dirs["conf_dir"] = configs_dir
-            configs = Configurations.load(configs_file, **configs_dirs)
-            self._do_load_sections(configs, prefix_uuid)
+        defaults = {}
+        configs = configs.copy()
+        if configs.has_section(self.SECTION):
+            data = configs.get_section(self.SECTION)
+            defaults.update(self._parse_defaults(data))
+            if data.has_section("channels"):
+                self._load_sections(context, data.get_section("channels"), defaults)
+        self._load_from_file(context, configs.dirs, defaults=defaults)
 
-    def _do_load_sections(
+    def _load_sections(
         self,
+        context: Registrator,
         configs: Configurations,
-        prefix_uuid: str = None
-    ) -> None:
-        channel_ids = [
-            i for i in configs.keys() if (isinstance(configs[i], Mapping) and i not in ["logger", "connector"])
-        ]
-        channels = {i: configs.pop(i) for i in channel_ids}
-        for channel_id, channel_section in channels.items():
-            channel_uuid = channel_id if prefix_uuid is None else f"{prefix_uuid}.{channel_id}"
-            channel_configs = configs.copy()
-            channel_configs.update(channel_section)
-            channel_configs.set("uuid", channel_uuid)
-            channel_configs.set("id", channel_id)
+        defaults: Optional[Mapping[str, Any]] = None
+    ) -> Collection[Channel]:
+        channels = []
+        if defaults is None:
+            defaults = {}
+        defaults.update(self._parse_defaults(configs))
+        for channel_key in [i for i in configs.keys() if i not in defaults]:
+            channel_configs = deepcopy(defaults)
+            channel_configs.update(configs.get_section(channel_key))
 
-            for connector_type in ["logger", "connector"]:
-                connector = channel_configs.get(connector_type, None)
-                if not connector:
-                    continue
-                if isinstance(connector, str):
-                    channel_configs[connector_type] = connector = {"connector": connector}
-                elif not isinstance(connector, Mapping):
-                    raise ConfigurationException(f"Invalid channel {connector_type} type: " + str(connector))
-                if "connector" in connector:
-                    connector_uuid = connector["connector"]
-                    if prefix_uuid is not None:
-                        connector_uuid = f"{prefix_uuid}.{connector['connector']}"
-                    if connector_uuid in self.connectors.keys():
-                        channel_configs[connector_type]["connector"] = connector_uuid
+            channel_key = channel_configs.pop("key", channel_key)
+            channel_id = f"{context.id}.{channel_key}"
+            channels.append(self._update(id=channel_id, key=channel_key, **channel_configs))
+        return channels
 
-            channel = self._new(channel_configs)
+    # noinspection PyProtectedMember
+    def _load_from_file(
+        self,
+        context: Registrator,
+        configs_dirs: Directories,
+        configs_file: str = "channels.conf",
+        defaults: Mapping[str, Any] = None,
+    ) -> Collection[Channel]:
+        channels = []
+        if configs_dirs.conf.joinpath(configs_file).is_file():
+            configs = Configurations(configs_file, deepcopy(configs_dirs))
+            configs._load()
+            channels.extend(self._load_sections(context, configs, defaults))
+        return channels
 
-            # TODO: Implement channel config update
-            # if channel.uuid in self:
-            #     self.__get(channel.uuid).update(channel_configs)
-            # else:
-            #     self._add(channel)
-            self._add(channel)
+    @staticmethod
+    def _parse_defaults(configs: Configurations) -> Mapping[str, Any]:
+        return {k: v for k, v in configs.items() if not isinstance(v, Mapping) or k in ["logger", "connector"]}
 
-    def __get(self, uuid: str) -> Channel:
-        return self._channels.get(uuid)
+    def _get(self, key: str) -> Channel:
+        return self._channels.get(key)
 
-    # noinspection PyMethodMayBeStatic
-    def _new(self, configs: Configurations) -> Channel:
-        return Channel(**configs)
+    def _set(self, key: str, channel: Channel) -> None:
+        self._channels[key] = channel
 
     def _add(self, channel: Channel) -> None:
         if not isinstance(channel, Channel):
-            raise LocalResourceException(f"Invalid channel type: {type(channel)}")
+            raise ResourceException(f"Invalid channel type: {type(channel)}")
 
-        if channel.uuid in self._channels.keys():
-            raise ConfigurationException(f'Channel with UUID "{channel.uuid}" already exists')
+        if channel.id in self._channels.keys():
+            raise ConfigurationException(f'Channel with UUID "{channel.id}" already exists')
 
         # TODO: connector sanity check
-        self._channels[channel.uuid] = channel
+        self._set(channel.id, channel)
 
-    def _remove(self, uuid: str) -> None:
-        del self._channels[uuid]
+    # noinspection PyShadowingBuiltins
+    def _new(self, key: str, id: str = None, **configs: Any) -> Channel:
+        for connector_type in ["logger", "connector"]:
+            connector = configs.get(connector_type, None)
+            if not connector:
+                continue
+            if isinstance(connector, str):
+                configs[connector_type] = connector = {"connector": connector}
+            elif not isinstance(connector, Mapping):
+                raise ConfigurationException(f"Invalid channel {connector_type} type: " + str(connector))
+            if "connector" in connector:
+                connector_id = connector["connector"]
+                if not connector_id.startswith(self.id):
+                    connector_id = id.replace(key, connector["connector"])
+                    if connector_id not in self.connectors.keys():
+                        connector_id = f"{self.id}.{connector['connector']}"
+                configs[connector_type]["connector"] = connector_id
 
-    @property
-    def components(self) -> ComponentContext:
-        return self._components
+        return Channel(id, key, **configs)
 
-    @property
-    def connectors(self) -> ConnectorContext:
-        return self._connectors
+    # noinspection PyShadowingBuiltins
+    def _update(self, id: str, key: str, **configs: Any) -> Channel:
+        channel = self._new(id=id, key=key, **configs)
+
+        # TODO: Implement connector config update
+        # if channel.key in self:
+        #     self._get(channel.key).configs.update(configs)
+        # else:
+        #     self._add(channel)
+        self._add(channel)
+        return channel
+
+    def _remove(self, key: str) -> None:
+        del self._channels[key]
 
     @property
     def channels(self) -> Channels:
-        return self.values()
+        return Channels(self._channels.values())
+
+    # noinspection PyShadowingBuiltins
+    def filter(self, filter: Callable[[Channel], bool]) -> Channels:
+        return Channels([c for c in self._channels.values() if filter(c)])
+
+    # noinspection SpellCheckingInspection
+    def groupby(self, by: str) -> List[Tuple[Any, Channels]]:
+        groups = []
+        for group_by in np.unique([getattr(c, by) for c in self._channels.values()]):
+            groups.append((group_by, self.filter(lambda c: getattr(c, by) == group_by)))
+        return groups
+
+    def to_frame(self, **kwargs) -> pd.DataFrame:
+        return self.channels.to_frame(**kwargs)

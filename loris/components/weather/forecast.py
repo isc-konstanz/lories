@@ -9,50 +9,56 @@ loris.components.weather.forecast
 from __future__ import annotations
 
 import datetime as dt
+from typing import Optional
 
 import pandas as pd
 import pytz as tz
 from loris import Configurations
 from loris.components import Component
-from loris.components.weather.connector import WeatherConnector
+from loris.connectors import Connector
+from loris.util import floor_date, to_date, to_timezone
 
 
 class WeatherForecast(Component):
     TYPE: str = "weather_forecast"
     SECTION: str = "forecast"
 
+    timezone: tz.BaseTzInfo
+
     interval: int = 60
     offset: int = 0
 
-    __connector: WeatherConnector
-
-    def __init__(self, context, connector: WeatherConnector, configs: Configurations) -> None:
-        super().__init__(context, configs)
+    def __init__(self, connector, configs: Configurations) -> None:
+        super().__init__(connector, configs)
         self.__connector = connector
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
+
+        from loris.components.weather import WeatherConnector, WeatherException
+        if isinstance(self.__connector, WeatherConnector):
+            self.timezone = self.__connector.location.timezone
+        elif "timezone" in configs:
+            self.timezone = to_timezone(configs.get("timezone"))
+        else:
+            raise WeatherException(f"Unable to determine timezone for weather forecast '{self.name}'")
+
         self.interval = configs.get_int("interval", default=WeatherForecast.interval)
         self.offset = configs.get_int("offset", default=WeatherForecast.offset)
-
-    def activate(self):
-        pass
-
-    def deactivate(self):
-        pass
 
     @property
     def type(self) -> str:
         return self.TYPE
 
     @property
-    def connector(self) -> WeatherConnector:
+    def connector(self) -> Connector:
         return self.__connector
 
     def get(
         self,
-        start: pd.Timestamp | dt.datetime = pd.Timestamp.now(tz=tz.UTC),
-        end: pd.Timestamp | dt.datetime = None,
+        start: Optional[pd.Timestamp, dt.datetime, str] = None,
+        end: Optional[pd.Timestamp, dt.datetime, str] = None,
+        timezone: Optional[tz.BaseTzInfo | str | int | float] = None,
         **kwargs,
     ) -> pd.DataFrame:
         """
@@ -62,12 +68,17 @@ class WeatherForecast(Component):
             the start timestamp for which forecasted data will be looked up for.
             For many applications, passing datetime.datetime.now() will suffice.
         :type start:
-            :class:`pandas.Timestamp` or datetime
+            :class:`pandas.Timestamp`, datetime or str
 
         :param end:
             the end timestamp for which forecasted data will be looked up for.
         :type end:
-            :class:`pandas.Timestamp` or datetime
+            :class:`pandas.Timestamp`, datetime or str
+
+        :param timezone:
+            the timezone for the timestamps data will be looked up for.
+        :type timezone:
+            :class:`pytz.BaseTzInfo`, str or number
 
         :returns:
             the forecasted data, indexed in a specific time interval.
@@ -75,39 +86,31 @@ class WeatherForecast(Component):
         :rtype:
             :class:`pandas.DataFrame`
         """
-        # # Calculate the available forecast start and end times
-        # timezone = self.location.timezone
-        # end = to_date(end, timezone=timezone)
-        # start = to_date(start, timezone=timezone)
-        #
-        # start_schedule = floor_date(start, self.database.timezone, f"{self.interval}T")
-        # start_schedule += dt.timedelta(minutes=self.offset)
-        # if start_schedule > start:
-        #     start_schedule -= dt.timedelta(minutes=self.interval)
-        #
-        # if self.database.exists(start_schedule):
-        #     forecast = self.database.read_file(start_schedule).tz_convert(timezone)
-        #
-        # elif start < pd.Timestamp.now(timezone):
-        #     raise WeatherException("Unable to read persisted historic forecast")
-        #
-        # else:
-        #     forecast = self.predict(start_schedule, **kwargs)
-        #
-        #     self.database.write_file(forecast, start=start_schedule)
-        #
-        # return self._get_range(forecast, start_schedule, end)
-        return pd.DataFrame()
+        forecast = super().get(start, end, **kwargs)
 
-    # noinspection PyMethodMayBeStatic
-    def _get_range(
-        self,
-        forecast: pd.DataFrame,
-        start: pd.Timestamp | dt.datetime,
-        end: pd.Timestamp | dt.datetime
-    ) -> pd.DataFrame:
-        if start is None or start < forecast.index[0]:
-            start = forecast.index[0]
-        if end is None or end > forecast.index[-1]:
-            end = forecast.index[-1]
-        return forecast[(forecast.index >= start) & (forecast.index <= end)]
+        # Calculate the available forecast start and end times
+        if timezone is None:
+            timezone = self.timezone
+        else:
+            timezone = to_timezone(timezone)
+        end = to_date(end, timezone=timezone)
+        start = to_date(start, timezone=timezone)
+        if start is None:
+            start = pd.Timestamp.now(tz=timezone)
+
+        if forecast.empty or forecast.index[0] > start:
+            forecast_channels = self.data.filter(lambda c: c.has_logger() and c.has_connector(self.connector.id))
+            if len(forecast_channels) > 0:
+                start_schedule = floor_date(start, self.timezone, freq=f"{self.interval}T")
+                start_schedule += pd.Timedelta(minutes=self.offset)
+                if start_schedule > start:
+                    start_schedule -= pd.Timedelta(minutes=self.interval)
+
+                # TODO: Implement reading of logged forecasts
+                # if self.database.exists(start_schedule):
+                #     forecast = self.database.read_file(start_schedule).tz_convert(timezone)
+                #
+                # elif start < pd.Timestamp.now(timezone):
+                #     raise WeatherException("Unable to read persisted historic forecast")
+                forecast = self._get_range(forecast, start_schedule, end, **kwargs)
+        return forecast

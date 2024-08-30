@@ -10,18 +10,18 @@ from __future__ import annotations
 
 import datetime as dt
 import os
-from typing import Mapping, Optional
+from typing import Mapping, Optional, Tuple
 
 import pandas as pd
 import pytz as tz
-from loris.channels import Channels
-from loris.configs import ConfigurationException, Configurations
-from loris.connectors import Connector
+from loris.connectors import Connector, register_connector_type
+from loris.core import ConfigurationException, Configurations, Resources
 from loris.io import csv
-from loris.util import _parse_freq, resample, to_timezone
+from loris.util import _parse_freq, ceil_date, floor_date, to_timezone
 
 
 # noinspection PyShadowingBuiltins
+@register_connector_type
 class CsvConnector(Connector):
     TYPE: str = "csv"
 
@@ -30,9 +30,7 @@ class CsvConnector(Connector):
     _data_dir: str
 
     index_column: str = "timestamp"
-    index_unix: bool = False
-
-    resolution: int = None
+    index_type: str = "timestamp"
 
     override: bool = False
     slice: bool = False
@@ -48,31 +46,34 @@ class CsvConnector(Connector):
 
     columns: Mapping[str, str] = {}
 
-    @property
-    def type(self) -> str:
-        return self.TYPE
-
+    # noinspection PyTypeChecker
     def configure(self, configs: Configurations) -> None:
-        data_dir = configs.get("dir", default=os.getcwd())
-        if "~" in data_dir:
-            data_dir = os.path.expanduser(data_dir)
-        if not os.path.isabs(data_dir):
-            data_dir = os.path.join(configs.dirs.data, data_dir)
-        self._data_dir = data_dir
+        data_dir = configs.get("dir", default=None)
+        if data_dir is not None:
+            if "~" in data_dir:
+                data_dir = os.path.expanduser(data_dir)
+            if not os.path.isabs(data_dir):
+                data_dir = os.path.join(configs.dirs.data, data_dir)
 
         data_path = configs.get("file", default=None)
-        if data_path is not None and not os.path.isabs(data_path):
-            data_path = os.path.join(data_dir, data_path)
+        if data_path is not None:
+            if not os.path.isabs(data_path):
+                if data_dir is None:
+                    data_dir = configs.dirs.data
+                data_path = os.path.join(data_dir, data_path)
+            elif data_dir is None:
+                data_dir = os.path.dirname(data_path)
+
+        if data_dir is None:
+            data_dir = configs.dirs.data
+
+        self._data_dir = data_dir
         self._data_path = data_path
 
         self.index_column = configs.get("index_column", default=CsvConnector.index_column)
-        self.index_unix = configs.get_bool("index_unix", default=CsvConnector.index_unix)
-
-        # TODO: Validate if minutely default resolution is sufficient
-        resolution = configs.get_int("resolution", default=CsvConnector.resolution)
-        if resolution is not None:
-            resolution *= 60
-        self.resolution = resolution
+        self.index_type = configs.get("index_type", default=CsvConnector.index_type).lower()
+        if self.index_type not in ["timestamp", "unix", "none", None]:
+            raise ConfigurationException(f"Unknown index type: {self.index_type}")
 
         self.override = configs.get_bool("override", default=CsvConnector.override)
         self.slice = configs.get_bool("slice", default=CsvConnector.slice)
@@ -108,16 +109,23 @@ class CsvConnector(Connector):
         # TODO: Implement flag if pretty printing should be used or not
         self.columns = configs.get("columns", default=CsvConnector.columns)
 
-    def connect(self, channels: Channels) -> None:
+    def connect(self, resources: Resources) -> None:
+        if not os.path.isdir(self._data_dir):
+            os.makedirs(self._data_dir, exist_ok=True)
+
+        columns = {r.name: r.id for r in self.resources if "name" in r}
+        columns.update({r.name: r.id for r in resources if "name" in r})
+        columns.update({column: key for key, column in self.columns.items()})
+
         if self._data_path is not None:
             self._data = csv.read_file(
                 self._data_path,
                 index_column=self.index_column,
-                index_unix=self.index_unix,
+                index_type=self.index_type,
                 timezone=self.timezone,
                 separator=self.separator,
                 decimal=self.decimal,
-                rename=self.columns,
+                rename=columns,
             )
 
     def disconnect(self) -> None:
@@ -128,36 +136,52 @@ class CsvConnector(Connector):
 
     def read(
         self,
-        channels: Channels,
+        resources: Resources,
         start: Optional[pd.Timestamp, dt.datetime] = None,
         end: Optional[pd.Timestamp, dt.datetime] = None,
-    ) -> None:
-        columns = {c.name: c.id for c in channels if "name" in c}
+    ) -> pd.DataFrame:
+        columns = {r.name: r.id for r in self.resources if "name" in r}
+        columns.update({r.name: r.id for r in resources if "name" in r})
         columns.update({column: key for key, column in self.columns.items()})
 
-        if self._data is not None:
-            data = self._data
-        else:
-            data = csv.read_files(
-                self._data_dir,
-                self.freq,
-                self.format,
-                start,
-                end,
-                index_column=self.index_column,
-                index_unix=self.index_unix,
-                timezone=self.timezone,
-                separator=self.separator,
-                decimal=self.decimal,
-                rename=columns,
-            )
+        def _infer_dates(s=start, e=end) -> Tuple[pd.Timestamp, pd.Timestamp]:
+            if all(pd.isna(d) for d in [s, e]):
+                n = pd.Timestamp.now(tz=self.timezone)
+                s = floor_date(n, timezone=self.timezone, freq=self.freq)
+                e = ceil_date(n, timezone=self.timezone, freq=self.freq)
+            return s, e
 
-        if self.resolution is not None:
-            data = resample(data, self.resolution)
-        return data.loc[start:end, :]
+        try:
+            if self._data is not None:
+                data = self._data
+            else:
+                data = csv.read_files(
+                    self._data_dir,
+                    self.freq,
+                    self.format,
+                    *_infer_dates(),
+                    index_column=self.index_column,
+                    index_type=self.index_type,
+                    timezone=self.timezone,
+                    separator=self.separator,
+                    decimal=self.decimal,
+                    rename=columns,
+                )
 
-    def write(self, channels: Channels) -> None:
-        columns = {c.id: c.name for c in channels if "name" in c}
+            if self.index_type in ["timestamp", "unix"] and all(pd.isna(d) for d in [start, end]):
+                now = pd.Timestamp.now(tz=self.timezone)
+                index = data.index.tz_convert(self.timezone).get_indexer([now], method="nearest")
+                data = data.iloc[[index[-1]], :]
+
+            data = data.rename(columns=columns)
+            return data.loc[:, [r.id for r in resources if r.id in data.columns]]
+
+        except IOError:
+            # TODO: Return more informative ChannelStates or raise ConnectionException (?)
+            return pd.DataFrame()
+
+    def write(self, data: pd.DataFrame) -> None:
+        columns = {r.id: r.name for r in self.resources if "name" in r}
         columns.update(self.columns)
         kwargs = {
             "timezone": self.timezone,
@@ -166,14 +190,10 @@ class CsvConnector(Connector):
             "override": self.override,
             "rename": columns,
         }
-        if self.slice:
-            data = channels.to_frame()
-            data.index.name = self.index_column
-            csv.write_files(channels.to_frame(), self._data_dir, self.freq, self.format, **kwargs)
-        else:
-            for data_time, data_channels in channels.groupby("timestamp"):
-                data = data_channels.to_frame()
-                data.index.name = self.index_column
+        data.index.name = self.index_column
 
-                csv_file = os.path.join(self._data_dir, data_time.strftime(self.format) + ".csv")
-                csv.write_file(data, csv_file, **kwargs)
+        if self.slice:
+            csv.write_files(data, self._data_dir, self.freq, self.format, **kwargs)
+        else:
+            csv_file = os.path.join(self._data_dir, data.index[0].strftime(self.format) + ".csv")
+            csv.write_file(data, csv_file, **kwargs)

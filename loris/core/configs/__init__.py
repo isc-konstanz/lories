@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-loris.configs
-~~~~~~~~~~~~~
+loris.core.configs
+~~~~~~~~~~~~~~~~~~
 
 
 """
 
-from .directories import Directories  # noqa: F401
+from .directories import (  # noqa: F401
+    Directory,
+    Directories,
+)
 
 from .configurations import (  # noqa: F401
     Configurations,

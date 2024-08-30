@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.components.weather
-~~~~~~~~~~~~~~~~~~~~~~~~
+loris.components.weather.constants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """

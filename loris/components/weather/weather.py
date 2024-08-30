@@ -12,18 +12,38 @@ effective irradiance on defined, tilted photovoltaic systems.
 
 from __future__ import annotations
 
-import datetime as dt
-from typing import Collection, Optional
+from typing import Type
 
-import pandas as pd
-from loris import Configurations, Configurator, Location, LocationUnavailableException
-from loris.components import Component, ComponentException, ComponentUnavailableException
-from loris.components.weather import WeatherConnector, WeatherForecast
+from loris.components import Component, ComponentException, ComponentUnavailableException, register_component_type
+from loris.core import ActivatorMeta, Configurations, Context
+from loris.location import Location, LocationUnavailableException
+
+
+class WeatherMeta(ActivatorMeta):
+    def __call__(cls, context: Context, configs: Configurations) -> Weather:
+        _type = configs.get("type", default="default").lower()
+        _cls = cls._get_class(_type)
+        if cls != _cls:
+            return _cls(context, configs)
+
+        return super().__call__(context, configs)
+
+    # noinspection PyShadowingBuiltins
+    def _get_class(cls: Type[Weather], type: str) -> Type[Weather]:
+        if type in ["virtual", "default"]:
+            return cls
+
+        elif type in ["brightsky", "dwd"]:
+            from loris.components.weather.dwd import Brightsky
+            return Brightsky
+
+        raise WeatherException(f"Unknown weather type '{type}'")
 
 
 # noinspection SpellCheckingInspection
-class Weather(Component):
-    TYPE = "weather"
+@register_component_type
+class Weather(Component, metaclass=WeatherMeta):
+    TYPE: str = "weather"
 
     GHI = "ghi"
     DNI = "dni"
@@ -51,54 +71,13 @@ class Weather(Component):
 
     _location: Location
 
-    _forecast: Optional[WeatherForecast] = None
-    _connector: Optional[WeatherConnector] = None
-
     # noinspection PyProtectedMember
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self.localize(configs.get_section(Location.SECTION, defaults={"enabled": False}))
-
-        connector_type = configs.get("type", default="virtual").lower()
-        connector_context = self.context.context.connectors
-        connector_configs = configs.get_section(connector_type, defaults={})
-        connector_configs["id"] = configs.get("id", default=connector_type).lower()
-        connector_configs["uuid"] = f"{self.uuid}.{configs['id']}"
-        if connector_type != "virtual":
-            self._connector = WeatherConnector.load(
-                connector_type,
-                connector_context,
-                connector_configs,
-                self._location
-            )
-            if self._connector.has_forecast() and configs.has_section(WeatherForecast.SECTION):
-                self.configs[WeatherForecast.SECTION]["id"] = f"{self.id}_forecast"
-                self._forecast = WeatherForecast(
-                    self,
-                    self._connector,
-                    configs.get_section(WeatherForecast.SECTION)
-                )
-            connector_context._add(self._connector)
-
-        # TODO: configure default channels
-
-    # noinspection PyProtectedMember
-    def _do_configure_members(self, configurators: Collection[Configurator]) -> None:
-        configurators = list(configurators)
-
-        # Update local configurator variables manually to ensure correct order
-        if self._has_connector():
-            self._connector._do_configure()
-            self.configs.update(self._connector._get_config_defaults(), replace=False)
-            configurators.remove(self._connector)
-        if self.has_forecast():
-            self._forecast._do_configure()
-            configurators.remove(self._forecast)
-
-        super()._do_configure_members(configurators)
+        self.localize(configs.get_section(Location.SECTION, defaults={}))
 
     def localize(self, configs: Configurations) -> None:
-        if configs.enabled:
+        if configs.enabled and all(k in configs for k in ["latitude", "longitude"]):
             self._location = Location(
                 configs.get_float("latitude"),
                 configs.get_float("longitude"),
@@ -111,77 +90,13 @@ class Weather(Component):
             try:
                 self._location = self.context.location
                 if not isinstance(self._location, Location):
-                    raise WeatherException(f"Invalid location type for weather '{self.uuid}': {type(self._location)}")
-            except (LocationUnavailableException, AttributeError) as e:
-                raise WeatherException(f"Unable to find valid location for weather: {self.name}", e)
-
-    def activate(self) -> None:
-        super().activate()
-
-    def deactivate(self) -> None:
-        super().deactivate()
-
-    def has_forecast(self) -> bool:
-        return self._forecast is not None
+                    raise WeatherException(f"Invalid location type for weather '{self.id}': {type(self._location)}")
+            except (LocationUnavailableException, AttributeError):
+                raise WeatherException(f"Missing location for weather '{self.id}'")
 
     @property
-    def forecast(self) -> WeatherForecast:
-        if not self._forecast:
-            raise WeatherException(f"Weather '{self.name}' has no forecast configured")
-        return self._forecast
-
-    def _has_connector(self) -> bool:
-        return self._connector is not None
-
-    @property
-    def connector(self) -> WeatherConnector:
-        if not self._connector:
-            raise WeatherException(f"Weather '{self.name}' has no connector available")
-        return self._connector
-
-    @property
-    def type(self) -> str:
-        return self.TYPE
-
-    def get(
-        self,
-        start: pd.Timestamp | dt.datetime = None,
-        end: pd.Timestamp | dt.datetime = None,
-        **kwargs
-    ) -> pd.DataFrame:
-        """
-        Retrieves the weather data for a specified time interval
-
-        :param start:
-            the start timestamp for which weather data will be looked up for.
-            For many applications, passing datetime.datetime.now() will suffice.
-        :type start:
-            :class:`pandas.Timestamp` or datetime
-
-        :param end:
-            the end timestamp for which weather data will be looked up for.
-        :type end:
-            :class:`pandas.Timestamp` or datetime
-
-        :returns:
-            the weather data, indexed in a specific time interval.
-
-        :rtype:
-            :class:`pandas.DataFrame`
-        """
-        return self._get_range(self.data.to_frame(), start, end)
-
-    @staticmethod
-    def _get_range(
-        data: pd.DataFrame,
-        start: pd.Timestamp | dt.datetime,
-        end: pd.Timestamp | dt.datetime
-    ) -> pd.DataFrame:
-        if start is not None:
-            data = data[data.index >= start]
-        if end is not None:
-            data = data[data.index <= end]
-        return data
+    def location(self) -> Location:
+        return self._location
 
 
 class WeatherException(ComponentException):

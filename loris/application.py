@@ -8,28 +8,42 @@ loris.application
 
 from __future__ import annotations
 
+import logging
+import signal
 from threading import Event, Thread
-from typing import Type
+from typing import Collection, Type
 
 import pandas as pd
 import pytz as tz
 from loris import Channel, Settings, System
+from loris.components import ComponentContext
+from loris.connectors import ConnectorContext
 from loris.data.manager import DataManager
 from loris.util import floor_date, to_timedelta
 
 
-def load(name: str = "Loris", factory: Type[System] = System, **kwargs) -> Application:
-    return Application(Settings(name, **kwargs)).setup(factory)
-
-
 class Application(DataManager, Thread):
+    TYPE: str = "app"
+    SECTION: str = "application"
+    SECTIONS: Collection[str] = [ComponentContext.SECTION, ConnectorContext.SECTION]
+
     _interval: int
     __interrupt: Event = Event()
 
+    @classmethod
+    def load(cls, name: str, factory: Type[System] = System, **kwargs) -> Application:
+        app = cls(Settings(name, **kwargs))
+        app.setup(factory)
+        return app
+
     def __init__(self, settings: Settings, **kwargs) -> None:
-        super().__init__(settings, name=settings.application, **kwargs)
+        super().__init__(settings, name=settings["name"], **kwargs)
         self.__interrupt = Event()
         self.__interrupt.set()
+        self._logger = logging.getLogger(self.key)
+
+        signal.signal(signal.SIGINT, self.interrupt)
+        signal.signal(signal.SIGTERM, self.terminate)
 
     def __eq__(self, other):
         return self is other
@@ -41,40 +55,32 @@ class Application(DataManager, Thread):
         super().configure(settings)
         self._interval = settings.get_int("interval", default=1)
 
-    def setup(self, factory: Type[System]) -> Application:
-        self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
-        self._do_load_systems(self.settings, factory)
-        self._do_configure()
-        return self
-
     # noinspection PyProtectedMember
-    def _do_load_systems(self, settings: Settings, factory: Type[System]) -> None:
+    def setup(self, factory: Type[System]) -> None:
+        self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
         systems = []
-        systems_flat = settings.get_bool("system_flat", default=False)
-        system_dirs = settings.dirs.encode()
+        systems_flat = self.settings.get_bool("system_flat", default=False)
+        system_dirs = self.settings.dirs.encode()
         system_dirs["conf_dir"] = None
-        if settings.get_bool("system_scan", default=False):
-            if settings.get_bool("system_copy", default=False):
-                factory.copy(settings)
-            system_dirs["scan_dir"] = settings.dirs.data
+        if self.settings.get_bool("system_scan", default=False):
+            if self.settings.get_bool("system_copy", default=False):
+                factory.copy(self.settings)
+            system_dirs["scan_dir"] = str(self.settings.dirs.data)
             for system in factory.scan(self, **system_dirs, flat=systems_flat):
                 systems.append(system)
         else:
             systems.append(factory.load(self, **system_dirs, flat=systems_flat))
         for system in systems:
-            if system.id in self._components:
-                self._components.get(system.id).configs.update(system.configs)
+            if system.key in self._components:
+                self._components.get(system.key).configs.update(system.configs)
             else:
                 self._components._add(system)
+        self._do_configure()
 
     # noinspection PyTypeChecker
     @property
     def settings(self) -> Settings:
         return self.configs
-
-    @property
-    def name(self) -> str:
-        return self.settings.application
 
     def start(self) -> None:
         self._logger.info(f"Starting {type(self).__name__}: {self.name}")
@@ -84,10 +90,18 @@ class Application(DataManager, Thread):
     def wait(self, **kwargs) -> None:
         self.join(**kwargs)
 
-    def interrupt(self) -> None:
+    def interrupt(self, *_) -> None:
         self.__interrupt.set()
 
-    # noinspection PyShadowingBuiltins
+    def terminate(self, *_) -> None:
+        self.interrupt()
+        self.wait()
+
+    def deactivate(self) -> None:
+        super().deactivate()
+        self.terminate()
+
+    # noinspection PyShadowingBuiltins, PyProtectedMember
     def run(self, *args, **kwargs) -> None:
         self.read(*args, **kwargs)
         self._run(*args, **kwargs)
@@ -105,24 +119,31 @@ class Application(DataManager, Thread):
                 self.interrupt()
                 break
 
+            for connector in self.connectors.filter(lambda c: c._is_reconnectable()):
+                self.reconnect(connector)
+
             def is_reading(channel: Channel, timestamp: pd.Timestamp) -> bool:
                 freq = channel.freq
-                if freq is None or not channel.has_connector():
+                if (freq is None
+                        or not channel.has_connector()
+                        or not self.connectors.get(channel.connector.id, False)
+                        or not self.connectors.get(channel.connector.id).is_connected()):
                     return False
                 return pd.isna(channel.connector.timestamp) or timestamp >= _next(channel.connector.timestamp, freq)
 
             now = pd.Timestamp.now(tz.UTC)
-            channels = self.values().filter(lambda c: is_reading(c, now))
+            channels = self.channels.filter(lambda c: is_reading(c, now))
 
-            self._logger.debug(f"Reading {len(channels)} channels of application: {self.name}")
             if len(channels) > 0:
+                self._logger.debug(f"Reading {len(channels)} channels of application: {self.name}")
                 self.read(channels)
                 self.notify(channels)
 
             self._run()
-            self.log(channels)
+            self.log()
         self.log()
 
+    # noinspection PyUnresolvedReferences
     def _run(self, *args, **kwargs) -> None:
         for system in self.components.get_all(System):
             try:
@@ -131,7 +152,7 @@ class Application(DataManager, Thread):
                 system.run(*args, **kwargs)
 
             except Exception as e:
-                self._logger.warning(f"Error running system '{system.id}': ", str(e))
+                self._logger.warning(f"Error running system '{system.key}': ", repr(e))
 
 
 # noinspection PyShadowingBuiltins

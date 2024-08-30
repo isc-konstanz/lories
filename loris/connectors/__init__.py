@@ -13,18 +13,20 @@ from .connector import (  # noqa: F401
     ConnectionException,
 )
 
-from . import registry  # noqa: F401
-from .registry import ConnectorRegistration, register  # noqa: F401
-
 from . import context  # noqa: F401
-from .context import ConnectorContext  # noqa: F401
+from .context import (  # noqa: F401
+    ConnectorContext,
+    register_connector_type,
+    registry,
+)
 
-from .csv import CsvConnector
-registry.types[CsvConnector.TYPE] = ConnectorRegistration(CsvConnector, CsvConnector.TYPE)
+from .access import ConnectorAccess  # noqa: F401
+
+from .rnd import Randomizer  # noqa: F401
+from .csv import CsvConnector  # noqa: F401
 
 try:
-    from .mysql import MySqlConnector
-    registry.types[MySqlConnector.TYPE] = ConnectorRegistration(MySqlConnector, MySqlConnector.TYPE)
+    from .mysql import MySqlConnector  # noqa: F401
 
 except ImportError:
     pass

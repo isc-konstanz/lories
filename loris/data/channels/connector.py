@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.core.channels.channel
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.data.channels.connector
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -9,16 +9,15 @@ loris.core.channels.channel
 from __future__ import annotations
 
 from collections import OrderedDict
-from copy import deepcopy
-from typing import Any, Mapping
+from typing import Any, Dict
 
 import pandas as pd
 from loris.util import parse_id
 
 
 class ChannelConnector:
-    _uuid: str
     _id: str
+    _key: str
 
     __configs: OrderedDict[str, Any]
 
@@ -26,16 +25,21 @@ class ChannelConnector:
 
     # noinspection PyShadowingBuiltins
     def __init__(self, connector: str = None, **configs: Any) -> None:
-        self._uuid = connector
-        self._id = parse_id(connector.split(".")[-1]) if connector is not None else None
+        self._id = connector
+        self._key = parse_id(connector.split(".")[-1]) if connector is not None else None
         self.__configs = OrderedDict(configs)
 
+    # noinspection PyShadowingBuiltins
+    def _get_vars(self) -> Dict[str, Any]:
+        vars = OrderedDict(id=self.id, **self.__configs)
+        vars["timestamp"] = self.timestamp
+        return vars
+
     def __repr__(self) -> str:
-        return (
-            "ChannelConnector:\n\t"
-            + f"\n\tid: {self.id}"
-            + "\n\t".join(f"{key}: {str(val)}" for key, val in self.__configs.items())
-        )
+        return f"{type(self).__name__}({self.key})"
+
+    def __str__(self) -> str:
+        return f"{type(self).__name__}:\n\t" + "\n\t".join(f"{k}={v}" for k, v in self._get_vars().items())
 
     def __getattr__(self, attr):
         # __getattr__ gets called when the item is not found via __getattribute__
@@ -46,15 +50,12 @@ class ChannelConnector:
         raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
 
     @property
-    def uuid(self) -> str:
-        return self._uuid
-
-    @property
     def id(self) -> str:
         return self._id
 
-    def copy(self) -> ChannelConnector:
-        return ChannelConnector(self._uuid, **self.__configs)
+    @property
+    def key(self) -> str:
+        return self._key
 
-    def _copy_configs(self) -> Mapping[str, Any]:
-        return deepcopy(self.__configs)
+    def copy(self) -> ChannelConnector:
+        return type(self)(**self._get_vars())

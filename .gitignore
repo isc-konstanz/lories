@@ -146,4 +146,4 @@ conf/*
 !conf/*.default.conf
 
 # Configurations and default generated output files
-data/
+/data/
