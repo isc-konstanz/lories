@@ -21,14 +21,15 @@ from loris.location import Location, LocationUnavailableException
 
 
 class WeatherMeta(ActivatorMeta):
-    def __call__(cls, context: Context, configs: Configurations) -> Weather:
+    def __call__(cls, context: Context, configs: Configurations, *args, **kwargs) -> Weather:
         _type = configs.get("type", default="default").lower()
         _cls = cls._get_class(_type)
         if cls != _cls:
-            return _cls(context, configs)
+            return _cls(context, configs, *args, **kwargs)
 
-        return super().__call__(context, configs)
+        return super().__call__(context, configs, *args, **kwargs)
 
+    # fmt: off
     # noinspection PyShadowingBuiltins
     def _get_class(cls: Type[Weather], type: str) -> Type[Weather]:
         if type in ["virtual", "default"]:
@@ -39,6 +40,7 @@ class WeatherMeta(ActivatorMeta):
             return Brightsky
 
         raise WeatherException(f"Unknown weather type '{type}'")
+    # fmt: on
 
 
 # noinspection SpellCheckingInspection

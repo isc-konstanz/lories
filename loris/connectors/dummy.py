@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.connectors.rnd
-~~~~~~~~~~~~~~~~~~~~
+loris.connectors.dummy
+~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -19,9 +19,9 @@ from loris.core import Resources
 
 
 # noinspection PyShadowingBuiltins
-@register_connector_type
-class Randomizer(Connector):
-    TYPE: str = "random"
+@register_connector_type("dummy", "random")
+class DummyConnector(Connector):
+    TYPE: str = "dummy"
 
     _data: pd.Series
 

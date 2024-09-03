@@ -12,9 +12,10 @@ from collections import OrderedDict
 from functools import wraps
 from typing import Any, Dict, Optional
 
-from loris.core import Context, Registrator, Resource, Resources, ResourceException
+from loris.core import Context, Registrator, Resource, ResourceException, Resources
 from loris.core.configs import ConfigurationException, Configurations, Configurator, ConfiguratorMeta
-from loris.util import parse_id, parse_name
+from loris.location import Location
+from loris.util import parse_name
 
 
 class ActivatorMeta(ConfiguratorMeta):
@@ -41,35 +42,40 @@ class Activator(Registrator, metaclass=ActivatorMeta):
     def __init__(
         self,
         context: Optional[Registrator | Context] = None,
-        configs: Configurations = None,
-        *args, **kwargs
+        configs: Optional[Configurations] = None,
+        key: Optional[str] = None,
+        name: Optional[str] = None,
+        *args,
+        **kwargs,
     ) -> None:
-        if configs is None:
-            raise ConfigurationException("Missing configuration")
-
-        if self.SECTION not in configs.sections:
-            configs._add_section(self.SECTION, {"type": self.TYPE})
-        section = configs.get_section(self.SECTION)
-        if "type" not in section:
-            section["key"] = self.TYPE
-        if "name" in configs:
-            section["name"] = configs.pop("name")
-        if "key" in configs:
-            section["key"] = configs.pop("key")
-        if "key" not in section and "name" in section:
-            section["key"] = parse_id(section["name"])
-        if "key" in section and "name" not in section:
-            section["name"] = parse_name(section["key"])
-        super().__init__(context, configs, *args, **kwargs)
-        self._name = configs[self.SECTION].get("name")
+        super().__init__(context, configs, key=key, *args, **kwargs)
+        self._name = self._assert_name(configs, name)
 
     def __enter__(self) -> Activator:
-        self._do_activate()
+        self.activate()
         return self
 
     # noinspection PyShadowingBuiltins
     def __exit__(self, type, value, traceback):
-        self._do_deactivate()
+        self.deactivate()
+
+    def _assert_key(self, configs: Optional[Configurations], key: Optional[str]) -> str:
+        if configs is not None and key is None:
+            if configs.has_section(self.SECTION) and "name" in configs[self.SECTION]:
+                key = configs[self.SECTION]["name"]
+            elif "name" in configs:
+                key = configs["name"]
+        return super()._assert_key(configs, key)
+
+    def _assert_name(self, configs: Optional[Configurations], name: Optional[str]) -> str:
+        if configs is not None:
+            if configs.has_section(self.SECTION) and "name" in configs[self.SECTION]:
+                name = configs[self.SECTION]["name"]
+            elif "name" in configs:
+                name = configs["name"]
+        if name is None:
+            name = parse_name(self._key)
+        return name
 
     # noinspection PyShadowingBuiltins
     def _parse_vars(self, vars: Optional[Dict[str, Any]] = None, parse: callable = str) -> Dict[str, str]:
@@ -82,17 +88,17 @@ class Activator(Registrator, metaclass=ActivatorMeta):
             if id != key:
                 values["key"] = id
             values["key"] = key
-            values["name"] = vars.pop('name', self.name)
+            values["name"] = vars.pop("name", self.name)
         except (ResourceException, AttributeError):
             # Abstract properties are not yet instanced
             pass
 
-        from loris import Location
-
-        values.update({
-            k: str(v) if not isinstance(v,  (Resource, Resources, Configurator, Context, Location)) else parse(v)
-            for k, v in vars.items()
-        })
+        values.update(
+            {
+                k: str(v) if not isinstance(v, (Resource, Resources, Configurator, Context, Location)) else parse(v)
+                for k, v in vars.items()
+            }
+        )
         values["context"] = parse(self.context)
         values["configurations"] = parse(self.configs)
         values["configured"] = str(self.is_configured())
@@ -112,7 +118,7 @@ class Activator(Registrator, metaclass=ActivatorMeta):
 
     # noinspection PyUnresolvedReferences
     @wraps(activate, updated=())
-    def _do_activate(self) -> None:
+    def _do_activate(self, *args, **kwargs) -> None:
         if not self.is_enabled():
             raise ConfigurationException(f"Trying to activate disabled {type(self).__name__}: {self.name}")
         if not self.is_configured():
@@ -121,7 +127,7 @@ class Activator(Registrator, metaclass=ActivatorMeta):
             self._logger.warning(f"{type(self).__name__} '{self.id}' already active")
             return
 
-        self.__activate()
+        self.__activate(*args, **kwargs)
         self._on_activate()
         self._active = True
 

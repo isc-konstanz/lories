@@ -38,6 +38,8 @@ class InterfaceMeta(ConfiguratorMeta):
 
 
 class Interface(Configurator, metaclass=InterfaceMeta):
+    SECTION: str = "interface"
+
     def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
         from loris.app import Application
         if context is None or not isinstance(context, Application):

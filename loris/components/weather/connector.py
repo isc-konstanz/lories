@@ -32,22 +32,22 @@ class WeatherConnectorMeta(WeatherMeta, ConnectorMeta):
 class WeatherConnector(Weather, Connector, metaclass=WeatherConnectorMeta):
     _forecast: WeatherForecast = None
 
-    # def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
-    #     super(Connector, self).__init__(context, configs, *args, **kwargs)
-
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self._load_forecast(configs.get_section(WeatherForecast.SECTION, defaults={}))
+        self._configure_forecast(configs)
 
     # noinspection PyProtectedMember
+    def _configure_forecast(self, configs: Configurations) -> None:
+        if self.has_forecast():
+            if not configs.has_section(WeatherForecast.SECTION):
+                configs._add_section(WeatherForecast.SECTION, {})
+            section = configs.get_section(WeatherForecast.SECTION)
+            section.set("key", "forecast", replace=False)
+            self._forecast = WeatherForecast(self, section)
+
     def _on_configure(self, configs: Configurations) -> None:
         super()._on_configure(configs)
-        self._forecast._do_configure()
-
-    def _load_forecast(self, configs: Configurations) -> None:
-        if self.has_forecast():
-            configs.set("key", "forecast", replace=False)
-            self._forecast = WeatherForecast(self, configs)
+        self._forecast.configure(configs.get_section(WeatherForecast.SECTION))
 
     def activate(self) -> None:
         super().activate()

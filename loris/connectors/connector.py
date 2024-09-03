@@ -46,19 +46,25 @@ class Connector(Registrator, metaclass=ConnectorMeta):
 
     __resources: Resources
 
-    def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
+    def __init__(
+        self,
+        context: Registrator | Context,
+        configs: Optional[Configurations] = None,
+        *args,
+        **kwargs,
+    ) -> None:
         if context is None:
-            raise ConnectorException(f"Invalid connector context: {context}", connector=self)
+            raise ConnectorException(f"Invalid context: {context}", connector=self)
         super().__init__(context, configs, *args, **kwargs)
         self.__resources = Resources()
 
     def __enter__(self) -> Connector:
-        self._do_connect(self.__resources)
+        self.connect(self.__resources)
         return self
 
     # noinspection PyShadowingBuiltins
     def __exit__(self, type, value, traceback):
-        self._do_disconnect()
+        self.disconnect()
 
     # noinspection PyShadowingBuiltins, PyProtectedMember
     def _get_vars(self) -> Dict[str, Any]:
@@ -86,10 +92,12 @@ class Connector(Registrator, metaclass=ConnectorMeta):
         if "name" in vars:
             values["name"] = vars.pop("name")
 
-        values.update({
-            k: str(v) if not isinstance(v,  (Resource, Resources, Configurator, Context)) else parse(v)
-            for k, v in vars.items()
-        })
+        values.update(
+            {
+                k: str(v) if not isinstance(v, (Resource, Resources, Configurator, Context)) else parse(v)
+                for k, v in vars.items()
+            }
+        )
         values["context"] = parse(self.context)
         values["configurations"] = parse(self.configs)
         values["configured"] = str(self.is_configured())
@@ -116,11 +124,13 @@ class Connector(Registrator, metaclass=ConnectorMeta):
 
     def _is_reconnectable(self) -> bool:
         return (
-            self.is_enabled() and
-            self.is_configured() and
-            self._is_disconnected() and
-            (pd.isna(self._disconnect_timestamp) or
-             pd.Timestamp.now(tz.UTC) >= self._disconnect_timestamp + self._reconnect_interval)
+            self.is_enabled()
+            and self.is_configured()
+            and self._is_disconnected()
+            and (
+                pd.isna(self._disconnect_timestamp)
+                or pd.Timestamp.now(tz.UTC) >= self._disconnect_timestamp + self._reconnect_interval
+            )
         )
 
     def _is_connected(self) -> bool:
@@ -134,7 +144,7 @@ class Connector(Registrator, metaclass=ConnectorMeta):
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
     @wraps(connect, updated=())
-    def _do_connect(self, resources: Resources) -> None:
+    def _do_connect(self, resources: Resources, *args, **kwargs) -> None:
         if not self.is_enabled():
             raise ConfigurationException(f"Trying to connect disabled {type(self).__name__}: {self.id}")
         if not self.is_configured():
@@ -143,7 +153,7 @@ class Connector(Registrator, metaclass=ConnectorMeta):
             self._logger.warning(f"{type(self).__name__} '{self.id}' already connected")
             return
 
-        self.__connect(resources)
+        self.__connect(resources, *args, **kwargs)
         self._on_connect(resources)
         self._disconnect_timestamp = pd.NaT
         self._connect_timestamp = pd.Timestamp.now(tz.UTC)

@@ -53,7 +53,7 @@ class System(Component, ComponentContext):
                 "evaluations*",
                 "results*",
                 "settings*",
-                "logging*"
+                "logging*",
             ),
         )
         return True

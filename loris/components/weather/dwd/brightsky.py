@@ -80,8 +80,9 @@ class Brightsky(WeatherConnector):
         for source, source_resources in resources.groupby("source"):
             source_data = response.loc[
                 response["source_type"].isin(source.split(",")),
-                np.unique(["source_id", "source_first_record", "source_last_record"] +
-                          [r.address for r in source_resources])
+                np.unique(
+                    ["source_id", "source_first_record", "source_last_record"] + [r.address for r in source_resources]
+                ),
             ]
             if source_data.empty:
                 self._logger.warning(f"Unable to read {self._id} channels: {[r.id for r in source_resources]}")
@@ -110,7 +111,7 @@ class Brightsky(WeatherConnector):
     def _request(
         self,
         date: Optional[pd.Timestamp, dt.datetime] = None,
-        date_last: Optional[pd.Timestamp, dt.datetime] = None
+        date_last: Optional[pd.Timestamp, dt.datetime] = None,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         if date is None:
             date = pd.Timestamp.now(tz=self.location.timezone)

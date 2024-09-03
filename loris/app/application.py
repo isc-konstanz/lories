@@ -36,15 +36,16 @@ class Application(DataManager, Thread):
 
     @classmethod
     def load(cls, name: str, factory: Type[System] = System, **kwargs) -> Application:
-        app = cls(Settings(name, **kwargs))
-        app.setup(factory)
+        settings = Settings(name, **kwargs)
+        app = cls(settings)
+        app.configure(settings, factory)
         return app
 
     def __init__(self, settings: Settings, **kwargs) -> None:
         super().__init__(settings, name=settings["name"], **kwargs)
-        if not settings.has_section("interface"):
-            settings._add_section("interface", {"enabled": False})
-        self._interface = Interface(self, settings.get_section("interface"))
+        if not settings.has_section(Interface.SECTION):
+            settings._add_section(Interface.SECTION, {"enabled": False})
+        self._interface = Interface(self, settings.get_section(Interface.SECTION))
         self.__interrupt = Event()
         self.__interrupt.set()
         self._logger = logging.getLogger(self.key)
@@ -58,14 +59,13 @@ class Application(DataManager, Thread):
     def __hash__(self):
         return hash(id(self))
 
-    def configure(self, settings: Settings) -> None:
-        super().configure(settings)
+    # noinspection PyProtectedMember
+    def configure(self, settings: Settings, factory: Type[System]) -> None:
         if self._interface.is_enabled():
-            self._interface._do_configure()
+            self._interface.configure(settings.get_section(Interface.SECTION))
+        self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
         self._interval = settings.get_int("interval", default=1)
 
-    def setup(self, factory: Type[System]) -> None:
-        self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
         systems = []
         systems_flat = self.settings.get_bool("system_flat", default=False)
         system_dirs = self.settings.dirs.encode()
@@ -83,7 +83,8 @@ class Application(DataManager, Thread):
                 self._components.get(system.key).configs.update(system.configs)
             else:
                 self._components._add(system)
-        self._do_configure()
+
+        super().configure(settings)
 
     @property
     def server(self) -> Interface:
@@ -141,10 +142,12 @@ class Application(DataManager, Thread):
 
             def is_reading(channel: Channel, timestamp: pd.Timestamp) -> bool:
                 freq = channel.freq
-                if (freq is None
-                        or not channel.has_connector()
-                        or not self.connectors.get(channel.connector.id, False)
-                        or not self.connectors.get(channel.connector.id).is_connected()):
+                if (
+                    freq is None
+                    or not channel.has_connector()
+                    or not self.connectors.get(channel.connector.id, False)
+                    or not self.connectors.get(channel.connector.id).is_connected()
+                ):
                     return False
                 return pd.isna(channel.connector.timestamp) or timestamp >= _next(channel.connector.timestamp, freq)
 
