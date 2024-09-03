@@ -82,7 +82,7 @@ class Configurations(MutableMapping[str, Any]):
         name: str,
         dirs: Directories,
         defaults: Optional[Mapping[str, Any]] = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         super().__init__()
         self.__configs = OrderedDict()
@@ -178,7 +178,7 @@ class Configurations(MutableMapping[str, Any]):
         return [k for k, v in self.items() if isinstance(v, Configurations)]
 
     def has_section(self, section: str) -> bool:
-        if section in [k for k, v in self.items() if isinstance(v, Configurations)]:
+        if section in self.sections:
             return True
         return False
 

@@ -15,7 +15,6 @@ T = TypeVar("T")
 
 
 class Context(ABC, Generic[T], Mapping[str, T]):
-
     def __getitem__(self, __uid: str) -> T:
         return self._get(__uid)
 

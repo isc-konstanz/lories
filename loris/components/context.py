@@ -27,7 +27,7 @@ def register_component_type(cls: Type[C]) -> Type[C]: ...
 def register_component_type(
     *alias: Optional[str],
     factory: Callable[..., Type[C]] = None,
-    replace: bool = False
+    replace: bool = False,
 ) -> Type[C]: ...
 
 
@@ -54,9 +54,9 @@ class ComponentContext(RegistratorContext[Component], Configurator):
 
     def __init__(self, context: Context, *args, **kwargs) -> None:
         from loris.data.context import DataContext
+
         if context is None or not isinstance(context, DataContext):
             raise ConfigurationException(f"Invalid data context: {None if context is None else type(context)}")
-
         super().__init__(context, *args, **kwargs)
 
     @property
@@ -68,9 +68,9 @@ class ComponentContext(RegistratorContext[Component], Configurator):
         self._load(self, configs)
 
     def _load(
-         self,
-         context: Registrator | RegistratorContext,
-         configs: Configurations
+        self,
+        context: Registrator | RegistratorContext,
+        configs: Configurations,
     ) -> None:
         defaults = {}
         configs = configs.copy()
@@ -82,9 +82,11 @@ class ComponentContext(RegistratorContext[Component], Configurator):
 
             self._load_sections(context, components, defaults)
 
-        context_dirs = [str(c.configs.dirs.conf)
-                        for c in self.context.components.values()
-                        if c != self and isinstance(c, RegistratorContext)]
+        context_dirs = [
+            str(c.configs.dirs.conf)
+            for c in self.context.components.values()
+            if c != self and isinstance(c, RegistratorContext)
+        ]
         if str(configs.dirs.conf) not in context_dirs:
             self._load_from_file(context, configs.dirs, "components.conf", defaults)
             self._load_from_dir(context, str(configs.dirs.conf), defaults)

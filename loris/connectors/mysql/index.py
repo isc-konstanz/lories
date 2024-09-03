@@ -42,7 +42,7 @@ class IndexColumn(Column):
         type: AnyStr | Type | int,
         nullable: bool = False,
         datetime: Optional[bool] = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         super().__init__(name, type, nullable=nullable, **kwargs)
         if datetime is None:
@@ -141,8 +141,10 @@ class Index(Columns[IndexColumn]):
             return pd.DataFrame(columns=result_columns)
 
         for group, group_resources in self._groupby(resources):
+
             def _is_group(row: pd.Series) -> bool:
                 return all(row[col] == val for col, val in group.items())
+
             group_data = data[data.apply(_is_group, axis="columns")]
 
             for index in self:
@@ -158,8 +160,7 @@ class Index(Columns[IndexColumn]):
                 group_data.drop([date_column, time_column], inplace=True, axis="columns")
                 group_data = group_data.set_index(index_column).tz_localize(self.timezone, ambiguous="infer")
 
-            elif (self._has_datetime(DatetimeIndexType.DATETIME) or
-                  self._has_datetime(DatetimeIndexType.TIMESTAMP)):
+            elif self._has_datetime(DatetimeIndexType.TIMESTAMP) or self._has_datetime(DatetimeIndexType.DATETIME):
                 index_column, *_ = self.names
                 group_data = group_data.set_index(index_column)
 
@@ -236,7 +237,7 @@ class Index(Columns[IndexColumn]):
         self,
         query: str,
         start: pd.Timestamp | dt.datetime = None,
-        end: pd.Timestamp | dt.datetime = None
+        end: pd.Timestamp | dt.datetime = None,
     ) -> Tuple[str, Sequence[Any]]:
         # TODO: Implement start and end type checking and allow e.g. integers as well
         params = []
@@ -260,13 +261,12 @@ class Index(Columns[IndexColumn]):
 
 # noinspection PyShadowingBuiltins
 class SurrogateKeyColumn(IndexColumn):
-
     def __init__(
         self,
         name: str,
         type: AnyStr | Type | int,
         attribute: str,
-        **kwargs
+        **kwargs,
     ) -> None:
         super().__init__(name, type, **kwargs)
         self.attribute = attribute
@@ -278,5 +278,5 @@ def _is_datetime(type: str) -> bool:
         "TIME",
         "DATE",
         "DATETIME",
-        "TIMESTAMP"
+        "TIMESTAMP",
     ]

@@ -175,7 +175,7 @@ def write_files(
     freq: str,
     format: str,
     timezone: Optional[tz.tzinfo] = None,
-    **kwargs
+    **kwargs,
 ) -> None:
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)

@@ -5,6 +5,7 @@ loris.components.weather.constants
 
 
 """
+# fmt: off
 
 from loris.components.weather import Weather
 
@@ -41,3 +42,4 @@ WEATHER = {
     Weather.PRECIPITABLE_WATER:  "Precipitable water [cm]",
     Weather.SNOW_FRACTION:       "Snow Fraction [1/0]",
 }
+# fmt: on

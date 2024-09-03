@@ -18,7 +18,7 @@ from loris.data import DataAccess
 from loris.util import to_date
 
 
-# noinspection PyAbstractClass, PyProtectedMember
+# noinspection PyAbstractClass
 class Component(Activator):
     SECTION: str = "component"
     SECTIONS: Collection[str] = [DataAccess.SECTION, ConnectorAccess.SECTION]
@@ -27,17 +27,30 @@ class Component(Activator):
 
     __data: DataAccess
 
-    def __init__(self, context: Component | Context, configs: Configurations, *args, **kwargs) -> None:
+    def __init__(
+        self,
+        context: Component | Context,
+        configs: Optional[Configurations] = None,
+        *args,
+        **kwargs,
+    ) -> None:
         if context is None:
             raise ComponentException(f"Invalid context: {context}")
         super().__init__(context, configs, *args, **kwargs)
         self.__connectors = ConnectorAccess(self)
         self.__data = DataAccess(self)
 
+    # noinspection PyProtectedMember
     def _on_configure(self, configs: Configurations) -> None:
         super()._on_configure(configs)
-        self.__connectors._do_configure()
-        self.__data._do_configure()
+
+        if not configs.has_section(ConnectorAccess.SECTION):
+            configs._add_section(ConnectorAccess.SECTION, {})
+        self.__connectors.configure(configs.get_section(ConnectorAccess.SECTION))
+
+        if not configs.has_section(DataAccess.SECTION):
+            configs._add_section(DataAccess.SECTION, {})
+        self.__data.configure(configs.get_section(DataAccess.SECTION))
 
     # noinspection PyShadowingBuiltins
     def _get_vars(self) -> Dict[str, Any]:
