@@ -5,137 +5,65 @@ participant Application [
     ""Application""
 ]
 participant DataManager << (C,#ADD1B2) >>
-participant ConnectorContext << (C,#ADD1B2) >>
-participant ComponentContext << (C,#ADD1B2) >>
 participant Connector << (C,#ADD1B2) >>
 participant Component << (C,#ADD1B2) >>
 participant DataAccess << (C,#ADD1B2) >>
 
 ====
 
-Application -> DataManager: _do_configure()
+Application -> DataManager: configure(configs)
 activate DataManager
 
-DataManager -> DataManager: configure(configs)
-DataManager -> DataManager: _do_configure_members()
+DataManager -> DataManager: _configure(connectors)
 activate DataManager
 
 
-DataManager -> ConnectorContext: _do_configure()
-activate ConnectorContext
-
-ConnectorContext -> ConnectorContext: configure(configs)
-ConnectorContext -> ConnectorContext: _do_configure_members()
-activate ConnectorContext
-
-ConnectorContext -> Connector: _do_configure()
+DataManager -> Connector: configure(configs)
 activate Connector
-Connector -> Connector: configure(configs)
-Connector -> Connector: _do_configure_members()
-activate Connector
-deactivate Connector
-Connector -> Connector: _on_configure(configs)
 
 deactivate Connector
-deactivate ConnectorContext
+deactivate DataManager
 
-ConnectorContext -> ConnectorContext: _on_configure(configs)
-deactivate ConnectorContext
+DataManager -> DataManager: _configure(components)
+activate DataManager
 
-
-DataManager -> ComponentContext: _do_configure()
-activate ComponentContext
-
-ComponentContext -> ComponentContext: configure(configs)
-ComponentContext -> ComponentContext: _do_configure_members()
-activate ComponentContext
-
-ComponentContext -> Component: _do_configure()
-activate Component
-Component -> Component: configure(configs)
+DataManager -> Component: configure(configs)
     opt Add default Channel configurations
     activate Component
-    Component -> DataAccess: add(id, configs)
+    Component -> DataAccess: add(key, **configs)
     end
-deactivate Component
 
-Component -> Component: _do_configure_members()
-activate Component
 
-Component -> DataAccess: _do_configure()
+Component -> DataAccess: configure(configs)
 activate DataAccess
-DataAccess -> DataAccess: configure(configs)
 deactivate DataAccess
-deactivate Component
-
-Component -> Component: _on_configure(configs)
 
 deactivate Component
-deactivate ComponentContext
-
-ComponentContext -> ComponentContext: _on_configure(configs)
-deactivate ComponentContext
-
-
 deactivate DataManager
 
-DataManager -> DataManager: _on_configure(configs)
 deactivate DataManager
 
 ====
 
-Application -> DataManager: _do_connect()
+Application -> DataManager: activate()
 activate DataManager
 
-DataManager -> DataManager: connect(channels)
-DataManager -> Connector: _do_connect(channels)
-
+DataManager -> Connector: connect(channels)
 activate Connector
-Connector -> Connector: connect(channels)
-Connector -> Connector: _on_connect(channels)
 deactivate Connector
 
-DataManager -> DataManager: _on_connect(channels)
+
+DataManager -> DataManager: _activate(components)
+activate DataManager
+
+DataManager -> Component: activate()
+activate Component
+deactivate Component
+
+deactivate DataManager
 deactivate DataManager
 
 ====
-
-
-Application -> DataManager: _do_activate()
-activate DataManager
-
-DataManager -> DataManager: activate()
-DataManager -> DataManager: _do_activate_members()
-activate DataManager
-
-
-DataManager -> ComponentContext: _do_activate()
-activate ComponentContext
-
-ComponentContext -> ComponentContext: activate()
-ComponentContext -> ComponentContext: _do_activate_members()
-activate ComponentContext
-
-ComponentContext -> Component: _do_activate()
-activate Component
-Component -> Component: activate()
-Component -> Component: _do_activate_members()
-activate Component
-deactivate Component
-
-Component -> Component: _on_activate()
-
-deactivate Component
-deactivate ComponentContext
-
-ComponentContext -> ComponentContext: _on_activate()
-deactivate ComponentContext
-
-
-deactivate DataManager
-
-DataManager -> DataManager: _on_activate()
-deactivate DataManager
 
 loop While running
     Application -> Application: run()
