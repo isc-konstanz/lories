@@ -20,6 +20,7 @@ import pytz as tz
 from loris.connectors import ConnectionException, Connector, ConnectorException, register_connector_type
 from loris.connectors.sql import Table
 from loris.core import Configurations, Resources
+from loris.util import to_timezone
 
 
 @register_connector_type
@@ -150,15 +151,9 @@ class SqlConnector(Connector, Mapping[str, Table]):
         return column_schemas
 
     def _select_timezone(self) -> tz.BaseTzInfo:
-        cursor = self.connection.cursor()
+        cursor = self.connection.cursor(buffered=True)
         cursor.execute("SELECT @@system_time_zone as tz")
-        for row in cursor.fetchall():
-            try:
-                return tz.timezone(row[0])
-            except tz.UnknownTimeZoneError:
-                # Handle the case where the timezone is not recognized
-                if row[0] == 'CEST':
-                    return tz.timezone('Europe/Berlin')
+        return to_timezone(cursor.fetchone()[0])
 
     def exists(
         self,
