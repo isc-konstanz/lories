@@ -22,7 +22,7 @@ from .context import (  # noqa: F401
 
 from .access import ConnectorAccess  # noqa: F401
 
-from .rnd import Randomizer  # noqa: F401
+from .dummy import DummyConnector  # noqa: F401
 from .csv import CsvConnector  # noqa: F401
 
 try:

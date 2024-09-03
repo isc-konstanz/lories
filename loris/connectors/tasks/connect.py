@@ -14,6 +14,6 @@ class ConnectTask(ConnectorTask):
     # noinspection PyProtectedMember
     def run(self) -> None:
         self.connector.set_channels(ChannelState.CONNECTING)
-        self.connector._do_connect(self.channels)
+        self.connector.connect(self.channels)
 
         self.connector.set_channels(ChannelState.CONNECTED)

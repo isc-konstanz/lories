@@ -81,17 +81,16 @@ class Channel(Resource):
 
     @property
     def type(self) -> Optional[Type]:
-        if (self._type is None
-                and self._value is not None):
+        if self._type is None and self._value is not None:
             return type(self._value)
         return self._type
 
     @property
     def freq(self) -> Optional[str]:
-        for k in ["freq", "frequency", "resolution"]:
-            if k in self:
-                return _parse_freq(self._get(k))
-        return None
+        freq = self.get(next((k for k in ["freq", "frequency", "resolution"] if k in self), None), default=None)
+        if freq is not None:
+            freq = _parse_freq(freq)
+        return freq
 
     @property
     def timedelta(self) -> Optional[pd.Timedelta]:
@@ -124,7 +123,7 @@ class Channel(Resource):
         self,
         timestamp: pd.Timestamp,
         value: Any,
-        state: Optional[str | ChannelState] = ChannelState.VALID
+        state: Optional[str | ChannelState] = ChannelState.VALID,
     ) -> None:
         self._set(timestamp, value, state)
 
@@ -132,7 +131,7 @@ class Channel(Resource):
         self,
         timestamp: pd.Timestamp,
         value: Optional[Any],
-        state: str | ChannelState
+        state: str | ChannelState,
     ) -> None:
         # TODO: Implement value type validation based on value type attribute
         self._timestamp = timestamp

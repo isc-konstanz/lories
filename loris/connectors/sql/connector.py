@@ -86,12 +86,13 @@ class SqlConnector(Connector, Mapping[str, Table]):
         tables = {}
         table_schemas = self._select_table_schemas()
         tables_configs = self.configs.get_section(Table.SECTION, defaults={})
+        tables_defaults = {
+            "index": tables_configs.get_section("index", defaults={}),
+            "columns": tables_configs.get_section("columns", defaults={}),
+        }
 
         for table_name, table_resources in resources.groupby("table"):
-            table_configs = tables_configs.get_section(table_name, defaults={
-                "index":   tables_configs.get_section("index", defaults={}),
-                "columns": tables_configs.get_section("columns", defaults={}),
-            })
+            table_configs = tables_configs.get_section(table_name, defaults=tables_defaults)
             table = Table.from_configs(self, table_name, table_configs, table_resources)
             tables[table.name] = table
             if table.name not in table_schemas:

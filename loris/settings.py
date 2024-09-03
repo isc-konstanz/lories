@@ -88,22 +88,25 @@ class Settings(Configurations):
 def _parse_kwargs(parser: ArgumentParser) -> Dict[str, Any]:
     if parser is not None:
         parser.add_argument(
-            "-c", "--conf-dir",
+            "-c",
+            "--conf-dir",
             dest="conf_dir",
             metavar="dir",
-            help="directory to expect root configuration files"
+            help="directory to expect root configuration files",
         )
         parser.add_argument(
-            "-l", "--lib-dir",
+            "-l",
+            "--lib-dir",
             dest="lib_dir",
             metavar="dir",
-            help="directory to expect and write library files to"
+            help="directory to expect and write library files to",
         )
         parser.add_argument(
-            "-d", "--data-dir",
+            "-d",
+            "--data-dir",
             dest="data_dir",
             metavar="dir",
-            help="directory to expect and write data files to"
+            help="directory to expect and write data files to",
         )
         parser.add_argument(
             "--system-scan",
@@ -116,7 +119,7 @@ def _parse_kwargs(parser: ArgumentParser) -> Dict[str, Any]:
             dest="system_flat",
             action="store_true",
             help="flags if the configuration files will be expected directly in the data directory, "
-                 "instead of a corresponding 'conf' directory",
+            + "instead of a corresponding 'conf' directory",
         )
         parser.add_argument(
             "--system-copy",

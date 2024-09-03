@@ -44,7 +44,7 @@ def get_context(object: Any, type: Type[C] | Collection[Type[C]]) -> Optional[C]
 def get_variables(
     obj: Any,
     include: Optional[Type[V]] = object,
-    exclude: Optional[Type | Tuple[Type, ...]] = None
+    exclude: Optional[Type | Tuple[Type, ...]] = None,
 ) -> List[V]:
     def _is_type(o) -> bool:
         return isinstance(o, include) and (exclude is None or not isinstance(o, exclude))
@@ -58,7 +58,7 @@ def get_variables(
 def get_members(
     obj: Any,
     filter: Optional[Callable] = None,
-    private: bool = False
+    private: bool = False,
 ) -> Dict[str, Any]:
     members = dict()
     processed = set()
@@ -71,9 +71,9 @@ def get_members(
         except (AttributeError, ResourceException):
             continue
         if (
-            (private or "__" not in attr) and
-            (filter is None or filter(attr, member)) and
-            member not in members.values()
+            (private or "__" not in attr)
+            and (filter is None or filter(attr, member))
+            and member not in members.values()
         ):
             members[attr] = member
         processed.add(attr)
@@ -83,7 +83,8 @@ def get_members(
 # noinspection PyUnresolvedReferences, PyShadowingBuiltins, PyShadowingNames
 def is_type(series: pd.Series, *type: str) -> bool:
     series_name = series.name.split("_")
-    series_suffix = series_name[(-1 if len(series_name) < 3 else -2):]
+    series_suffix_start = -1 if len(series_name) < 3 else -2
+    series_suffix = series_name[series_suffix_start:]
     return any(t in series_suffix for t in type)
 
 
@@ -97,7 +98,7 @@ def infer_resample_method(series: pd.Series) -> str:
 
 
 # noinspection PyUnresolvedReferences
-def resample(data: Union[pd.DataFrame, pd.Series], resolution: int) -> pd.DataFrame:
+def resample(data: pd.DataFrame | pd.Series, resolution: int) -> pd.DataFrame:
     resampled = []
 
     for column, series in (data if isinstance(data, pd.DataFrame) else data.to_frame()).items():
@@ -116,7 +117,7 @@ def resample_series(
     data: pd.Series,
     resolution: int,
     method: str,
-    offset: pd.Timedelta = None
+    offset: pd.Timedelta = None,
 ) -> pd.Series:
     kwargs = {}
     if offset is not None:
@@ -169,7 +170,7 @@ def derive_by_hours(data: pd.Series) -> pd.Series:
 
 def convert_timezone(
     date: dt.datetime | pd.Timestamp | str,
-    timezone: dt.tzinfo = tz.UTC
+    timezone: dt.tzinfo = tz.UTC,
 ) -> Optional[pd.Timestamp]:
     if date is None:
         return None
@@ -219,7 +220,7 @@ def slice_range(
 def floor_date(
     date: dt.datetime | pd.Timestamp | str,
     timezone: dt.tzinfo = None,
-    freq: str = "D"
+    freq: str = "D",
 ) -> Optional[pd.Timestamp]:
     if date is None:
         return None
@@ -238,7 +239,7 @@ def floor_date(
 def ceil_date(
     date: dt.datetime | pd.Timestamp | str,
     timezone: dt.tzinfo = None,
-    freq: str = "D"
+    freq: str = "D",
 ) -> Optional[pd.Timestamp]:
     date = floor_date(date, timezone, freq)
     if date is None:
@@ -251,7 +252,7 @@ def ceil_date(
 def to_date(
     date: Optional[str | int | dt.datetime | pd.Timestamp],
     timezone: dt.tzinfo = None,
-    format: str = "%d.%m.%Y"
+    format: str = "%d.%m.%Y",
 ) -> Optional[pd.Timestamp]:
     if date is None:
         return None

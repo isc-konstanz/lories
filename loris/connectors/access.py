@@ -18,13 +18,11 @@ class ConnectorAccess(ConnectorContext):
     def __init__(self, component) -> None:
         from loris import Component, ComponentException
         from loris.data.context import DataContext
-        super().__init__(get_context(component.context, DataContext))
 
+        super().__init__(get_context(component.context, DataContext))
         if component is None or not isinstance(component, Component):
             raise ComponentException(f"Invalid component: {None if component is None else type(component)}")
         self.__component = component
-        if not self.__component.configs.has_section(self.SECTION):
-            self.__component.configs._add_section(self.SECTION, {})
 
     # noinspection PyShadowingNames, PyArgumentList
     def __getattr__(self, attr):
@@ -52,7 +50,7 @@ class ConnectorAccess(ConnectorContext):
 
     @property
     def configs(self) -> Configurations:
-        return self.__component.configs.get_section(self.SECTION)
+        return self.__component.configs.get_section(self.SECTION, defaults={})
 
     # noinspection PyProtectedMember
     def configure(self, configs: Configurations) -> None:

@@ -29,10 +29,10 @@ CHANNEL_IDS = [
 ]
 
 CHANNEL_ADDRESS_ALIAS = {
-    Weather.GHI:                 "solar",
-    Weather.TEMP_AIR:            "temperature",
-    Weather.PRESSURE_SEA:        "pressure_msl",
-    Weather.WIND_SPEED_GUST:     "wind_gust_speed",
+    Weather.GHI: "solar",
+    Weather.TEMP_AIR: "temperature",
+    Weather.PRESSURE_SEA: "pressure_msl",
+    Weather.WIND_SPEED_GUST: "wind_gust_speed",
     Weather.WIND_DIRECTION_GUST: "wind_gust_direction",
 }
 

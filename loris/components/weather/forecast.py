@@ -35,6 +35,7 @@ class WeatherForecast(Component):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
+        # fmt: off
         from loris.components.weather import WeatherConnector, WeatherException
         if isinstance(self.__connector, WeatherConnector):
             self.timezone = self.__connector.location.timezone
@@ -43,6 +44,7 @@ class WeatherForecast(Component):
         else:
             raise WeatherException(f"Unable to determine timezone for weather forecast '{self.name}'")
 
+        # fmt: on
         self.interval = configs.get_int("interval", default=WeatherForecast.interval)
         self.offset = configs.get_int("offset", default=WeatherForecast.offset)
 

@@ -6,6 +6,9 @@ loris.components.weather
 
 """
 
+from . import forecast  # noqa: F401
+from .forecast import WeatherForecast  # noqa: F401
+
 from . import weather  # noqa: F401
 from .weather import (  # noqa: F401
     Weather,
@@ -13,8 +16,5 @@ from .weather import (  # noqa: F401
     WeatherException,
     WeatherUnavailableException,
 )
-
-from . import forecast  # noqa: F401
-from .forecast import WeatherForecast  # noqa: F401
 
 from .connector import WeatherConnector  # noqa: F401
