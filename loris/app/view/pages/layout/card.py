@@ -85,6 +85,4 @@ class PageCard(dbc.Card, MutableSequence[PageCardItem]):
         children = list(children)
         if href is not None and len(href) > 0:
             children.append(dbc.Button("More", class_name="card-button", href=href))
-        self.children.append(
-            dbc.CardFooter(children, **kwargs)
-        )
+        self.children.append(dbc.CardFooter(children, **kwargs))

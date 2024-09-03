@@ -30,7 +30,8 @@ class ComponentPage(Page, Generic[C]):
         super().__init__(
             id=component.id,
             name=component.name,
-            *args, **kwargs
+            *args,
+            **kwargs,
         )
         self._component = component
 
@@ -49,8 +50,7 @@ class ComponentPage(Page, Generic[C]):
     @property
     def path(self) -> str:
         if isinstance(self._component.context, Component):
-            return (f"/{self._encode_id(self._component.context.key)}"
-                    f"/{self._encode_id(self._component.key)}")
+            return f"/{self._encode_id(self._component.context.key)}/{self._encode_id(self._component.key)}"
         else:
             return f"/{self._encode_id(self._component.key)}"
 
@@ -78,9 +78,10 @@ class ComponentPage(Page, Generic[C]):
             layout.append(dbc.Row(data))
 
     def _build_data(self) -> html.Div:
-
-        @callback(Output(f"{self.id}-data", "children"),
-                  Input(f"{self.id}-data-update", "n_intervals"))
+        @callback(
+            Output(f"{self.id}-data", "children"),
+            Input(f"{self.id}-data-update", "n_intervals"),
+        )
         def _update_data(*_) -> Sequence[dbc.AccordionItem]:
             return [self._build_channel(channel) for channel in self.data.channels]
 

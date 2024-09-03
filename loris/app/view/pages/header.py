@@ -56,5 +56,5 @@ class PageHeader:
             children=self.menu,
             brand=self._brand,
             brand_href="/",
-            links_left=True
+            links_left=True,
         )

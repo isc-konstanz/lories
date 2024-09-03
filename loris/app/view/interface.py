@@ -67,7 +67,7 @@ class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
                 str(assets_default),
                 str(assets_path),
                 dirs_exist_ok=True,
-                copy_function=copy_assets
+                copy_function=copy_assets,
             )
 
         super().__init__(
@@ -81,10 +81,13 @@ class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
             use_pages=True,
             server=True,  # TODO: Probably replace this with local Flask server, to create custom REST API ?
         )
-        theme = configs.get_section("theme", defaults={
+
+        theme_defaults = {
             "name": context.name,
-            "logo": assets_path.joinpath("logo.png")
-        })
+            "logo": assets_path.joinpath("logo.png"),
+        }
+        theme = configs.get_section("theme", defaults=theme_defaults)
+
         header = PageHeader(**theme)
         footer = PageFooter()
 
@@ -103,7 +106,7 @@ class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
             id=f"{self.context.id}",
             children=[
                 self.view.header.navbar,
-                dash.page_container
+                dash.page_container,
             ],
         )
 

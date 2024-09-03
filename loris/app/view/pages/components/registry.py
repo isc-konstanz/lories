@@ -32,7 +32,7 @@ class Registration(ABC, Generic[P]):
     def __init__(
         self,
         cls: Type[P],
-        factory: Optional[Callable] = None
+        factory: Optional[Callable] = None,
     ):
         self._class = cls
         self._factory = cls if factory is None else factory
@@ -59,7 +59,7 @@ class PageRegistration(Registration[CP]):
         self,
         cls: Type[CP],
         type: Type[C],
-        factory: Optional[Callable] = None
+        factory: Optional[Callable] = None,
     ):
         super().__init__(cls, factory)
         self.type = type
@@ -113,10 +113,10 @@ class ComponentRegistry:
     # noinspection PyTypeChecker, PyUnresolvedReferences
     def register_page(
         self,
-        cls: Type[P],
+        cls: Type[CP],
         type: Type[C],
         factory: Optional[Callable] = None,
-        replace: bool = False
+        replace: bool = False,
     ) -> None:
         if not issubclass(cls, ComponentPage):
             raise ValueError("Can only register ComponentPage types")
@@ -132,7 +132,7 @@ class ComponentRegistry:
     # noinspection PyTypeChecker, PyUnresolvedReferences
     def register_group(
         self,
-        cls: Type[G],
+        cls: Type[CG],
         *types: Type[C],
         name: Optional[str] = None,
         factory: Optional[Callable] = None,

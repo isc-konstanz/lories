@@ -29,9 +29,8 @@ registry = ComponentRegistry()
 def register_component_page(
     *types: Type[C],
     factory: Optional[Callable] = None,
-    replace: bool = False
+    replace: bool = False,
 ) -> Callable[[Type[P]], Type[P]]:
-
     # noinspection PyShadowingNames
     def _register(cls: Type[P]) -> Type[P]:
         registry.register_page(cls, *types, factory=factory, replace=replace)
@@ -45,9 +44,8 @@ def register_component_group(
     *types: Type[C],
     name: Optional[str] = None,
     factory: Optional[Callable] = None,
-    replace: bool = False
+    replace: bool = False,
 ) -> Callable[[Type[G]], Type[G]]:
-
     # noinspection PyShadowingNames
     def _register(cls: Type[G]) -> Type[G]:
         registry.register_group(cls, *types, name=name, factory=factory, replace=replace)
@@ -127,9 +125,7 @@ class View(ComponentGroup):
 
     def _new_page(self, view: ComponentGroup, component: Component) -> Optional[ComponentPage]:
         if not component.is_enabled():
-            self._logger.debug(
-                f"Skipping page creation for disabled {type(component).__name__} '{component.id}'"
-            )
+            self._logger.debug(f"Skipping page creation for disabled {type(component).__name__} '{component.id}'")
             return
 
         _type = type(component)

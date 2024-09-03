@@ -33,14 +33,8 @@ class ComponentGroup(PageGroup[ComponentPage[C]], Generic[C]):
         layout.card.add_title(self.name)
         layout.card.add_footer(href=self.path)
 
-        layout.append(
-            dbc.Row(dbc.Col(html.H4(f"{self.name}:")))
-        )
+        layout.append(dbc.Row(dbc.Col(html.H4(f"{self.name}:"))))
 
         for page in self.sort():
             if page.layout.has_card_items():
-                layout.append(
-                    dbc.Row(
-                        dbc.Col(page.layout.card, width="auto")
-                    )
-                )
+                layout.append(dbc.Row(dbc.Col(page.layout.card, width="auto")))

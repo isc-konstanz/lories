@@ -33,13 +33,7 @@ class SystemPage(ComponentGroup, ComponentPage[System]):
             if title is not None:
                 data.append(html.H5(f"{title}:"))
             data.append(self._build_data())
-            layout.append(
-                dbc.Row(
-                    dbc.Col(
-                        dbc.Card(dbc.CardBody(data))
-                    )
-                )
-            )
+            layout.append(dbc.Row(dbc.Col(dbc.Card(dbc.CardBody(data)))))
 
     def _do_create_layout(self) -> PageLayout:
         for page in self:

@@ -8,7 +8,6 @@ loris.app.interface
 
 from __future__ import annotations
 
-from abc import abstractmethod
 from typing import Optional, Type
 
 from loris.core import Context, ResourceException, ResourceUnavailableException
@@ -34,6 +33,7 @@ class InterfaceMeta(ConfiguratorMeta):
     # noinspection PyMethodMayBeStatic, PyUnusedLocal
     def _get_class(self, configs: Configurations) -> Type[Interface]:
         from loris.app.view import ViewInterface
+
         return ViewInterface
 
 
@@ -42,6 +42,7 @@ class Interface(Configurator, metaclass=InterfaceMeta):
 
     def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
         from loris.app import Application
+
         if context is None or not isinstance(context, Application):
             raise ResourceException(f"Invalid server context '{context}': {type(context)}")
         if configs is None:
