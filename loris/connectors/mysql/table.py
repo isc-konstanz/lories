@@ -152,7 +152,7 @@ class MySqlTable(Sequence[Column]):
         self,
         resources: Resources,
         query: str,
-        parameters: Sequence[Any] = ()
+        parameters: Sequence[Any] = (),
     ) -> pd.DataFrame:
         with self.connection.cursor(buffered=True, dictionary=True) as cursor:
             self._logger.debug(query)
@@ -174,10 +174,11 @@ class MySqlTable(Sequence[Column]):
 
     # noinspection PyUnresolvedReferences
     def insert(self, resources: Resources, data: pd.DataFrame) -> None:
-        query = (f"INSERT INTO {self.name} ({self.index}, {self.columns}) "
-                 f"VALUES ({', '.join(['%s'] * (len(self.index) + len(self.columns)))}) "
-                 f"ON DUPLICATE KEY UPDATE {', '.join([f'`{c.name}`=VALUES(`{c.name}`)' for c in self.columns])}")
-
+        query = (
+            f"INSERT INTO {self.name} ({self.index}, {self.columns}) "
+            f"VALUES ({', '.join(['%s'] * (len(self.index) + len(self.columns)))}) "
+            f"ON DUPLICATE KEY UPDATE {', '.join([f'`{c.name}`=VALUES(`{c.name}`)' for c in self.columns])}"
+        )
         with self.connection.cursor() as cursor:
             self._logger.debug(query)
 

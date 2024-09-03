@@ -87,10 +87,13 @@ class MySqlConnector(Connector, Mapping[str, MySqlTable]):
         tables_configs = self.configs.get_section(MySqlTable.SECTION, defaults={})
 
         for table_name, table_resources in resources.groupby("table"):
-            table_configs = tables_configs.get_section(table_name, defaults={
-                "index":   tables_configs.get_section("index", defaults={}),
-                "columns": tables_configs.get_section("columns", defaults={}),
-            })
+            table_configs = tables_configs.get_section(
+                table_name,
+                defaults={
+                    "index": tables_configs.get_section("index", defaults={}),
+                    "columns": tables_configs.get_section("columns", defaults={}),
+                },
+            )
             table = MySqlTable.from_configs(self, table_name, table_configs, table_resources)
             tables[table.name] = table
             if table.name not in table_schemas:

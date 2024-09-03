@@ -51,9 +51,9 @@ class DataContext(Context[Channel]):
         return iter(self._channels)
 
     def _load(
-         self,
-         context: Registrator,
-         configs: Configurations
+        self,
+        context: Registrator,
+        configs: Configurations,
     ) -> None:
         defaults = {}
         configs = configs.copy()
@@ -68,7 +68,7 @@ class DataContext(Context[Channel]):
         self,
         context: Registrator,
         configs: Configurations,
-        defaults: Optional[Mapping[str, Any]] = None
+        defaults: Optional[Mapping[str, Any]] = None,
     ) -> Collection[Channel]:
         channels = []
         if defaults is None:

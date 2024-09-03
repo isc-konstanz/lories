@@ -111,7 +111,7 @@ class Directories:
             self._log._dir,
             self._tmp._dir,
             self._data._dir,
-            self._conf._dir
+            self._conf._dir,
         )
 
     # noinspection PyProtectedMember, PyShadowingBuiltins
