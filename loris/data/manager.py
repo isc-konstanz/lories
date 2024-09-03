@@ -49,17 +49,16 @@ class DataManager(DataContext, Activator):
         if isinstance(item, Channel):
             return item in self._channels.values()
         if isinstance(item, Connector) or isinstance(item, Component):
-            return (item in self._connectors.values() or
-                    item in self._components.values())
+            return item in self._connectors.values() or item in self._components.values()
         return False
 
     def __enter__(self) -> DataManager:
-        self._do_activate()
+        self.activate()
         return self
 
     # noinspection PyShadowingBuiltins
     def __exit__(self, type, value, traceback) -> None:
-        self._do_deactivate()
+        self.deactivate()
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
@@ -84,7 +83,8 @@ class DataManager(DataContext, Activator):
                 )
                 continue
             self._logger.debug(f"Configuring {type(self).__name__}: {configurator.configs.path}")
-            configurator._do_configure()
+            configurations = configurator.configs
+            configurator.configure(configurations)
 
             if self._logger.isEnabledFor(logging.DEBUG):
                 self._logger.debug(f"Configured {configurator}")
@@ -103,7 +103,7 @@ class DataManager(DataContext, Activator):
                 continue
 
             self._logger.info(f"Activating {type(activator).__name__} '{activator.name}': {activator.id}")
-            activator._do_activate()
+            activator.activate()
 
             self._logger.debug(f"Activated {type(activator).__name__} '{activator.name}': {activator.id}")
 
@@ -124,8 +124,7 @@ class DataManager(DataContext, Activator):
 
     def _connect(self, connector: Connector) -> Future:
         self._logger.info(f"Connecting {type(connector).__name__}: {connector.id}")
-        connect_channels = self.channels.filter(lambda c: (c.has_connector(connector.id) or
-                                                           c.has_logger(connector.id)))
+        connect_channels = self.channels.filter(lambda c: (c.has_connector(connector.id) or c.has_logger(connector.id)))
 
         return self._executor.submit(ConnectTask(connector, connect_channels))
 
@@ -166,7 +165,7 @@ class DataManager(DataContext, Activator):
         try:
             self._logger.info(f"Disconnecting {type(connector).__name__}: {connector.id}")
             connector.set_channels(ChannelState.DISCONNECTING)
-            connector._do_disconnect()
+            connector.disconnect()
 
             self._logger.debug(f"Disconnected {type(connector).__name__}: {connector.id}")
 
@@ -189,7 +188,7 @@ class DataManager(DataContext, Activator):
                 continue
             try:
                 self._logger.info(f"Deactivating {type(activator).__name__} '{activator.name}': {activator.id}")
-                activator._do_deactivate()
+                activator.deactivate()
 
                 self._logger.debug(f"Deactivated {type(activator).__name__} '{activator.name}': {activator.id}")
 

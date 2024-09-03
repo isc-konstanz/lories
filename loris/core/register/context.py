@@ -15,8 +15,9 @@ from abc import abstractmethod
 from collections import OrderedDict
 from copy import deepcopy
 from itertools import chain
-from typing import Any, Callable, Collection, Iterator, Optional, Tuple, Type, TypeVar, get_args
+from typing import Any, Callable, Collection, Iterator, Mapping, Optional, Tuple, Type, TypeVar, get_args
 
+import numpy as np
 import pandas as pd
 from loris.core import Configurations, Context, Directories, ResourceException
 from loris.core.register import Registrator, Registry
@@ -33,8 +34,9 @@ class RegistratorContext(Context[R]):
 
     def __init__(self, context: Context, *args, **kwargs) -> None:
         from loris.data.context import DataContext
+
         if context is None or not isinstance(context, DataContext):
-            raise ResourceException(f"Invalid data context: {None if context is None else type(context)}")
+            raise ResourceException(f"Invalid context: {None if context is None else type(context)}")
         super().__init__(context, *args, **kwargs)
         self.__map = OrderedDict[str, R]()
 
@@ -79,15 +81,20 @@ class RegistratorContext(Context[R]):
         defaults: Optional[Mapping[str, Any]] = None,
     ) -> Collection[R]:
         values = []
-        _type = self._get_type()
         if defaults is None:
             defaults = {}
+        if isinstance(context, RegistratorContext):
+            default_sections = _get_sections(context._get_type())
+        elif isinstance(context, Registrator):
+            default_sections = _get_sections(type(context))
+        else:
+            raise ResourceException(f"Unable to load sections for: {type(context)}")
 
-        for section in _type.SECTIONS:
+        for section in default_sections:
             if section in configs:
                 defaults.update(configs.get(section))
         for section_name in configs.sections:
-            if section_name in _type.SECTIONS:
+            if section_name in default_sections:
                 continue
             section_file = f"{section_name}.conf"
             section_default = deepcopy(defaults)
@@ -96,7 +103,7 @@ class RegistratorContext(Context[R]):
                 section_file,
                 **configs.dirs.encode(),
                 **section_default,
-                require=False
+                require=False,
             )
             values.append(self._update(context, section))
         return values
@@ -127,16 +134,18 @@ class RegistratorContext(Context[R]):
         if os.path.isdir(configs_dir):
             config_types = tuple(itertools.chain(*[[t.type, *t.alias] for t in self._registry.types.values()]))
             for configs_entry in os.scandir(configs_dir):
-                if (configs_entry.is_file() and configs_entry.path.endswith('.conf')
-                        and not configs_entry.path.endswith('default.conf')
-                        and configs_entry.name.startswith(config_types)):
-
+                if (
+                    configs_entry.is_file()
+                    and not configs_entry.path.endswith("default.conf")
+                    and configs_entry.path.endswith(".conf")
+                    and configs_entry.name.startswith(config_types)
+                ):
                     configs_dirs = self.configs.dirs.encode()
                     configs_dirs["conf_dir"] = os.path.dirname(configs_entry.path)
                     configs = Configurations.load(
                         configs_entry.name,
                         **configs_dirs,
-                        **defaults
+                        **defaults,
                     )
                     values.append(self._update(context, configs))
         return values
@@ -148,9 +157,7 @@ class RegistratorContext(Context[R]):
             elements = [int(t) if t.isdigit() else t for t in elements if pd.notna(t) and t.strip()]
             return tuple(elements)
 
-        self.__map = OrderedDict(
-            sorted(self.__map.items(), key=lambda e: order(e[0]))
-        )
+        self.__map = OrderedDict(sorted(self.__map.items(), key=lambda e: order(e[0])))
 
     # noinspection PyShadowingBuiltins
     def filter(self, filter: Callable[[R], bool]) -> Collection[R]:
@@ -170,16 +177,16 @@ class RegistratorContext(Context[R]):
         return len(self.get_all(*types)) > 0
 
     def get_all(self, *types: Optional[str | type]) -> Collection[R]:
-        if len(types) > 0:
-            return [
-                value for value in self.__map.values()
-                if (
-                    any(t.startswith(value.TYPE) for t in types if isinstance(t, str))
-                    or any(isinstance(value, t) for t in types if isinstance(t, type))
-                )
-            ]
-        else:
-            return self.__map.values()
+        length = len(types)
+
+        def _is_type(value: R) -> bool:
+            return (
+                length == 0
+                or any(t.startswith(value.TYPE) for t in types if isinstance(t, str))
+                or any(isinstance(value, t) for t in types if isinstance(t, type))
+            )
+
+        return [v for v in self.__map.values() if _is_type(v)]
 
     def get_first(self, *types: Optional[str | type]) -> Optional[R]:
         return next(iter(self.get_all(*types)))
@@ -201,15 +208,11 @@ class RegistratorContext(Context[R]):
     # noinspection PyProtectedMember, SpellCheckingInspection
     def _new(self, context: Context, configs: Configurations) -> R:
         registrator_type = self._get_type()
-        registration_name = "_".join(os.path.splitext(configs.name)[:-1])
+        registration_key = "_".join(os.path.splitext(configs.name)[:-1])
         if registrator_type.SECTION not in configs.sections:
-            configs._add_section(registrator_type.SECTION, {"key": registration_name})
+            configs._add_section(registrator_type.SECTION, {})
         registrator_section = configs[registrator_type.SECTION]
-        if "key" not in configs[registrator_type.SECTION]:
-            registrator_section["key"] = registration_name
-            registrator_section.move_to_top("key")
-
-        registration_type = re.split(r"[^a-zA-Z0-9\s]", registration_name)[0]
+        registration_type = re.split(r"[^a-zA-Z0-9\s]", registration_key)[0]
         if "type" in registrator_section:
             registration_type = registrator_section.get("type").lower()
         elif "type" in configs:
@@ -225,8 +228,12 @@ class RegistratorContext(Context[R]):
                 self._logger.debug(
                     f"Using alias \"{','.join(registration.alias)}\" " f"for registration: {registration_type}"
                 )
+        if "key" not in configs[registrator_type.SECTION]:
+            registrator_section["key"] = registration_key
+            registrator_section.move_to_top("key")
         if "type" not in registrator_section:
             registrator_section["type"] = registration_type
+            registrator_section.move_to_top("type")
         return self._registry.types[registration_type].initialize(context, configs)
 
     def _update(self, context: Context, configs: Configurations) -> R:
@@ -236,3 +243,10 @@ class RegistratorContext(Context[R]):
         else:
             self._add(value)
         return value
+
+
+# noinspection PyShadowingBuiltins, PyTypeChecker
+def _get_sections(type: Type[R]) -> Collection[str]:
+    sections = [t.SECTIONS for t in type.mro() if t != Registrator and issubclass(t, Registrator)]
+    sections = [*itertools.chain.from_iterable(s for s in sections if isinstance(s, Collection))]
+    return np.unique(sections)

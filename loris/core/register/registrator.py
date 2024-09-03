@@ -40,31 +40,35 @@ class Registrator(Configurator):
     def __init__(
         self,
         context: Optional[Registrator | Context] = None,
-        configs: Configurations = None,
-        *args, **kwargs
+        configs: Optional[Configurations] = None,
+        key: Optional[str] = None,
+        *args,
+        **kwargs,
     ) -> None:
-        from loris.core import RegistratorContext
-        from loris.data.context import DataContext
-        if context is not None and not isinstance(context, (Registrator, RegistratorContext)):
-            raise ResourceException(f"Invalid context: {None if context is None else type(context)}")
         super().__init__(get_context(context, Context), configs, *args, **kwargs)
-
         if context is not None:
+            from loris.core import RegistratorContext
+            from loris.data.context import DataContext
+
+            if context is not None and not isinstance(context, (Registrator, RegistratorContext)):
+                raise ResourceException(f"Invalid context: {None if context is None else type(context)}")
+
             self._registrator = context if isinstance(context, Registrator) else get_context(context, DataContext)
-        if configs is None:
-            raise ConfigurationException("Missing configuration")
-        if self.SECTION not in configs.sections:
-            configs._add_section(self.SECTION, {"type": self.TYPE})
-        elif "type" not in configs[self.SECTION]:
-            configs[self.SECTION]["type"] = self.TYPE
 
-        if "key" in configs:
-            configs[self.SECTION]["key"] = configs.pop("key")
-        if "key" not in configs[self.SECTION]:
-            raise ConfigurationException(f"Invalid configuration, missing specified {self.SECTION} Key")
-
-        self._key = parse_id(configs[self.SECTION].get("key"))
+        self._key = self._assert_key(configs, key)
         self._id = self._key if self._registrator is None else f"{self._registrator.id}.{self._key}"
+
+    def _assert_key(self, configs: Optional[Configurations], key: Optional[str]) -> str:
+        if configs is not None:
+            if configs.has_section(self.SECTION) and "key" in configs[self.SECTION]:
+                key = configs[self.SECTION]["key"]
+            elif "key" in configs:
+                key = configs["key"]
+            elif key is None:
+                raise ConfigurationException(f"Invalid configuration, missing specified {self.SECTION}.key")
+        elif key is None:
+            raise ConfigurationException("Missing configuration")
+        return parse_id(key)
 
     @property
     def id(self) -> str:

@@ -17,17 +17,14 @@ from loris.util import get_context
 
 # noinspection PyProtectedMember
 class DataAccess(DataContext, Configurator):
-
     def __init__(self, component, **channels: Channel) -> None:
         from loris import Component, ComponentException
         from loris.data.context import DataContext
-        super().__init__(channels, get_context(component.context, DataContext))
 
+        super().__init__(channels, get_context(component.context, DataContext))
         if component is None or not isinstance(component, Component):
             raise ComponentException(f"Invalid component: {None if component is None else type(component)}")
         self.__component = component
-        if not self.__component.configs.has_section(self.SECTION):
-            self.__component.configs._add_section(self.SECTION, {})
 
     # noinspection PyArgumentList
     def __getattr__(self, attr):
@@ -38,7 +35,7 @@ class DataAccess(DataContext, Configurator):
 
     @property
     def configs(self) -> Configurations:
-        return self.__component.configs.get_section(self.SECTION)
+        return self.__component.configs.get_section(self.SECTION, defaults={})
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
