@@ -48,6 +48,12 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
         self.__configs = configs
         self.__context = context
 
+    def __eq__(self, other: Any) -> bool:
+        return self is other
+
+    def __hash__(self) -> int:
+        return hash(id(self))
+
     def _get_vars(self) -> Dict[str, Any]:
         def _is_var(attr: str, var: Any) -> bool:
             return not (

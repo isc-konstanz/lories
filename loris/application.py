@@ -46,12 +46,6 @@ class Application(DataManager, Thread):
         signal.signal(signal.SIGINT, self.interrupt)
         signal.signal(signal.SIGTERM, self.terminate)
 
-    def __eq__(self, other):
-        return self is other
-
-    def __hash__(self):
-        return hash(id(self))
-
     # noinspection PyProtectedMember
     def configure(self, settings: Settings, factory: Type[System]) -> None:
         self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
