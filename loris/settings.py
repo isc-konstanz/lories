@@ -16,6 +16,7 @@ from argparse import ArgumentParser
 from typing import Any, Dict
 
 from loris.core import Configurations, Directories, Directory
+from loris.util import to_bool
 
 
 class Settings(Configurations):
@@ -25,6 +26,7 @@ class Settings(Configurations):
     def __init__(self, app_name: str, app_file: str = "settings.conf", parser: ArgumentParser = None) -> None:
         app_args = _parse_kwargs(parser)
         app_args["name"] = app_name
+        app_args["systems"] = {k: to_bool(app_args.pop(f"system_{k}", False)) for k in ["scan", "flat", "copy"]}
         app_dirs = Directories(**{d: app_args.pop(d, None) for d in Directories.KEYS})
         super().__init__(app_file, app_dirs, app_args)
         self._load(require=False)

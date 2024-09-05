@@ -58,11 +58,11 @@ class Application(DataManager, Thread):
         self._interval = settings.get_int("interval", default=1)
 
         systems = []
-        systems_flat = self.settings.get_bool("system_flat", default=False)
-        system_dirs = self.settings.dirs.encode()
+        systems_flat = self.settings["systems"]["flat"]
+        system_dirs = self.settings.dirs.to_dict()
         system_dirs["conf_dir"] = None
-        if self.settings.get_bool("system_scan", default=False):
-            if self.settings.get_bool("system_copy", default=False):
+        if self.settings["systems"]["scan"]:
+            if self.settings["systems"]["copy"]:
                 factory.copy(self.settings)
             system_dirs["scan_dir"] = str(self.settings.dirs.data)
             for system in factory.scan(self, **system_dirs, flat=systems_flat):
