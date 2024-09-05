@@ -1,9 +1,6 @@
 @startuml loris.data.access.DataAccess
 set namespaceSeparator none
-class "Channel" as loris.channels.channel.Channel {
-  uuid: str
-  id: str
-  name: str
+class "Channel" as loris.data.channels.channel.Channel {
   connector: ChannelConnector
   logger: ChannelConnector
   freq: str
@@ -11,64 +8,63 @@ class "Channel" as loris.channels.channel.Channel {
   timestamp: pd.Timestamp
   value: Any
   state: ChannelState
-  value_length: int
-  value_type: str | type
   set(timestamp: pd.Timestamp, value: Any, state: Optional[str | ChannelState]) -> None
   is_valid() -> bool
-  has_connector(uuid: Optional[str]) -> bool
+  has_connector(id: Optional[str]) -> bool
   has_logger() -> bool
   from_logger() -> Channel
-  copy() -> Channel
   to_series(state: bool) -> pd.Series
 }
-class "ChannelConnector" as loris.channels.connector.ChannelConnector {
-  uuid: str
+class "ChannelConnector" as loris.data.channels.connector.ChannelConnector {
   id: str
+  key: str
   timestamp: pd.Timestamp
   copy() -> ChannelConnector
 }
-class "Channels" as loris.channels.collection.Channels {
-  copy() -> Channels
-  apply(apply: callable) -> None
-  filter(filter: callable) -> Channels
-  groupby(by: str) -> List[Tuple[Any, Channels]]
+class "Channels" as loris.data.channels.collection.Channels {
   to_frame(unique: bool, states: bool) -> pd.DataFrame
+}
+class "Resources" as loris.core.resources.Resources {
+  copy() -> Resources
+  append(resource: Resource)
+  extend(resources: Iterable[Resource])
+  apply(apply: Callable[[Resource], None]) -> None
+  filter(filter: Callable[[Resource], bool]) -> Resources
+  groupby(by: str) -> Iterator[Tuple[Any, Collection[R]]]
+}
+class "Resource" as loris.core.resource.Resource {
+  id
+  key
+  name
+  type
+  copy() -> Resource
+  get(attr: str, default: Optional[Any]) -> Any
 }
 class "DataAccess" as loris.data.access.DataAccess {
   add(id: str, **configs: Any) -> None
 }
-class "DataMapping" as loris.data.mapping.DataMapping {
-  values() -> Channels
-  filter(filter: callable) -> Channels
+class "DataContext" as loris.data.context.DataContext {
+  channels: Channels
+  filter(filter: Callable[[Channel], bool]) -> Channels
   groupby(by: str) -> List[Tuple[Any, Channels]]
   to_frame() -> pd.DataFrame
 }
-class _collections_abc.Mapping {
-  get(key: str, default: Any)
-  keys()
-  values()
-  items()
-}
-class collections.OrderedDict {
-  {abstract}move_to_end(key, last)
-}
-class "Configurator" as loris.configs.configurator.Configurator {
-  name: str
+class "Configurator" as loris.core.configs.configurator.Configurator {
+  context: Context
   configs: Configurations
   {abstract}configure(configs: Configurations) -> None
   is_configured() -> bool
   is_enabled() -> bool
 }
-loris.channels.connector.ChannelConnector --* loris.channels.channel.Channel : logger
-loris.channels.connector.ChannelConnector --* loris.channels.channel.Channel : connector
-loris.channels.collection.Channels --o loris.channels.channel.Channel : _channels
-loris.channels.collection.Channels --o loris.data.mapping.DataMapping : values()
-loris.channels.collection.Channels --o loris.data.mapping.DataMapping : filter()
-loris.channels.collection.Channels --o loris.data.mapping.DataMapping : groupby()
-loris.data.access.DataAccess --|> loris.configs.configurator.Configurator
-loris.data.access.DataAccess --|> loris.data.mapping.DataMapping
-loris.data.mapping.DataMapping --|> _collections_abc.Mapping
-collections.OrderedDict --* loris.channels.channel.Channel : __configs
-collections.OrderedDict --* loris.channels.connector.ChannelConnector : __configs
-collections.OrderedDict --* loris.data.mapping.DataMapping : _channels
+loris.data.access.DataAccess --|> loris.core.configs.configurator.Configurator
+loris.data.access.DataAccess --|> loris.data.context.DataContext
+loris.core.resources.Resources - loris.core.resource.Resource : 0..*
+loris.data.channels.channel.Channel --|> loris.core.resource.Resource
+loris.data.channels.channel.Channel *-- loris.data.channels.connector.ChannelConnector : logger
+loris.data.channels.channel.Channel *-- loris.data.channels.connector.ChannelConnector : connector
+loris.data.channels.collection.Channels --|> loris.core.resources.Resources
+loris.data.channels.collection.Channels - loris.data.channels.channel.Channel : 0..*
+loris.data.context.DataContext *-- loris.data.channels.collection.Channels : channels
+loris.data.context.DataContext *-- loris.data.channels.collection.Channels : filter()
+loris.data.context.DataContext *-- loris.data.channels.collection.Channels : groupby()
 @enduml

@@ -1,76 +1,44 @@
 @startuml loris.components.component.Component
 set namespaceSeparator none
 class "Component" as loris.components.component.Component {
-  uuid: str
-  id: str
-  name: str
-  type: str
   data: DataAccess
+  connectors: ConnectorAccess
   context: ComponentContext
   get(start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame
 }
-class "Activator" as loris.components.activator.Activator {
+class "Activator" as loris.core.activator.Activator {
+  name: str
   {abstract}activate() -> None
   {abstract}deactivate() -> None
   is_active() -> bool
 }
-class "Configurator" as loris.configs.configurator.Configurator {
-  name: str
+class "Registrator" as loris.core.register.registrator.Registrator {
+  TYPE: str
+  SECTION: str
+  SECTIONS: Collection[str]
+  context: RegistratorContext
+  id: str
+  key: str
+}
+class "Configurator" as loris.core.configs.configurator.Configurator {
+  context: Context
   configs: Configurations
   {abstract}configure(configs: Configurations) -> None
   is_configured() -> bool
   is_enabled() -> bool
 }
-class "Configurations" as loris.configs.configurations.Configurations {
-  name: str
-  path: str
-  sections -> List[Configurations]
-  dirs: Directories
-  enabled: bool
-  get(key: str, default: Any) -> Any
-  get_bool(key, default: bool) -> bool
-  get_date(key, default: dt.datetime | pd.Timestamp) -> pd.Timestamp
-  get_float(key, default: float) -> float
-  get_int(key, default: int) -> int
-  get_section(section: str, defaults: Optional[Mapping[str, Any]]) -> Configurations
-  has_section(section: str) -> bool
-  move_to_bottom(key: str) -> None
-  move_to_top(key: str) -> None
-  set(key: str, value: Any) -> None
-  update(u: Mapping[str, Any], replace: bool) -> Configurations
-  copy() -> Configurations
-}
-class "Directories" as loris.configs.directories.Directories {
-  conf: str
-  cmpt: str
-  data: str
-  lib: str
-  log: str
-  tmp: str
-  encode() -> Dict[str, Optional[str]]
-  join(configs: Mapping[str, str]) -> None
-}
 class "ComponentContext" as loris.components.context.ComponentContext {
-  get_types() -> List[str]
-  get_all(*types: str | type) -> List[Component]
-  has_type(*types: str | type) -> bool
+  SECTION: str
+  filter(filter: Callable[[Component], bool]) -> Collection[Component]
+  get_all() -> Collection[Component]
+  get_first() -> Optional[Component]
+  get_last() -> Optional[Component]
+  get_types() -> Collection[str]
+  has_type() -> bool
 }
-class "DataAccess" as loris.data.access.DataAccess {
-  add(id: str, **configs: Any) -> None
-}
-class "DataMapping" as loris.data.mapping.DataMapping {
-  values() -> Channels
-  filter(filter: callable) -> Channels
-  groupby(by: str) -> List[Tuple[Any, Channels]]
-  to_frame() -> pd.DataFrame
-}
-loris.components.activator.Activator --|> loris.configs.configurator.Configurator
-loris.components.component.Component --|> loris.components.activator.Activator
-loris.data.access.DataAccess --|> loris.data.mapping.DataMapping
-loris.data.access.DataAccess --|> loris.configs.configurator.Configurator
-loris.data.access.DataAccess --* loris.components.component.Component : __data
-loris.components.context.ComponentContext --|> loris.components.activator.Activator
-loris.components.context.ComponentContext --* loris.components.component.Component : __context
-loris.configs.configurations.Configurations --o loris.configs.configurator.Configurator : __configs
-loris.configs.directories.Directories --o loris.configs.configurations.Configurations : __dirs
+loris.core.register.registrator.Registrator --|> loris.core.configs.configurator.Configurator
+loris.core.activator.Activator --|> loris.core.register.registrator.Registrator
+loris.components.component.Component --|> loris.core.activator.Activator
+loris.components.component.Component *-- loris.components.context.ComponentContext : __context
+loris.components.context.ComponentContext --|> loris.core.activator.Activator
 @enduml

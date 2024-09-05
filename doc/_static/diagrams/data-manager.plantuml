@@ -1,40 +1,50 @@
 @startuml loris.data.manager.DataManager
 set namespaceSeparator none
 class "DataManager" as loris.data.manager.DataManager {
-  connect(channels: Optional[Channels]) -> None
-  disconnect() -> None
-  read(channels: Optional[Channels], start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame
+  components: ComponentContext
+  connectors: ConnectorContext
+  connect(*connectors: Connector) -> None
+  reconnect(*connectors: Connector) -> None
+  disconnect(*connectors: Connector) -> None
+  read(channels: Optional[Channels], start: Optional[pd.Timestamp], end: Optional[pd.Timestamp]) -> pd.DataFrame
   write(data: pd.DataFrame, channels: Optional[Channels]) -> None
-  log(channels: Optional[Channels]) -> None
+  log(channels: Optional[Channels], force: bool) -> None
 }
 class "DataContext" as loris.data.context.DataContext {
   channels: Channels
-  components: ComponentContext
-  connectors: ConnectorContext
-}
-class "DataMapping" as loris.data.mapping.DataMapping {
-  values() -> Channels
-  filter(filter: callable) -> Channels
+  filter(filter: Callable[[Channel], bool]) -> Channels
   groupby(by: str) -> List[Tuple[Any, Channels]]
   to_frame() -> pd.DataFrame
 }
 class "ComponentContext" as loris.components.context.ComponentContext {
-  get_types() -> List[str]
-  get_all(*types: str | type) -> List[Component]
-  has_type(*types: str | type) -> bool
 }
 class "ConnectorContext" as loris.connectors.context.ConnectorContext {
-  get_types() -> List[str]
-  get_all(*types: str | type) -> List[Connector]
-  has_type(*types: str | type) -> bool
 }
-class "Activator" as loris.components.activator.Activator {
+class "Activator" as loris.core.activator.Activator {
+  name: str
   {abstract}activate() -> None
   {abstract}deactivate() -> None
   is_active() -> bool
 }
-class "Configurator" as loris.configs.configurator.Configurator {
-  name: str
+class "Registrator" as loris.core.register.registrator.Registrator {
+  TYPE: str
+  SECTION: str
+  SECTIONS: Collection[str]
+  context: RegistratorContext
+  id: str
+  key: str
+}
+class "RegistratorContext" as loris.core.register.context.RegistratorContext {
+  SECTION
+  filter(filter: Callable[[R], bool]) -> Collection[R]
+  get_all() -> Collection[R]
+  get_first() -> Optional[R]
+  get_last() -> Optional[R]
+  get_types() -> Collection[str]
+  has_type() -> bool
+}
+class "Configurator" as loris.core.configs.configurator.Configurator {
+  context: Context
   configs: Configurations
   {abstract}configure(configs: Configurations) -> None
   is_configured() -> bool
@@ -44,14 +54,18 @@ class "ThreadPoolExecutor" as concurrent.futures.thread.ThreadPoolExecutor {
   shutdown(wait)
   submit()
 }
-loris.components.activator.Activator --|> loris.configs.configurator.Configurator
-loris.components.context.ComponentContext --|> loris.components.activator.Activator
-loris.connectors.context.ConnectorContext --|> loris.configs.configurator.Configurator
-loris.data.context.DataContext --|> loris.configs.configurator.Configurator
-loris.data.context.DataContext --|> loris.data.mapping.DataMapping
-loris.data.manager.DataManager --|> loris.components.activator.Activator
+
+loris.core.register.registrator.Registrator --|> loris.core.configs.configurator.Configurator
+loris.core.register.registrator.Registrator - loris.core.register.context.RegistratorContext : 0..*
+loris.core.activator.Activator --|> loris.core.register.registrator.Registrator
+loris.data.context.DataContext --|> loris.core.configs.configurator.Configurator
 loris.data.manager.DataManager --|> loris.data.context.DataContext
-loris.components.context.ComponentContext --* loris.data.context.DataContext : _components
-loris.connectors.context.ConnectorContext --* loris.data.context.DataContext : _connectors
-concurrent.futures.thread.ThreadPoolExecutor --* loris.data.manager.DataManager : _executor
+loris.data.manager.DataManager --|> loris.core.activator.Activator
+loris.data.manager.DataManager *-- loris.components.context.ComponentContext : _components
+loris.data.manager.DataManager *-- loris.connectors.context.ConnectorContext : _connectors
+loris.data.manager.DataManager *-- concurrent.futures.thread.ThreadPoolExecutor : _executor
+loris.components.context.ComponentContext --|> loris.core.register.context.RegistratorContext
+loris.components.context.ComponentContext --|> loris.core.configs.configurator.Configurator
+loris.connectors.context.ConnectorContext --|> loris.core.register.context.RegistratorContext
+loris.connectors.context.ConnectorContext --|> loris.core.configs.configurator.Configurator
 @enduml

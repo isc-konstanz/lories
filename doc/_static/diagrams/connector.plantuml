@@ -1,38 +1,59 @@
 @startuml loris.connectors.connector.Connector
 set namespaceSeparator none
 class "Connector" as loris.connectors.connector.Connector {
-  uuid: str
-  id: str
   channels: Channels
-  context: ConnectorContext
-  {abstract}is_connected() -> bool
-  {abstract}connect(channels: Channels) -> None
+  resources: Resources
+  is_connected() -> bool
+  {abstract}connect(resources: Resources) -> None
   {abstract}disconnect() -> None
-  {abstract}read(channels: Channels, start: Optional[pd.Timestamp, dt.datetime], end: Optional[pd.Timestamp, dt.datetime]) -> None
-  {abstract}write(channels: Channels) -> None
-  set_states(channel_state: ChannelState) -> None
+  {abstract}read(resources: Resources, start: Optional[pd.Timestamp], end: Optional[pd.Timestamp]) -> pd.DataFrame
+  {abstract}write(data: pd.DataFrame) -> None
+  set_channels(state: ChannelState) -> None
 }
-class "ConnectorContext" as loris.connectors.context.ConnectorContext {
-  get_types() -> List[str]
-  get_all(*types: str | type) -> List[Connector]
-  has_type(*types: str | type) -> bool
+class "Registrator" as loris.core.register.registrator.Registrator {
+  TYPE: str
+  SECTION: str
+  SECTIONS: Collection[str]
+  context: RegistratorContext
+  id: str
+  key: str
 }
-class "Channels" as loris.channels.collection.Channels {
-  copy() -> Channels
-  apply(apply: callable) -> None
-  filter(filter: callable) -> Channels
-  groupby(by: str) -> List[Tuple[Any, Channels]]
-  to_frame(unique: bool, states: bool) -> pd.DataFrame
-}
-class "Configurator" as loris.configs.configurator.Configurator {
-  name: str
+class "Configurator" as loris.core.configs.configurator.Configurator {
+  context: Context
   configs: Configurations
   {abstract}configure(configs: Configurations) -> None
   is_configured() -> bool
   is_enabled() -> bool
 }
-loris.connectors.connector.Connector --|> loris.configs.configurator.Configurator
-loris.connectors.context.ConnectorContext --|> loris.configs.configurator.Configurator
-loris.connectors.context.ConnectorContext --* loris.connectors.connector.Connector : __context
-loris.channels.collection.Channels --* loris.connectors.connector.Connector : __channels
+class "ConnectorContext" as loris.connectors.context.ConnectorContext {
+  SECTION: str
+  filter(filter: Callable[[Connector], bool]) -> Collection[Connector]
+  get_all() -> Collection[Connector]
+  get_first() -> Optional[Connector]
+  get_last() -> Optional[Connector]
+  get_types() -> Collection[str]
+  has_type() -> bool
+}
+class "Resources" as loris.core.resources.Resources {
+  copy() -> Resources
+  append(resource: Resource)
+  extend(resources: Iterable[Resource])
+  apply(apply: Callable[[Resource], None]) -> None
+  filter(filter: Callable[[Resource], bool]) -> Resources
+  groupby(by: str) -> Iterator[Tuple[Any, Collection[R]]]
+}
+class "Resource" as loris.core.resource.Resource {
+  id
+  key
+  name
+  type
+  copy() -> Resource
+  get(attr: str, default: Optional[Any]) -> Any
+}
+loris.core.register.registrator.Registrator --|> loris.core.configs.configurator.Configurator
+loris.connectors.connector.Connector --|> loris.core.register.registrator.Registrator
+loris.connectors.connector.Connector *-- loris.core.resources.Resources : __resources
+loris.connectors.connector.Connector *-- loris.connectors.context.ConnectorContext : __context
+loris.connectors.context.ConnectorContext --|> loris.core.configs.configurator.Configurator
+loris.core.resource.Resource - loris.core.resources.Resources : 0..*
 @enduml
