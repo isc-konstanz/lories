@@ -21,7 +21,7 @@ class "ChannelConnector" as loris.data.channels.connector.ChannelConnector {
   timestamp: pd.Timestamp
   copy() -> ChannelConnector
 }
-class "Channels" as loris.data.channels.collection.Channels {
+class "Channels" as loris.data.channels.channels.Channels {
   to_frame(unique: bool, states: bool) -> pd.DataFrame
 }
 class "Resources" as loris.core.resources.Resources {
@@ -62,9 +62,9 @@ loris.core.resources.Resources - loris.core.resource.Resource : 0..*
 loris.data.channels.channel.Channel --|> loris.core.resource.Resource
 loris.data.channels.channel.Channel *-- loris.data.channels.connector.ChannelConnector : logger
 loris.data.channels.channel.Channel *-- loris.data.channels.connector.ChannelConnector : connector
-loris.data.channels.collection.Channels --|> loris.core.resources.Resources
-loris.data.channels.collection.Channels - loris.data.channels.channel.Channel : 0..*
-loris.data.context.DataContext *-- loris.data.channels.collection.Channels : channels
-loris.data.context.DataContext *-- loris.data.channels.collection.Channels : filter()
-loris.data.context.DataContext *-- loris.data.channels.collection.Channels : groupby()
+loris.data.channels.channels.Channels --|> loris.core.resources.Resources
+loris.data.channels.channels.Channels - loris.data.channels.channel.Channel : 0..*
+loris.data.context.DataContext *-- loris.data.channels.channels.Channels : channels
+loris.data.context.DataContext *-- loris.data.channels.channels.Channels : filter()
+loris.data.context.DataContext *-- loris.data.channels.channels.Channels : groupby()
 @enduml
