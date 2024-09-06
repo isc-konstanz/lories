@@ -53,8 +53,6 @@ class Connector(Registrator, metaclass=ConnectorMeta):
         *args,
         **kwargs,
     ) -> None:
-        if context is None:
-            raise ConnectorException(f"Invalid context: {context}", connector=self)
         super().__init__(context, configs, *args, **kwargs)
         self.__resources = Resources()
 
@@ -66,6 +64,12 @@ class Connector(Registrator, metaclass=ConnectorMeta):
     def __exit__(self, type, value, traceback):
         self.disconnect()
 
+    # noinspection PyMethodMayBeStatic
+    def _assert_context(self, context: Optional[Context]) -> Optional[Context]:
+        if context is None:
+            raise ConnectorException(f"Invalid context: {context}", connector=self)
+        return super()._assert_context(context)
+
     # noinspection PyShadowingBuiltins, PyProtectedMember
     def _get_vars(self) -> Dict[str, Any]:
         vars = super()._get_vars()
@@ -75,9 +79,8 @@ class Connector(Registrator, metaclass=ConnectorMeta):
         return vars
 
     # noinspection PyShadowingBuiltins
-    def _parse_vars(self, vars: Optional[Dict[str, Any]] = None, parse: callable = str) -> Dict[str, str]:
-        if vars is None:
-            vars = self._get_vars()
+    def _convert_vars(self, convert: callable = str) -> Dict[str, str]:
+        vars = self._get_vars()
         values = OrderedDict()
         try:
             id = vars.pop("id", self.id)
@@ -94,12 +97,12 @@ class Connector(Registrator, metaclass=ConnectorMeta):
 
         values.update(
             {
-                k: str(v) if not isinstance(v, (Resource, Resources, Configurator, Context)) else parse(v)
+                k: str(v) if not isinstance(v, (Resource, Resources, Configurator, Context)) else convert(v)
                 for k, v in vars.items()
             }
         )
-        values["context"] = parse(self.context)
-        values["configurations"] = parse(self.configs)
+        values["context"] = convert(self.context)
+        values["configurations"] = convert(self.configs)
         values["configured"] = str(self.is_configured())
         values["connected"] = str(self._is_connected())
         values["enabled"] = str(self.is_enabled())

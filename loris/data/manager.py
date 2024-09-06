@@ -52,14 +52,6 @@ class DataManager(DataContext, Activator):
             return item in self._connectors.values() or item in self._components.values()
         return False
 
-    def __enter__(self) -> DataManager:
-        self.activate()
-        return self
-
-    # noinspection PyShadowingBuiltins
-    def __exit__(self, type, value, traceback) -> None:
-        self.deactivate()
-
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
         self._load(self, configs)

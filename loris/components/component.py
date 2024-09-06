@@ -34,11 +34,15 @@ class Component(Activator):
         *args,
         **kwargs,
     ) -> None:
-        if context is None:
-            raise ComponentException(f"Invalid context: {context}")
         super().__init__(context, configs, *args, **kwargs)
         self.__connectors = ConnectorAccess(self)
         self.__data = DataAccess(self)
+
+    # noinspection PyMethodMayBeStatic
+    def _assert_context(self, context: Optional[Context]) -> Optional[Context]:
+        if context is None:
+            raise ComponentException(f"Invalid context: {context}")
+        return super()._assert_context(context)
 
     # noinspection PyProtectedMember
     def _on_configure(self, configs: Configurations) -> None:
@@ -52,16 +56,7 @@ class Component(Activator):
             configs._add_section(DataAccess.SECTION, {})
         self.__data.configure(configs.get_section(DataAccess.SECTION))
 
-    # noinspection PyShadowingBuiltins
-    def _get_vars(self) -> Dict[str, Any]:
-        vars = super()._get_vars()
-        vars.pop("type", None)
-        return vars
-
-    @property
-    def configs(self) -> Configurations:
-        return super().configs
-
+    # Override return type, as a context is mandatory for components
     @property
     def context(self) -> Context:
         return super().context
@@ -98,6 +93,12 @@ class Component(Activator):
             end = to_date(end, **kwargs)
             data = data[data.index <= end]
         return data
+
+    # noinspection PyShadowingBuiltins
+    def _get_vars(self) -> Dict[str, Any]:
+        vars = super()._get_vars()
+        vars.pop("type", None)
+        return vars
 
 
 class ComponentException(ResourceException):

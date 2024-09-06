@@ -12,7 +12,7 @@ from collections import OrderedDict
 from typing import Any, Dict
 
 import pandas as pd
-from loris.util import parse_id
+from loris.util import parse_key
 
 
 class ChannelConnector:
@@ -26,7 +26,7 @@ class ChannelConnector:
     # noinspection PyShadowingBuiltins
     def __init__(self, connector: str = None, **configs: Any) -> None:
         self._id = connector
-        self._key = parse_id(connector.split(".")[-1]) if connector is not None else None
+        self._key = parse_key(connector.split(".")[-1]) if connector is not None else None
         self.__configs = OrderedDict(configs)
 
     # noinspection PyShadowingBuiltins
