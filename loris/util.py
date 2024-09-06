@@ -349,7 +349,7 @@ def parse_name(name: str) -> str:
 
 
 # noinspection PyShadowingBuiltins
-def parse_id(id: str) -> str:
+def parse_key(id: str) -> str:
     for c in INVALID_CHARS:
         id = id.replace(c, "_")
     return re.sub("[^\\w]+", "", id).lower()

@@ -15,7 +15,7 @@ from pydoc import locate
 from typing import Any, Dict, List, Optional, Type
 
 from loris.core import ConfigurationException
-from loris.util import parse_id, parse_name
+from loris.util import parse_key, parse_name
 
 
 class Resource:
@@ -40,7 +40,7 @@ class Resource:
 
         if key is None:
             raise ConfigurationException(f"Invalid configuration, missing specified {builtins.type(self).__name__} Key")
-        self._key = parse_id(key)
+        self._key = parse_key(key)
         self._id = id if id is not None else self._key
         if self._key != key:
             self._logger.warning(f"{builtins.type(self).__name__} Key contains invalid characters: {key}")

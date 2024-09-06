@@ -49,7 +49,7 @@ class Directories:
         return f"[{self.SECTION}]\n" + "\n".join(f'{attr} = "{str(getattr(self, attr))}"' for attr in attrs)
 
     # noinspection PyProtectedMember
-    def encode(self) -> Dict[str, Optional[str]]:
+    def to_dict(self) -> Dict[str, Optional[str]]:
         dirs = {
             self.LIB: self._lib._dir,
             self.LOG: self._log._dir,

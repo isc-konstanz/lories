@@ -14,9 +14,9 @@ from collections import OrderedDict
 from functools import wraps
 from typing import Any, Dict, Optional
 
-from loris.core import Context
+from loris.core import Context, ResourceException
 from loris.core.configs import ConfigurationException, Configurations
-from loris.util import get_members
+from loris.util import get_context, get_members
 
 
 class ConfiguratorMeta(ABCMeta):
@@ -45,8 +45,30 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
     ) -> None:
         super().__init__(*args, **kwargs)
         self._logger = logging.getLogger(self.__module__)
-        self.__configs = configs
-        self.__context = context
+        self.__context = self._assert_context(context)
+        self.__configs = self._assert_configs(configs)
+
+    def __eq__(self, other: Any) -> bool:
+        return self is other
+
+    def __hash__(self) -> int:
+        return hash(id(self))
+
+    # noinspection PyMethodMayBeStatic
+    def _assert_configs(self, configs: Optional[Configurations]) -> Optional[Configurations]:
+        if configs is None:
+            return None
+        if not isinstance(configs, Configurations):
+            raise ConfigurationException(f"Invalid configurations: {None if configs is None else type(configs)}")
+        return configs
+
+    # noinspection PyMethodMayBeStatic
+    def _assert_context(self, context: Optional[Context]) -> Optional[Context]:
+        if context is None:
+            return None
+        if not isinstance(context, Context):
+            raise ResourceException(f"Invalid context: {None if context is None else type(context)}")
+        return get_context(context, Context)
 
     def _get_vars(self) -> Dict[str, Any]:
         def _is_var(attr: str, var: Any) -> bool:
@@ -61,28 +83,28 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
         return get_members(self, filter=_is_var)
 
     # noinspection PyShadowingBuiltins
-    def _parse_vars(self, vars: Optional[Dict[str, Any]] = None, parse: callable = str) -> Dict[str, str]:
-        if vars is None:
-            vars = self._get_vars()
-        values = OrderedDict(
-            {k: str(v) if not isinstance(v, (Configurator, Context)) else parse(v) for k, v in vars.items()}
-        )
+    def _convert_vars(self, convert: callable = str) -> Dict[str, str]:
+        def _convert(var: Any) -> str:
+            return str(var) if not isinstance(var, (Configurator, Context)) else convert(var)
+
+        vars = self._get_vars()
+        values = OrderedDict([(k, _convert(v)) for k, v in vars.items()])
         if self.context is not None:
-            values["context"] = parse(self.context)
+            values["context"] = convert(self.context)
         if self.configs is not None:
-            values["configurations"] = parse(self.configs)
+            values["configurations"] = convert(self.configs)
             values["configured"] = str(self.is_configured())
             values["enabled"] = str(self.is_enabled())
         return values
 
     # noinspection PyShadowingBuiltins
     def __repr__(self) -> str:
-        vars = [f"{k}={v}" for k, v in self._parse_vars(parse=lambda v: f"<{type(v).__name__}>").items()]
+        vars = [f"{k}={v}" for k, v in self._convert_vars(lambda v: f"<{type(v).__name__}>").items()]
         return f"{type(self).__name__}({', '.join(vars)})"
 
     # noinspection PyShadowingBuiltins
     def __str__(self) -> str:
-        vars = [f"{k} = {v}" for k, v in self._parse_vars(parse=repr).items()]
+        vars = [f"{k} = {v}" for k, v in self._convert_vars(repr).items()]
         return f"{type(self).__name__}:\n\t" + "\n\t".join(vars)
 
     @property

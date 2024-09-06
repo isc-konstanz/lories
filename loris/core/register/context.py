@@ -33,9 +33,7 @@ class RegistratorContext(Context[R]):
         pass
 
     def __init__(self, context: Context, *args, **kwargs) -> None:
-        from loris.data.context import DataContext
-
-        if context is None or not isinstance(context, DataContext):
+        if context is None or not isinstance(context, Context):
             raise ResourceException(f"Invalid context: {None if context is None else type(context)}")
         super().__init__(context, *args, **kwargs)
         self.__map = OrderedDict[str, R]()
@@ -101,7 +99,7 @@ class RegistratorContext(Context[R]):
             section_default.update(configs.get(section_name))
             section = Configurations.load(
                 section_file,
-                **configs.dirs.encode(),
+                **configs.dirs.to_dict(),
                 **section_default,
                 require=False,
             )
@@ -140,7 +138,7 @@ class RegistratorContext(Context[R]):
                     and configs_entry.path.endswith(".conf")
                     and configs_entry.name.startswith(config_types)
                 ):
-                    configs_dirs = self.configs.dirs.encode()
+                    configs_dirs = self.configs.dirs.to_dict()
                     configs_dirs["conf_dir"] = os.path.dirname(configs_entry.path)
                     configs = Configurations.load(
                         configs_entry.name,
