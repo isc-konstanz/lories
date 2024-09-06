@@ -19,7 +19,7 @@ from loris.components.context import ComponentContext
 from loris.core import Context, RegistratorContext
 from loris.data.context import DataContext
 from loris.location import Location, LocationUnavailableException
-from loris.util import parse_id
+from loris.util import parse_key
 
 
 class System(Component, ComponentContext):
@@ -30,11 +30,11 @@ class System(Component, ComponentContext):
     # noinspection PyShadowingBuiltins
     @classmethod
     def copy(cls, settings: Settings) -> bool:
-        configs = Configurations.load(f"{cls.__name__.lower()}.conf", **settings.dirs.encode())
+        configs = Configurations.load(f"{cls.__name__.lower()}.conf", **settings.dirs.to_dict())
         if "key" in configs:
-            key = parse_id(configs["key"])
+            key = parse_key(configs["key"])
         elif "name" in configs:
-            key = parse_id(configs["name"])
+            key = parse_key(configs["name"])
             configs["key"] = key
         else:
             raise ConfigurationException("Invalid configuration, missing specified system name")

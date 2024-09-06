@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from functools import wraps
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from loris.core import Context, Registrator, Resource, ResourceException, Resources
 from loris.core.configs import ConfigurationException, Configurations, Configurator, ConfiguratorMeta
@@ -41,7 +41,7 @@ class Activator(Registrator, metaclass=ActivatorMeta):
     # noinspection PyProtectedMember
     def __init__(
         self,
-        context: Optional[Registrator | Context] = None,
+        context: Optional[Context | Registrator] = None,
         configs: Optional[Configurations] = None,
         key: Optional[str] = None,
         name: Optional[str] = None,
@@ -49,7 +49,7 @@ class Activator(Registrator, metaclass=ActivatorMeta):
         **kwargs,
     ) -> None:
         super().__init__(context, configs, key=key, *args, **kwargs)
-        self._name = self._assert_name(configs, name)
+        self._name = self._assert_name(context, configs, name)
 
     def __enter__(self) -> Activator:
         self.activate()
@@ -59,15 +59,17 @@ class Activator(Registrator, metaclass=ActivatorMeta):
     def __exit__(self, type, value, traceback):
         self.deactivate()
 
-    def _assert_key(self, configs: Optional[Configurations], key: Optional[str]) -> str:
+    # noinspection PyUnusedLocal
+    def _assert_key(self, context: Optional[Context], configs: Optional[Configurations], key: Optional[str]) -> str:
         if configs is not None and key is None:
             if configs.has_section(self.SECTION) and "name" in configs[self.SECTION]:
                 key = configs[self.SECTION]["name"]
             elif "name" in configs:
                 key = configs["name"]
-        return super()._assert_key(configs, key)
+        return super()._assert_key(context, configs, key)
 
-    def _assert_name(self, configs: Optional[Configurations], name: Optional[str]) -> str:
+    # noinspection PyUnusedLocal
+    def _assert_name(self, context: Optional[Context], configs: Optional[Configurations], name: Optional[str]) -> str:
         if configs is not None:
             if configs.has_section(self.SECTION) and "name" in configs[self.SECTION]:
                 name = configs[self.SECTION]["name"]
@@ -78,9 +80,8 @@ class Activator(Registrator, metaclass=ActivatorMeta):
         return name
 
     # noinspection PyShadowingBuiltins
-    def _parse_vars(self, vars: Optional[Dict[str, Any]] = None, parse: callable = str) -> Dict[str, str]:
-        if vars is None:
-            vars = self._get_vars()
+    def _convert_vars(self, convert: callable = str) -> Dict[str, str]:
+        vars = self._get_vars()
         values = OrderedDict()
         try:
             id = vars.pop("key", self.id)
@@ -95,12 +96,12 @@ class Activator(Registrator, metaclass=ActivatorMeta):
 
         values.update(
             {
-                k: str(v) if not isinstance(v, (Resource, Resources, Configurator, Context, Location)) else parse(v)
+                k: str(v) if not isinstance(v, (Resource, Resources, Configurator, Context, Location)) else convert(v)
                 for k, v in vars.items()
             }
         )
-        values["context"] = parse(self.context)
-        values["configurations"] = parse(self.configs)
+        values["context"] = convert(self.context)
+        values["configurations"] = convert(self.configs)
         values["configured"] = str(self.is_configured())
         values["active"] = str(self.is_active())
         values["enabled"] = str(self.is_enabled())

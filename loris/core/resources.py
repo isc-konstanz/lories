@@ -40,10 +40,10 @@ class Resources(Generic[R], Collection[R]):
     def __len__(self) -> int:
         return len(self._resources)
 
-    def append(self, resource: R):
+    def append(self, resource: R) -> None:
         self._resources.append(resource)
 
-    def extend(self, resources: Iterable[R]):
+    def extend(self, resources: Iterable[R]) -> None:
         self._resources.extend(resources)
 
     def copy(self):
