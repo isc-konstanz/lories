@@ -2,8 +2,6 @@
 """
 loris.connectors.sql.connector
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
 """
 
 from __future__ import annotations
@@ -12,8 +10,9 @@ import datetime as dt
 from collections.abc import Mapping
 from typing import Any, Dict, Iterator, Optional
 
-from mysql import connector
-from mysql.connector.errors import DatabaseError
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import sessionmaker
 
 import pandas as pd
 import pytz as tz
@@ -28,6 +27,9 @@ class SqlConnector(Connector, Mapping[str, Table]):
     TYPE: str = "sql"
 
     _connection = None
+    _engine = None
+    _session = None
+
     _tables: Dict[str, Table] = {}
 
     _timezone: tz.BaseTzInfo
@@ -41,8 +43,8 @@ class SqlConnector(Connector, Mapping[str, Table]):
 
     @property
     def connection(self):
-        if self._connection is None or not self._connection.is_connected():
-            raise ConnectionException("MySQL Connection not open", connector=self)
+        if self._connection is None:
+            raise ConnectionException("SQLAlchemy Connection not open", connector=self)
         return self._connection
 
     def __getitem__(self, table_name: str) -> Table:
@@ -65,21 +67,27 @@ class SqlConnector(Connector, Mapping[str, Table]):
 
         self.database = configs.get("database")
 
+    def create_engine(self):
+        self._engine = create_engine(
+            f'mysql+mysqlconnector://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}'
+        )
+        self._session = sessionmaker(bind=self._engine)
+        self._connection = self._session()
+
     def connect(self, resources: Resources) -> None:
         self._logger.debug(f"Connecting to MySQL database {self.database}@{self.host}:{self.port}")
         try:
-            self._connection = connector.connect(
-                host=self.host, port=self.port, user=self.user, passwd=self.password, database=self.database
-            )
+            self.create_engine()
             self._timezone = self._select_timezone()
             self._tables = self._connect_tables(resources)
 
-        except DatabaseError as e:
+        except SQLAlchemyError as e:
             raise ConnectionException(repr(e), connector=self)
 
     def disconnect(self) -> None:
         if self._connection is not None:
             self._connection.close()
+            self._connection = None
 
     # noinspection PyTypeChecker
     def _connect_tables(self, resources: Resources) -> Dict[str, Table]:
@@ -104,14 +112,17 @@ class SqlConnector(Connector, Mapping[str, Table]):
                 table_schema = table_schemas[table.name]
                 if table.engine is not None and table.engine != table_schema["engine"]:
                     raise ConnectorException(
-                        f"Mismatching table engine for configured table '{table_name}': {table_schema['engine']}",
+                        f"Mismatching table engine for configured table '{table_name}': "
+                        f"{table_schema['engine']}",
                         connector=self,
                     )
+
                 column_schemas = self._select_column_schemas(table.name)
                 for column in table:
                     if column.name not in column_schemas:
                         # TODO: Implement column creation if configured
-                        raise ConnectorException(f"Unable to find configured column: {column.name}", connector=self)
+                        raise ConnectorException(f"Unable to find configured column: {column.name}",
+                                                 connector=self)
                     # column_schema = column_schemas[column.name]
                     # TODO: Implement column validation
 
@@ -122,39 +133,39 @@ class SqlConnector(Connector, Mapping[str, Table]):
         if columns is None:
             columns = ["table_name", "engine"]
 
-        cursor = self.connection.cursor()
-        cursor.execute(
-            f"SELECT {','.join(f'`{c}`' for c in columns)} "
-            f"FROM information_schema.tables WHERE `table_schema`='{self.database}'"
-        )
+        query = (f"SELECT {','.join(f'`{c}`' for c in columns)} FROM information_schema.tables "
+                 f"WHERE `table_schema`=:database")
+        result = self._connection.execute(text(query), {'database': self.database})
 
         table_schemas = {}
-        for table_params in cursor.fetchall():
+        for table_params in result.fetchall():
             table_schema = dict(zip(columns, table_params))
             table_schemas[table_schema["table_name"]] = table_schema
+
         return table_schemas
 
     def _select_column_schemas(self, table: str, columns=None) -> Dict[str, Dict[str, Any]]:
         if columns is None:
             columns = ["column_name", "is_nullable", "data_type", "column_key"]
 
-        cursor = self.connection.cursor()
-        cursor.execute(
-            f"SELECT {','.join(f'`{c}`' for c in columns)} "
-            f"FROM information_schema.columns "
-            f"WHERE `table_schema`='{self.database}' AND `table_name`='{table}'"
+        query = (
+            f"SELECT {','.join(f'`{c}`' for c in columns)} FROM information_schema.columns "
+            f"WHERE `table_schema`=:database AND `table_name`=:table"
         )
+        result = self._connection.execute(text(query), {'database': self.database, 'table': table})
 
         column_schemas = {}
-        for table_params in cursor.fetchall():
-            column_schema = dict(zip(columns, table_params))
+        for row in result.fetchall():
+            column_schema = dict(zip(columns, row))
             column_schemas[column_schema["column_name"]] = column_schema
+
         return column_schemas
 
     def _select_timezone(self) -> tz.BaseTzInfo:
-        cursor = self.connection.cursor(buffered=True)
-        cursor.execute("SELECT @@system_time_zone as tz")
-        return to_timezone(cursor.fetchone()[0])
+        query = f"SELECT @@system_time_zone as tz"
+        result = self._connection.execute(text(query))
+        timezone = result.scalar()
+        return to_timezone(timezone)
 
     def exists(
         self,
@@ -187,7 +198,7 @@ class SqlConnector(Connector, Mapping[str, Table]):
                     table_data = table.select(table_resources, start, end)
 
                 data = data.merge(table_data, how="outer", left_index=True, right_index=True)
-        except DatabaseError as e:
+        except SQLAlchemyError as e:
             # TODO: Differentiate between syntax- and connection failures.
             raise ConnectionException(repr(e), connector=self)
         return data
@@ -201,10 +212,14 @@ class SqlConnector(Connector, Mapping[str, Table]):
                 table = self.get(table_name)
                 table.insert(table_resources, data)
 
-        except DatabaseError as e:
+        except SQLAlchemyError as e:
             raise ConnectionException(repr(e), connector=self)
 
     def is_connected(self) -> bool:
         if self._connection is not None:
-            return self._connection.is_connected()
+            try:
+                self._connection.execute(text("SELECT 1"))
+                return True
+            except SQLAlchemyError:
+                return False
         return False

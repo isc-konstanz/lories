@@ -13,40 +13,45 @@ import logging
 from collections import UserList
 from typing import Any, AnyStr, Callable, Generic, List, Optional, Type, TypeVar
 
-from mysql.connector import FieldType
+from sqlalchemy import Column as SAColumn, Integer, String, Boolean
+from sqlalchemy.ext.declarative import declarative_base
 
 import pandas as pd
 from loris.core import ConfigurationException
 
+Base = declarative_base()
 
-class Column:
+class Column(Base):
+    __tablename__ = 'columns'
+
+    id = SAColumn(Integer, primary_key=True)
+    name = SAColumn(String)
+    column_type = SAColumn(String)
+    length = SAColumn(Integer, nullable=True)
+    default = SAColumn(String, nullable=True)
+    nullable = SAColumn(Boolean, default=True)
+
     DEFAULT_NAME: str = "data"
     DEFAULT_TYPE: str = "FLOAT"
 
-    name: str
-    type: str
-    length: Optional[int]
-
-    default: Optional[Any]
-    flags: List[str]
-
     @classmethod
     def from_defaults(cls) -> Column:
-        return cls(cls.DEFAULT_NAME, cls.DEFAULT_TYPE)
+        return cls(name=cls.DEFAULT_NAME, column_type=cls.DEFAULT_TYPE)
 
     # noinspection PyShadowingBuiltins
     def __init__(
         self,
         name: str,
-        type: AnyStr | Type | int,
+        column_type: AnyStr | Type | int,
         length: Optional[int] = None,
         default: Optional[Any] = None,
         nullable: bool = True,
     ):
         self.name = name
-        self.type = self._parse_type(type, length)
+        self.column_type = self._parse_type(column_type, length)
         self.length = length
         self.default = default
+        self.is_nullable = nullable
 
         self.flags = []
         if not nullable:
@@ -54,7 +59,7 @@ class Column:
         self._logger = logging.getLogger(__name__)
 
     def __repr__(self) -> str:
-        column = f"name={self.name}, type={self.type}"
+        column = f"name={self.name}, type={self.column_type}"
         if self.length is not None:
             column += f"({self.length})"
         if len(self.flags) > 0:
@@ -62,7 +67,7 @@ class Column:
         return f"MySqlColumn({column})"
 
     def __str__(self) -> str:
-        column = f"`{self.name}` {self.type}"
+        column = f"`{self.name}` {self.column_type}"
         if self.length is not None:
             column += f"({self.length})"
         if self.default is not None:
@@ -71,44 +76,38 @@ class Column:
             column += f" {' '.join(self.flags)}"
         return column
 
-    @property
-    def nullable(self) -> bool:
-        return "NOT NULL" not in self.flags
-
     # noinspection PyShadowingBuiltins, PyUnresolvedReferences
     @staticmethod
-    def _parse_type(type: AnyStr | Type | int, type_length: Optional[int] = None) -> str:
-        if isinstance(type, str):
-            type = type.upper()
-            if type == "INT":
-                # Plain "INT" is not in the FieldType list. Skip this for the following check
-                # TODO: Validate necessity for this
-                pass
-            elif type not in [d[1] for d in FieldType.desc.values()]:
-                raise ConfigurationException(f"Unknown MySQL data type: {type}")
-            return type
+    def _parse_type(column_type: AnyStr | Type | int, type_length: Optional[int] = None) -> str:
+        if isinstance(column_type, str):
+            column_type = column_type.upper()
+            if column_type == "INT":
+                return "INTEGER"
+            elif column_type == "FLOAT":
+                return "FLOAT"
+            elif column_type == "VARCHAR":
+                return "VARCHAR"
+            elif column_type == "TIMESTAMP":
+                return "TIMESTAMP"
+            else:
+                raise ConfigurationException(f"Unknown SQLAlchemy data type: {column_type}")
 
-        if isinstance(type, int):
-            type_info = FieldType.get_info(type)
-            if type_info is None:
-                raise ConfigurationException(f"Unknown MySQL data type code: {type}")
+        if isinstance(column_type, int):
+            return "INTEGER"
 
-            return type_info[1]
-
-        if type == str:  # noqa: E721
+        if column_type == str: # noqa: E721
             return "VARCHAR" if type_length is not None else "STRING"
 
-        if type in [pd.Timestamp, dt.datetime]:
+        if column_type in [pd.Timestamp, dt.datetime]:
             return "TIMESTAMP"
 
-        if type == int:  # noqa: E721
-            return "INT"
+        if column_type == int: # noqa: E721
+            return "INTEGER"
 
-        if type == float:  # noqa: E721
+        if column_type == float: # noqa: E721
             return "FLOAT"
 
-        raise ConfigurationException(f"Unknown MySQL data type: {type}")
-
+        raise ConfigurationException(f"Unknown SQLAlchemy data type: {column_type}")
 
 C = TypeVar("C", bound=Column)
 
@@ -129,20 +128,20 @@ class Columns(UserList[C], Generic[C]):
     def add(
         self,
         name: str,
-        type: AnyStr | Type | int,
+        column_type: AnyStr | Type | int,
         length: Optional[int] = None,
         default: Optional[Any] = None,
         nullable: bool = True,
     ) -> None:
-        self.append(Column(name, type, length=length, default=default, nullable=nullable))
+        self.append(Column(name, column_type, length=length, default=default, nullable=nullable))
 
     @property
     def names(self) -> List[str]:
         return [c.name for c in self]
 
     # noinspection PyShadowingBuiltins
-    def filter(self, filter: Callable[[C], bool]):
-        return type(self)(*[column for column in self if filter(column)])
+    def filter(self, filter_func: Callable[[C], bool]):
+        return type(self)(*[column for column in self if filter_func(column)])
 
     def extract(self, values: pd.Series) -> List[Any]:
         return [values.get(c.name, default=None) for c in self]

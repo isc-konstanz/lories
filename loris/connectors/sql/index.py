@@ -26,7 +26,6 @@ class DatetimeIndexType(Enum):
     TIMESTAMP = ("TIMESTAMP",)
     TIMESTAMP_UNIX = ("INT",)
 
-
 # noinspection PyShadowingBuiltins
 class IndexColumn(Column):
     DEFAULT_NAME: str = "timestamp"
@@ -39,21 +38,21 @@ class IndexColumn(Column):
     def __init__(
         self,
         name: str,
-        type: AnyStr | Type | int,
+        column_type: AnyStr | Type | int,
         nullable: bool = False,
         datetime: Optional[bool] = None,
         **kwargs,
     ) -> None:
-        super().__init__(name, type, nullable=nullable, **kwargs)
+        super().__init__(name, column_type, nullable=nullable, **kwargs)
         if datetime is None:
-            datetime = _is_datetime(self.type)
+            datetime = _is_datetime(self.column_type)
         self._datetime = datetime
 
         # TODO: Implement default assertions for more primary columns, like date and time
         if self.default is None:
-            if self.type == "INT" and datetime:
+            if self.column_type == "INT" and datetime:
                 self.default = "(UNIX_TIMESTAMP())"
-            elif self.type in ["DATETIME", "TIMESTAMP"]:
+            elif self.column_type in ["DATETIME", "TIMESTAMP"]:
                 self.default = "CURRENT_TIMESTAMP"
 
     def is_datetime(self) -> bool:
@@ -64,28 +63,28 @@ class IndexColumn(Column):
         if self._datetime:
             if index is None or not isinstance(index, (pd.DatetimeIndex, pd.Timestamp, dt.datetime)):
                 raise ResourceException(f"Unable to prepare datetime index from '{type(index)}' index: {index}")
-            if self.type in ["TIMESTAMP", "INT"]:
+            if self.column_type in ["TIMESTAMP", "INT"]:
                 if isinstance(index, (pd.DatetimeIndex, pd.Timestamp)):
                     index = index.tz_convert(tz.UTC)
                 else:
                     index = index.astimezone(tz.UTC)
 
-            elif self.type in ["DATETIME", "DATE", "TIME"]:
+            elif self.column_type in ["DATETIME", "DATE", "TIME"]:
                 if isinstance(index, (pd.DatetimeIndex, pd.Timestamp)):
                     index = index.tz_convert(timezone)
                 else:
                     index = index.astimezone(timezone)
 
-            if self.type == "INT":
+            if self.column_type == "INT":
                 return (index - dt.datetime(1970, 1, 1, tzinfo=tz.UTC)).total_seconds()
 
-            if self.type == "DATE":
+            if self.column_type == "DATE":
                 if isinstance(index, pd.DatetimeIndex):
                     return index.date
                 else:
                     return index.date()
 
-            if self.type == "TIME":
+            if self.column_type == "TIME":
                 if isinstance(index, pd.DatetimeIndex):
                     return index.time
                 else:
@@ -100,17 +99,17 @@ class IndexColumn(Column):
 class Index(Columns[IndexColumn]):
     @classmethod
     def from_configs(cls, configs: Configurations, **kwargs) -> Index:
-        if "type" in configs and configs.get("type") not in [None, "None"]:
-            index_type = DatetimeIndexType[configs.get("type").upper()]
+        if "column_type" in configs and configs.get("column_type") not in [None, "None"]:
+            index_type = DatetimeIndexType[configs.get("column_type").upper()]
             index = cls.from_type(index_type, configs.get("column", default=None), **kwargs)
         else:
             index = cls(IndexColumn.from_defaults(), **kwargs)
         return index
 
     @classmethod
-    def from_type(cls, type: DatetimeIndexType, name: Optional[str] = None, **kwargs) -> Index:
+    def from_type(cls, index_type: DatetimeIndexType, name: Optional[str] = None, **kwargs) -> Index:
         columns = cls(**kwargs)
-        for column_type in type.value:
+        for column_type in index_type.value:
             column_name = name if name is not None else column_type.lower()
             columns.add(column_name, column_type, datetime=True)
         return columns
@@ -123,16 +122,16 @@ class Index(Columns[IndexColumn]):
     def add(
         self,
         name: str,
-        type: AnyStr | Type | int,
+        column_type: AnyStr | Type | int,
         attribute: Optional[str] = None,
         length: Optional[int] = None,
         default: Optional[Any] = None,
         **kwargs,
     ) -> None:
         if attribute is None or len(attribute) == 0:
-            self.append(IndexColumn(name, type, length=length, default=default, **kwargs))
+            self.append(IndexColumn(name, column_type, length=length, default=default, **kwargs))
         else:
-            self.append(SurrogateKeyColumn(name, type, attribute, length=length, default=default, **kwargs))
+            self.append(SurrogateKeyColumn(name, column_type, attribute, length=length, default=default, **kwargs))
 
     def process(self, resources: Resources, data: pd.DataFrame) -> pd.DataFrame:
         result_columns = [r.id for r in resources]
@@ -190,19 +189,19 @@ class Index(Columns[IndexColumn]):
             yield group_data
 
     # noinspection PyProtectedMember
-    def _get_datetime(self, type: DatetimeIndexType) -> Sequence[IndexColumn]:
+    def _get_datetime(self, index_type: DatetimeIndexType) -> Sequence[IndexColumn]:
         # Datetime index column should be the first column(s), otherwise they will be ignored
         columns = []
-        for i in range(len(type.value)):
+        for i in range(len(index_type.value)):
             if i >= len(self):
                 break
             column = self[i]
-            if column._datetime and column.type in type.value:
+            if column.is_datetime() and column.column_type in index_type.value:
                 columns.append(column)
         return columns
 
-    def _has_datetime(self, type: DatetimeIndexType) -> bool:
-        return len(self._get_datetime(type)) == len(type.value)
+    def _has_datetime(self, index_type: DatetimeIndexType) -> bool:
+        return len(self._get_datetime(index_type)) == len(index_type.value)
 
     def _is_datetime(self, column: IndexColumn) -> bool:
         return column.is_datetime() and any(column in self._get_datetime(t) for t in DatetimeIndexType)
@@ -221,7 +220,7 @@ class Index(Columns[IndexColumn]):
             for column in self._get_surrogate_keys():
                 if not hasattr(resource, column.attribute):
                     raise ResourceException(
-                        f"MySQL resource '{resource.id}' missing surrugate key attribute: {column.attribute}"
+                        f"MySQL resource '{resource.id}' missing surrogate key attribute: {column.attribute}"
                     )
                 attributes[column.name] = getattr(resource, column.attribute)
             for group in groups:
@@ -234,10 +233,10 @@ class Index(Columns[IndexColumn]):
         return iter(groups)
 
     def where(
-        self,
-        query: str,
-        start: pd.Timestamp | dt.datetime = None,
-        end: pd.Timestamp | dt.datetime = None,
+            self,
+            query: str,
+            start: pd.Timestamp | dt.datetime = None,
+            end: pd.Timestamp | dt.datetime = None,
     ) -> Tuple[str, Sequence[Any]]:
         # TODO: Implement start and end type checking and allow e.g. integers as well
         params = []
@@ -262,19 +261,18 @@ class Index(Columns[IndexColumn]):
 # noinspection PyShadowingBuiltins
 class SurrogateKeyColumn(IndexColumn):
     def __init__(
-        self,
-        name: str,
-        type: AnyStr | Type | int,
-        attribute: str,
-        **kwargs,
+            self,
+            name: str,
+            column_type: AnyStr | Type | int,
+            attribute: str,
+            **kwargs,
     ) -> None:
-        super().__init__(name, type, **kwargs)
+        super().__init__(name, column_type, **kwargs)
         self.attribute = attribute
 
-
 # noinspection PyShadowingBuiltins
-def _is_datetime(type: str) -> bool:
-    return type.upper() in [
+def _is_datetime(index_type: str) -> bool:
+    return index_type.upper() in [
         "TIME",
         "DATE",
         "DATETIME",
