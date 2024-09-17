@@ -8,6 +8,7 @@ loris.connectors.sql.table
 
 from __future__ import annotations
 
+import re
 import datetime as dt
 import logging
 from collections.abc import Sequence
@@ -99,6 +100,17 @@ class Table(Sequence[Column]):
     def connection(self):
         return self._connector.connection
 
+    def is_postgresql(self, query: str) -> str:
+        if self._connector.db_type == "postgres":
+            # Replace backticks with double quotes
+            query = query.replace("`", "\"")
+            # Replace MySQL's ON DUPLICATE KEY UPDATE with PostgreSQL's ON CONFLICT
+            query = re.sub(r"ON DUPLICATE KEY UPDATE.*",
+                           f"ON CONFLICT ({', '.join(self.index.names)}) DO UPDATE SET "
+                           f"{', '.join([f'\"{col.name}\"=EXCLUDED.\"{col.name}\"' for col in self.columns])}",
+                           query)
+        return query
+
     def create(self):
         columns = [*self.index, *self.columns]
         query = (
@@ -107,6 +119,8 @@ class Table(Sequence[Column]):
         )
         if self.engine is not None:
             query += f" ENGINE={self.engine}"
+
+        query = self.is_postgresql(query)
 
         self._logger.debug(query)
         self.connection.execute(text(query))
@@ -132,16 +146,19 @@ class Table(Sequence[Column]):
         query = f"SELECT {self.index.names}, {self.columns.names} FROM `{self.name}`"
         query, params = self.index.where(query, start, end)
         query += f" {self.index.order_by('ASC')}"
+        query = self.is_postgresql(query)
         return self._select(resources, query, params)
 
     def select_first(self, resources: Resources) -> pd.DataFrame:
-        query = text(f"SELECT {self.index.names}, {self.columns.names} "
-                     f"FROM `{self.name}` {self.index.order_by('ASC')} LIMIT 1;")
+        query = (f"SELECT {self.index.names}, {self.columns.names} "
+                 f"FROM `{self.name}` {self.index.order_by('ASC')} LIMIT 1;")
+        query = self.is_postgresql(query)
         return self._select(resources, query)
 
     def select_last(self, resources: Resources) -> pd.DataFrame:
-        query = text(f"SELECT {self.index.names}, {self.columns.names} "
-                     f"FROM `{self.name}` {self.index.order_by('DESC')} LIMIT 1;")
+        query = (f"SELECT {self.index.names}, {self.columns.names} "
+                 f"FROM `{self.name}` {self.index.order_by('DESC')} LIMIT 1;")
+        query = self.is_postgresql(query)
         return self._select(resources, query)
 
     def _select(
@@ -161,7 +178,8 @@ class Table(Sequence[Column]):
         return self.index.process(resources, data)
 
     def delete(self, start: pd.Timestamp | dt.datetime, end: pd.Timestamp | dt.datetime) -> None:
-        query = text(f"DELETE FROM `{self.name}`")
+        query = f"DELETE FROM `{self.name}`"
+        query = self.is_postgresql(query)
         query, params = self.index.where(query, start, end)
 
         self._logger.debug(query)
@@ -178,6 +196,7 @@ class Table(Sequence[Column]):
             f"VALUES ({', '.join([':' + col for col in self.index.names + self.columns.names])}) "
             f"ON DUPLICATE KEY UPDATE {', '.join([f'`{col.name}`=VALUES(`{col.name}`)' for col in self.columns])}"
         )
+        query = self.is_postgresql(query)
 
         self._logger.debug(query)
 
@@ -186,18 +205,24 @@ class Table(Sequence[Column]):
         for param in params:
             param_dict = {key.name if hasattr(key, 'name') else str(key): value
                           for key, value in zip(self.index.names + self.columns.names, param)}
+
+            if self._connector.db_type == "postgres" and 'timestamp' in param_dict.keys():
+                # Convert to string in the desired format
+                param_dict['timestamp'] = param_dict['timestamp'].strftime('%Y-%m-%d %H:%M:%S%')
+
             self.connection.execute(text(query), param_dict)
 
         self.connection.commit()
 
     def _get_column_type(self, column: str) -> str:
-        select = (
-            "SELECT data_type FROM information_schema.COLUMNS "
-            "WHERE table_schema = :database "
-            "AND table_name = :table_name "
-            "AND column_name = :column"
+        query = (
+            "SELECT `data_type` FROM information_schema.COLUMNS "
+            "WHERE `table_schema` = :database "
+            "AND `table_name` = :table_name "
+            "AND `column_name` = :column"
         )
-        result = self.connection.execute(text(select), {
+        query = self.is_postgresql(query)
+        result = self.connection.execute(text(query), {
             'database': self.connection.engine.url.database,
             'table_name': self.name,
             'column': column

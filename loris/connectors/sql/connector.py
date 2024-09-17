@@ -16,6 +16,7 @@ from sqlalchemy.orm import sessionmaker
 
 import pandas as pd
 import pytz as tz
+
 from loris.connectors import ConnectionException, Connector, ConnectorException, register_connector_type
 from loris.connectors.sql import Table
 from loris.core import Configurations, Resources
@@ -33,13 +34,14 @@ class SqlConnector(Connector, Mapping[str, Table]):
     _tables: Dict[str, Table] = {}
 
     _timezone: tz.BaseTzInfo
+    db_type: str
 
     user: str
     password: str
     database: str
 
-    host: str = "127.0.0.1"
-    port: int = 3306
+    host: str
+    port: int
 
     @property
     def connection(self):
@@ -59,8 +61,10 @@ class SqlConnector(Connector, Mapping[str, Table]):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        self.host = configs.get("host", SqlConnector.host)
-        self.port = configs.get_int("port", SqlConnector.port)
+        self.db_type = configs.get("db_type")
+
+        self.host = configs.get("host")
+        self.port = configs.get_int("port")
 
         self.user = configs.get("user")
         self.password = configs.get("password")
@@ -68,14 +72,22 @@ class SqlConnector(Connector, Mapping[str, Table]):
         self.database = configs.get("database")
 
     def create_engine(self):
+        if self.db_type == "mysql" or self.db_type == "mariadb":
+            connection_prefix = 'mysql+mysqlconnector://'
+        elif self.db_type == "postgres":
+            connection_prefix = 'postgresql+psycopg2://'
+        else:
+            raise ValueError("Unsupported database type")
+
         self._engine = create_engine(
-            f'mysql+mysqlconnector://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}'
+            f'{connection_prefix}{self.user}:{self.password}@{self.host}:{self.port}/{self.database}'
         )
+
         self._session = sessionmaker(bind=self._engine)
         self._connection = self._session()
 
     def connect(self, resources: Resources) -> None:
-        self._logger.debug(f"Connecting to MySQL database {self.database}@{self.host}:{self.port}")
+        self._logger.debug(f"Connecting to {self.db_type.upper()} database {self.database}@{self.host}:{self.port}")
         try:
             self.create_engine()
             self._timezone = self._select_timezone()
@@ -131,10 +143,13 @@ class SqlConnector(Connector, Mapping[str, Table]):
     def _select_table_schemas(self, columns=None) -> Dict[str, Dict[str, Any]]:
         # columns = ['table_name', 'table_rows', 'engine', 'create_time', 'update_time']
         if columns is None:
-            columns = ["table_name", "engine"]
+            columns = ["table_name"]
+            if self.db_type == "mysql" or self.db_type == "mariadb":
+                columns.append("engine")
 
         query = (f"SELECT {','.join(f'`{c}`' for c in columns)} FROM information_schema.tables "
                  f"WHERE `table_schema`=:database")
+        query = query.replace("`","\"") if self.db_type == 'postgres' else query
         result = self._connection.execute(text(query), {'database': self.database})
 
         table_schemas = {}
@@ -152,6 +167,7 @@ class SqlConnector(Connector, Mapping[str, Table]):
             f"SELECT {','.join(f'`{c}`' for c in columns)} FROM information_schema.columns "
             f"WHERE `table_schema`=:database AND `table_name`=:table"
         )
+        query = query.replace("`","\"") if self.db_type == 'postgres' else query
         result = self._connection.execute(text(query), {'database': self.database, 'table': table})
 
         column_schemas = {}
@@ -162,7 +178,13 @@ class SqlConnector(Connector, Mapping[str, Table]):
         return column_schemas
 
     def _select_timezone(self) -> tz.BaseTzInfo:
-        query = f"SELECT @@system_time_zone as tz"
+        if self.db_type == "mysql" or self.db_type == "mariadb":
+            query = "SELECT @@system_time_zone as tz"
+        elif self.db_type == "postgres":
+            query = "SHOW TIMEZONE"
+        else:
+            raise ValueError("Unsupported database type")
+
         result = self._connection.execute(text(query))
         timezone = result.scalar()
         return to_timezone(timezone)

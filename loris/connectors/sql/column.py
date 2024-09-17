@@ -139,7 +139,7 @@ class Column(Base):
             column += f"({self.length})"
         if len(self.flags) > 0:
             column += f", flags={' '.join(self.flags)}"
-        return f"MySqlColumn({column})"
+        return f"Column({column})"
 
     def __str__(self) -> str:
         column = f"`{self.name}` {self.type}"

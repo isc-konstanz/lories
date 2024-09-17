@@ -221,7 +221,7 @@ class Index(Columns[IndexColumn]):
             for column in self._get_surrogate_keys():
                 if not hasattr(resource, column.attribute):
                     raise ResourceException(
-                        f"MySQL resource '{resource.id}' missing surrogate key attribute: {column.attribute}"
+                        f"SQL resource '{resource.id}' missing surrogate key attribute: {column.attribute}"
                     )
                 attributes[column.name] = getattr(resource, column.attribute)
             for group in groups:
