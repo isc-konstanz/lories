@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.connectors.mysql.index
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.connectors.sql.index
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -16,7 +16,7 @@ from typing import Any, AnyStr, Dict, Optional, Sequence, Tuple, Type
 import numpy as np
 import pandas as pd
 import pytz as tz
-from loris.connectors.mysql.column import Column, Columns
+from loris.connectors.sql.column import Column, Columns
 from loris.core import Configurations, Resource, ResourceException, Resources
 
 
@@ -121,13 +121,13 @@ class Index(Columns[IndexColumn]):
 
     # noinspection PyShadowingBuiltins
     def add(
-        self,
-        name: str,
-        type: AnyStr | Type | int,
-        attribute: Optional[str] = None,
-        length: Optional[int] = None,
-        default: Optional[Any] = None,
-        **kwargs,
+            self,
+            name: str,
+            type: AnyStr | Type | int,
+            attribute: Optional[str] = None,
+            length: Optional[int] = None,
+            default: Optional[Any] = None,
+            **kwargs,
     ) -> None:
         if attribute is None or len(attribute) == 0:
             self.append(IndexColumn(name, type, length=length, default=default, **kwargs))
@@ -197,7 +197,7 @@ class Index(Columns[IndexColumn]):
             if i >= len(self):
                 break
             column = self[i]
-            if column._datetime and column.type in type.value:
+            if column.is_datetime() and column.type in type.value:
                 columns.append(column)
         return columns
 
@@ -221,7 +221,7 @@ class Index(Columns[IndexColumn]):
             for column in self._get_surrogate_keys():
                 if not hasattr(resource, column.attribute):
                     raise ResourceException(
-                        f"MySQL resource '{resource.id}' missing surrugate key attribute: {column.attribute}"
+                        f"SQL resource '{resource.id}' missing surrogate key attribute: {column.attribute}"
                     )
                 attributes[column.name] = getattr(resource, column.attribute)
             for group in groups:
@@ -234,10 +234,10 @@ class Index(Columns[IndexColumn]):
         return iter(groups)
 
     def where(
-        self,
-        query: str,
-        start: pd.Timestamp | dt.datetime = None,
-        end: pd.Timestamp | dt.datetime = None,
+            self,
+            query: str,
+            start: pd.Timestamp | dt.datetime = None,
+            end: pd.Timestamp | dt.datetime = None,
     ) -> Tuple[str, Sequence[Any]]:
         # TODO: Implement start and end type checking and allow e.g. integers as well
         params = []
@@ -262,11 +262,11 @@ class Index(Columns[IndexColumn]):
 # noinspection PyShadowingBuiltins
 class SurrogateKeyColumn(IndexColumn):
     def __init__(
-        self,
-        name: str,
-        type: AnyStr | Type | int,
-        attribute: str,
-        **kwargs,
+            self,
+            name: str,
+            type: AnyStr | Type | int,
+            attribute: str,
+            **kwargs,
     ) -> None:
         super().__init__(name, type, **kwargs)
         self.attribute = attribute

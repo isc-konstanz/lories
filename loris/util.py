@@ -274,7 +274,12 @@ def to_timezone(timezone: Optional[str | int | float | tz.BaseTzInfo]) -> Option
     if isinstance(timezone, tz.BaseTzInfo):
         return timezone
     if isinstance(timezone, str):
-        return tz.timezone(timezone)
+        try:
+            return tz.timezone(timezone)
+        except tz.UnknownTimeZoneError:
+            # Handle the case where the timezone is not recognized
+            if timezone == "CEST":
+                return tz.FixedOffset(2 * 60)
     if isinstance(timezone, (int, float)):
         return tz.FixedOffset(timezone * 60)
 
