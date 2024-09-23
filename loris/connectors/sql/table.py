@@ -8,17 +8,17 @@ loris.connectors.sql.table
 
 from __future__ import annotations
 
-import re
 import datetime as dt
 import logging
+import re
 from collections.abc import Sequence
 from itertools import chain
 from typing import Any, Optional
 
-import pandas as pd
 from sqlalchemy import MetaData, text
 from sqlalchemy.ext.declarative import declarative_base
 
+import pandas as pd
 from loris.connectors.sql import Column, Columns, Index
 from loris.core import Configurations, Resources
 
@@ -103,12 +103,14 @@ class Table(Sequence[Column]):
     def is_postgresql(self, query: str) -> str:
         if self._connector.db_type == "postgres":
             # Replace backticks with double quotes
-            query = query.replace("`", "\"")
+            query = query.replace("`", '"')
             # Replace MySQL's ON DUPLICATE KEY UPDATE with PostgreSQL's ON CONFLICT
-            query = re.sub(r"ON DUPLICATE KEY UPDATE.*",
-                           f"ON CONFLICT ({', '.join(self.index.names)}) DO UPDATE SET "
-                           f"{', '.join([f'\"{col.name}\"=EXCLUDED.\"{col.name}\"' for col in self.columns])}",
-                           query)
+            query = re.sub(
+                r"ON DUPLICATE KEY UPDATE.*",
+                f"ON CONFLICT ({', '.join(self.index.names)}) DO UPDATE SET "
+                f"{', '.join([f'\"{col.name}\"=EXCLUDED.\"{col.name}\"' for col in self.columns])}",
+                query,
+            )
         return query
 
     def create(self):
@@ -138,10 +140,10 @@ class Table(Sequence[Column]):
         return not self.select(resources, start, end).empty
 
     def select(
-            self,
-            resources: Resources,
-            start: pd.Timestamp | dt.datetime = None,
-            end: pd.Timestamp | dt.datetime = None,
+        self,
+        resources: Resources,
+        start: pd.Timestamp | dt.datetime = None,
+        end: pd.Timestamp | dt.datetime = None,
     ) -> pd.DataFrame:
         query = f"SELECT {self.index.names}, {self.columns.names} FROM `{self.name}`"
         query, params = self.index.where(query, start, end)
@@ -150,22 +152,26 @@ class Table(Sequence[Column]):
         return self._select(resources, query, params)
 
     def select_first(self, resources: Resources) -> pd.DataFrame:
-        query = (f"SELECT {self.index.names}, {self.columns.names} "
-                 f"FROM `{self.name}` {self.index.order_by('ASC')} LIMIT 1;")
+        query = (
+            f"SELECT {self.index.names}, {self.columns.names} "
+            f"FROM `{self.name}` {self.index.order_by('ASC')} LIMIT 1;"
+        )
         query = self.is_postgresql(query)
         return self._select(resources, query)
 
     def select_last(self, resources: Resources) -> pd.DataFrame:
-        query = (f"SELECT {self.index.names}, {self.columns.names} "
-                 f"FROM `{self.name}` {self.index.order_by('DESC')} LIMIT 1;")
+        query = (
+            f"SELECT {self.index.names}, {self.columns.names} "
+            f"FROM `{self.name}` {self.index.order_by('DESC')} LIMIT 1;"
+        )
         query = self.is_postgresql(query)
         return self._select(resources, query)
 
     def _select(
-            self,
-            resources: Resources,
-            query: str,
-            parameters: Sequence[Any] = (),
+        self,
+        resources: Resources,
+        query: str,
+        parameters: Sequence[Any] = (),
     ) -> pd.DataFrame:
         self._logger.debug(query)
         result = self.connection.execute(text(query), parameters)
@@ -203,12 +209,14 @@ class Table(Sequence[Column]):
         params = list(chain.from_iterable(_extract(d) for d in self.index.prepare(resources, data)))
 
         for param in params:
-            param_dict = {key.name if hasattr(key, 'name') else str(key): value
-                          for key, value in zip(self.index.names + self.columns.names, param)}
+            param_dict = {
+                key.name if hasattr(key, "name") else str(key): value
+                for key, value in zip(self.index.names + self.columns.names, param)
+            }
 
-            if self._connector.db_type == "postgres" and 'timestamp' in param_dict.keys():
+            if self._connector.db_type == "postgres" and "timestamp" in param_dict.keys():
                 # Convert to string in the desired format
-                param_dict['timestamp'] = param_dict['timestamp'].strftime('%Y-%m-%d %H:%M:%S%')
+                param_dict["timestamp"] = param_dict["timestamp"].strftime("%Y-%m-%d %H:%M:%S%")
 
             self.connection.execute(text(query), param_dict)
 
@@ -222,13 +230,13 @@ class Table(Sequence[Column]):
             "AND `column_name` = :column"
         )
         query = self.is_postgresql(query)
-        result = self.connection.execute(text(query), {
-            'database': self.connection.engine.url.database,
-            'table_name': self.name,
-            'column': column
-        })
+        params = {
+            "database": self.connection.engine.url.database,
+            "table_name": self.name,
+            "column": column,
+        }
+        result = self.connection.execute(text(query), params)
         row = result.fetchone()
-
         if row:
             return row[0].upper()
         else:

@@ -16,7 +16,6 @@ from sqlalchemy.orm import sessionmaker
 
 import pandas as pd
 import pytz as tz
-
 from loris.connectors import ConnectionException, Connector, ConnectorException, register_connector_type
 from loris.connectors.sql import Table
 from loris.core import Configurations, Resources
@@ -73,14 +72,14 @@ class SqlConnector(Connector, Mapping[str, Table]):
 
     def create_engine(self):
         if self.db_type == "mysql" or self.db_type == "mariadb":
-            connection_prefix = 'mysql+mysqlconnector://'
+            connection_prefix = "mysql+mysqlconnector://"
         elif self.db_type == "postgres":
-            connection_prefix = 'postgresql+psycopg2://'
+            connection_prefix = "postgresql+psycopg2://"
         else:
             raise ValueError("Unsupported database type")
 
         self._engine = create_engine(
-            f'{connection_prefix}{self.user}:{self.password}@{self.host}:{self.port}/{self.database}'
+            f"{connection_prefix}{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
         )
 
         self._session = sessionmaker(bind=self._engine)
@@ -124,8 +123,7 @@ class SqlConnector(Connector, Mapping[str, Table]):
                 table_schema = table_schemas[table.name]
                 if table.engine is not None and table.engine != table_schema["engine"]:
                     raise ConnectorException(
-                        f"Mismatching table engine for configured table '{table_name}': "
-                        f"{table_schema['engine']}",
+                        f"Mismatching table engine for configured table '{table_name}': {table_schema['engine']}",
                         connector=self,
                     )
 
@@ -133,8 +131,7 @@ class SqlConnector(Connector, Mapping[str, Table]):
                 for column in table:
                     if column.name not in column_schemas:
                         # TODO: Implement column creation if configured
-                        raise ConnectorException(f"Unable to find configured column: {column.name}",
-                                                 connector=self)
+                        raise ConnectorException(f"Unable to find configured column: {column.name}", connector=self)
                     # column_schema = column_schemas[column.name]
                     # TODO: Implement column validation
 
@@ -147,10 +144,12 @@ class SqlConnector(Connector, Mapping[str, Table]):
             if self.db_type == "mysql" or self.db_type == "mariadb":
                 columns.append("engine")
 
-        query = (f"SELECT {','.join(f'`{c}`' for c in columns)} FROM information_schema.tables "
-                 f"WHERE `table_schema`=:database")
-        query = query.replace("`","\"") if self.db_type == 'postgres' else query
-        result = self._connection.execute(text(query), {'database': self.database})
+        query = (
+            f"SELECT {','.join(f'`{c}`' for c in columns)} FROM information_schema.tables "
+            f"WHERE `table_schema`=:database"
+        )
+        query = query.replace("`", '"') if self.db_type == "postgres" else query
+        result = self._connection.execute(text(query), {"database": self.database})
 
         table_schemas = {}
         for table_params in result.fetchall():
@@ -167,8 +166,8 @@ class SqlConnector(Connector, Mapping[str, Table]):
             f"SELECT {','.join(f'`{c}`' for c in columns)} FROM information_schema.columns "
             f"WHERE `table_schema`=:database AND `table_name`=:table"
         )
-        query = query.replace("`","\"") if self.db_type == 'postgres' else query
-        result = self._connection.execute(text(query), {'database': self.database, 'table': table})
+        query = query.replace("`", '"') if self.db_type == "postgres" else query
+        result = self._connection.execute(text(query), {"database": self.database, "table": table})
 
         column_schemas = {}
         for row in result.fetchall():

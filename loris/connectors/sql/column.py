@@ -11,9 +11,10 @@ from __future__ import annotations
 import datetime as dt
 import logging
 from collections import UserList
-from typing import Any, AnyStr, Callable, Generic, List, Optional, Type, TypeVar, Dict, Tuple
+from typing import Any, AnyStr, Callable, Dict, Generic, List, Optional, Tuple, Type, TypeVar
 
-from sqlalchemy import Column as SAColumn, Integer, String, Boolean
+from sqlalchemy import Boolean, Integer, String
+from sqlalchemy import Column as SAColumn
 from sqlalchemy.ext.declarative import declarative_base
 
 import pandas as pd
@@ -97,7 +98,7 @@ class FieldType:
 
 
 class Column(Base):
-    __tablename__ = 'columns'
+    __tablename__ = "columns"
 
     id = SAColumn(Integer, primary_key=True)
     name = SAColumn(String)
@@ -184,6 +185,7 @@ class Column(Base):
             return "FLOAT"
 
         raise ConfigurationException(f"Unknown SQLAlchemy data type: {type}")
+
 
 C = TypeVar("C", bound=Column)
 
