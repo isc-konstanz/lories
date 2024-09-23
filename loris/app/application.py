@@ -55,10 +55,7 @@ class Application(DataManager, Thread):
 
     # noinspection PyProtectedMember
     def configure(self, settings: Settings, factory: Type[System]) -> None:
-        if self._interface.is_enabled():
-            self._interface.configure(settings.get_section(Interface.SECTION))
         self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
-        self._interval = settings.get_int("interval", default=1)
 
         systems = []
         systems_flat = self.settings["systems"]["flat"]
@@ -79,6 +76,9 @@ class Application(DataManager, Thread):
                 self._components._add(system)
 
         super().configure(settings)
+        self._interval = settings.get_int("interval", default=1)
+        if self._interface.is_enabled():
+            self._interface.configure(settings.get_section(Interface.SECTION))
 
     @property
     def server(self) -> Interface:
