@@ -15,7 +15,7 @@ from loris.app.view.pages import Page
 from loris.app.view.pages.components import ComponentGroup, ComponentPage
 from loris.components import Component
 from loris.core import ResourceException
-from loris.util import parse_id, parse_name
+from loris.util import parse_key, parse_name
 
 C = TypeVar("C", bound=Component)
 CP = TypeVar("CP", bound=ComponentPage)
@@ -93,7 +93,7 @@ class GroupRegistration(Registration[CG]):
         self.name = name
 
         if id is None:
-            id = parse_id(name)
+            id = parse_key(name)
         self.id = id
 
     def has_type(self, *types: Type[CG]) -> bool:
