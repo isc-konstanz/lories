@@ -26,7 +26,7 @@ from .dummy import DummyConnector  # noqa: F401
 from .csv import CsvConnector  # noqa: F401
 
 try:
-    from .mysql import MySqlConnector  # noqa: F401
+    from .sql import SqlConnector  # noqa: F401
 
 except ImportError:
     pass

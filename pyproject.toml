@@ -45,7 +45,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-mysql = [
+sql = [
     "mysql-connector-python"
 ]
 doc = [
@@ -56,7 +56,7 @@ doc = [
     "myst-parser",
 ]
 dev = [
-    # "loris[mysql, doc]",
+    # "loris[sql, doc]",
     "pre-commit",
     "ruff"
 ]

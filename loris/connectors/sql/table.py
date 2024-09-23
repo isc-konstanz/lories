@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.connectors.mysql.table
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.connectors.sql.table
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -10,25 +10,31 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import re
 from collections.abc import Sequence
 from itertools import chain
 from typing import Any, Optional
 
+from sqlalchemy import MetaData, text
+from sqlalchemy.ext.declarative import declarative_base
+
 import pandas as pd
-from loris.connectors.mysql import Column, Columns, Index
+from loris.connectors.sql import Column, Columns, Index
 from loris.core import Configurations, Resources
 
+Base = declarative_base()
+metadata = MetaData()
 
-class MySqlTable(Sequence[Column]):
+
+class Table(Sequence[Column]):
     SECTION = "tables"
 
     index: Index
-
     columns: Columns
 
     # noinspection PyProtectedMember
     @classmethod
-    def from_configs(cls, connector, name: str, configs: Configurations, resources: Resources) -> MySqlTable:
+    def from_configs(cls, connector, name: str, configs: Configurations, resources: Resources) -> Table:
         index = Index.from_configs(configs.get_section("index", defaults={}), timezone=connector._timezone)
 
         columns_configs = configs.get_section("columns", defaults={})
@@ -58,7 +64,7 @@ class MySqlTable(Sequence[Column]):
                 column_type = resource.type if "type" in resource else columns_type
                 columns.add(column_name, column_type, **column_args)
 
-        return MySqlTable(connector, name, index, columns)
+        return Table(connector, name, index, columns)
 
     def __init__(
         self,
@@ -94,20 +100,34 @@ class MySqlTable(Sequence[Column]):
     def connection(self):
         return self._connector.connection
 
+    def is_postgresql(self, query: str) -> str:
+        if self._connector.db_type == "postgres":
+            # Replace backticks with double quotes
+            query = query.replace("`", '"')
+            # Replace MySQL's ON DUPLICATE KEY UPDATE with PostgreSQL's ON CONFLICT
+            query = re.sub(
+                r"ON DUPLICATE KEY UPDATE.*",
+                f"ON CONFLICT ({', '.join(self.index.names)}) DO UPDATE SET "
+                f"{', '.join([f'\"{col.name}\"=EXCLUDED.\"{col.name}\"' for col in self.columns])}",
+                query,
+            )
+        return query
+
     def create(self):
         columns = [*self.index, *self.columns]
         query = (
-            f"CREATE TABLE IF NOT EXISTS {self.name} "
+            f"CREATE TABLE IF NOT EXISTS `{self.name}` "
             f"({', '.join([str(c) for c in columns])}, PRIMARY KEY ({', '.join(self.index.names)}))"
         )
         if self.engine is not None:
             query += f" ENGINE={self.engine}"
 
-        with self.connection.cursor() as cursor:
-            self._logger.debug(query)
-            cursor.execute(query)
+        query = self.is_postgresql(query)
 
-            self.connection.commit()
+        self._logger.debug(query)
+        self.connection.execute(text(query))
+        self.connection.commit()
+
         return self
 
     def exists(
@@ -125,27 +145,26 @@ class MySqlTable(Sequence[Column]):
         start: pd.Timestamp | dt.datetime = None,
         end: pd.Timestamp | dt.datetime = None,
     ) -> pd.DataFrame:
-        columns = [r.column if "column" in r else r.key for r in resources]
-        query = f"SELECT {self.index}, {', '.join([f'`{c}`' for c in columns])} FROM {self.name}"
+        query = f"SELECT {self.index.names}, {self.columns.names} FROM `{self.name}`"
         query, params = self.index.where(query, start, end)
         query += f" {self.index.order_by('ASC')}"
-
+        query = self.is_postgresql(query)
         return self._select(resources, query, params)
 
     def select_first(self, resources: Resources) -> pd.DataFrame:
-        columns = [r.column if "column" in r else r.key for r in resources]
         query = (
-            f"SELECT {self.index}, {', '.join([f'`{c}`' for c in columns])} FROM {self.name} "
-            f"{self.index.order_by('ASC')} LIMIT 1;"
+            f"SELECT {self.index.names}, {self.columns.names} "
+            f"FROM `{self.name}` {self.index.order_by('ASC')} LIMIT 1;"
         )
+        query = self.is_postgresql(query)
         return self._select(resources, query)
 
     def select_last(self, resources: Resources) -> pd.DataFrame:
-        columns = [r.column if "column" in r else r.key for r in resources]
         query = (
-            f"SELECT {self.index}, {', '.join([f'`{c}`' for c in columns])} FROM {self.name} "
-            f"{self.index.order_by('DESC')} LIMIT 1;"
+            f"SELECT {self.index.names}, {self.columns.names} "
+            f"FROM `{self.name}` {self.index.order_by('DESC')} LIMIT 1;"
         )
+        query = self.is_postgresql(query)
         return self._select(resources, query)
 
     def _select(
@@ -154,48 +173,71 @@ class MySqlTable(Sequence[Column]):
         query: str,
         parameters: Sequence[Any] = (),
     ) -> pd.DataFrame:
-        with self.connection.cursor(buffered=True, dictionary=True) as cursor:
-            self._logger.debug(query)
-            cursor.execute(query, parameters)
-            if cursor.rowcount > 0:
-                data = pd.DataFrame.from_dict(cursor.fetchall())
-            else:
-                data = pd.DataFrame()
+        self._logger.debug(query)
+        result = self.connection.execute(text(query), parameters)
+
+        if result.rowcount > 0:
+            data = pd.DataFrame(result.fetchall(), columns=result.keys())
+        else:
+            data = pd.DataFrame()
+
         return self.index.process(resources, data)
 
     def delete(self, start: pd.Timestamp | dt.datetime, end: pd.Timestamp | dt.datetime) -> None:
-        # TODO: Implement deleting only from specific columns?
-        query = f"DELETE FROM {self.name}"
+        query = f"DELETE FROM `{self.name}`"
+        query = self.is_postgresql(query)
         query, params = self.index.where(query, start, end)
-        with self.connection.cursor() as cursor:
-            self._logger.debug(query)
-            cursor.execute(query, params)
-            self.connection.commit()
+
+        self._logger.debug(query)
+        self.connection.execute(text(query), params)
+        self.connection.commit()
 
     # noinspection PyUnresolvedReferences
     def insert(self, resources: Resources, data: pd.DataFrame) -> None:
+        def _extract(d: pd.DataFrame) -> Sequence[Any]:
+            return d.apply(lambda r: self.index.extract(r) + self.columns.extract(r), axis="columns").values
+
         query = (
-            f"INSERT INTO {self.name} ({self.index}, {self.columns}) "
-            f"VALUES ({', '.join(['%s'] * (len(self.index) + len(self.columns)))}) "
-            f"ON DUPLICATE KEY UPDATE {', '.join([f'`{c.name}`=VALUES(`{c.name}`)' for c in self.columns])}"
+            f"INSERT INTO `{self.name}` ({self.index}, {self.columns}) "
+            f"VALUES ({', '.join([':' + col for col in self.index.names + self.columns.names])}) "
+            f"ON DUPLICATE KEY UPDATE {', '.join([f'`{col.name}`=VALUES(`{col.name}`)' for col in self.columns])}"
         )
-        with self.connection.cursor() as cursor:
-            self._logger.debug(query)
+        query = self.is_postgresql(query)
 
-            def _extract(d: pd.DataFrame) -> Sequence[Any]:
-                return d.apply(lambda r: self.index.extract(r) + self.columns.extract(r), axis="columns").values
+        self._logger.debug(query)
 
-            params = list(chain.from_iterable(_extract(d) for d in self.index.prepare(resources, data)))
-            cursor.executemany(query, params)
-            self.connection.commit()
+        params = list(chain.from_iterable(_extract(d) for d in self.index.prepare(resources, data)))
+
+        for param in params:
+            param_dict = {
+                key.name if hasattr(key, "name") else str(key): value
+                for key, value in zip(self.index.names + self.columns.names, param)
+            }
+
+            if self._connector.db_type == "postgres" and "timestamp" in param_dict.keys():
+                # Convert to string in the desired format
+                param_dict["timestamp"] = param_dict["timestamp"].strftime("%Y-%m-%d %H:%M:%S%")
+
+            self.connection.execute(text(query), param_dict)
+
+        self.connection.commit()
 
     def _get_column_type(self, column: str) -> str:
-        with self.connection.cursor(buffered=True) as cursor:
-            select = (
-                f"SELECT data_type FROM information_schema.COLUMNS "
-                f"WHERE table_schema = '{self.connection.database}' "
-                f"AND table_name = '{self.name}' "
-                f"AND column_name = '{column}'"
-            )
-            cursor.execute(select)
-            return cursor.fetchone()[0].upper()
+        query = (
+            "SELECT `data_type` FROM information_schema.COLUMNS "
+            "WHERE `table_schema` = :database "
+            "AND `table_name` = :table_name "
+            "AND `column_name` = :column"
+        )
+        query = self.is_postgresql(query)
+        params = {
+            "database": self.connection.engine.url.database,
+            "table_name": self.name,
+            "column": column,
+        }
+        result = self.connection.execute(text(query), params)
+        row = result.fetchone()
+        if row:
+            return row[0].upper()
+        else:
+            raise ValueError(f"Column '{column}' not found in table '{self.name}'.")
