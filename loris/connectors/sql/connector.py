@@ -33,7 +33,9 @@ class SqlConnector(Connector, Mapping[str, Table]):
     _tables: Dict[str, Table] = {}
 
     _timezone: tz.BaseTzInfo
+
     db_type: str
+    table_schema: str
 
     user: str
     password: str
@@ -69,6 +71,7 @@ class SqlConnector(Connector, Mapping[str, Table]):
         self.password = configs.get("password")
 
         self.database = configs.get("database")
+        self.table_schema = configs.get("table_schema")
 
     def create_engine(self):
         if self.db_type == "mysql" or self.db_type == "mariadb":
@@ -146,10 +149,13 @@ class SqlConnector(Connector, Mapping[str, Table]):
 
         query = (
             f"SELECT {','.join(f'`{c}`' for c in columns)} FROM information_schema.tables "
-            f"WHERE `table_schema`=:database"
+            f"WHERE `table_schema`=:table_schema"
         )
-        query = query.replace("`", '"') if self.db_type == "postgres" else query
-        result = self._connection.execute(text(query), {"database": self.database})
+        query = query.replace("`", '') if self.db_type == "postgres" else query
+
+        self.table_schema = self.database if self.table_schema is None else self.table_schema
+
+        result = self._connection.execute(text(query), {"table_schema": self.table_schema})
 
         table_schemas = {}
         for table_params in result.fetchall():
@@ -160,14 +166,14 @@ class SqlConnector(Connector, Mapping[str, Table]):
 
     def _select_column_schemas(self, table: str, columns=None) -> Dict[str, Dict[str, Any]]:
         if columns is None:
-            columns = ["column_name", "is_nullable", "data_type", "column_key"]
+            columns = ["column_name", "is_nullable", "data_type"]
 
         query = (
             f"SELECT {','.join(f'`{c}`' for c in columns)} FROM information_schema.columns "
-            f"WHERE `table_schema`=:database AND `table_name`=:table"
+            f"WHERE `table_schema`=:table_schema AND `table_name`=:table"
         )
-        query = query.replace("`", '"') if self.db_type == "postgres" else query
-        result = self._connection.execute(text(query), {"database": self.database, "table": table})
+        query = query.replace("`", '') if self.db_type == "postgres" else query
+        result = self._connection.execute(text(query), {"table_schema": self.table_schema, "table": table})
 
         column_schemas = {}
         for row in result.fetchall():
@@ -244,3 +250,4 @@ class SqlConnector(Connector, Mapping[str, Table]):
             except SQLAlchemyError:
                 return False
         return False
+

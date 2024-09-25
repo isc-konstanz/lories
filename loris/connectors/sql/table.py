@@ -103,7 +103,8 @@ class Table(Sequence[Column]):
     def is_postgresql(self, query: str) -> str:
         if self._connector.db_type == "postgres":
             # Replace backticks with double quotes
-            query = query.replace("`", '"')
+            query = query.replace("`", "")
+            query = query.replace(self.name, ".".join((self._connector.table_schema, self.name)))
             # Replace MySQL's ON DUPLICATE KEY UPDATE with PostgreSQL's ON CONFLICT
             query = re.sub(
                 r"ON DUPLICATE KEY UPDATE.*",
@@ -145,7 +146,7 @@ class Table(Sequence[Column]):
         start: pd.Timestamp | dt.datetime = None,
         end: pd.Timestamp | dt.datetime = None,
     ) -> pd.DataFrame:
-        query = f"SELECT {self.index.names}, {self.columns.names} FROM `{self.name}`"
+        query = f"SELECT {self.index}, {self.columns} FROM `{self.name}`"
         query, params = self.index.where(query, start, end)
         query += f" {self.index.order_by('ASC')}"
         query = self.is_postgresql(query)
@@ -153,7 +154,7 @@ class Table(Sequence[Column]):
 
     def select_first(self, resources: Resources) -> pd.DataFrame:
         query = (
-            f"SELECT {self.index.names}, {self.columns.names} "
+            f"SELECT {self.index}, {self.columns} "
             f"FROM `{self.name}` {self.index.order_by('ASC')} LIMIT 1;"
         )
         query = self.is_postgresql(query)
@@ -161,7 +162,7 @@ class Table(Sequence[Column]):
 
     def select_last(self, resources: Resources) -> pd.DataFrame:
         query = (
-            f"SELECT {self.index.names}, {self.columns.names} "
+            f"SELECT {self.index}, {self.columns} "
             f"FROM `{self.name}` {self.index.order_by('DESC')} LIMIT 1;"
         )
         query = self.is_postgresql(query)

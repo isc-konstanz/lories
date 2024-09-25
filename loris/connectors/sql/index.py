@@ -100,8 +100,8 @@ class IndexColumn(Column):
 class Index(Columns[IndexColumn]):
     @classmethod
     def from_configs(cls, configs: Configurations, **kwargs) -> Index:
-        if "type" in configs and configs.get("type") not in [None, "None"]:
-            index_type = DatetimeIndexType[configs.get("type").upper()]
+        if "type" in configs and configs.get("type") not in [None, "None"] or "column" in configs:
+            index_type = DatetimeIndexType[configs.get("type", default=IndexColumn.DEFAULT_TYPE).upper()]
             index = cls.from_type(index_type, configs.get("column", default=None), **kwargs)
         else:
             index = cls(IndexColumn.from_defaults(), **kwargs)
