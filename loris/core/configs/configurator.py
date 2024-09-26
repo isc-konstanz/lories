@@ -127,7 +127,9 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
     # noinspection PyUnresolvedReferences
     @wraps(configure, updated=())
     def _do_configure(self, configs: Configurations, *args, **kwargs) -> None:
-        if configs is None or not configs.enabled:
+        if configs is None:
+            raise ConfigurationException(f"Invalid NoneType configuration for {type(self).__name__}: {self.name}")
+        if not configs.enabled:
             raise ConfigurationException(f"Trying to configure disabled {type(self).__name__}: {configs.name}")
 
         if self.is_configured():

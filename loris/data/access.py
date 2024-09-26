@@ -17,6 +17,8 @@ from loris.util import get_context
 
 # noinspection PyProtectedMember
 class DataAccess(DataContext, Configurator):
+    _created: bool = False
+
     def __init__(self, component, **channels: Channel) -> None:
         from loris import Component, ComponentException
         from loris.data.context import DataContext
@@ -33,34 +35,35 @@ class DataAccess(DataContext, Configurator):
             return channels[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no channel '{attr}'")
 
-    @property
-    def configs(self) -> Configurations:
-        return self.__component.configs.get_section(self.SECTION, defaults={})
-
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        defaults = self._parse_defaults(configs)
-        if configs.has_section("channels"):
-            self._load_sections(self.__component, configs.get_section("channels"), defaults)
-        self._load_from_file(self.__component, configs.dirs, defaults=defaults)
+        if not configs.has_section("channels"):
+            configs._add_section("channels", {})
+
+    def create(self) -> None:
+        defaults = self._parse_defaults(self.configs)
+        if self.configs.has_section("channels"):
+            self._load_sections(self.__component, self.configs.get_section("channels"), defaults)
+        self._load_from_file(self.__component, self.configs.dirs, defaults=defaults)
+        self._created = True
+
+    def is_created(self) -> bool:
+        return self._created
 
     # noinspection PyUnresolvedReferences
     def add(self, key: str, **configs: Any) -> None:
-        data_configs = self.configs
-        if not data_configs.has_section("channels"):
-            data_configs._add_section("channels", {})
-        if not data_configs["channels"].has_section(key):
-            data_configs["channels"]._add_section(key, configs)
+        if not self.configs["channels"].has_section(key):
+            self.configs["channels"]._add_section(key, configs)
         else:
-            data_configs["channels"][key].update(configs, replace=False)
+            self.configs["channels"][key].update(configs, replace=False)
 
-        if self.is_configured():
-            channel_configs = self._parse_defaults(data_configs["channels"])
+        if self.is_created():
+            channel_configs = self._parse_defaults(self.configs["channels"])
             # Be wary of the order. First, update the channel core with the default core
             # of the configuration file, then update the function arguments. Last, override
             # everything with the channel specific configurations of the file.
             channel_configs.update(configs)
-            channel_configs.update(data_configs["channels"][key])
+            channel_configs.update(self.configs["channels"][key])
             channel_id = f"{self.__component.id}.{key}"
             self._update(id=channel_id, key=key, **channel_configs)
 

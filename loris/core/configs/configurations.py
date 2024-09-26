@@ -182,16 +182,28 @@ class Configurations(MutableMapping[str, Any]):
             return True
         return False
 
-    def get_section(self, section: str, defaults: Optional[Mapping[str, Any]] = None) -> Configurations:
-        if self.has_section(section):
-            section = self[section]
+    def get_section(
+        self,
+        section: str,
+        defaults: Optional[Mapping[str, Any]] = None,
+        ensure_exists: bool = False,
+    ) -> Configurations:
+        if not self.has_section(section) and ensure_exists:
+            if defaults is None:
+                defaults = {}
+            self._add_section(section, defaults)
+            return self[section]
+
+        elif self.has_section(section):
+            configs = self[section]
             if defaults is not None:
-                section.update(defaults, replace=False)
+                configs.update(defaults, replace=False)
+            return configs
+
         elif defaults is not None:
-            section = self.__new_section(section, defaults)
+            return self.__new_section(section, defaults)
         else:
             raise ConfigurationUnavailableException(f"Unknown configuration section: {section}")
-        return section
 
     def _add_section(self, section, configs: Mapping[str, Any]) -> None:
         if self.has_section(section):
