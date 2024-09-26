@@ -14,7 +14,8 @@ from loris.util import get_context
 
 
 class ConnectorAccess(ConnectorContext):
-    # noinspection PyProtectedMember
+    _created: bool = False
+
     def __init__(self, component) -> None:
         from loris import Component, ComponentException
         from loris.data.context import DataContext
@@ -34,6 +35,14 @@ class ConnectorAccess(ConnectorContext):
         raise AttributeError(f"'{type(self).__name__}' object has no connector '{attr}'")
 
     # noinspection PyProtectedMember
+    def create(self) -> None:
+        self._add(*self.context.connectors._load_sections(self.__component, self.configs))
+        self._created = True
+
+    def is_created(self) -> bool:
+        return self._created
+
+    # noinspection PyProtectedMember
     def _add(self, *connectors: Connector) -> None:
         for connector in connectors:
             super()._set(connector.key, connector)
@@ -47,12 +56,3 @@ class ConnectorAccess(ConnectorContext):
         else:
             self._add(connector)
         return connector
-
-    @property
-    def configs(self) -> Configurations:
-        return self.__component.configs.get_section(self.SECTION, defaults={})
-
-    # noinspection PyProtectedMember
-    def configure(self, configs: Configurations) -> None:
-        super().configure(configs)
-        self._add(*self.context.connectors._load_sections(self.__component, configs))
