@@ -39,23 +39,20 @@ class WeatherConnector(Weather, Connector, metaclass=WeatherConnectorMeta):
     # noinspection PyProtectedMember
     def _configure_forecast(self, configs: Configurations) -> None:
         if self.has_forecast():
-            if not configs.has_section(WeatherForecast.SECTION):
-                configs._add_section(WeatherForecast.SECTION, {})
-            section = configs.get_section(WeatherForecast.SECTION)
+            section = configs.get_section(WeatherForecast.SECTION, ensure_exists=True)
             section.set("key", "forecast", replace=False)
             self._forecast = WeatherForecast(self, section)
-
-    def _on_configure(self, configs: Configurations) -> None:
-        super()._on_configure(configs)
-        self._forecast.configure(configs.get_section(WeatherForecast.SECTION))
+            self._forecast.configure(configs.get_section(WeatherForecast.SECTION))
 
     def activate(self) -> None:
         super().activate()
-        self._forecast.activate()
+        if self.has_forecast():
+            self._forecast.activate()
 
     def deactivate(self) -> None:
         super().deactivate()
-        self._forecast.deactivate()
+        if self.has_forecast():
+            self._forecast.deactivate()
 
     @property
     def context(self):
