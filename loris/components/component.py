@@ -9,11 +9,13 @@ loris.components.connector
 from __future__ import annotations
 
 import datetime as dt
+from functools import wraps
 from typing import Any, Collection, Dict, Optional
 
 import pandas as pd
 from loris.connectors import ConnectorAccess
-from loris.core import Activator, Configurations, Context, ResourceException, ResourceUnavailableException
+from loris.core import Activator, Context, ResourceException, ResourceUnavailableException
+from loris.core.configs import ConfigurationException, Configurations
 from loris.data import DataAccess
 from loris.util import to_date
 
@@ -44,17 +46,22 @@ class Component(Activator):
             raise ComponentException(f"Invalid context: {context}")
         return super()._assert_context(context)
 
-    # noinspection PyProtectedMember
-    def _on_configure(self, configs: Configurations) -> None:
-        super()._on_configure(configs)
+    def configure(self, configs: Configurations) -> None:
+        super().configure(configs)
 
-        if not configs.has_section(ConnectorAccess.SECTION):
-            configs._add_section(ConnectorAccess.SECTION, {})
-        self.__connectors.configure(configs.get_section(ConnectorAccess.SECTION))
+    @wraps(configure, updated=())
+    def _do_configure(self, configs: Configurations, *args, **kwargs) -> None:
+        if configs is None:
+            raise ConfigurationException(f"Invalid NoneType configuration for {type(self).__name__}: {self.name}")
+        if not configs.enabled:
+            raise ConfigurationException(f"Trying to configure disabled {type(self).__name__}: {configs.name}")
 
-        if not configs.has_section(DataAccess.SECTION):
-            configs._add_section(DataAccess.SECTION, {})
-        self.__data.configure(configs.get_section(DataAccess.SECTION))
+        self.__connectors.configure(configs.get_section(ConnectorAccess.SECTION, ensure_exists=True))
+        self.__data.configure(configs.get_section(DataAccess.SECTION, ensure_exists=True))
+        super()._do_configure(configs, *args, **kwargs)
+
+        self.__data.create()
+        self.__connectors.create()
 
     # Override return type, as a context is mandatory for components
     @property
