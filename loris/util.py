@@ -9,9 +9,11 @@ loris.util
 from __future__ import annotations
 
 import datetime as dt
+import dateutil.parser
 import re
 from copy import copy
 from dateutil.relativedelta import relativedelta
+from pydoc import locate
 from typing import Any, Callable, Collection, Dict, List, Optional, Tuple, Type, TypeVar
 
 import numpy as np
@@ -175,8 +177,6 @@ def convert_timezone(
     if date is None:
         return None
     if isinstance(date, str):
-        import dateutil.parser
-
         date = dateutil.parser.parse(date)
     if isinstance(date, dt.datetime):
         date = pd.Timestamp(date)
@@ -187,7 +187,7 @@ def convert_timezone(
         else:
             return date.tz_convert(timezone)
     else:
-        raise ConversionException(f"Unable to convert date of type {type(date)}")
+        raise TypeError(f"Unable to convert date of type {type(date)}")
 
 
 def slice_range(
@@ -256,14 +256,18 @@ def to_date(
 ) -> Optional[pd.Timestamp]:
     if date is None:
         return None
-    if isinstance(date, (dt.datetime, pd.Timestamp)):
+    if issubclass(type(date), dt.datetime):
         return date
+
+    def _convert_timezone(_date: pd.Timestamp) -> pd.Timestamp:
+        if timezone is not None:
+            _date = convert_timezone(_date, timezone)
+        return _date
+
     if isinstance(date, str):
-        date = pd.Timestamp(dt.datetime.strptime(date, format))
+        return _convert_timezone(pd.Timestamp(dt.datetime.strptime(date, format)))
     if isinstance(date, int):
-        date = pd.Timestamp(dt.datetime.fromtimestamp(date))
-    if timezone is not None:
-        date = convert_timezone(date, timezone)
+        return _convert_timezone(pd.Timestamp(dt.datetime.fromtimestamp(date)))
 
     raise TypeError(f"Invalid date type: {type(date)}")
 
@@ -276,10 +280,11 @@ def to_timezone(timezone: Optional[str | int | float | tz.BaseTzInfo]) -> Option
     if isinstance(timezone, str):
         try:
             return tz.timezone(timezone)
-        except tz.UnknownTimeZoneError:
+        except tz.UnknownTimeZoneError as e:
             # Handle the case where the timezone is not recognized
             if timezone == "CEST":
                 return tz.FixedOffset(2 * 60)
+            raise e
     if isinstance(timezone, (int, float)):
         return tz.FixedOffset(timezone * 60)
 
@@ -306,22 +311,39 @@ def to_timedelta(freq: str) -> relativedelta | pd.Timedelta:
         raise ValueError(f"Invalid frequency: {freq}")
 
 
-def to_float(value: str | float) -> float:
-    if isinstance(value, str):
+def to_float(value: str | float) -> Optional[float]:
+    if value is None:
+        return None
+    if type(value) == float:
+        return value
+    if isinstance(value, str) or issubclass(type(value), float):
         return float(value)
-    return value
+    raise TypeError(f"Expected str or float, not: {type(value)}")
 
 
-def to_int(value: str | int) -> int:
-    if isinstance(value, str):
+def to_int(value: str | int) -> Optional[int]:
+    if value is None:
+        return None
+    if type(value) == int:
+        return value
+    if isinstance(value, str) or issubclass(type(value), int):
         return int(value)
-    return value
+    raise TypeError(f"Expected str or int, not: {type(value)}")
 
 
-def to_bool(value: str | bool) -> bool:
+def to_bool(value: str | bool) -> Optional[bool]:
+    if value is None:
+        return None
+    if type(value) == bool:
+        return value
     if isinstance(value, str):
-        return value.lower() in ["true", "yes", "y"]
-    return value
+        if value.lower() in ["true", "yes", "y"]:
+            return True
+        if value.lower() in ["false", "no", "n"]:
+            return False
+    if issubclass(type(value), int):
+        return bool(value)
+    raise TypeError(f"Invalid bool type: {type(value)}")
 
 
 # noinspection SpellCheckingInspection
@@ -344,6 +366,19 @@ def _parse_freq(f: str) -> str:
         raise ValueError(f"Invalid frequency: {f}")
 
 
+# noinspection PyShadowingBuiltins
+def parse_type(t: str | Type, default: Type = None) -> Type:
+    if t is None:
+        if default is None:
+            raise ValueError("Invalid NoneType")
+        return default
+    if isinstance(t, str):
+        t = locate(t)
+    if not isinstance(t, type):
+        raise TypeError(f"Invalid type: {type(t)}")
+    return t
+
+
 def parse_name(name: str) -> str:
     return " ".join(
         [
@@ -357,10 +392,4 @@ def parse_name(name: str) -> str:
 def parse_key(id: str) -> str:
     for c in INVALID_CHARS:
         id = id.replace(c, "_")
-    return re.sub("[^\\w]+", "", id).lower()
-
-
-class ConversionException(ResourceException):
-    """
-    Raise if a conversion failed
-    """
+    return re.sub(r"\W", "", id).lower()

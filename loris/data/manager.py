@@ -13,30 +13,35 @@ import logging
 import os
 from concurrent import futures
 from concurrent.futures import Future, ThreadPoolExecutor
-from typing import Optional
+from typing import Any, Dict, Mapping, Optional, Type
 
 import pandas as pd
 import pytz as tz
-from loris import Channel, Channels, ChannelState, Configurations, Configurator
 from loris.components.component import Component
 from loris.components.context import ComponentContext
 from loris.connectors import Connector, ConnectorException
 from loris.connectors.context import ConnectorContext
 from loris.connectors.tasks import ConnectTask, LogTask, ReadTask, WriteTask
-from loris.core import Activator
+from loris.converters.context import ConverterContext
+from loris.core import Activator, ResourceException
+from loris.core.configs import ConfigurationException, Configurations, Configurator
+from loris.core.register import RegistratorContext
+from loris.data.channels import Channel, ChannelConnector, ChannelConverter, Channels, ChannelState
 from loris.data.context import DataContext
-from loris.util import floor_date, get_variables
+from loris.util import floor_date, get_variables, parse_type
 
 
 # noinspection PyProtectedMember
 class DataManager(DataContext, Activator):
     _executor: ThreadPoolExecutor
 
+    _converters: ConverterContext
     _connectors: ConnectorContext
     _components: ComponentContext
 
     def __init__(self, configs: Configurations, *args, **kwargs) -> None:
         super().__init__(configs=configs, *args, **kwargs)
+        self._converters = ConverterContext(self, configs)
         self._connectors = ConnectorContext(self, configs)
         self._components = ComponentContext(self, configs)
         self._executor = ThreadPoolExecutor(
@@ -52,20 +57,83 @@ class DataManager(DataContext, Activator):
             return item in self._connectors.values() or item in self._components.values()
         return False
 
+    def _add(self, channel: Channel) -> None:
+        if not isinstance(channel, Channel):
+            raise ResourceException(f"Invalid channel type: {type(channel)}")
+
+        if channel.id in self._channels.keys():
+            raise ConfigurationException(f'Channel with UUID "{channel.id}" already exists')
+
+        # TODO: connector sanity check
+        self._set(channel.id, channel)
+
+    # noinspection PyShadowingBuiltins
+    def _new(self, id: str, key: str, type: Type, **configs: Any) -> Channel:
+        # noinspection PyShadowingBuiltins
+        def build_args(
+            registrator_context: RegistratorContext,
+            registrator_type: str,
+            name: Optional[str] = None,
+        ) -> Dict[str, Any]:
+            if name is None:
+                name = registrator_type
+            registrator_section = configs.pop(name, None)
+            if not registrator_section:
+                return {registrator_type: None}
+            if isinstance(registrator_section, str):
+                registrator_section = {registrator_type: registrator_section}
+            elif not isinstance(registrator_section, Mapping):
+                raise ConfigurationException(f"Invalid channel {name} type: " + str(registrator_section))
+
+            registrator_id = registrator_section.pop(registrator_type)
+            if "." not in registrator_id:
+                _registrator_id = id.replace(key, registrator_id)
+                if _registrator_id in registrator_context.keys():
+                    registrator_id = _registrator_id
+                else:
+                    registrator_id = f"{self.id}.{registrator_id}"
+            return {registrator_type: registrator_context.get(registrator_id, None), **registrator_section}
+
+        if "converter" not in configs:
+            converter = ChannelConverter(self._converters.get_by_dtype(parse_type(type)))
+        else:
+            converter = ChannelConverter(**build_args(self._converters, "converter"))
+        connector = ChannelConnector(**build_args(self._connectors, "connector"))
+        logger = ChannelConnector(**build_args(self._connectors, "connector", "logger"))
+
+        return Channel(id, key, type, converter, connector, logger, **configs)
+
+    # noinspection PyShadowingBuiltins
+    def _update(self, id: str, key: str, **configs: Any) -> Channel:
+        if id in self:
+            # TODO: Take popped configs into account
+            channel = self._get(id)
+            channel.configs.update(configs)
+        else:
+            channel = self._new(id=id, key=key, **configs)
+        self._add(channel)
+        return channel
+
+    def _remove(self, key: str) -> None:
+        del self._channels[key]
+
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
         self._load(self, configs)
 
         self._configure(*get_variables(self._components.values(), include=ComponentContext))
 
+        self._configure(self._converters)
         self._configure(self._connectors)
         self._configure(self._components)
 
         self._configure(*get_variables(self._components.values(), exclude=ComponentContext))
         self._configure(*get_variables(self._connectors.values(), exclude=Component))
+        self._configure(*get_variables(self._converters.values(), exclude=(Component, Connector)))
 
-        self._components._sort()
+        self._converters._sort()
         self._connectors._sort()
+        self._components._sort()
 
     def _configure(self, *configurators: Configurator) -> None:
         for configurator in configurators:
@@ -189,12 +257,16 @@ class DataManager(DataContext, Activator):
                 self._logger.exception(e)
 
     @property
-    def components(self) -> ComponentContext:
-        return self._components
+    def converters(self) -> ConnectorContext:
+        return self._converters
 
     @property
     def connectors(self) -> ConnectorContext:
         return self._connectors
+
+    @property
+    def components(self) -> ComponentContext:
+        return self._components
 
     def notify(self, channels: Optional[Channels] = None) -> None:
         pass

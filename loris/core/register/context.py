@@ -235,6 +235,7 @@ class RegistratorContext(Context[R]):
         return self._registry.types[registration_type].initialize(context, configs)
 
     def _update(self, context: Context, configs: Configurations) -> R:
+        # TODO: Break out ID parsing to static function, to avoid object initialization as seen here
         value = self._new(context, configs)
         if value.id in self:
             self._get(value.id).configs.update(configs)

@@ -19,20 +19,15 @@ class Registrator(Configurator):
     # noinspection PyPep8Naming
     @property
     @abstractmethod
-    def SECTIONS(self) -> Collection[str]:
-        pass
-
-    # noinspection PyPep8Naming
-    @property
-    @abstractmethod
-    def SECTION(self) -> str:
-        pass
-
-    # noinspection PyPep8Naming
-    @property
-    @abstractmethod
     def TYPE(self) -> str:
         pass
+
+    # noinspection PyPep8Naming
+    @property
+    def SECTION(self) -> str:
+        return self.TYPE
+
+    SECTIONS: Collection[str] = []
 
     # noinspection PyProtectedMember
     def __init__(

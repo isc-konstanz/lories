@@ -8,6 +8,8 @@ loris.data.mapping
 
 from __future__ import annotations
 
+import datetime as dt
+from abc import abstractmethod
 from collections import OrderedDict
 from collections.abc import Mapping
 from copy import deepcopy
@@ -15,8 +17,9 @@ from typing import Any, Callable, Collection, Iterator, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from loris.core import ConfigurationException, Configurations, Context, Directories, Registrator, ResourceException
+from loris.core import Configurations, Context, Directories, Registrator
 from loris.data.channels import Channel, Channels
+from loris.util import parse_key
 
 
 class DataContext(Context[Channel]):
@@ -78,7 +81,7 @@ class DataContext(Context[Channel]):
             channel_configs = deepcopy(defaults)
             channel_configs.update(configs.get_section(channel_key))
 
-            channel_key = channel_configs.pop("key", channel_key)
+            channel_key = parse_key(channel_configs.pop("key", channel_key))
             channel_id = f"{context.id}.{channel_key}"
             channels.append(self._update(id=channel_id, key=channel_key, **channel_configs))
         return channels
@@ -108,50 +111,18 @@ class DataContext(Context[Channel]):
     def _set(self, key: str, channel: Channel) -> None:
         self._channels[key] = channel
 
+    @abstractmethod
     def _add(self, channel: Channel) -> None:
-        if not isinstance(channel, Channel):
-            raise ResourceException(f"Invalid channel type: {type(channel)}")
+        pass
 
-        if channel.id in self._channels.keys():
-            raise ConfigurationException(f'Channel with UUID "{channel.id}" already exists')
-
-        # TODO: connector sanity check
-        self._set(channel.id, channel)
+    @abstractmethod
+    def _new(self, id: str, key: str, **configs: Any) -> Channel:
+        pass
 
     # noinspection PyShadowingBuiltins
-    def _new(self, key: str, id: str = None, **configs: Any) -> Channel:
-        for connector_type in ["logger", "connector"]:
-            connector = configs.get(connector_type, None)
-            if not connector:
-                continue
-            if isinstance(connector, str):
-                configs[connector_type] = connector = {"connector": connector}
-            elif not isinstance(connector, Mapping):
-                raise ConfigurationException(f"Invalid channel {connector_type} type: " + str(connector))
-            if "connector" in connector:
-                connector_id = connector["connector"]
-                if not connector_id.startswith(self.id):
-                    connector_id = id.replace(key, connector["connector"])
-                    if connector_id not in self.connectors.keys():
-                        connector_id = f"{self.id}.{connector['connector']}"
-                configs[connector_type]["connector"] = connector_id
-
-        return Channel(id, key, **configs)
-
-    # noinspection PyShadowingBuiltins
+    @abstractmethod
     def _update(self, id: str, key: str, **configs: Any) -> Channel:
-        channel = self._new(id=id, key=key, **configs)
-
-        # TODO: Implement connector config update
-        # if channel.key in self:
-        #     self._get(channel.key).configs.update(configs)
-        # else:
-        #     self._add(channel)
-        self._add(channel)
-        return channel
-
-    def _remove(self, key: str) -> None:
-        del self._channels[key]
+        pass
 
     @property
     def channels(self) -> Channels:
@@ -167,6 +138,19 @@ class DataContext(Context[Channel]):
         for group_by in np.unique([getattr(c, by) for c in self._channels.values()]):
             groups.append((group_by, self.filter(lambda c: getattr(c, by) == group_by)))
         return groups
+
+    @abstractmethod
+    def read(
+        self,
+        channels: Optional[Channels] = None,
+        start: Optional[pd.Timestamp, dt.datetime] = None,
+        end: Optional[pd.Timestamp, dt.datetime] = None,
+    ) -> pd.DataFrame:
+        pass
+
+    @abstractmethod
+    def write(self, data: pd.DataFrame, channels: Optional[Channels] = None) -> None:
+        pass
 
     def to_frame(self, **kwargs) -> pd.DataFrame:
         return self.channels.to_frame(**kwargs)

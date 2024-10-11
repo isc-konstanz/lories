@@ -9,19 +9,19 @@ loris.data.channels.channel
 from __future__ import annotations
 
 from collections import OrderedDict
-from copy import deepcopy
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Collection, Dict, List, Optional, Type
 
 import pandas as pd
 import pytz as tz
-from loris.core import Resource
-from loris.data.channels import ChannelConnector, ChannelState
+from loris.core import Resource, ResourceException
+from loris.data.channels import ChannelConnector, ChannelConverter, ChannelState
 from loris.util import _parse_freq, to_timedelta
 
 
 class Channel(Resource):
     logger: ChannelConnector
     connector: ChannelConnector
+    converter: ChannelConverter
 
     _timestamp: pd.Timestamp = pd.NaT
     _value: Optional[Any] = None
@@ -32,30 +32,23 @@ class Channel(Resource):
         self,
         id: str = None,
         key: str = None,
-        name: Optional[str] = None,
+        type: str | Type = None,
+        converter: ChannelConverter = None,
+        connector: Optional[ChannelConnector] = None,
+        logger: Optional[ChannelConnector] = None,
         **configs: Any,
     ) -> None:
-        connector = self.__parse_connector(configs.pop("connector", {}))
-        logger = self.__parse_connector(configs.pop("logger", {}))
-
-        super().__init__(id, key, name, **configs)
+        super().__init__(id=id, key=key, type=type, **configs)
+        self.converter = converter
         self.connector = connector
         self.logger = logger
-
-    @staticmethod
-    def __parse_connector(connector: ChannelConnector | Dict[str, Any]) -> ChannelConnector:
-        if isinstance(connector, ChannelConnector):
-            return connector
-
-        if connector is None or isinstance(connector, str):
-            connector = {"connector": connector}
-        return ChannelConnector(**connector)
 
     def _get_attrs(self) -> List[str]:
         return [
             *super()._get_attrs(),
             "logger",
             "connector",
+            "converter",
             "value",
             "state",
             "timestamp",
@@ -78,12 +71,6 @@ class Channel(Resource):
             vars["state"] = str(self.state)
         vars["timestamp"] = str(self.timestamp)
         return f"{type(self).__name__}({', '.join(f'{k}={v}' for k, v in vars.items())})"
-
-    @property
-    def type(self) -> Optional[Type]:
-        if self._type is None and self._value is not None:
-            return type(self._value)
-        return self._type
 
     @property
     def freq(self) -> Optional[str]:
@@ -116,8 +103,14 @@ class Channel(Resource):
     def state(self, state) -> None:
         self._set(pd.Timestamp.now(tz.UTC).floor(freq="s"), None, state)
 
-    def is_valid(self):
-        return self.state == ChannelState.VALID
+    def is_valid(self) -> bool:
+        return self.state == ChannelState.VALID and self._is_valid(self.value)
+
+    @staticmethod
+    def _is_valid(value: Any) -> bool:
+        if isinstance(value, Collection):
+            return not any(pd.isna(value))
+        return not pd.isna(value)
 
     def set(
         self,
@@ -133,33 +126,55 @@ class Channel(Resource):
         value: Optional[Any],
         state: str | ChannelState,
     ) -> None:
-        # TODO: Implement value type validation based on value type attribute
+        if not isinstance(timestamp, pd.Timestamp):
+            raise ResourceException(f"Expected pandas Timestamp for '{self.id}', not: {type(value)}")
         self._timestamp = timestamp
+
+        valid = self._is_valid(value)
+        if valid:
+            value = self.converter(value)
+        elif state == ChannelState.VALID:
+            raise ResourceException(f"Invalid value for valid state '{self.id}': {value}")
+
         self._value = value
         self._state = state
 
     def copy(self) -> Channel:
-        configs = self._get_vars()
-        configs["logger"] = self.logger.copy()
-        configs["connector"] = self.connector.copy()
-        return Channel(**configs)
+        channel = Channel(
+            self._id,
+            self._key,
+            self._type,
+            self.converter.copy(),
+            self.connector.copy(),
+            self.logger.copy(),
+            name=self.name,
+            **self.__configs,
+        )
+        channel.set(self._timestamp, self._value, self._state)
+        return channel
 
     # noinspection PyProtectedMember
     def from_logger(self) -> Channel:
-        configs = {k: v for k, v in self.logger._get_vars().items() if k not in ["id", "timestamp"]}
-        configs["logger"] = deepcopy(self.logger)
-        configs["connector"] = deepcopy(self.connector)
-        channel = Channel(id=self._id, key=self._key, name=self.name, **configs)
+        channel = Channel(
+            self._id,
+            self._key,
+            self._type,
+            self.converter,
+            self.connector,
+            self.logger,
+            name=self.name,
+            **self.logger._copy_configs(),
+        )
         channel.set(self._timestamp, self._value, self._state)
         return channel
 
     # noinspection PyShadowingBuiltins
     def has_logger(self, *ids: Optional[str]) -> bool:
-        return any(self.logger.id == id for id in ids) if len(ids) > 0 else self.logger.id is not None
+        return self.logger.enabled and any(self.logger.id == id for id in ids) if len(ids) > 0 else True
 
     # noinspection PyShadowingBuiltins
     def has_connector(self, id: Optional[str] = None) -> bool:
-        return self.connector.id == id if id is not None else self.connector.id is not None
+        return self.connector.enabled and self.connector.id == id if id is not None else True
 
     def to_series(self, state: bool = False) -> pd.Series:
         if isinstance(self.value, pd.Series):

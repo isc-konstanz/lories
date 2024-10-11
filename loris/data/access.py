@@ -8,8 +8,10 @@ loris.data.access
 
 from __future__ import annotations
 
-from typing import Any
+import datetime as dt
+from typing import Any, Optional
 
+import pandas as pd
 from loris.core import Configurations, Configurator
 from loris.data import Channel, DataContext
 from loris.util import get_context
@@ -74,3 +76,31 @@ class DataAccess(DataContext, Configurator):
     # noinspection PyShadowingBuiltins
     def _new(self, id: str, key: str, **configs: Any) -> Channel:
         return self.context._new(id=id, key=key, **configs)
+
+    # noinspection PyShadowingBuiltins
+    def _update(self, id: str, key: str, **configs: Any) -> Channel:
+        if key in self:
+            # TODO: Take popped configs into account
+            channel = self._get(key)
+            channel.configs.update(configs)
+        else:
+            channel = self._new(id=id, key=key, **configs)
+        self._add(channel)
+        return channel
+
+    def _remove(self, key: str) -> None:
+        channel = self._get(key)
+        self.context.remove(channel)
+        del self._channels[key]
+
+    # noinspection PyShadowingBuiltins
+    def read(
+        self,
+        start: Optional[pd.Timestamp, dt.datetime] = None,
+        end: Optional[pd.Timestamp, dt.datetime] = None,
+    ) -> pd.DataFrame:
+        return self.context.read(self.channels, start, end)
+
+    # noinspection PyShadowingBuiltins
+    def write(self, data: pd.DataFrame) -> None:
+        self.context.write(data, self.channels)

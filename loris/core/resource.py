@@ -11,11 +11,10 @@ from __future__ import annotations
 import builtins
 import logging
 from collections import OrderedDict
-from pydoc import locate
 from typing import Any, Dict, List, Optional, Type
 
 from loris.core import ConfigurationException
-from loris.util import parse_key, parse_name
+from loris.util import parse_key, parse_name, parse_type
 
 
 class Resource:
@@ -23,7 +22,7 @@ class Resource:
     _key: str
     _name: str
 
-    _type: Optional[Type]
+    _type: Type
 
     __configs: OrderedDict[str, Any]
 
@@ -33,7 +32,7 @@ class Resource:
         id: str = None,
         key: str = None,
         name: Optional[str] = None,
-        type: Optional[str | Type] = None,
+        type: Type | str = None,
         **configs: Any,
     ) -> None:
         self._logger = logging.getLogger(__name__)
@@ -49,9 +48,7 @@ class Resource:
             name = parse_name(self.key)
         self._name = name
 
-        if isinstance(type, str):
-            type = locate(type)
-        self._type = type
+        self._type = parse_type(type)
         self.__configs = OrderedDict(configs)
 
     def __contains__(self, attr: str) -> bool:
@@ -93,7 +90,7 @@ class Resource:
         return self._name
 
     @property
-    def type(self) -> Optional[Type]:
+    def type(self) -> Type:
         return self._type
 
     def copy(self) -> Resource:

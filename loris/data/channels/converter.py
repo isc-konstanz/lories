@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-loris.data.channels.connector
+loris.data.channels.converter
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
@@ -11,33 +11,26 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Any, Dict
 
-import pandas as pd
 from loris.core import ResourceException
 
 
-class ChannelConnector:
+class ChannelConverter:
     __configs: OrderedDict[str, Any]
 
-    enabled: bool = False
-
-    timestamp: pd.Timestamp = pd.NaT
-
     # noinspection PyShadowingBuiltins
-    def __init__(self, connector, configs: Dict[str, Any] = ()) -> None:
+    def __init__(self, converter, configs: Dict[str, Any] = ()) -> None:
         self.__configs = OrderedDict(configs)
-        self._connector = self._assert_connector(connector)
+        self._converter = self._assert_converter(converter)
 
-        self.enabled = self.__configs.pop("enabled", connector is not None and connector.is_enabled())
+        self.enabled = self.__configs.pop("enabled", converter is not None)
 
     # noinspection PyMethodMayBeStatic
-    def _assert_connector(self, connector):
-        from loris.connectors import Connector
+    def _assert_converter(self, converter):
+        from loris.converters import Converter
 
-        if connector is None:
-            return None
-        if not isinstance(connector, Connector):
-            raise ResourceException(f"Invalid connector: {None if connector is None else type(connector)}")
-        return connector
+        if converter is None or not isinstance(converter, Converter):
+            raise ResourceException(f"Invalid converter: {None if converter is None else type(converter)}")
+        return converter
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.key})"
@@ -50,23 +43,26 @@ class ChannelConnector:
     def __getattr__(self, attr):
         # __getattr__ gets called when the item is not found via __getattribute__
         # To avoid recursion, call __getattribute__ directly to get components dict
-        configs = ChannelConnector.__getattribute__(self, f"_{ChannelConnector.__name__}__configs")
+        configs = ChannelConverter.__getattribute__(self, f"_{ChannelConverter.__name__}__configs")
         if attr in configs.keys():
             return configs[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
 
+    def __call__(self, value: Any) -> Any:
+        return self._converter.convert(value)
+
     @property
     def id(self) -> str:
-        return self._connector.id
+        return self._converter.id
 
     @property
     def key(self) -> str:
-        return self._connector.key
+        return self._converter.key
 
-    def copy(self) -> ChannelConnector:
+    def copy(self) -> ChannelConverter:
         configs = self._copy_configs()
         configs["enabled"] = self.enabled
-        return type(self)(self._connector, configs)
+        return type(self)(self._converter, configs)
 
     # noinspection PyShadowingBuiltins
     def _copy_configs(self) -> Dict[str, Any]:
@@ -75,6 +71,5 @@ class ChannelConnector:
     # noinspection PyShadowingBuiltins
     def _get_vars(self) -> Dict[str, Any]:
         vars = self._copy_configs()
-        vars["timestamp"] = self.timestamp
         vars["enabled"] = self.enabled
         return vars

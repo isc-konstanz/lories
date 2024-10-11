@@ -12,7 +12,7 @@ import datetime as dt
 from abc import abstractmethod
 from collections import OrderedDict
 from functools import wraps
-from typing import Any, Collection, Dict, Optional
+from typing import Any, Dict, Optional
 
 import pandas as pd
 import pytz as tz
@@ -37,7 +37,6 @@ class ConnectorMeta(ConfiguratorMeta):
 
 class Connector(Registrator, metaclass=ConnectorMeta):
     SECTION: str = "connector"
-    SECTIONS: Collection[str] = []
 
     _connected: bool = False
     _connect_timestamp: pd.Timestamp = pd.NaT
