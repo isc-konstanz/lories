@@ -151,7 +151,9 @@ class Channel(Resource):
             logger=self.logger.copy(),
             **self._copy_configs(),
         )
-        channel.set(self._timestamp, self._value, self._state)
+        channel._timestamp = self._timestamp
+        channel._value = self._value
+        channel._state = self._state
         return channel
 
     # noinspection PyProtectedMember
