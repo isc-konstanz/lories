@@ -10,6 +10,7 @@ from .connector import (  # noqa: F401
     ConnectorMeta,
     Connector,
     ConnectorException,
+    ConnectorUnavailableException,
     ConnectionException,
 )
 

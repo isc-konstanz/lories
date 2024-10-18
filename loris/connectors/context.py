@@ -71,6 +71,7 @@ class ConnectorContext(RegistratorContext[Connector], Configurator):
         self,
         context: Registrator | RegistratorContext,
         configs: Configurations,
+        configs_file: str = "connectors.conf",
     ) -> None:
         defaults = {}
         configs = configs.copy()
@@ -81,4 +82,4 @@ class ConnectorContext(RegistratorContext[Connector], Configurator):
                     defaults.update(connectors.pop(section))
 
             self._load_sections(context, connectors, defaults)
-        self._load_from_file(context, configs.dirs, "connectors.conf", defaults)
+        self._load_from_file(context, configs.dirs, configs_file, defaults)

@@ -24,6 +24,7 @@ class Registration(Generic[R]):
     type: str
     alias: List[str]
 
+    # noinspection PyTypeChecker
     def __init__(self, cls: Type[R], *alias: str, factory: Callable = None):
         self.type = cls.TYPE
         self._class = cls

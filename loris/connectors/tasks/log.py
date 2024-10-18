@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-loris.connectors.tasks.write
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loris.connectors.tasks.log
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -16,6 +16,6 @@ class LogTask(ConnectorTask):
             f"Logging {len(self.channels)} channels of " f"{type(self.connector).__name__}: " f"{self.connector.id}"
         )
         # Pass copied connectors instead of actual objects, including parsed logger specific connector configurations
-        channels = Channels([c.from_logger() for c in self.channels])
+        channels = Channels(c.from_logger() for c in self.channels)
 
         self.connector.write(channels.to_frame(unique=True))

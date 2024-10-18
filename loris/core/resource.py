@@ -11,11 +11,10 @@ from __future__ import annotations
 import builtins
 import logging
 from collections import OrderedDict
-from pydoc import locate
 from typing import Any, Dict, List, Optional, Type
 
 from loris.core import ConfigurationException
-from loris.util import parse_key, parse_name
+from loris.util import parse_key, parse_name, parse_type
 
 
 class Resource:
@@ -23,7 +22,7 @@ class Resource:
     _key: str
     _name: str
 
-    _type: Optional[Type]
+    _type: Type
 
     __configs: OrderedDict[str, Any]
 
@@ -33,7 +32,7 @@ class Resource:
         id: str = None,
         key: str = None,
         name: Optional[str] = None,
-        type: Optional[str | Type] = None,
+        type: Type | str = None,
         **configs: Any,
     ) -> None:
         self._logger = logging.getLogger(__name__)
@@ -49,9 +48,7 @@ class Resource:
             name = parse_name(self.key)
         self._name = name
 
-        if isinstance(type, str):
-            type = locate(type)
-        self._type = type
+        self._type = parse_type(type)
         self.__configs = OrderedDict(configs)
 
     def __contains__(self, attr: str) -> bool:
@@ -68,11 +65,14 @@ class Resource:
     def get(self, attr: str, default: Optional[Any] = None) -> Any:
         return self.__configs.get(attr, default)
 
+    def _get_confs(self) -> Dict[str, Any]:
+        return self.__configs
+
     def _get_attrs(self) -> List[str]:
-        return ["id", "key", "name", "type", *self.__configs.keys()]
+        return ["id", "key", "name", "type", *self._get_confs().keys()]
 
     def _get_vars(self) -> Dict[str, Any]:
-        return OrderedDict(id=self.id, key=self.key, name=self.name, type=self.type, **self.__configs)
+        return OrderedDict(id=self.id, key=self.key, name=self.name, type=self.type, **self._get_confs())
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.id})"
@@ -93,8 +93,17 @@ class Resource:
         return self._name
 
     @property
-    def type(self) -> Optional[Type]:
+    def type(self) -> Type:
         return self._type
 
     def copy(self) -> Resource:
-        return type(self)(**self._get_vars())
+        return type(self)(
+            id=self.id,
+            key=self.key,
+            type=self.type,
+            **self._copy_configs(),
+        )
+
+    # noinspection PyShadowingBuiltins
+    def _copy_configs(self) -> Dict[str, Any]:
+        return OrderedDict(**self.__configs)

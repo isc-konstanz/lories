@@ -12,12 +12,12 @@ import datetime as dt
 from abc import abstractmethod
 from collections import OrderedDict
 from functools import wraps
-from typing import Any, Collection, Dict, Optional
+from typing import Any, Dict, Optional
 
 import pandas as pd
 import pytz as tz
 from loris import Channel, Channels, ChannelState
-from loris.core import Context, Registrator, Resource, ResourceException, Resources
+from loris.core import Context, Registrator, Resource, ResourceException, ResourceUnavailableException, Resources
 from loris.core.configs import ConfigurationException, Configurations, Configurator, ConfiguratorMeta
 
 
@@ -37,7 +37,6 @@ class ConnectorMeta(ConfiguratorMeta):
 
 class Connector(Registrator, metaclass=ConnectorMeta):
     SECTION: str = "connector"
-    SECTIONS: Collection[str] = []
 
     _connected: bool = False
     _connect_timestamp: pd.Timestamp = pd.NaT
@@ -210,7 +209,14 @@ class ConnectorException(ResourceException):
         self.connector = connector
 
 
-class ConnectionException(ConnectorException, IOError):
+class ConnectorUnavailableException(ResourceUnavailableException, ConnectorException):
+    """
+    Raise if an error occurred accessing the connector.
+
+    """
+
+
+class ConnectionException(ConnectorException):
     """
     Raise if an error occurred with the connection.
 

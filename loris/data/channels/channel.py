@@ -80,12 +80,6 @@ class Channel(Resource):
         return f"{type(self).__name__}({', '.join(f'{k}={v}' for k, v in vars.items())})"
 
     @property
-    def type(self) -> Optional[Type]:
-        if self._type is None and self._value is not None:
-            return type(self._value)
-        return self._type
-
-    @property
     def freq(self) -> Optional[str]:
         freq = self.get(next((k for k in ["freq", "frequency", "resolution"] if k in self), None), default=None)
         if freq is not None:

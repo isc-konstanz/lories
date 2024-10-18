@@ -49,9 +49,8 @@ class Resources(Generic[R], Collection[R]):
     def copy(self):
         return type(self)([resource.copy() for resource in self._resources])
 
-    def apply(self, apply: Callable[[R], None]) -> None:
-        for resource in self:
-            apply(resource)
+    def apply(self, apply: Callable[[R], R]):
+        return type(self)([apply(resource.copy()) for resource in self._resources])
 
     # noinspection PyShadowingBuiltins
     def filter(self, filter: Callable[[R], bool]):

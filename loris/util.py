@@ -12,6 +12,7 @@ import datetime as dt
 import re
 from copy import copy
 from dateutil.relativedelta import relativedelta
+from pydoc import locate
 from typing import Any, Callable, Collection, Dict, List, Optional, Tuple, Type, TypeVar
 
 import numpy as np
@@ -342,6 +343,19 @@ def _parse_freq(f: str) -> str:
         return f"{v}s"
     else:
         raise ValueError(f"Invalid frequency: {f}")
+
+
+# noinspection PyShadowingBuiltins
+def parse_type(t: str | Type, default: Type = None) -> Type:
+    if t is None:
+        if default is None:
+            raise ValueError("Invalid NoneType")
+        return default
+    if isinstance(t, str):
+        t = locate(t)
+    if not isinstance(t, type):
+        raise TypeError(f"Invalid type: {type(t)}")
+    return t
 
 
 def parse_name(name: str) -> str:

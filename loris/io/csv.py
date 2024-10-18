@@ -257,8 +257,8 @@ def get_files(
     path: str,
     freq: str,
     format: str,
-    start: pd.Timestamp | dt.datetime | str,
-    end: pd.Timestamp | dt.datetime | str,
+    start: Optional[pd.Timestamp | dt.datetime | str] = None,
+    end: Optional[pd.Timestamp | dt.datetime | str] = None,
     timezone: tz.tzinfo = tz.UTC,
 ) -> List[str]:
     end = to_date(end, timezone)

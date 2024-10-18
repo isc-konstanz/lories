@@ -216,7 +216,7 @@ class Index(Columns[IndexColumn]):
     def _groupby(self, resources: Resources) -> Iterator[Tuple[Dict[str, Any], Resources]]:
         groups = list[Tuple[Dict[str, Any], Resources]]()
 
-        def _group(resource: Resource) -> None:
+        def _group(resource: Resource) -> Resource:
             attributes = {}
             for column in self._get_surrogate_keys():
                 if not hasattr(resource, column.attribute):
@@ -227,8 +227,9 @@ class Index(Columns[IndexColumn]):
             for group in groups:
                 if group[0] == attributes:
                     group[1].append(resource)
-                    return
+                    return resource
             groups.append((attributes, Resources([resource])))
+            return resource
 
         resources.apply(_group)
         return iter(groups)
