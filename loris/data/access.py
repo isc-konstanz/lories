@@ -43,7 +43,7 @@ class DataAccess(DataContext, Configurator):
             configs._add_section("channels", {})
 
     def create(self) -> None:
-        defaults = self._parse_defaults(self.configs)
+        defaults = self._build_defaults(self.configs)
         if self.configs.has_section("channels"):
             self._load_sections(self.__component, self.configs.get_section("channels"), defaults)
         self._load_from_file(self.__component, self.configs.dirs, defaults=defaults)
@@ -54,18 +54,21 @@ class DataAccess(DataContext, Configurator):
 
     # noinspection PyUnresolvedReferences
     def add(self, key: str, **configs: Any) -> None:
+        configs = self._build_configs(configs)
         if not self.configs["channels"].has_section(key):
             self.configs["channels"]._add_section(key, configs)
         else:
-            self.configs["channels"][key].update(configs, replace=False)
+            channel_configs = self._build_configs(self.configs["channels"][key])
+            channel_configs = self._update_configs(channel_configs, configs, replace=False)
+            self.configs["channels"][key] = channel_configs
 
         if self.is_created():
-            channel_configs = self._parse_defaults(self.configs["channels"])
+            channel_configs = self._build_configs(self._build_defaults(self.configs["channels"]))
             # Be wary of the order. First, update the channel core with the default core
             # of the configuration file, then update the function arguments. Last, override
             # everything with the channel specific configurations of the file.
-            channel_configs.update(configs)
-            channel_configs.update(self.configs["channels"][key])
+            channel_configs = self._update_configs(channel_configs, configs)
+            channel_configs = self._update_configs(channel_configs, self.configs["channels"][key])
             channel_id = f"{self.__component.id}.{key}"
             self._update(id=channel_id, key=key, **channel_configs)
 

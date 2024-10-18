@@ -47,11 +47,13 @@ class Brightsky(WeatherConnector):
                 key="timestamp_creation",
                 name="Creation Timestamp",
                 connector=self.id,
-                source="forecast",
                 address="source_first_record",
+                source="forecast",
                 type=pd.Timestamp,
-                primary=True,
-                nullable=False,
+                logger={
+                    "primary": True,
+                    "nullable": False,
+                },
             )
             for channel in get_channels(connector=self.id, source="forecast"):
                 self.forecast.data.add(**channel)

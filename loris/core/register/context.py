@@ -32,11 +32,11 @@ class RegistratorContext(Context[R]):
     def SECTION(self) -> str:
         pass
 
-    def __init__(self, context: Context, *args, **kwargs) -> None:
+    def __init__(self, context: Context, *args, other: Collection[R] = (), **kwargs) -> None:
         if context is None or not isinstance(context, Context):
             raise ResourceException(f"Invalid context: {None if context is None else type(context)}")
         super().__init__(context, *args, **kwargs)
-        self.__map = OrderedDict[str, R]()
+        self.__map = OrderedDict[str, R](other)
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({[c.id for c in self.__map.values()]})"

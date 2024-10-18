@@ -78,12 +78,14 @@ class DataManager(DataContext, Activator):
             if name is None:
                 name = registrator_type
             registrator_section = configs.pop(name, None)
-            if not registrator_section:
+            if registrator_section is None:
                 return {registrator_type: None}
             if isinstance(registrator_section, str):
                 registrator_section = {registrator_type: registrator_section}
             elif not isinstance(registrator_section, Mapping):
                 raise ConfigurationException(f"Invalid channel {name} type: " + str(registrator_section))
+            elif registrator_type not in registrator_section:
+                return {registrator_type: None}
 
             registrator_id = registrator_section.pop(registrator_type)
             if "." not in registrator_id:
@@ -101,7 +103,7 @@ class DataManager(DataContext, Activator):
         connector = ChannelConnector(**build_args(self._connectors, "connector"))
         logger = ChannelConnector(**build_args(self._connectors, "connector", "logger"))
 
-        return Channel(id, key, type, converter, connector, logger, **configs)
+        return Channel(id=id, key=key, type=type, converter=converter, connector=connector, logger=logger, **configs)
 
     # noinspection PyShadowingBuiltins
     def _update(self, id: str, key: str, **configs: Any) -> Channel:
@@ -167,7 +169,7 @@ class DataManager(DataContext, Activator):
 
             self._logger.debug(f"Activated {type(activator).__name__} '{activator.name}': {activator.id}")
 
-    def connect(self, *connectors: Connector) -> None:
+    def connect(self, *connectors: Connector, channels: Optional[Channels] = None) -> None:
         connect_futures = []
         for connector in connectors:
             if not connector.is_enabled():
@@ -176,17 +178,19 @@ class DataManager(DataContext, Activator):
             if connector._is_connected():
                 self._logger.debug(f"Skipping already connected {type(connector).__name__}: {connector.id}")
                 continue
-            connect_futures.append(self._connect(connector))
+            connect_futures.append(self._connect(connector, channels))
         for connect_future in futures.as_completed(connect_futures):
             self._connect_callback(connect_future)
         # for connect_future in connect_futures:
         #     connect_future.add_done_callback(self._connect_callback)
 
-    def _connect(self, connector: Connector) -> Future:
+    def _connect(self, connector: Connector, channels: Optional[Channels] = None) -> Future:
         self._logger.info(f"Connecting {type(connector).__name__}: {connector.id}")
-        connect_channels = self.channels.filter(lambda c: (c.has_connector(connector.id) or c.has_logger(connector.id)))
+        if channels is None:
+            channels = self.channels.filter(lambda c: c.has_connector(connector.id))
+            channels.update(self.channels.filter(lambda c: c.has_logger(connector.id)).apply(lambda c: c.from_logger()))
 
-        return self._executor.submit(ConnectTask(connector, connect_channels))
+        return self._executor.submit(ConnectTask(connector, channels))
 
     def _connect_callback(self, future: Future) -> None:
         try:
@@ -253,8 +257,9 @@ class DataManager(DataContext, Activator):
                 self._logger.debug(f"Deactivated {type(activator).__name__} '{activator.name}': {activator.id}")
 
             except Exception as e:
-                self._logger.warning(f"Error deactivating {type(activator).__name__} '{activator.id}': {e}")
-                self._logger.exception(e)
+                self._logger.warning(f"Error deactivating {type(activator).__name__} '{activator.id}': {repr(e)}")
+                if self._logger.isEnabledFor(logging.DEBUG):
+                    self._logger.exception(e)
 
     @property
     def converters(self) -> ConnectorContext:
@@ -307,8 +312,9 @@ class DataManager(DataContext, Activator):
                 read_channels.apply(update_connector)
 
             except ConnectorException as e:
-                self._logger.warning(f"Error reading connector '{e.connector.id}': {e}")
-                self._logger.exception(e)
+                self._logger.warning(f"Error reading connector '{e.connector.id}': {repr(e)}")
+                if self._logger.isEnabledFor(logging.DEBUG):
+                    self._logger.exception(e)
 
                 def update_state(read_channel: Channel) -> None:
                     read_channel.state = ChannelState.UNKNOWN_ERROR
@@ -358,7 +364,8 @@ class DataManager(DataContext, Activator):
 
             except ConnectorException as e:
                 self._logger.warning(f"Error writing connector '{e.connector.id}': {repr(e)}")
-                self._logger.exception(e)
+                if self._logger.isEnabledFor(logging.DEBUG):
+                    self._logger.exception(e)
 
                 # noinspection PyShadowingNames
                 def update_state(write_channel: Channel) -> None:
@@ -410,4 +417,5 @@ class DataManager(DataContext, Activator):
 
             except ConnectorException as e:
                 self._logger.warning(f"Error logging connector '{e.connector.id}': {repr(e)}")
-                self._logger.exception(e)
+                if self._logger.isEnabledFor(logging.DEBUG):
+                    self._logger.exception(e)

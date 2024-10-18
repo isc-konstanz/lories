@@ -9,7 +9,7 @@ loris.core.resources
 from __future__ import annotations
 
 import logging
-from collections.abc import Collection
+from collections.abc import Sequence
 from typing import Any, Callable, Generic, Iterable, Iterator, List, Tuple, TypeVar
 
 import numpy as np
@@ -18,7 +18,7 @@ from loris.core import Resource
 R = TypeVar("R", bound=Resource)
 
 
-class Resources(Generic[R], Collection[R]):
+class Resources(Generic[R], Sequence[R]):
     _resources: List[R]
 
     def __init__(self, resources=()) -> None:
@@ -34,6 +34,9 @@ class Resources(Generic[R], Collection[R]):
     def __contains__(self, __x: object) -> bool:
         return __x in self._resources
 
+    def __getitem__(self, index: int) -> R:
+        return self._resources[index]
+
     def __iter__(self) -> Iterator[R]:
         return iter(self._resources)
 
@@ -46,18 +49,23 @@ class Resources(Generic[R], Collection[R]):
     def extend(self, resources: Iterable[R]) -> None:
         self._resources.extend(resources)
 
+    def update(self, resources: Iterable[R]) -> None:
+        resource_ids = [r.id for r in resources]
+        for resource in [r for r in self._resources if r.id in resource_ids]:
+            self._resources.remove(resource)
+        self._resources.extend(resources)
+
     def copy(self):
         return type(self)([resource.copy() for resource in self._resources])
 
-    def apply(self, apply: Callable[[R], None]) -> None:
-        for resource in self:
-            apply(resource)
+    def apply(self, apply: Callable[[R], R]):
+        return type(self)([apply(resource.copy()) for resource in self._resources])
 
     # noinspection PyShadowingBuiltins
     def filter(self, filter: Callable[[R], bool]):
         return type(self)([resource for resource in self._resources if filter(resource)])
 
     # noinspection SpellCheckingInspection
-    def groupby(self, by: str) -> Iterator[Tuple[Any, Collection[R]]]:
+    def groupby(self, by: str) -> Iterator[Tuple[Any, Sequence[R]]]:
         for group_by in np.unique([getattr(r, by) for r in self]):
             yield group_by, self.filter(lambda r: getattr(r, by) == group_by)

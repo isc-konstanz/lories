@@ -17,7 +17,7 @@ from typing import Any, Dict, Optional
 import pandas as pd
 import pytz as tz
 from loris import Channel, Channels, ChannelState
-from loris.core import Context, Registrator, Resource, ResourceException, Resources
+from loris.core import Context, Registrator, Resource, ResourceException, Resources, ResourceUnavailableException
 from loris.core.configs import ConfigurationException, Configurations, Configurator, ConfiguratorMeta
 
 
@@ -209,7 +209,14 @@ class ConnectorException(ResourceException):
         self.connector = connector
 
 
-class ConnectionException(ConnectorException, IOError):
+class ConnectorUnavailableException(ResourceUnavailableException, ConnectorException):
+    """
+    Raise if an error occurred accessing the connector.
+
+    """
+
+
+class ConnectionException(ConnectorException):
     """
     Raise if an error occurred with the connection.
 

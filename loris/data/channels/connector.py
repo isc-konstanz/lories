@@ -9,7 +9,7 @@ loris.data.channels.connector
 from __future__ import annotations
 
 from collections import OrderedDict
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import pandas as pd
 from loris.core import ResourceException
@@ -23,7 +23,7 @@ class ChannelConnector:
     timestamp: pd.Timestamp = pd.NaT
 
     # noinspection PyShadowingBuiltins
-    def __init__(self, connector, configs: Dict[str, Any] = ()) -> None:
+    def __init__(self, connector, **configs: Any) -> None:
         self.__configs = OrderedDict(configs)
         self._connector = self._assert_connector(connector)
 
@@ -39,8 +39,15 @@ class ChannelConnector:
             raise ResourceException(f"Invalid connector: {None if connector is None else type(connector)}")
         return connector
 
+    # noinspection PyShadowingBuiltins
+    def _get_vars(self) -> Dict[str, Any]:
+        vars = self._copy_configs()
+        vars["timestamp"] = self.timestamp
+        vars["enabled"] = self.enabled
+        return vars
+
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.key})"
+        return f"{type(self).__name__}({self.id})"
 
     def __str__(self) -> str:
         return f"{type(self).__name__}:\n\tid={self.id}\n\t" + "\n\t".join(
@@ -56,25 +63,18 @@ class ChannelConnector:
         raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
 
     @property
-    def id(self) -> str:
-        return self._connector.id
+    def id(self) -> Optional[str]:
+        return self._connector.id if self._connector is not None else None
 
     @property
     def key(self) -> str:
-        return self._connector.key
+        return self._connector.key if self._connector is not None else None
 
     def copy(self) -> ChannelConnector:
         configs = self._copy_configs()
         configs["enabled"] = self.enabled
-        return type(self)(self._connector, configs)
+        return type(self)(self._connector, **configs)
 
     # noinspection PyShadowingBuiltins
     def _copy_configs(self) -> Dict[str, Any]:
         return OrderedDict(**self.__configs)
-
-    # noinspection PyShadowingBuiltins
-    def _get_vars(self) -> Dict[str, Any]:
-        vars = self._copy_configs()
-        vars["timestamp"] = self.timestamp
-        vars["enabled"] = self.enabled
-        return vars

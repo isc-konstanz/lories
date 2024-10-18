@@ -11,7 +11,7 @@ from __future__ import annotations
 import builtins
 import logging
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Mapping, Optional, Type
 
 from loris.core import ConfigurationException
 from loris.util import parse_key, parse_name, parse_type
@@ -66,10 +66,10 @@ class Resource:
         return self.__configs.get(attr, default)
 
     def _get_attrs(self) -> List[str]:
-        return ["id", "key", "name", "type", *self.__configs.keys()]
+        return ["id", "key", "name", "type", *self._copy_configs().keys()]
 
     def _get_vars(self) -> Dict[str, Any]:
-        return OrderedDict(id=self.id, key=self.key, name=self.name, type=self.type, **self.__configs)
+        return OrderedDict(id=self.id, key=self.key, name=self.name, type=self.type, **self._copy_configs())
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.id})"
@@ -94,4 +94,16 @@ class Resource:
         return self._type
 
     def copy(self) -> Resource:
-        return type(self)(**self._get_vars())
+        return type(self)(
+            id=self.id,
+            key=self.key,
+            type=self.type,
+            **self._copy_configs(),
+        )
+
+    # noinspection PyShadowingBuiltins
+    def _copy_configs(self) -> Dict[str, Any]:
+        return OrderedDict(**self.__configs)
+
+    def _update_configs(self, configs: Mapping[str, Any]) -> None:
+        self.__configs.update(configs)

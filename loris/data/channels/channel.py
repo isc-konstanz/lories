@@ -32,13 +32,14 @@ class Channel(Resource):
         self,
         id: str = None,
         key: str = None,
+        name: str = None,
         type: str | Type = None,
         converter: ChannelConverter = None,
         connector: Optional[ChannelConnector] = None,
         logger: Optional[ChannelConnector] = None,
         **configs: Any,
     ) -> None:
-        super().__init__(id=id, key=key, type=type, **configs)
+        super().__init__(id=id, key=key, name=name, type=type, **configs)
         self.converter = converter
         self.connector = connector
         self.logger = logger
@@ -46,9 +47,9 @@ class Channel(Resource):
     def _get_attrs(self) -> List[str]:
         return [
             *super()._get_attrs(),
-            "logger",
-            "connector",
             "converter",
+            "connector",
+            "logger",
             "value",
             "state",
             "timestamp",
@@ -64,7 +65,7 @@ class Channel(Resource):
 
     # noinspection PyShadowingBuiltins
     def __repr__(self) -> str:
-        vars = OrderedDict(key=self.key)
+        vars = OrderedDict(key=self.id)
         if self.is_valid():
             vars["value"] = str(self.value)
         else:
@@ -108,7 +109,7 @@ class Channel(Resource):
 
     @staticmethod
     def _is_valid(value: Any) -> bool:
-        if isinstance(value, Collection):
+        if isinstance(value, Collection) and not isinstance(value, str):
             return not any(pd.isna(value))
         return not pd.isna(value)
 
@@ -141,31 +142,22 @@ class Channel(Resource):
 
     def copy(self) -> Channel:
         channel = Channel(
-            self._id,
-            self._key,
-            self._type,
-            self.converter.copy(),
-            self.connector.copy(),
-            self.logger.copy(),
+            id=self.id,
+            key=self.key,
             name=self.name,
-            **self.__configs,
+            type=self.type,
+            converter=self.converter.copy(),
+            connector=self.connector.copy(),
+            logger=self.logger.copy(),
+            **self._copy_configs(),
         )
         channel.set(self._timestamp, self._value, self._state)
         return channel
 
     # noinspection PyProtectedMember
     def from_logger(self) -> Channel:
-        channel = Channel(
-            self._id,
-            self._key,
-            self._type,
-            self.converter,
-            self.connector,
-            self.logger,
-            name=self.name,
-            **self.logger._copy_configs(),
-        )
-        channel.set(self._timestamp, self._value, self._state)
+        channel = self.copy()
+        channel._update_configs(self.logger._copy_configs())
         return channel
 
     # noinspection PyShadowingBuiltins

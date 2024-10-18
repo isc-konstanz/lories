@@ -13,11 +13,11 @@ from abc import abstractmethod
 from collections import OrderedDict
 from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Callable, Collection, Iterator, List, Optional, Tuple
+from typing import Any, Callable, Collection, Dict, Iterator, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from loris.core import Configurations, Context, Directories, Registrator
+from loris.core import ConfigurationException, Configurations, Context, Directories, Registrator
 from loris.data.channels import Channel, Channels
 from loris.util import parse_key
 
@@ -62,7 +62,7 @@ class DataContext(Context[Channel]):
         configs = configs.copy()
         if configs.has_section(self.SECTION):
             data = configs.get_section(self.SECTION)
-            defaults.update(self._parse_defaults(data))
+            self._update_configs(defaults, self._build_defaults(configs))
             if data.has_section("channels"):
                 self._load_sections(context, data.get_section("channels"), defaults)
         self._load_from_file(context, configs.dirs, defaults=defaults)
@@ -76,10 +76,9 @@ class DataContext(Context[Channel]):
         channels = []
         if defaults is None:
             defaults = {}
-        defaults.update(self._parse_defaults(configs))
+        self._update_configs(defaults, self._build_defaults(configs))
         for channel_key in [i for i in configs.keys() if i not in defaults]:
-            channel_configs = deepcopy(defaults)
-            channel_configs.update(configs.get_section(channel_key))
+            channel_configs = self._update_configs(deepcopy(defaults), configs.get_section(channel_key))
 
             channel_key = parse_key(channel_configs.pop("key", channel_key))
             channel_id = f"{context.id}.{channel_key}"
@@ -102,8 +101,40 @@ class DataContext(Context[Channel]):
         return channels
 
     @staticmethod
-    def _parse_defaults(configs: Configurations) -> Mapping[str, Any]:
-        return {k: v for k, v in configs.items() if not isinstance(v, Mapping) or k in ["logger", "connector"]}
+    def _build_defaults(configs: Configurations) -> Mapping[str, Any]:
+        configs_sections = ["logger", "connector", "converter"]
+        configs_defaults = {k: v for k, v in configs.items() if not isinstance(v, Mapping) or k in configs_sections}
+        return DataContext._build_configs(configs_defaults)
+
+    @staticmethod
+    # noinspection PyShadowingNames
+    def _build_configs(configs: Dict[str, Any]) -> Mapping[str, Any]:
+        def _build_section(section: str, name: Optional[str] = None) -> None:
+            if section not in configs:
+                return
+            if name is None:
+                name = section
+            if isinstance(configs[section], str):
+                value = configs[section]
+                configs[section] = {name: value}
+            elif not isinstance(configs[section], Mapping):
+                raise ConfigurationException(f"Invalid channel {name} type: " + str(configs[section]))
+
+        _build_section("converter")
+        _build_section("connector")
+        _build_section("connector", "logger")
+        return configs
+
+    @staticmethod
+    def _update_configs(configs: Dict[str, Any], update: Mapping[str, Any], replace: bool = True) -> Dict[str, Any]:
+        for k, v in update.items():
+            if isinstance(v, Mapping):
+                if k not in configs.keys():
+                    configs[k] = {k: v}
+                configs[k] = DataContext._update_configs(configs[k], v)
+            elif k not in configs or replace:
+                configs[k] = v
+        return configs
 
     def _get(self, key: str) -> Channel:
         return self._channels.get(key)
@@ -115,6 +146,7 @@ class DataContext(Context[Channel]):
     def _add(self, channel: Channel) -> None:
         pass
 
+    # noinspection PyShadowingBuiltins
     @abstractmethod
     def _new(self, id: str, key: str, **configs: Any) -> Channel:
         pass

@@ -71,6 +71,7 @@ class ComponentContext(RegistratorContext[Component], Configurator):
         self,
         context: Registrator | RegistratorContext,
         configs: Configurations,
+        configs_file: str = "components.conf",
     ) -> None:
         defaults = {}
         configs = configs.copy()
@@ -88,5 +89,5 @@ class ComponentContext(RegistratorContext[Component], Configurator):
             if c != self and isinstance(c, RegistratorContext)
         ]
         if str(configs.dirs.conf) not in context_dirs:
-            self._load_from_file(context, configs.dirs, "components.conf", defaults)
+            self._load_from_file(context, configs.dirs, configs_file, defaults)
             self._load_from_dir(context, str(configs.dirs.conf), defaults)
