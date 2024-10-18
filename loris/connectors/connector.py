@@ -17,7 +17,7 @@ from typing import Any, Dict, Optional
 import pandas as pd
 import pytz as tz
 from loris import Channel, Channels, ChannelState
-from loris.core import Context, Registrator, Resource, ResourceException, ResourceUnavailableException, Resources
+from loris.core import Context, Registrator, Resource, ResourceException, Resources, ResourceUnavailableException
 from loris.core.configs import ConfigurationException, Configurations, Configurator, ConfiguratorMeta
 
 

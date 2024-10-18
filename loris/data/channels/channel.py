@@ -9,8 +9,7 @@ loris.data.channels.channel
 from __future__ import annotations
 
 from collections import OrderedDict
-from copy import deepcopy
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Collection, Dict, List, Optional, Type
 
 import pandas as pd
 import pytz as tz
@@ -32,30 +31,21 @@ class Channel(Resource):
         self,
         id: str = None,
         key: str = None,
-        name: Optional[str] = None,
+        name: str = None,
+        type: str | Type = None,
+        connector: Optional[ChannelConnector] = None,
+        logger: Optional[ChannelConnector] = None,
         **configs: Any,
     ) -> None:
-        connector = self.__parse_connector(configs.pop("connector", {}))
-        logger = self.__parse_connector(configs.pop("logger", {}))
-
-        super().__init__(id, key, name, **configs)
+        super().__init__(id=id, key=key, name=name, type=type, **configs)
         self.connector = connector
         self.logger = logger
-
-    @staticmethod
-    def __parse_connector(connector: ChannelConnector | Dict[str, Any]) -> ChannelConnector:
-        if isinstance(connector, ChannelConnector):
-            return connector
-
-        if connector is None or isinstance(connector, str):
-            connector = {"connector": connector}
-        return ChannelConnector(**connector)
 
     def _get_attrs(self) -> List[str]:
         return [
             *super()._get_attrs(),
-            "logger",
             "connector",
+            "logger",
             "value",
             "state",
             "timestamp",
@@ -71,7 +61,7 @@ class Channel(Resource):
 
     # noinspection PyShadowingBuiltins
     def __repr__(self) -> str:
-        vars = OrderedDict(key=self.key)
+        vars = OrderedDict(key=self.id)
         if self.is_valid():
             vars["value"] = str(self.value)
         else:
@@ -110,8 +100,14 @@ class Channel(Resource):
     def state(self, state) -> None:
         self._set(pd.Timestamp.now(tz.UTC).floor(freq="s"), None, state)
 
-    def is_valid(self):
-        return self.state == ChannelState.VALID
+    def is_valid(self) -> bool:
+        return self.state == ChannelState.VALID and self._is_valid(self.value)
+
+    @staticmethod
+    def _is_valid(value: Any) -> bool:
+        if isinstance(value, Collection) and not isinstance(value, str):
+            return not any(pd.isna(value))
+        return not pd.isna(value)
 
     def set(
         self,
@@ -127,33 +123,36 @@ class Channel(Resource):
         value: Optional[Any],
         state: str | ChannelState,
     ) -> None:
-        # TODO: Implement value type validation based on value type attribute
         self._timestamp = timestamp
         self._value = value
         self._state = state
 
     def copy(self) -> Channel:
-        configs = self._get_vars()
-        configs["logger"] = self.logger.copy()
-        configs["connector"] = self.connector.copy()
-        return Channel(**configs)
+        channel = Channel(
+            id=self.id,
+            key=self.key,
+            name=self.name,
+            type=self.type,
+            connector=self.connector.copy(),
+            logger=self.logger.copy(),
+            **self._copy_configs(),
+        )
+        channel.set(self._timestamp, self._value, self._state)
+        return channel
 
     # noinspection PyProtectedMember
     def from_logger(self) -> Channel:
-        configs = {k: v for k, v in self.logger._get_vars().items() if k not in ["id", "timestamp"]}
-        configs["logger"] = deepcopy(self.logger)
-        configs["connector"] = deepcopy(self.connector)
-        channel = Channel(id=self._id, key=self._key, name=self.name, **configs)
-        channel.set(self._timestamp, self._value, self._state)
+        channel = self.copy()
+        channel._update_configs(self.logger._copy_configs())
         return channel
 
     # noinspection PyShadowingBuiltins
     def has_logger(self, *ids: Optional[str]) -> bool:
-        return any(self.logger.id == id for id in ids) if len(ids) > 0 else self.logger.id is not None
+        return self.logger.enabled and any(self.logger.id == id for id in ids) if len(ids) > 0 else True
 
     # noinspection PyShadowingBuiltins
     def has_connector(self, id: Optional[str] = None) -> bool:
-        return self.connector.id == id if id is not None else self.connector.id is not None
+        return self.connector.enabled and self.connector.id == id if id is not None else True
 
     def to_series(self, state: bool = False) -> pd.Series:
         if isinstance(self.value, pd.Series):

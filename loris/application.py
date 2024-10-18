@@ -82,7 +82,8 @@ class Application(DataManager, Thread):
         super().start()
 
     def wait(self, **kwargs) -> None:
-        self.join(**kwargs)
+        if self.is_alive():
+            self.join(**kwargs)
 
     def interrupt(self, *_) -> None:
         self.__interrupt.set()

@@ -47,8 +47,8 @@ class Brightsky(WeatherConnector):
                 key="timestamp_creation",
                 name="Creation Timestamp",
                 connector=self.id,
-                source="forecast",
                 address="source_first_record",
+                source="forecast",
                 type=pd.Timestamp,
                 logger={
                     "primary": True,
