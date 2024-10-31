@@ -14,7 +14,7 @@ import re
 from copy import copy
 from dateutil.relativedelta import relativedelta
 from pydoc import locate
-from typing import Any, Callable, Collection, Dict, List, Optional, Tuple, Type, TypeVar
+from typing import Any, Callable, Collection, Dict, List, Mapping, Optional, Tuple, Type, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -82,8 +82,20 @@ def get_members(
     return dict(sorted(members.items()))
 
 
+def update_recursive(configs: Dict[str, Any], update: Mapping[str, Any], replace: bool = True) -> Dict[str, Any]:
+    for k, v in update.items():
+        if isinstance(v, Mapping):
+            if k not in configs.keys():
+                configs[k] = {}
+            configs[k] = update_recursive(configs[k], v, replace)
+        elif k not in configs or replace:
+            configs[k] = v
+    return configs
+
+
 # noinspection PyUnresolvedReferences, PyShadowingBuiltins, PyShadowingNames
 def is_type(series: pd.Series, *type: str) -> bool:
+    # TODO: Introduce Unit or "Nature" constant, to differentiate better
     series_name = series.name.split("_")
     series_suffix_start = -1 if len(series_name) < 3 else -2
     series_suffix = series_name[series_suffix_start:]
@@ -205,15 +217,24 @@ def slice_range(
 
     freq_delta = to_timedelta(freq)
 
+    def _next(timestamp: pd.Timestamp) -> pd.Timestamp:
+        _timestamp = floor_date(timestamp + freq_delta, freq=freq)
+        if _timestamp > timestamp:
+            return _timestamp
+        # Handle daylight savings
+        return floor_date(timestamp + freq_delta * 2, freq=freq)
+
     ranges = []
     range_start = start
-    range_end = min(ceil_date(range_start, freq=freq), end)
+    if floor_date(start, freq=freq) == start:
+        range_start += pd.Timedelta(seconds=1)
+    range_end = min(_next(start), end)
     ranges.append((range_start, range_end))
 
     while range_end < end:
-        range_start = floor_date(range_start + freq_delta, freq=freq)
-        range_end = min(ceil_date(range_start, freq=freq), end)
-        ranges.append((range_start, range_end))
+        range_start = _next(range_start)
+        range_end = min(_next(range_start), end)
+        ranges.append((range_start + pd.Timedelta(seconds=1), range_end))
     return ranges
 
 
@@ -227,11 +248,11 @@ def floor_date(
     if timezone is None:
         timezone = date.tzinfo
     date = convert_timezone(date, timezone)
-    freq = _parse_freq(freq)
+    freq = parse_freq(freq)
     if freq in ["Y", "M"]:
-        return date.tz_localize(None).to_period(freq).to_timestamp().tz_localize(timezone)
+        return date.tz_localize(None).to_period(freq).to_timestamp().tz_localize(timezone, ambiguous=True)
     elif any([freq.endswith(f) for f in ["D", "h", "min", "s"]]):
-        return date.tz_localize(None).floor(freq).tz_localize(timezone)
+        return date.tz_localize(None).floor(freq).tz_localize(timezone, ambiguous=True)
     else:
         raise ValueError(f"Invalid frequency: {freq}")
 
@@ -256,14 +277,14 @@ def to_date(
 ) -> Optional[pd.Timestamp]:
     if date is None:
         return None
-    if issubclass(type(date), dt.datetime):
-        return date
 
     def _convert_timezone(_date: pd.Timestamp) -> pd.Timestamp:
         if timezone is not None:
             _date = convert_timezone(_date, timezone)
         return _date
 
+    if issubclass(type(date), dt.datetime):
+        return _convert_timezone(date)
     if isinstance(date, str):
         return _convert_timezone(pd.Timestamp(dt.datetime.strptime(date, format)))
     if isinstance(date, int):
@@ -280,11 +301,15 @@ def to_timezone(timezone: Optional[str | int | float | tz.BaseTzInfo]) -> Option
     if isinstance(timezone, str):
         try:
             return tz.timezone(timezone)
-        except tz.UnknownTimeZoneError as e:
+
+        except tz.UnknownTimeZoneError:
             # Handle the case where the timezone is not recognized
             if timezone == "CEST":
                 return tz.FixedOffset(2 * 60)
-            raise e
+
+            # Handle offset time strings
+            return pd.to_datetime(timezone, format="%z").tzinfo
+
     if isinstance(timezone, (int, float)):
         return tz.FixedOffset(timezone * 60)
 
@@ -294,7 +319,7 @@ def to_timezone(timezone: Optional[str | int | float | tz.BaseTzInfo]) -> Option
 def to_timedelta(freq: str) -> relativedelta | pd.Timedelta:
     freq_val = "".join(s for s in freq if s.isnumeric())
     freq_val = int(freq_val) if len(freq_val) > 0 else 1
-    freq = _parse_freq(freq)
+    freq = parse_freq(freq)
     if freq == "Y":
         return relativedelta(years=freq_val)
     elif freq == "M":
@@ -347,23 +372,23 @@ def to_bool(value: str | bool) -> Optional[bool]:
 
 
 # noinspection SpellCheckingInspection
-def _parse_freq(f: str) -> str:
-    v = "".join(s for s in f if s.isnumeric())
-    v = int(v) if len(v) > 0 else 1
-    if f.upper() == "Y":
+def parse_freq(freq: str) -> Optional[str]:
+    value = "".join(s for s in freq if s.isnumeric())
+    value = int(value) if len(value) > 0 else 1
+    if freq.upper() == "Y":
         return "Y"
-    elif f.upper() == "M":
+    elif freq.upper() == "M":
         return "M"
-    elif f.lower().endswith(("d", "day", "days")):
-        return f"{v}D"
-    elif f.lower().endswith(("h", "hour", "hours")):
-        return f"{v}h"
-    elif f.lower().endswith(("t", "min", "mins")):
-        return f"{v}min"
-    elif f.lower().endswith(("s", "sec", "secs")):
-        return f"{v}s"
+    elif freq.lower().endswith(("d", "day", "days")):
+        return f"{value}D"
+    elif freq.lower().endswith(("h", "hour", "hours")):
+        return f"{value}h"
+    elif freq.lower().endswith(("t", "min", "mins")):
+        return f"{value}min"
+    elif freq.lower().endswith(("s", "sec", "secs")):
+        return f"{value}s"
     else:
-        raise ValueError(f"Invalid frequency: {f}")
+        raise ValueError(f"Invalid frequency: {freq}")
 
 
 # noinspection PyShadowingBuiltins

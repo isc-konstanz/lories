@@ -60,8 +60,8 @@ class Component(Activator):
         self.__data.configure(configs.get_section(DataAccess.SECTION, ensure_exists=True))
         super()._do_configure(configs, *args, **kwargs)
 
-        self.__data.create()
         self.__connectors.create()
+        self.__data.create()
 
     # Override return type, as a context is mandatory for components
     @property

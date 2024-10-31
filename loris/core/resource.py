@@ -11,10 +11,10 @@ from __future__ import annotations
 import builtins
 import logging
 from collections import OrderedDict
-from typing import Any, Dict, List, Mapping, Optional, Type
+from typing import Any, Dict, List, Optional, Type
 
 from loris.core import ConfigurationException
-from loris.util import parse_key, parse_name, parse_type
+from loris.util import parse_key, parse_name, parse_type, update_recursive
 
 
 class Resource:
@@ -93,17 +93,36 @@ class Resource:
     def type(self) -> Type:
         return self._type
 
+    # noinspection PyShadowingBuiltins
+    def _update(
+        self,
+        id: Optional[str] = None,
+        key: Optional[str] = None,
+        name: Optional[str] = None,
+        type: Optional[str | Type] = None,
+        **configs: Any,
+    ) -> None:
+        if id is not None and id != self.id:
+            raise ConfigurationException(f"Invalid channel update, trying to change ID from '{self.id}' to '{id}'")
+        if key is not None and key != self.key:
+            raise ConfigurationException(f"Invalid channel update, trying to change Key from '{self.key}' to '{key}'")
+        if name is not None:
+            self._name = name
+        if type is not None:
+            self._type = parse_type(type)
+        self.__update_configs(configs)
+
+    def __update_configs(self, configs: Dict[str, Any]) -> None:
+        update_recursive(self.__configs, configs)
+
+    def _copy_configs(self) -> Dict[str, Any]:
+        return OrderedDict(**self.__configs)
+
     def copy(self) -> Resource:
         return type(self)(
             id=self.id,
             key=self.key,
+            name=self.name,
             type=self.type,
             **self._copy_configs(),
         )
-
-    # noinspection PyShadowingBuiltins
-    def _copy_configs(self) -> Dict[str, Any]:
-        return OrderedDict(**self.__configs)
-
-    def _update_configs(self, configs: Mapping[str, Any]) -> None:
-        self.__configs.update(configs)

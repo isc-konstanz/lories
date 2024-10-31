@@ -68,8 +68,8 @@ class Brightsky(WeatherConnector):
     def read(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp, dt.datetime] = None,
-        end: Optional[pd.Timestamp, dt.datetime] = None,
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> pd.DataFrame:
         response, sources = self._request(start, end)
         response_sources = sources.loc[response["source_id"], ["observation_type", "first_record", "last_record"]]
@@ -112,8 +112,8 @@ class Brightsky(WeatherConnector):
     # noinspection PyPackageRequirements
     def _request(
         self,
-        date: Optional[pd.Timestamp, dt.datetime] = None,
-        date_last: Optional[pd.Timestamp, dt.datetime] = None,
+        date: Optional[pd.Timestamp | dt.datetime] = None,
+        date_last: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         if date is None:
             date = pd.Timestamp.now(tz=self.location.timezone)

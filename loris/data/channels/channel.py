@@ -9,13 +9,14 @@ loris.data.channels.channel
 from __future__ import annotations
 
 from collections import OrderedDict
-from typing import Any, Collection, Dict, List, Optional, Type
+from typing import Any, Collection, Dict, List, Mapping, Optional, Type
 
 import pandas as pd
 import pytz as tz
 from loris.core import Resource, ResourceException
+from loris.core.configs import ConfigurationException, Configurations
 from loris.data.channels import ChannelConnector, ChannelConverter, ChannelState
-from loris.util import _parse_freq, to_timedelta
+from loris.util import parse_freq, to_timedelta
 
 
 class Channel(Resource):
@@ -40,9 +41,23 @@ class Channel(Resource):
         **configs: Any,
     ) -> None:
         super().__init__(id=id, key=key, name=name, type=type, **configs)
-        self.converter = converter
-        self.connector = connector
-        self.logger = logger
+        self.converter = self._assert_converter(converter)
+        self.connector = self._assert_connector(connector)
+        self.logger = self._assert_connector(logger)
+
+    # noinspection PyMethodMayBeStatic
+    def _assert_converter(self, converter: Optional[ChannelConverter]) -> ChannelConverter:
+        if converter is None or not isinstance(converter, ChannelConverter):
+            raise ResourceException(f"Invalid channel converter: {None if converter is None else type(converter)}")
+        return converter
+
+    # noinspection PyMethodMayBeStatic
+    def _assert_connector(self, connector: Optional[ChannelConnector]) -> ChannelConnector:
+        if connector is None:
+            connector = ChannelConnector(None)
+        elif not isinstance(connector, ChannelConnector):
+            raise ResourceException(f"Invalid channel connector: {type(connector)}")
+        return connector
 
     def _get_attrs(self) -> List[str]:
         return [
@@ -77,7 +92,7 @@ class Channel(Resource):
     def freq(self) -> Optional[str]:
         freq = self.get(next((k for k in ["freq", "frequency", "resolution"] if k in self), None), default=None)
         if freq is not None:
-            freq = _parse_freq(freq)
+            freq = parse_freq(freq)
         return freq
 
     @property
@@ -140,26 +155,10 @@ class Channel(Resource):
         self._value = value
         self._state = state
 
-    def copy(self) -> Channel:
-        channel = Channel(
-            id=self.id,
-            key=self.key,
-            name=self.name,
-            type=self.type,
-            converter=self.converter.copy(),
-            connector=self.connector.copy(),
-            logger=self.logger.copy(),
-            **self._copy_configs(),
-        )
-        channel._timestamp = self._timestamp
-        channel._value = self._value
-        channel._state = self._state
-        return channel
-
     # noinspection PyProtectedMember
     def from_logger(self) -> Channel:
         channel = self.copy()
-        channel._update_configs(self.logger._copy_configs())
+        channel._update(**self.logger._copy_configs())
         return channel
 
     # noinspection PyShadowingBuiltins
@@ -179,3 +178,74 @@ class Channel(Resource):
             else:
                 data = self.value
             return pd.Series(index=[self.timestamp], data=[data], name=self.key)
+
+    def copy(self) -> Channel:
+        channel = Channel(
+            id=self.id,
+            key=self.key,
+            name=self.name,
+            type=self.type,
+            converter=self.converter.copy(),
+            connector=self.connector.copy(),
+            logger=self.logger.copy(),
+            **self._copy_configs(),
+        )
+        channel._timestamp = self._timestamp
+        channel._value = self._value
+        channel._state = self._state
+        return channel
+
+    # noinspection PyShadowingBuiltins, PyProtectedMember
+    def _update(
+        self,
+        converter: Optional[Dict[str, Any] | str] = None,
+        connector: Optional[Dict[str, Any] | str] = None,
+        logger: Optional[Dict[str, Any] | str] = None,
+        **configs: Any,
+    ) -> None:
+        if converter is not None:
+            converter = Channel._build_section(converter, "converter")
+            self.converter._update(**converter)
+        if connector is not None:
+            connector = Channel._build_section(connector, "connector")
+            self.connector._update(**connector)
+        if logger is not None:
+            logger = Channel._build_section(logger, "connector")
+            self.logger._update(**logger)
+        super()._update(**configs)
+
+    @staticmethod
+    def _build_defaults(configs: Configurations) -> Dict[str, Any]:
+        return Channel._build_configs(
+            {
+                k: v
+                for k, v in configs.items()
+                if not isinstance(v, Mapping) or k in ["logger", "connector", "converter"]
+            }
+        )
+
+    @staticmethod
+    # noinspection PyShadowingNames
+    def _build_configs(configs: Dict[str, Any]) -> Dict[str, Any]:
+        def _build_registrator(section: str, key: Optional[str] = None) -> None:
+            if section not in configs:
+                return
+            if key is None:
+                key = section
+            configs[section] = Channel._build_section(configs[section], key)
+
+        _build_registrator("converter")
+        _build_registrator("connector")
+        _build_registrator("connector", "logger")
+        return configs
+
+    @staticmethod
+    # noinspection PyShadowingNames
+    def _build_section(section: Optional[Dict[str, Any] | str], key: str) -> Optional[Dict[str, Any]]:
+        if section is None:
+            return None
+        if isinstance(section, str):
+            return {key: section}
+        elif not isinstance(section, Mapping):
+            raise ConfigurationException(f"Invalid channel {key} type: " + str(section))
+        return dict(section)

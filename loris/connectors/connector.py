@@ -211,7 +211,7 @@ class ConnectorException(ResourceException):
 
 class ConnectorUnavailableException(ResourceUnavailableException, ConnectorException):
     """
-    Raise if an error occurred accessing the connector.
+    Raise if an accessed connector can not be found.
 
     """
 

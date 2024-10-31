@@ -32,8 +32,8 @@ class DummyConnector(Connector):
     def read(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp, dt.datetime] = None,
-        end: Optional[pd.Timestamp, dt.datetime] = None,
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> pd.DataFrame:
         for resource in resources:
             if pd.isna(self._data[resource.id]):

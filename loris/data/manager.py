@@ -23,7 +23,7 @@ from loris.connectors import Connector, ConnectorException
 from loris.connectors.context import ConnectorContext
 from loris.connectors.tasks import ConnectTask, LogTask, ReadTask, WriteTask
 from loris.converters.context import ConverterContext
-from loris.core import Activator, ResourceException
+from loris.core import Activator
 from loris.core.configs import ConfigurationException, Configurations, Configurator
 from loris.core.register import RegistratorContext
 from loris.data.channels import Channel, ChannelConnector, ChannelConverter, Channels, ChannelState
@@ -56,16 +56,6 @@ class DataManager(DataContext, Activator):
         if isinstance(item, Connector) or isinstance(item, Component):
             return item in self._connectors.values() or item in self._components.values()
         return False
-
-    def _add(self, channel: Channel) -> None:
-        if not isinstance(channel, Channel):
-            raise ResourceException(f"Invalid channel type: {type(channel)}")
-
-        if channel.id in self._channels.keys():
-            raise ConfigurationException(f'Channel with UUID "{channel.id}" already exists')
-
-        # TODO: connector sanity check
-        self._set(channel.id, channel)
 
     # noinspection PyShadowingBuiltins
     def _new(self, id: str, key: str, type: Type, **configs: Any) -> Channel:
@@ -104,20 +94,6 @@ class DataManager(DataContext, Activator):
         logger = ChannelConnector(**build_args(self._connectors, "connector", "logger"))
 
         return Channel(id=id, key=key, type=type, converter=converter, connector=connector, logger=logger, **configs)
-
-    # noinspection PyShadowingBuiltins
-    def _update(self, id: str, key: str, **configs: Any) -> Channel:
-        if id in self:
-            # TODO: Take popped configs into account
-            channel = self._get(id)
-            channel.configs.update(configs)
-        else:
-            channel = self._new(id=id, key=key, **configs)
-        self._add(channel)
-        return channel
-
-    def _remove(self, key: str) -> None:
-        del self._channels[key]
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
@@ -280,8 +256,8 @@ class DataManager(DataContext, Activator):
     def read(
         self,
         channels: Optional[Channels] = None,
-        start: Optional[pd.Timestamp, dt.datetime] = None,
-        end: Optional[pd.Timestamp, dt.datetime] = None,
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> pd.DataFrame:
         time = pd.Timestamp.now(tz=tz.UTC)
         if channels is None:
@@ -316,8 +292,9 @@ class DataManager(DataContext, Activator):
                 if self._logger.isEnabledFor(logging.DEBUG):
                     self._logger.exception(e)
 
-                def update_state(read_channel: Channel) -> None:
-                    read_channel.state = ChannelState.UNKNOWN_ERROR
+                def update_state(channel: Channel) -> Channel:
+                    channel.state = ChannelState.UNKNOWN_ERROR
+                    return channel
 
                 read_task = read_tasks[e.connector.id]
                 read_task.channels.apply(update_state)
@@ -357,8 +334,9 @@ class DataManager(DataContext, Activator):
                 write_task = write_future.result()
 
                 # noinspection PyShadowingNames
-                def update_connector(write_channel: Channel) -> None:
-                    write_channel.connector.timestamp = time
+                def update_connector(channel: Channel) -> Channel:
+                    channel.connector.timestamp = time
+                    return channel
 
                 write_task.channels.apply(update_connector)
 
@@ -368,8 +346,9 @@ class DataManager(DataContext, Activator):
                     self._logger.exception(e)
 
                 # noinspection PyShadowingNames
-                def update_state(write_channel: Channel) -> None:
-                    write_channel.state = ChannelState.UNKNOWN_ERROR
+                def update_state(channel: Channel) -> Channel:
+                    channel.state = ChannelState.UNKNOWN_ERROR
+                    return channel
 
                 write_task = write_tasks[e.connector.id]
                 write_task.channels.apply(update_state)
@@ -410,8 +389,9 @@ class DataManager(DataContext, Activator):
             try:
                 log_task = write_future.result()
 
-                def update_logger(channel: Channel) -> None:
+                def update_logger(channel: Channel) -> Channel:
                     channel.logger.timestamp = channel.timestamp
+                    return channel
 
                 log_task.channels.apply(update_logger)
 

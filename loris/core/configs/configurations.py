@@ -90,8 +90,8 @@ class Configurations(MutableMapping[str, Any]):
         self.__path = Path(dirs.conf, name)
 
         if defaults is not None:
-            self.__update(defaults)
-        self.__update(kwargs)
+            self.update(defaults)
+        self.update(kwargs)
 
     def __repr__(self) -> str:
         return f"{Configurations.__name__}({self.__path})"
@@ -218,18 +218,15 @@ class Configurations(MutableMapping[str, Any]):
         section_dirs.conf = str(self.__path).replace(".conf", ".d")
         return Configurations(section_name, section_dirs, configs)
 
-    def __update(self, u: Mapping[str, Any], replace: bool = True) -> Configurations:
+    def update(self, u: Mapping[str, Any], replace: bool = True) -> Configurations:
         for k, v in u.items():
             if isinstance(v, Mapping):
                 if k not in self.keys():
                     self[k] = self.__new_section(k, v)
-                self[k] = Configurations.__update(self[k], v)
+                self[k] = Configurations.update(self[k], v, replace)
             elif k not in self or replace:
                 self[k] = v
         return self
-
-    def update(self, u: Mapping[str, Any], replace: bool = True) -> None:
-        self.__update(u, replace)
 
 
 class ConfigurationException(ResourceException):
