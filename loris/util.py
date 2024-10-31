@@ -242,9 +242,9 @@ def floor_date(
     date = convert_timezone(date, timezone)
     freq = parse_freq(freq)
     if freq in ["Y", "M"]:
-        return date.tz_localize(None).to_period(freq).to_timestamp().tz_localize(timezone)
+        return date.tz_localize(None).to_period(freq).to_timestamp().tz_localize(timezone, ambiguous=True)
     elif any([freq.endswith(f) for f in ["D", "h", "min", "s"]]):
-        return date.tz_localize(None).floor(freq).tz_localize(timezone)
+        return date.tz_localize(None).floor(freq).tz_localize(timezone, ambiguous=True)
     else:
         raise ValueError(f"Invalid frequency: {freq}")
 
@@ -269,14 +269,15 @@ def to_date(
 ) -> Optional[pd.Timestamp]:
     if date is None:
         return None
-    if isinstance(date, (dt.datetime, pd.Timestamp)):
-        return date
     if isinstance(date, str):
         date = pd.Timestamp(dt.datetime.strptime(date, format))
-    if isinstance(date, int):
+    elif isinstance(date, int):
         date = pd.Timestamp(dt.datetime.fromtimestamp(date))
-    if timezone is not None:
-        date = convert_timezone(date, timezone)
+
+    if isinstance(date, (dt.datetime, pd.Timestamp)):
+        if timezone is not None:
+            date = convert_timezone(date, timezone)
+        return date
 
     raise TypeError(f"Invalid date type: {type(date)}")
 
@@ -289,10 +290,15 @@ def to_timezone(timezone: Optional[str | int | float | tz.BaseTzInfo]) -> Option
     if isinstance(timezone, str):
         try:
             return tz.timezone(timezone)
+
         except tz.UnknownTimeZoneError:
             # Handle the case where the timezone is not recognized
             if timezone == "CEST":
                 return tz.FixedOffset(2 * 60)
+
+            # Handle offset time strings
+            return pd.to_datetime(timezone, format="%z").tzinfo
+
     if isinstance(timezone, (int, float)):
         return tz.FixedOffset(timezone * 60)
 
