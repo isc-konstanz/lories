@@ -37,8 +37,9 @@ class DataAccess(DataContext, Configurator):
     # noinspection PyArgumentList
     def __getattr__(self, attr):
         channels = DataContext.__getattribute__(self, "_channels")
-        if attr in channels.keys():
-            return channels[attr]
+        channels_by_key = {c.key: c for c in channels.values()}
+        if attr in channels_by_key:
+            return channels_by_key[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no channel '{attr}'")
 
     def configure(self, configs: Configurations) -> None:
