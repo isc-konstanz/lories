@@ -29,7 +29,7 @@ def has_range(
     timezone: tz.tzinfo = tz.UTC,
 ):
     files = get_files(path, freq, format, start, end, timezone)
-    return all([os.path.isfile(f) for f in files])
+    return len(files) > 0
 
 
 # noinspection PyShadowingBuiltins
@@ -45,22 +45,25 @@ def read_files(
     data = pd.DataFrame()
     start = to_date(start, timezone)
     end = to_date(end, timezone)
-    end = ceil_date(end, timezone)  # TODO: Check if ceiling this is unproblematic
 
-    for file in get_files(path, freq, format, start, end, timezone):
-        if not data.empty and (end is not None and data.index[-1] > end):
-            break
-        if not os.path.isfile(file):
-            raise IOError("File not found: " + file)
-
-        data = read_file(file, timezone=timezone, **kwargs).combine_first(data)
+    files = get_files(path, freq, format, start, end, timezone)
+    if len(files) == 0:
+        return data
+    elif len(files) == 1:
+        data = read_file(files[0], timezone=timezone, **kwargs)
+    else:
+        for file in get_files(path, freq, format, start, end, timezone):
+            if not data.empty and (end is not None and data.index[-1] > end):
+                break
+            file_data = read_file(file, timezone=timezone, **kwargs)
+            data = pd.concat([data, file_data], axis="index")
 
     if data.empty:
         return data
-    if pd.isna(start):
-        data = data[data.index >= start]
-    if pd.isna(end):
-        data = data[data.index <= end]
+    if not pd.isna(start):
+        data = data.loc[data.index >= start, :]
+    if not pd.isna(end):
+        data = data.loc[data.index <= end, :]
     return data
 
 
@@ -133,7 +136,7 @@ def read_file(
 
         if index_type.lower() in ["timestamp", "unix"]:
             if index_type.lower() == "timestamp":
-                data[index_column] = pd.to_datetime(data[index_column])  # , utc=True)
+                data[index_column] = pd.to_datetime(data[index_column], utc=True)
             elif index_type.lower() == "unix":
                 data[index_column] = pd.to_datetime(data[index_column], unit="ms")
             else:
@@ -260,6 +263,7 @@ def get_files(
     start: Optional[pd.Timestamp | dt.datetime | str] = None,
     end: Optional[pd.Timestamp | dt.datetime | str] = None,
     timezone: tz.tzinfo = tz.UTC,
+    exists_only: bool = True,
 ) -> List[str]:
     end = to_date(end, timezone)
     start = to_date(start, timezone)
@@ -267,16 +271,24 @@ def get_files(
         filenames = [os.path.basename(f) for f in glob.glob(os.path.join(path, "*.csv"))]
         if len(filenames) > 0:
             filenames.sort()
+
+            def _validate(filename: str) -> bool:
+                try:
+                    _date = to_date(filename, timezone=timezone, format=f"{format}.csv")
+                    return True
+                except ValueError:
+                    return False
+
             if start is None and end is None:
-                return [os.path.join(path, f) for f in filenames]
+                return [os.path.join(path, f) for f in filenames if _validate(f)]
 
             if start is None:
                 start_str = filenames[0].replace(".csv", "")
-                start = to_date(start_str, timezone=timezone, format=format)
+                start = to_date(start_str, timezone=timezone, format=f"{format}.csv")
 
                 if end is None:
                     end_str = filenames[-1].replace(".csv", "")
-                    end = to_date(end_str, timezone=timezone, format=format)
+                    end = to_date(end_str, timezone=timezone, format=f"{format}.csv")
                     end = ceil_date(end, timezone=timezone, freq=freq)
 
     date = floor_date(start, timezone=timezone, freq=freq)
@@ -293,15 +305,21 @@ def get_files(
                 ConnectionException(f"Unable to increment date for freq '{freq}'")
         return next_date
 
+    files = []
     file = date.strftime(format) + ".csv"
     file_path = os.path.join(path, file)
-    files = [file_path]
+    if os.path.isfile(file_path) or not exists_only:
+        files.append(file_path)
     if end is not None:
         date = next_date()
         while date <= end:
             file = date.strftime(format) + ".csv"
             file_path = os.path.join(path, file)
-            files.append(file_path)
+            if os.path.isfile(file_path) or not exists_only:
+                files.append(file_path)
             date = next_date()
+
+    # TODO: Implement or validate if custom sorting by file format is necessary
+    files.sort()
 
     return files

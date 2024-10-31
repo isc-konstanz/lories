@@ -17,7 +17,7 @@ import pytz as tz
 from loris.connectors import Connector, register_connector_type
 from loris.core import ConfigurationException, Configurations, Resources
 from loris.io import csv
-from loris.util import _parse_freq, ceil_date, floor_date, to_timezone
+from loris.util import ceil_date, floor_date, parse_freq
 
 
 # noinspection PyShadowingBuiltins
@@ -48,6 +48,8 @@ class CsvConnector(Connector):
 
     # noinspection PyTypeChecker
     def configure(self, configs: Configurations) -> None:
+        super().configure(configs)
+
         data_dir = configs.get("dir", default=None)
         if data_dir is not None:
             if "~" in data_dir:
