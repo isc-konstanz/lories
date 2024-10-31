@@ -133,8 +133,8 @@ class Table(Sequence[Column]):
     def exists(
         self,
         resources: Optional[Resources] = None,
-        start: Optional[pd.Timestamp, dt.datetime] = None,
-        end: Optional[pd.Timestamp, dt.datetime] = None,
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> bool:
         # TODO: Replace this placeholder more resource efficient
         return not self.select(resources, start, end).empty

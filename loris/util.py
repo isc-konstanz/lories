@@ -13,7 +13,7 @@ import re
 from copy import copy
 from dateutil.relativedelta import relativedelta
 from pydoc import locate
-from typing import Any, Callable, Collection, Dict, List, Optional, Tuple, Type, TypeVar
+from typing import Any, Callable, Collection, Dict, List, Mapping, Optional, Tuple, Type, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -81,8 +81,20 @@ def get_members(
     return dict(sorted(members.items()))
 
 
+def update_recursive(configs: Dict[str, Any], update: Mapping[str, Any], replace: bool = True) -> Dict[str, Any]:
+    for k, v in update.items():
+        if isinstance(v, Mapping):
+            if k not in configs.keys():
+                configs[k] = {}
+            configs[k] = update_recursive(configs[k], v, replace)
+        elif k not in configs or replace:
+            configs[k] = v
+    return configs
+
+
 # noinspection PyUnresolvedReferences, PyShadowingBuiltins, PyShadowingNames
 def is_type(series: pd.Series, *type: str) -> bool:
+    # TODO: Introduce Unit or "Nature" constant, to differentiate better
     series_name = series.name.split("_")
     series_suffix_start = -1 if len(series_name) < 3 else -2
     series_suffix = series_name[series_suffix_start:]
@@ -228,7 +240,7 @@ def floor_date(
     if timezone is None:
         timezone = date.tzinfo
     date = convert_timezone(date, timezone)
-    freq = _parse_freq(freq)
+    freq = parse_freq(freq)
     if freq in ["Y", "M"]:
         return date.tz_localize(None).to_period(freq).to_timestamp().tz_localize(timezone)
     elif any([freq.endswith(f) for f in ["D", "h", "min", "s"]]):
@@ -290,7 +302,7 @@ def to_timezone(timezone: Optional[str | int | float | tz.BaseTzInfo]) -> Option
 def to_timedelta(freq: str) -> relativedelta | pd.Timedelta:
     freq_val = "".join(s for s in freq if s.isnumeric())
     freq_val = int(freq_val) if len(freq_val) > 0 else 1
-    freq = _parse_freq(freq)
+    freq = parse_freq(freq)
     if freq == "Y":
         return relativedelta(years=freq_val)
     elif freq == "M":
@@ -326,23 +338,23 @@ def to_bool(value: str | bool) -> bool:
 
 
 # noinspection SpellCheckingInspection
-def _parse_freq(f: str) -> str:
-    v = "".join(s for s in f if s.isnumeric())
-    v = int(v) if len(v) > 0 else 1
-    if f.upper() == "Y":
+def parse_freq(freq: str) -> Optional[str]:
+    value = "".join(s for s in freq if s.isnumeric())
+    value = int(value) if len(value) > 0 else 1
+    if freq.upper() == "Y":
         return "Y"
-    elif f.upper() == "M":
+    elif freq.upper() == "M":
         return "M"
-    elif f.lower().endswith(("d", "day", "days")):
-        return f"{v}D"
-    elif f.lower().endswith(("h", "hour", "hours")):
-        return f"{v}h"
-    elif f.lower().endswith(("t", "min", "mins")):
-        return f"{v}min"
-    elif f.lower().endswith(("s", "sec", "secs")):
-        return f"{v}s"
+    elif freq.lower().endswith(("d", "day", "days")):
+        return f"{value}D"
+    elif freq.lower().endswith(("h", "hour", "hours")):
+        return f"{value}h"
+    elif freq.lower().endswith(("t", "min", "mins")):
+        return f"{value}min"
+    elif freq.lower().endswith(("s", "sec", "secs")):
+        return f"{value}s"
     else:
-        raise ValueError(f"Invalid frequency: {f}")
+        raise ValueError(f"Invalid frequency: {freq}")
 
 
 # noinspection PyShadowingBuiltins

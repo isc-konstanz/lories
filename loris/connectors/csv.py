@@ -137,8 +137,8 @@ class CsvConnector(Connector):
     def read(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp, dt.datetime] = None,
-        end: Optional[pd.Timestamp, dt.datetime] = None,
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> pd.DataFrame:
         columns = {r.name: r.id for r in self.resources if "name" in r}
         columns.update({r.name: r.id for r in resources if "name" in r})

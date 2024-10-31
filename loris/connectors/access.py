@@ -20,7 +20,9 @@ class ConnectorAccess(ConnectorContext):
         from loris import Component, ComponentException
         from loris.data.context import DataContext
 
-        super().__init__(get_context(component.context, DataContext))
+        context = get_context(component.context, DataContext)
+        configs = component.configs.get_section(self.SECTION, ensure_exists=True)
+        super().__init__(context, configs)
         if component is None or not isinstance(component, Component):
             raise ComponentException(f"Invalid component: {None if component is None else type(component)}")
         self.__component = component

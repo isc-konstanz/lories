@@ -13,13 +13,13 @@ from abc import abstractmethod
 from collections import OrderedDict
 from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Callable, Collection, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Callable, Collection, Iterator, List, Optional, Tuple, Type
 
 import numpy as np
 import pandas as pd
-from loris.core import ConfigurationException, Configurations, Context, Directories, Registrator
+from loris.core import ConfigurationException, Configurations, Context, Directories, Registrator, ResourceException
 from loris.data.channels import Channel, Channels
-from loris.util import parse_key
+from loris.util import parse_key, update_recursive
 
 
 class DataContext(Context[Channel]):
@@ -32,7 +32,7 @@ class DataContext(Context[Channel]):
         self._channels = OrderedDict(channels)
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({[c.key for c in self._channels.values()]})"
+        return f"{type(self).__name__}({[c.id for c in self._channels.values()]})"
 
     def __str__(self) -> str:
         return f"{type(self).__name__}:\n\t" + "\n\t".join([f"{i} = {repr(c)}" for i, c in self._channels.items()])
@@ -42,7 +42,7 @@ class DataContext(Context[Channel]):
 
     def __contains__(self, channel: str | Channel) -> bool:
         if isinstance(channel, str):
-            return channel in self._channels.keys()
+            return self._contains(channel)
         if isinstance(channel, Channel):
             return channel in self._channels.values()
         return False
@@ -67,6 +67,7 @@ class DataContext(Context[Channel]):
                 self._load_sections(context, data.get_section("channels"), defaults)
         self._load_from_file(context, configs.dirs, defaults=defaults)
 
+    # noinspection PyProtectedMember
     def _load_sections(
         self,
         context: Registrator,
@@ -76,9 +77,10 @@ class DataContext(Context[Channel]):
         channels = []
         if defaults is None:
             defaults = {}
-        self._update_configs(defaults, self._build_defaults(configs))
+        update_recursive(defaults, Channel._build_defaults(configs))
+
         for channel_key in [i for i in configs.keys() if i not in defaults]:
-            channel_configs = self._update_configs(deepcopy(defaults), configs.get_section(channel_key))
+            channel_configs = update_recursive(deepcopy(defaults), configs.get_section(channel_key))
 
             channel_key = parse_key(channel_configs.pop("key", channel_key))
             channel_id = f"{context.id}.{channel_key}"
@@ -100,59 +102,45 @@ class DataContext(Context[Channel]):
             channels.extend(self._load_sections(context, configs, defaults))
         return channels
 
-    @staticmethod
-    def _build_defaults(configs: Configurations) -> Mapping[str, Any]:
-        return DataContext._build_configs(
-            {k: v for k, v in configs.items() if not isinstance(v, Mapping) or k in ["logger", "connector"]}
-        )
-
-    @staticmethod
-    # noinspection PyShadowingNames
-    def _build_configs(configs: Dict[str, Any]) -> Mapping[str, Any]:
-        def _build_section(section: str, name: Optional[str] = None) -> None:
-            if section not in configs:
-                return
-            if name is None:
-                name = section
-            if isinstance(configs[section], str):
-                value = configs[section]
-                configs[section] = {name: value}
-            elif not isinstance(configs[section], Mapping):
-                raise ConfigurationException(f"Invalid channel {name} type: " + str(configs[section]))
-
-        _build_section("connector")
-        _build_section("connector", "logger")
-        return configs
-
-    @staticmethod
-    def _update_configs(configs: Dict[str, Any], update: Mapping[str, Any], replace: bool = True) -> Dict[str, Any]:
-        for k, v in update.items():
-            if isinstance(v, Mapping):
-                if k not in configs.keys():
-                    configs[k] = {k: v}
-                configs[k] = DataContext._update_configs(configs[k], v)
-            elif k not in configs or replace:
-                configs[k] = v
-        return configs
-
-    def _get(self, key: str) -> Channel:
-        return self._channels.get(key)
-
-    def _set(self, key: str, channel: Channel) -> None:
-        self._channels[key] = channel
-
-    @abstractmethod
-    def _add(self, channel: Channel) -> None:
-        pass
-
-    @abstractmethod
-    def _new(self, id: str, key: str, **configs: Any) -> Channel:
-        pass
+    # noinspection PyShadowingBuiltins, PyProtectedMember
+    def _update(self, id: str, key: str, **configs: Any) -> Channel:
+        if id in self:
+            channel = self._get(id)
+            channel._update(**configs)
+        else:
+            channel = self._new(id=id, key=key, **configs)
+        self._add(channel)
+        return channel
 
     # noinspection PyShadowingBuiltins
-    @abstractmethod
-    def _update(self, id: str, key: str, **configs: Any) -> Channel:
-        pass
+    def _new(self, id: str, key: str, type: Type, **configs: Any) -> Channel:
+        return Channel(id=id, key=key, type=type, **configs)
+
+    def _add(self, channel: Channel) -> None:
+        if not isinstance(channel, Channel):
+            raise ResourceException(f"Invalid channel type: {type(channel)}")
+
+        if channel.id in self._channels.keys():
+            raise ConfigurationException(f'Channel with ID "{channel.id}" already exists')
+
+        # TODO: connector sanity check
+        self._set(channel.id, channel)
+
+    # noinspection PyShadowingBuiltins
+    def _set(self, id: str, channel: Channel) -> None:
+        self._channels[id] = channel
+
+    # noinspection PyShadowingBuiltins
+    def _get(self, id: str) -> Channel:
+        return self._channels.get(id)
+
+    # noinspection PyShadowingBuiltins
+    def _contains(self, id: str) -> bool:
+        return id in self._channels.keys()
+
+    # noinspection PyShadowingBuiltins
+    def _remove(self, id: str) -> None:
+        del self._channels[id]
 
     @property
     def channels(self) -> Channels:
@@ -173,8 +161,8 @@ class DataContext(Context[Channel]):
     def read(
         self,
         channels: Optional[Channels] = None,
-        start: Optional[pd.Timestamp, dt.datetime] = None,
-        end: Optional[pd.Timestamp, dt.datetime] = None,
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> pd.DataFrame:
         pass
 
