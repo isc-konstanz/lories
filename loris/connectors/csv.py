@@ -17,7 +17,7 @@ import pytz as tz
 from loris.connectors import Connector, register_connector_type
 from loris.core import ConfigurationException, Configurations, Resources
 from loris.io import csv
-from loris.util import ceil_date, floor_date, parse_freq
+from loris.util import ceil_date, floor_date, parse_freq, to_timezone
 
 
 # noinspection PyShadowingBuiltins
@@ -80,7 +80,7 @@ class CsvConnector(Connector):
         self.override = configs.get_bool("override", default=CsvConnector.override)
         self.slice = configs.get_bool("slice", default=CsvConnector.slice)
 
-        self.freq = _parse_freq(configs.get("freq", default=CsvConnector.freq))
+        self.freq = parse_freq(configs.get("freq", default=CsvConnector.freq))
 
         format = configs.get("format", default=CsvConnector.format)
         if format is not None:

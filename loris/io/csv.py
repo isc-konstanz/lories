@@ -142,12 +142,12 @@ def read_file(
             else:
                 raise ValueError(f"Unknown index type: {index_type}")
 
-            data.set_index(index_column, verify_integrity=True, inplace=True)
+            data.set_index(index_column, inplace=True)  # , verify_integrity=True)
 
             if not hasattr(data.index, "tzinfo"):
                 data[index_column] = data.index
                 data[index_column] = data[index_column].apply(lambda t: t.astimezone(tz.UTC).replace(tzinfo=None))
-                data.set_index(index_column, verify_integrity=True, inplace=True)
+                data.set_index(index_column, inplace=True)  # , verify_integrity=True)
                 data.index = data.index.tz_localize(tz.UTC)
 
             if timezone is not None:
