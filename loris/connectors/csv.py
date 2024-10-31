@@ -13,8 +13,7 @@ import os
 from typing import Mapping, Optional, Tuple
 
 import pandas as pd
-import pytz as tz
-from loris.connectors import Connector, register_connector_type
+from loris.connectors import Database, register_connector_type
 from loris.core import ConfigurationException, Configurations, Resources
 from loris.io import csv
 from loris.util import ceil_date, floor_date, parse_freq
@@ -22,7 +21,7 @@ from loris.util import ceil_date, floor_date, parse_freq
 
 # noinspection PyShadowingBuiltins
 @register_connector_type
-class CsvConnector(Connector):
+class CsvDatabase(Database):
     TYPE: str = "csv"
 
     _data: Optional[pd.DataFrame] = None
@@ -38,8 +37,6 @@ class CsvConnector(Connector):
     freq: str = "D"
     format: str = None
     suffix: Optional[str] = None
-
-    timezone: Optional[tz.BaseTzInfo] = None
 
     decimal: str = "."
     separator: str = ","
@@ -72,17 +69,17 @@ class CsvConnector(Connector):
         self._data_dir = data_dir
         self._data_path = data_path
 
-        self.index_column = configs.get("index_column", default=CsvConnector.index_column)
-        self.index_type = configs.get("index_type", default=CsvConnector.index_type).lower()
+        self.index_column = configs.get("index_column", default=CsvDatabase.index_column)
+        self.index_type = configs.get("index_type", default=CsvDatabase.index_type).lower()
         if self.index_type not in ["timestamp", "unix", "none", None]:
             raise ConfigurationException(f"Unknown index type: {self.index_type}")
 
-        self.override = configs.get_bool("override", default=CsvConnector.override)
-        self.slice = configs.get_bool("slice", default=CsvConnector.slice)
+        self.override = configs.get_bool("override", default=CsvDatabase.override)
+        self.slice = configs.get_bool("slice", default=CsvDatabase.slice)
 
-        self.freq = _parse_freq(configs.get("freq", default=CsvConnector.freq))
+        self.freq = parse_freq(configs.get("freq", default=CsvDatabase.freq))
 
-        format = configs.get("format", default=CsvConnector.format)
+        format = configs.get("format", default=CsvDatabase.format)
         if format is not None:
             self.format = format
         elif self.freq == "Y":
@@ -96,20 +93,15 @@ class CsvConnector(Connector):
         else:
             raise ConfigurationException(f"Invalid frequency: {self.freq}")
 
-        self.suffix = configs.get("suffix", default=CsvConnector.suffix)
+        self.suffix = configs.get("suffix", default=CsvDatabase.suffix)
         if self.suffix is not None:
             self.format += f"_{self.suffix}"
 
-        timezone = configs.get("timezone", CsvConnector.timezone)
-        if isinstance(timezone, str):
-            timezone = tz.timezone(timezone)
-        self.timezone = to_timezone(timezone)
-
-        self.decimal = configs.get("decimal", CsvConnector.decimal)
-        self.separator = configs.get("separator", CsvConnector.separator)
+        self.decimal = configs.get("decimal", CsvDatabase.decimal)
+        self.separator = configs.get("separator", CsvDatabase.separator)
 
         # TODO: Implement flag if pretty printing should be used or not
-        self.columns = configs.get("columns", default=CsvConnector.columns)
+        self.columns = configs.get("columns", default=CsvDatabase.columns)
 
     def connect(self, resources: Resources) -> None:
         if not os.path.isdir(self._data_dir):
@@ -181,6 +173,64 @@ class CsvConnector(Connector):
         except IOError:
             # TODO: Return more informative ChannelStates or raise ConnectionException (?)
             return pd.DataFrame()
+
+    # noinspection PyTypeChecker
+    def read_first(self, resources: Resources) -> Optional[pd.DataFrame]:
+        columns = {r.name: r.id for r in self.resources if "name" in r}
+        columns.update({r.name: r.id for r in resources if "name" in r})
+        columns.update({column: key for key, column in self.columns.items()})
+        if self._data is not None:
+            data = self._data
+        else:
+            files = csv.get_files(
+                self._data_dir,
+                self.freq,
+                self.format,
+                timezone=self.timezone,
+            )
+            if len(files) == 0:
+                return None
+            data = csv.read_file(
+                files[0],
+                index_column=self.index_column,
+                index_type=self.index_type,
+                timezone=self.timezone,
+                separator=self.separator,
+                decimal=self.decimal,
+                rename=columns,
+            )
+        if data is None or data.empty:
+            return None
+        return data.head()
+
+    # noinspection PyTypeChecker
+    def read_last(self, resources: Resources) -> Optional[pd.DataFrame]:
+        columns = {r.name: r.id for r in self.resources if "name" in r}
+        columns.update({r.name: r.id for r in resources if "name" in r})
+        columns.update({column: key for key, column in self.columns.items()})
+        if self._data is not None:
+            data = self._data
+        else:
+            files = csv.get_files(
+                self._data_dir,
+                self.freq,
+                self.format,
+                timezone=self.timezone,
+            )
+            if len(files) == 0:
+                return None
+            data = csv.read_file(
+                files[-1],
+                index_column=self.index_column,
+                index_type=self.index_type,
+                timezone=self.timezone,
+                separator=self.separator,
+                decimal=self.decimal,
+                rename=columns,
+            )
+        if data is None or data.empty:
+            return None
+        return data.tail(1)
 
     def write(self, data: pd.DataFrame) -> None:
         columns = {r.id: r.name for r in self.resources if "name" in r}

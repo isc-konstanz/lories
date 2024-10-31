@@ -56,44 +56,67 @@ class IndexColumn(Column):
             elif self.type in ["DATETIME", "TIMESTAMP"]:
                 self.default = "CURRENT_TIMESTAMP"
 
+    # @property
+    # def placeholder(self) -> str:
+    #     placeholder = super().placeholder
+    #     if self.type == "TIMESTAMP":
+    #         return f"FROM_UNIXTIME({placeholder})"
+    #     return placeholder
+
     def is_datetime(self) -> bool:
         return self._datetime
 
     # noinspection PyUnresolvedReferences
-    def prepare(self, index: pd.Index | pd.Timestamp | dt.datetime | Any, timezone: tz.BaseTzInfo) -> pd.Index | Any:
+    def prepare(self, data: Any, timezone: tz.BaseTzInfo) -> Any:
         if self._datetime:
-            if index is None or not isinstance(index, (pd.DatetimeIndex, pd.Timestamp, dt.datetime)):
-                raise ResourceException(f"Unable to prepare datetime index from '{type(index)}' index: {index}")
+            if (
+                data is None
+                or not isinstance(data, (pd.Series, pd.DatetimeIndex, dt.datetime))
+                or (isinstance(data, pd.Series) and not data.map(lambda i: isinstance(i, dt.datetime)).all())
+            ):
+                raise ResourceException(f"Unable to prepare datetime index from '{type(data)}' data: {data}")
+
             if self.type in ["TIMESTAMP", "INT"]:
-                if isinstance(index, (pd.DatetimeIndex, pd.Timestamp)):
-                    index = index.tz_convert(tz.UTC)
+                if isinstance(data, pd.Series):
+                    data = data.dt.tz_convert(tz.UTC)
+                elif isinstance(data, (pd.DatetimeIndex, pd.Timestamp)):
+                    data = data.tz_convert(tz.UTC)
                 else:
-                    index = index.astimezone(tz.UTC)
+                    data = data.astimezone(tz.UTC)
 
-            elif self.type in ["DATETIME", "DATE", "TIME"]:
-                if isinstance(index, (pd.DatetimeIndex, pd.Timestamp)):
-                    index = index.tz_convert(timezone)
+                if self.type == "INT":
+                    if isinstance(data, (pd.DatetimeIndex, pd.Series)):
+                        return data.astype(np.int64) // 10**9
+                    elif isinstance(data, pd.Timestamp):
+                        epoch = dt.datetime(1970, 1, 1, tzinfo=tz.UTC)
+                        return int((data - epoch).total_seconds())
+                    else:
+                        epoch = dt.datetime(1970, 1, 1, tzinfo=tz.UTC)
+                        return int((data - epoch).total_seconds())
+
+            if self.type in ["DATETIME", "DATE", "TIME"]:
+                if isinstance(data, pd.Series):
+                    data = data.dt.tz_convert(timezone)
+                elif isinstance(data, (pd.DatetimeIndex, pd.Timestamp)):
+                    data = data.tz_convert(timezone)
                 else:
-                    index = index.astimezone(timezone)
+                    data = data.astimezone(timezone)
 
-            if self.type == "INT":
-                return (index - dt.datetime(1970, 1, 1, tzinfo=tz.UTC)).total_seconds()
+                if self.type == "DATE":
+                    if isinstance(data, (pd.DatetimeIndex, pd.Series)):
+                        return data.date
+                    else:
+                        return data.date()
 
-            if self.type == "DATE":
-                if isinstance(index, pd.DatetimeIndex):
-                    return index.date
-                else:
-                    return index.date()
+                if self.type == "TIME":
+                    if isinstance(data, (pd.DatetimeIndex, pd.Series)):
+                        return data.time
+                    else:
+                        return data.time()
 
-            if self.type == "TIME":
-                if isinstance(index, pd.DatetimeIndex):
-                    return index.time
-                else:
-                    return index.time()
-
-        if index is None and not self.nullable:
+        if data is None and not self.nullable:
             raise ResourceException(f"None value for '{self.name}' NOT NULL")
-        return index
+        return data
 
 
 # noinspection PyShadowingBuiltins, SpellCheckingInspection
@@ -148,9 +171,10 @@ class Index(Columns[IndexColumn]):
             group_data = data[data.apply(_is_group, axis="columns")]
 
             for index in self:
-                if index.type == "TIMESTAMP":
-                    group_data[index.name] = group_data[index.name].dt.tz_localize(tz.UTC).dt.tz_convert(self.timezone)
-                elif index.type == "DATETIME":
+                # TODO: Validate TIMESTAMP timezone handling
+                # if index.type == "TIMESTAMP":
+                #     group_data[index.name] = group_data[index.name].dt.tz_localize(tz.UTC).dt.tz_convert(self.timezone)
+                if index.type in ["TIMESTAMP", "DATETIME"]:
                     group_data[index.name] = group_data[index.name].dt.tz_localize(self.timezone, ambiguous="infer")
 
             if self._has_datetime(DatetimeIndexType.DATE_AND_TIME):
@@ -183,10 +207,13 @@ class Index(Columns[IndexColumn]):
             group_columns = {r.id: r.column if "column" in r else r.key for r in group_resources}
             group_data = data[group_columns.keys()].dropna(axis="index", how="all").rename(columns=group_columns)
             for group_column, group_value in group.items():
-                group_data.loc[:, [group_column]] = group_value
+                group_data[group_column] = group_value
             for index in self:
                 if self._is_datetime(index) or index.name not in group_data.columns:
-                    group_data.loc[:, [index.name]] = index.prepare(group_data.index, self.timezone)
+                    index_data = group_data.index
+                else:
+                    index_data = group_data[index.name]
+                group_data[index.name] = index.prepare(index_data, self.timezone)
             yield group_data
 
     # noinspection PyProtectedMember
@@ -208,10 +235,14 @@ class Index(Columns[IndexColumn]):
         return column.is_datetime() and any(column in self._get_datetime(t) for t in DatetimeIndexType)
 
     def _get_surrogate_keys(self) -> Sequence[SurrogateKeyColumn]:
-        return [c for c in self if isinstance(c, SurrogateKeyColumn)]
+        return [c for c in self if self._is_surrogate_key(c)]
 
     def _has_surrogate_keys(self) -> bool:
         return len(self._get_surrogate_keys()) > 0
+
+    # noinspection PyMethodMayBeStatic
+    def _is_surrogate_key(self, column: IndexColumn) -> bool:
+        return isinstance(column, SurrogateKeyColumn)
 
     def _groupby(self, resources: Resources) -> Iterator[Tuple[Dict[str, Any], Resources]]:
         groups = list[Tuple[Dict[str, Any], Resources]]()
@@ -239,25 +270,27 @@ class Index(Columns[IndexColumn]):
         query: str,
         start: pd.Timestamp | dt.datetime = None,
         end: pd.Timestamp | dt.datetime = None,
-    ) -> Tuple[str, Sequence[Any]]:
-        # TODO: Implement start and end type checking and allow e.g. integers as well
-        params = []
+    ) -> Tuple[str, Dict[str, Any]]:
+        params = {}
         where = []
-        for index in self:
-            if isinstance(index, SurrogateKeyColumn):
-                continue
+
+        # TODO: Implement start and end type checking and allow e.g. date and time columns or integers as well
+        index = self.first()
+        if index.is_datetime():
             if start is not None:
-                where.append(f"`{index.name}` >= %s")
-                params.append(index.prepare(start, self.timezone))
+                start_key = f"{index.name}_start"
+                where.append(f"`{index.name}` >= {index.placeholder.replace(index.name, start_key)}")
+                params[start_key] = index.prepare(start, self.timezone)
             if end is not None:
-                where.append(f"`{index.name}` <= %s")
-                params.append(index.prepare(end, self.timezone))
+                end_key = f"{index.name}_end"
+                where.append(f"`{index.name}` <= {index.placeholder.replace(index.name, end_key)}")
+                params[end_key] = index.prepare(end, self.timezone)
         if len(where) > 0:
             query = f"{query} WHERE {' AND '.join(where)}"
-        return query, tuple(params)
+        return query, params
 
     def order_by(self, order: str = "ASC") -> str:
-        return "ORDER BY " + ", ".join(f"`{i.name}` {order}" for i in self if not isinstance(i, SurrogateKeyColumn))
+        return "ORDER BY " + ", ".join(f"`{i.name}` {order}" for i in reversed(self) if not self._is_surrogate_key(i))
 
 
 # noinspection PyShadowingBuiltins

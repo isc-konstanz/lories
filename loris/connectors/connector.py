@@ -8,7 +8,6 @@ loris.connectors.connector
 
 from __future__ import annotations
 
-import datetime as dt
 from abc import abstractmethod
 from collections import OrderedDict
 from functools import wraps
@@ -184,12 +183,7 @@ class Connector(Registrator, metaclass=ConnectorMeta):
         pass
 
     @abstractmethod
-    def read(
-        self,
-        resources: Resources,
-        start: Optional[pd.Timestamp, dt.datetime] = None,
-        end: Optional[pd.Timestamp, dt.datetime] = None,
-    ) -> pd.DataFrame:
+    def read(self, resources: Resources) -> pd.DataFrame:
         pass
 
     @abstractmethod

@@ -97,13 +97,6 @@ def _parse_kwargs(parser: ArgumentParser) -> Dict[str, Any]:
             help="directory to expect root configuration files",
         )
         parser.add_argument(
-            "-l",
-            "--lib-dir",
-            dest="lib_dir",
-            metavar="dir",
-            help="directory to expect and write library files to",
-        )
-        parser.add_argument(
             "-d",
             "--data-dir",
             dest="data_dir",
@@ -129,6 +122,29 @@ def _parse_kwargs(parser: ArgumentParser) -> Dict[str, Any]:
             action="store_true",
             help="flags if the configured system files should be copied to the specified data directory if it is empty",
         )
+
+        action_parsers = parser.add_subparsers(dest="action")
+        action_parsers.required = True
+        # subparsers.default = "run"
+        action_parsers.add_parser("run", help="run local resources, connectors and systems")
+        action_parsers.add_parser("start", help="start the local resource system")
+
+        backup_parser = action_parsers.add_parser("backup", help="backup the local resources and configured data")
+        backup_parser.add_argument(
+            "--full",
+            dest="full",
+            action="store_true",
+            help="flags if the backup should be executed for all data",
+        )
+
+        sync_parser = action_parsers.add_parser("sync", help="synchronize the local data to a remote system")
+        sync_parser.add_argument(
+            "--full",
+            dest="full",
+            action="store_true",
+            help="flags if the synchronization should be executed for all data",
+        )
+
         args = parser.parse_args()
         kwargs = vars(args)
     else:

@@ -21,6 +21,7 @@ class Resource:
     _id: str
     _key: str
     _name: str
+    _group: str
 
     _type: Type
 
@@ -32,6 +33,7 @@ class Resource:
         id: str = None,
         key: str = None,
         name: Optional[str] = None,
+        group: Optional[str] = None,
         type: Type | str = None,
         **configs: Any,
     ) -> None:
@@ -47,6 +49,10 @@ class Resource:
         if name is None:
             name = parse_name(self.key)
         self._name = name
+
+        if group is None:
+            group = ".".join(self._id.split(".")[:-1])
+        self._group = group
 
         self._type = parse_type(type)
         self.__configs = OrderedDict(configs)
@@ -66,7 +72,7 @@ class Resource:
         return self.__configs.get(attr, default)
 
     def _get_attrs(self) -> List[str]:
-        return ["id", "key", "name", "type", *self._copy_configs().keys()]
+        return ["id", "key", "name", "group", "type", *self._copy_configs().keys()]
 
     def _get_vars(self) -> Dict[str, Any]:
         return OrderedDict(id=self.id, key=self.key, name=self.name, type=self.type, **self._copy_configs())
@@ -88,6 +94,10 @@ class Resource:
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def group(self) -> str:
+        return self._group
 
     @property
     def type(self) -> Type:
@@ -123,6 +133,7 @@ class Resource:
             id=self.id,
             key=self.key,
             name=self.name,
+            group=self.group,
             type=self.type,
             **self._copy_configs(),
         )

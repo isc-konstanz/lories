@@ -11,14 +11,14 @@ from __future__ import annotations
 import datetime as dt
 import logging
 from collections import UserList
-from typing import Any, AnyStr, Callable, Dict, Generic, List, Optional, Tuple, Type, TypeVar
+from typing import Any, AnyStr, Callable, Dict, Generic, List, Mapping, Optional, Tuple, Type, TypeVar
 
 from sqlalchemy import Boolean, Integer, String
 from sqlalchemy import Column as SAColumn
 from sqlalchemy.ext.declarative import declarative_base
 
 import pandas as pd
-from loris.core import ConfigurationException
+from loris.core import ConfigurationException, Resource, Resources
 
 Base = declarative_base()
 
@@ -186,6 +186,10 @@ class Column(Base):
 
         raise ConfigurationException(f"Unknown SQLAlchemy data type: {type}")
 
+    @property
+    def placeholder(self) -> str:
+        return f":{self.name}"
+
 
 C = TypeVar("C", bound=Column)
 
@@ -202,6 +206,12 @@ class Columns(UserList[C], Generic[C]):
     def __str__(self) -> str:
         return ", ".join(f"`{c.name}`" for c in self)
 
+    def first(self) -> C:
+        return self[0]
+
+    def last(self) -> C:
+        return self[-1]
+
     # noinspection PyShadowingBuiltins
     def add(
         self,
@@ -213,6 +223,23 @@ class Columns(UserList[C], Generic[C]):
     ) -> None:
         self.append(Column(name, type, length=length, default=default, nullable=nullable))
 
+    def get(self, resources: Resource | Resources):
+        if isinstance(resources, Resource):
+            return self._get(resources)
+        columns = []
+        for resource in resources:
+            column = self.get(resource)
+            if column is not None:
+                columns.append(column)
+        return type(self)(*columns)
+
+    def _get(self, resource: Resource) -> Optional[C]:
+        column_name = resource.column if "column" in resource else resource.key
+        for column in self:
+            if column.name == column_name:
+                return column
+        return None
+
     @property
     def names(self) -> List[str]:
         return [c.name for c in self]
@@ -221,5 +248,5 @@ class Columns(UserList[C], Generic[C]):
     def filter(self, filter_func: Callable[[C], bool]):
         return type(self)(*[column for column in self if filter_func(column)])
 
-    def extract(self, values: pd.Series) -> List[Any]:
-        return [values.get(c.name, default=None) for c in self]
+    def extract(self, values: pd.Series) -> Mapping[str, Any]:
+        return {c.name: values.get(c.name, default=None) for c in self}

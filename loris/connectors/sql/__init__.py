@@ -17,4 +17,4 @@ from .index import (  # noqa: F401
 )
 from .table import Table  # noqa: F401
 
-from .connector import SqlConnector  # noqa: F401
+from .database import SqlDatabase  # noqa: F401

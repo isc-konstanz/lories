@@ -21,12 +21,14 @@ from loris.components.component import Component
 from loris.components.context import ComponentContext
 from loris.connectors import Connector, ConnectorException
 from loris.connectors.context import ConnectorContext
+from loris.connectors.database import Database
 from loris.connectors.tasks import ConnectTask, LogTask, ReadTask, WriteTask
 from loris.core import Activator
 from loris.core.configs import ConfigurationException, Configurations, Configurator
 from loris.core.register import RegistratorContext
 from loris.data.channels import Channel, ChannelConnector, Channels, ChannelState
 from loris.data.context import DataContext
+from loris.data.databases import Databases
 from loris.util import floor_date, get_variables
 
 
@@ -237,6 +239,39 @@ class DataManager(DataContext, Activator):
 
     def notify(self, channels: Optional[Channels] = None) -> None:
         pass
+
+    # noinspection PyShadowingBuiltins
+    def backup(self, **kwargs) -> None:
+        # TODO: Backup local configurations and relevant resource files
+        self.synchronize(**kwargs)
+
+    # noinspection PyShadowingBuiltins
+    def synchronize(self, **kwargs) -> None:
+        section = self.configs.get_section("synchronize", defaults={})
+        if not section.enabled:
+            self._logger.error("Unable to synchronize for disabled configuration section 'synchronize'")
+            return
+        kwargs.update(section)
+
+        databases = Databases(self)
+        self._configure(databases)
+        self._configure(*databases.values())
+
+        # noinspection PyShadowingNames
+        def is_database(connector: Connector) -> bool:
+            return isinstance(connector, Database) and connector._is_connected()
+
+        connectors = self.connectors.filter(is_database)
+        connector_ids = [c.id for c in connectors]
+
+        # Pass copied connectors instead of actual objects, including parsed logger specific connector configurations
+        channels = self.channels.filter(lambda c: c.has_logger(*connector_ids)).apply(lambda c: c.from_logger())
+        self.connect(*databases.values(), channels=channels)
+        try:
+            for connector in connectors:
+                databases.synchronize(connector, channels.filter(lambda c: c.has_logger(connector.id)), **kwargs)
+        finally:
+            self.disconnect(*databases.values())
 
     # noinspection PyShadowingBuiltins
     def read(

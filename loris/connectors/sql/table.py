@@ -9,6 +9,7 @@ loris.connectors.sql.table
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import logging
 import re
 from collections.abc import Sequence
@@ -18,7 +19,9 @@ from typing import Any, Optional
 from sqlalchemy import MetaData, text
 from sqlalchemy.ext.declarative import declarative_base
 
+import numpy as np
 import pandas as pd
+from loris.connectors import ConnectorException
 from loris.connectors.sql import Column, Columns, Index
 from loris.core import Configurations, Resources
 
@@ -35,7 +38,7 @@ class Table(Sequence[Column]):
     # noinspection PyProtectedMember
     @classmethod
     def from_configs(cls, connector, name: str, configs: Configurations, resources: Resources) -> Table:
-        index = Index.from_configs(configs.get_section("index", defaults={}), timezone=connector._timezone)
+        index = Index.from_configs(configs.get_section("index", defaults={}), timezone=connector.timezone)
 
         columns_configs = configs.get_section("columns", defaults={})
         columns_type = columns_configs.get("type", default=Column.DEFAULT_TYPE)
@@ -101,23 +104,24 @@ class Table(Sequence[Column]):
         return self._connector.connection
 
     def is_postgresql(self, query: str) -> str:
-        if self._connector.db_type == "postgres":
+        if self._connector.dialect == "postgres":
             # Replace backticks with double quotes
             query = query.replace("`", '"')
             # Replace MySQL's ON DUPLICATE KEY UPDATE with PostgreSQL's ON CONFLICT
             query = re.sub(
                 r"ON DUPLICATE KEY UPDATE.*",
-                f"ON CONFLICT ({', '.join(self.index.names)}) DO UPDATE SET "
-                f"{', '.join([f'\"{col.name}\"=EXCLUDED.\"{col.name}\"' for col in self.columns])}",
+                f"ON CONFLICT ({', '.join(self.index.names)}) DO UPDATE SET " ', '.join(
+                    [f'"{col.name}"=EXCLUDED."{col.name}"' for col in self.columns]
+                ),
                 query,
             )
         return query
 
     def create(self):
-        columns = [*self.index, *self.columns]
+        columns = Columns(*self.index, *self.columns)
         query = (
             f"CREATE TABLE IF NOT EXISTS `{self.name}` "
-            f"({', '.join([str(c) for c in columns])}, PRIMARY KEY ({', '.join(self.index.names)}))"
+            f"({', '.join([f'`{c}`' for c in columns])}, PRIMARY KEY ({', '.join(self.index.names)}))"
         )
         if self.engine is not None:
             query += f" ENGINE={self.engine}"
@@ -145,25 +149,86 @@ class Table(Sequence[Column]):
         start: pd.Timestamp | dt.datetime = None,
         end: pd.Timestamp | dt.datetime = None,
     ) -> pd.DataFrame:
-        query = f"SELECT {self.index.names}, {self.columns.names} FROM `{self.name}`"
+        columns = Columns(*self.index, *self.columns.get(resources))
+        query = f"SELECT {', '.join([f'`{c.name}`' for c in columns])} FROM `{self.name}`"
         query, params = self.index.where(query, start, end)
         query += f" {self.index.order_by('ASC')}"
         query = self.is_postgresql(query)
         return self._select(resources, query, params)
 
-    def select_first(self, resources: Resources) -> pd.DataFrame:
+    # noinspection PyProtectedMember
+    def select_hash(
+        self,
+        resources: Resources,
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
+        method: str = "MD5",
+        encoding: str = "UTF-8",
+    ) -> Optional[str]:
+        if method.lower() not in ["md5"]:
+            # TODO: Implement further checksum methods
+            raise ValueError(f"Invalid checksum method '{method}'")
+
+        def _prepare(column: Column) -> str:
+            if column.type == "DATETIME":
+                # TODO: Verify if there is a more generic way to implement time
+                raise ConnectorException(
+                    f"Unable to generate consistent hashes for table '{self.name}' "
+                    f"with DATETIME column: {column.name}"
+                )
+            if column.type == "TIMESTAMP":
+                return f"UNIX_TIMESTAMP(`{column.name}`)"
+            else:
+                return f"`{column.name}`"
+
+        columns = self.columns.get(resources)
+        column_names = [_prepare(c) for c in columns]
+        index_names = [_prepare(c) for c in self.index]
         query = (
-            f"SELECT {self.index.names}, {self.columns.names} "
-            f"FROM `{self.name}` {self.index.order_by('ASC')} LIMIT 1;"
+            f"SELECT {method.upper()}(GROUP_CONCAT(CONCAT_WS(',', {', '.join(index_names + column_names)})"
+            f" {self.index.order_by('ASC')})) as `hash`,"
+            f" 1 as `in_range` FROM `{self.name}`"  # Maybe group by NULL here?
         )
+
+        query, params = self.index.where(query, start, end)
+        if len(columns) > 0:
+            # Make sure to only query valid values
+            query += f" AND CONCAT({','.join([f'`{c.name}`' for c in columns])}) IS NOT NULL"
+
+        query += " GROUP BY `in_range`"
+        query = self.is_postgresql(query)
+
+        result = self.connection.execute(text(query), params)
+        if result.rowcount > 0:
+            hashes = [r[0] for r in result.fetchall()]
+            if len(hashes) == 1:
+                return hashes[0]
+            return hashlib.md5(",".join(hashes).encode(encoding)).hexdigest()
+        return None
+
+    def select_first(self, resources: Resources) -> pd.DataFrame:
+        columns = Columns(*self.index, *self.columns.get(resources))
+        query = f"SELECT {', '.join([f'`{c.name}`' for c in columns])} FROM `{self.name}`"
+
+        # Make sure to only query valid values
+        not_null = [f"`{c.name}` IS NOT NULL" for c in self.columns if c in columns]
+        if len(not_null) > 0:
+            query += f" WHERE {' AND '.join(not_null)}"
+
+        query += f" {self.index.order_by('ASC')} LIMIT 1"
         query = self.is_postgresql(query)
         return self._select(resources, query)
 
     def select_last(self, resources: Resources) -> pd.DataFrame:
-        query = (
-            f"SELECT {self.index.names}, {self.columns.names} "
-            f"FROM `{self.name}` {self.index.order_by('DESC')} LIMIT 1;"
-        )
+        columns = Columns(*self.index, *self.columns.get(resources))
+        query = f"SELECT {', '.join([f'`{c.name}`' for c in columns])} FROM `{self.name}`"
+
+        # Make sure to only query valid values
+        not_null = [f"`{c.name}` IS NOT NULL" for c in self.columns if c in columns]
+        if len(not_null) > 0:
+            query += f" WHERE {' AND '.join(not_null)}"
+
+        query += f" {self.index.order_by('DESC')} LIMIT 1"
         query = self.is_postgresql(query)
         return self._select(resources, query)
 
@@ -194,32 +259,29 @@ class Table(Sequence[Column]):
 
     # noinspection PyUnresolvedReferences
     def insert(self, resources: Resources, data: pd.DataFrame) -> None:
-        def _extract(d: pd.DataFrame) -> Sequence[Any]:
-            return d.apply(lambda r: self.index.extract(r) + self.columns.extract(r), axis="columns").values
+        resources = resources.filter(lambda r: r.id in data.columns)
+        resource_columns = self.columns.get(resources)
+        columns = Columns(*self.index, *resource_columns)
+        column_names = [f"`{c.name}`" for c in resource_columns]
+        index_names = [f"`{c.name}`" for c in self.index]
 
         query = (
-            f"INSERT INTO `{self.name}` ({self.index}, {self.columns}) "
-            f"VALUES ({', '.join([':' + col for col in self.index.names + self.columns.names])}) "
-            f"ON DUPLICATE KEY UPDATE {', '.join([f'`{col.name}`=VALUES(`{col.name}`)' for col in self.columns])}"
+            f"INSERT INTO `{self.name}` ({', '.join([c for c in index_names + column_names])}) "
+            f"VALUES ({', '.join([c.placeholder for c in columns])})"
         )
+
+        if len(column_names) > 0:
+            query += f" ON DUPLICATE KEY UPDATE {', '.join([f'{c}=VALUES({c})' for c in column_names])}"
         query = self.is_postgresql(query)
 
         self._logger.debug(query)
 
-        params = list(chain.from_iterable(_extract(d) for d in self.index.prepare(resources, data)))
+        def _extract(d: pd.DataFrame) -> Sequence[Any]:
+            return d.apply(lambda r: columns.extract(r), axis="columns").values
 
-        for param in params:
-            param_dict = {
-                key.name if hasattr(key, "name") else str(key): value
-                for key, value in zip(self.index.names + self.columns.names, param)
-            }
-
-            if self._connector.db_type == "postgres" and "timestamp" in param_dict.keys():
-                # Convert to string in the desired format
-                param_dict["timestamp"] = param_dict["timestamp"].strftime("%Y-%m-%d %H:%M:%S%")
-
-            self.connection.execute(text(query), param_dict)
-
+        data.replace(np.nan, None, inplace=True)
+        for params in chain.from_iterable(_extract(d) for d in self.index.prepare(resources, data)):
+            self.connection.execute(text(query), params)
         self.connection.commit()
 
     def _get_column_type(self, column: str) -> str:

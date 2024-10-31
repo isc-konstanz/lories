@@ -163,6 +163,7 @@ class Channel(Resource):
             id=self.id,
             key=self.key,
             name=self.name,
+            group=self.group,
             type=self.type,
             connector=self.connector.copy(),
             logger=self.logger.copy(),

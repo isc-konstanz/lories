@@ -7,6 +7,7 @@ loris.connectors.sql.connector
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 from collections.abc import Mapping
 from typing import Any, Dict, Iterator, Optional
 
@@ -16,14 +17,14 @@ from sqlalchemy.orm import sessionmaker
 
 import pandas as pd
 import pytz as tz
-from loris.connectors import ConnectionException, Connector, ConnectorException, register_connector_type
+from loris.connectors import ConnectionException, ConnectorException, Database, register_connector_type
 from loris.connectors.sql import Table
 from loris.core import Configurations, Resources
 from loris.util import to_timezone
 
 
 @register_connector_type
-class SqlConnector(Connector, Mapping[str, Table]):
+class SqlDatabase(Database, Mapping[str, Table]):
     TYPE: str = "sql"
 
     _connection = None
@@ -32,15 +33,14 @@ class SqlConnector(Connector, Mapping[str, Table]):
 
     _tables: Dict[str, Table] = {}
 
-    _timezone: tz.BaseTzInfo
-    db_type: str
+    dialect: str
+
+    host: str
+    port: int
 
     user: str
     password: str
     database: str
-
-    host: str
-    port: int
 
     @property
     def connection(self):
@@ -60,7 +60,7 @@ class SqlConnector(Connector, Mapping[str, Table]):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        self.db_type = configs.get("db_type")
+        self.dialect = configs.get("dialect").lower()
 
         self.host = configs.get("host")
         self.port = configs.get_int("port")
@@ -70,26 +70,34 @@ class SqlConnector(Connector, Mapping[str, Table]):
 
         self.database = configs.get("database")
 
-    def create_engine(self):
-        if self.db_type == "mysql" or self.db_type == "mariadb":
-            connection_prefix = "mysql+mysqlconnector://"
-        elif self.db_type == "postgres":
-            connection_prefix = "postgresql+psycopg2://"
-        else:
-            raise ValueError("Unsupported database type")
-
-        self._engine = create_engine(
-            f"{connection_prefix}{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
-        )
-
-        self._session = sessionmaker(bind=self._engine)
-        self._connection = self._session()
-
     def connect(self, resources: Resources) -> None:
-        self._logger.debug(f"Connecting to {self.db_type.upper()} database {self.database}@{self.host}:{self.port}")
+        self._logger.debug(f"Connecting to {self.dialect} database {self.database}@{self.host}:{self.port}")
         try:
-            self.create_engine()
-            self._timezone = self._select_timezone()
+            if self.dialect == "mysql":
+                prefix = "mysql+pymysql://"
+
+            elif self.dialect == "mariadb":
+                prefix = "mariadb+pymysql://"
+
+            elif self.dialect == "postgres":
+                prefix = "postgresql+psycopg2://"
+            else:
+                raise ValueError("Unsupported database type")
+
+            engine = create_engine(
+                url=f"{prefix}{self.user}:{self.password}@{self.host}:{self.port}/{self.database}",
+                pool_recycle=3600,
+            )
+            session = sessionmaker(bind=engine)
+
+            self._connection = session()
+
+            # Make sure the session timezone is UTC
+            now = pd.Timestamp.now()
+            self._set_timezone(tz.UTC)
+            if self._select_timezone().utcoffset(now).seconds != 0:
+                raise ConnectorException("Error setting session timezone to UTC")
+
             self._tables = self._connect_tables(resources)
 
         except SQLAlchemyError as e:
@@ -141,14 +149,14 @@ class SqlConnector(Connector, Mapping[str, Table]):
         # columns = ['table_name', 'table_rows', 'engine', 'create_time', 'update_time']
         if columns is None:
             columns = ["table_name"]
-            if self.db_type == "mysql" or self.db_type == "mariadb":
+            if self.dialect in ["mysql", "mariadb"]:
                 columns.append("engine")
 
         query = (
             f"SELECT {','.join(f'`{c}`' for c in columns)} FROM information_schema.tables "
             f"WHERE `table_schema`=:database"
         )
-        query = query.replace("`", '"') if self.db_type == "postgres" else query
+        query = query.replace("`", '"') if self.dialect == "postgres" else query
         result = self._connection.execute(text(query), {"database": self.database})
 
         table_schemas = {}
@@ -166,7 +174,7 @@ class SqlConnector(Connector, Mapping[str, Table]):
             f"SELECT {','.join(f'`{c}`' for c in columns)} FROM information_schema.columns "
             f"WHERE `table_schema`=:database AND `table_name`=:table"
         )
-        query = query.replace("`", '"') if self.db_type == "postgres" else query
+        query = query.replace("`", '"') if self.dialect == "postgres" else query
         result = self._connection.execute(text(query), {"database": self.database, "table": table})
 
         column_schemas = {}
@@ -177,9 +185,9 @@ class SqlConnector(Connector, Mapping[str, Table]):
         return column_schemas
 
     def _select_timezone(self) -> tz.BaseTzInfo:
-        if self.db_type == "mysql" or self.db_type == "mariadb":
-            query = "SELECT @@system_time_zone as tz"
-        elif self.db_type == "postgres":
+        if self.dialect in ["mysql", "mariadb"]:
+            query = "SELECT @@session.time_zone as tz"
+        elif self.dialect == "postgres":
             query = "SHOW TIMEZONE"
         else:
             raise ValueError("Unsupported database type")
@@ -188,23 +196,49 @@ class SqlConnector(Connector, Mapping[str, Table]):
         timezone = result.scalar()
         return to_timezone(timezone)
 
-    def exists(
+    def _set_timezone(self, timezone: tz.BaseTzInfo) -> None:
+        query = f"SET time_zone = '{pd.Timestamp.now(timezone).strftime('%:z')}'"
+        self._connection.execute(text(query))
+        self._connection.commit()
+
+    def hash(
         self,
-        resources: Optional[Resources] = None,
-        start: Optional[pd.Timestamp, dt.datetime] = None,
-        end: Optional[pd.Timestamp, dt.datetime] = None,
-    ) -> bool:
-        # TODO: Replace this placeholder more resource efficient
-        if resources is None:
-            resources = self.resources
-        return not self.read(resources, start, end).empty
+        resources: Resources,
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
+        method: str = "MD5",
+        encoding: str = "UTF-8",
+    ) -> Optional[str]:
+        if method.lower() not in ["md5"]:
+            # TODO: Implement further checksum methods
+            raise ValueError(f"Invalid checksum method '{method}'")
+
+        table_hashes = []
+        try:
+            for table_name, table_resources in resources.groupby("table"):
+                if table_name not in self._tables:
+                    raise ConnectorException(f"Table '{table_name}' not available", connector=self)
+
+                table = self.get(table_name)
+                table_hash = table.select_hash(resources, start, end, method=method, encoding=encoding)
+                table_hashes.append(table_hash)
+
+        except SQLAlchemyError as e:
+            # TODO: Differentiate between syntax- and connection failures.
+            raise ConnectionException(repr(e), connector=self)
+
+        if len(table_hashes) == 0:
+            return None
+        elif len(table_hashes) == 1:
+            return table_hashes[0]
+        return hashlib.md5(",".join(table_hashes).encode(encoding)).hexdigest()
 
     # noinspection PyTypeChecker
     def read(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp, dt.datetime] = None,
-        end: Optional[pd.Timestamp, dt.datetime] = None,
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> pd.DataFrame:
         data = pd.DataFrame()
         try:
@@ -218,6 +252,39 @@ class SqlConnector(Connector, Mapping[str, Table]):
                 else:
                     table_data = table.select(table_resources, start, end)
 
+                data = pd.concat([data, table_data], axis="index")
+                # data = data.merge(table_data, how="outer", left_index=True, right_index=True)
+        except SQLAlchemyError as e:
+            # TODO: Differentiate between syntax- and connection failures.
+            raise ConnectionException(repr(e), connector=self)
+        return data
+
+    # noinspection PyTypeChecker
+    def read_first(self, resources: Resources) -> pd.DataFrame:
+        data = pd.DataFrame()
+        try:
+            for table_name, table_resources in resources.groupby("table"):
+                if table_name not in self._tables:
+                    raise ConnectorException(f"Table '{table_name}' not available", connector=self)
+
+                table_data = self.get(table_name).select_first(table_resources)
+
+                data = data.merge(table_data, how="outer", left_index=True, right_index=True)
+        except SQLAlchemyError as e:
+            # TODO: Differentiate between syntax- and connection failures.
+            raise ConnectionException(repr(e), connector=self)
+        return data
+
+    # noinspection PyTypeChecker
+    def read_last(self, resources: Resources) -> pd.DataFrame:
+        data = pd.DataFrame()
+        try:
+            for table_name, table_resources in resources.groupby("table"):
+                if table_name not in self._tables:
+                    raise ConnectorException(f"Table '{table_name}' not available", connector=self)
+
+                table_data = self.get(table_name).select_last(table_resources)
+
                 data = data.merge(table_data, how="outer", left_index=True, right_index=True)
         except SQLAlchemyError as e:
             # TODO: Differentiate between syntax- and connection failures.
@@ -230,8 +297,11 @@ class SqlConnector(Connector, Mapping[str, Table]):
             for table_name, table_resources in self.resources.groupby("table"):
                 if table_name not in self._tables:
                     raise ConnectorException(f"Table '{table_name}' not available", connector=self)
+                table_data = data.loc[:, [r.id for r in table_resources if r.id in data.columns]]
+                if table_data.empty:
+                    continue
                 table = self.get(table_name)
-                table.insert(table_resources, data)
+                table.insert(table_resources, table_data)
 
         except SQLAlchemyError as e:
             raise ConnectionException(repr(e), connector=self)
