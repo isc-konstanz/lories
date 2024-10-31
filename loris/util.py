@@ -218,15 +218,24 @@ def slice_range(
 
     freq_delta = to_timedelta(freq)
 
+    def _next(timestamp: pd.Timestamp) -> pd.Timestamp:
+        _timestamp = floor_date(timestamp + freq_delta, freq=freq)
+        if _timestamp > timestamp:
+            return _timestamp
+        # Handle daylight savings
+        return floor_date(timestamp + freq_delta * 2, freq=freq)
+
     ranges = []
     range_start = start
-    range_end = min(ceil_date(range_start, freq=freq), end)
+    if floor_date(start, freq=freq) == start:
+        range_start += pd.Timedelta(seconds=1)
+    range_end = min(_next(start), end)
     ranges.append((range_start, range_end))
 
     while range_end < end:
-        range_start = floor_date(range_start + freq_delta, freq=freq)
-        range_end = min(ceil_date(range_start, freq=freq), end)
-        ranges.append((range_start, range_end))
+        range_start = _next(range_start)
+        range_end = min(_next(range_start), end)
+        ranges.append((range_start + pd.Timedelta(seconds=1), range_end))
     return ranges
 
 
