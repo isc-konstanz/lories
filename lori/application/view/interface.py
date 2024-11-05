@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.app.view.interface
-~~~~~~~~~~~~~~~~~~~~~~~~
+lori.application.view.interface
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -20,9 +20,9 @@ from dash import Dash, html
 from dash_bootstrap_components import themes
 
 from lori import Configurations
-from lori.app import Application
-from lori.app.interface import Interface, InterfaceMeta
-from lori.app.view.pages import PageFooter, PageHeader, View
+from lori.application import Application
+from lori.application.interface import Interface, InterfaceMeta
+from lori.application.view.pages import PageFooter, PageHeader, View
 
 
 class ViewInterfaceMeta(InterfaceMeta):
@@ -37,7 +37,7 @@ class ViewInterfaceMeta(InterfaceMeta):
 # noinspection PyProtectedMember
 class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
     def __init__(self, context: Application, configs: Configurations) -> None:
-        view_path = resources.files("lori.app.view")
+        view_path = resources.files("lori.application.view")
 
         def get_custom_path(key: str) -> Path:
             custom_path = view_path.joinpath(key)

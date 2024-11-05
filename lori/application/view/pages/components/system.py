@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.app.view.pages.components.system
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lori.application.view.pages.components.system
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -14,8 +14,8 @@ import dash_bootstrap_components as dbc
 from dash import html
 
 from lori import System
-from lori.app.view.pages import PageLayout, register_component_page
-from lori.app.view.pages.components import ComponentGroup, ComponentPage
+from lori.application.view.pages import PageLayout, register_component_page
+from lori.application.view.pages.components import ComponentGroup, ComponentPage
 
 
 @register_component_page(System)

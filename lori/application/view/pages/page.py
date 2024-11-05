@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.app.view.pages.page
-~~~~~~~~~~~~~~~~~~~~~~~~~
+lori.application.view.pages.page
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -18,8 +18,8 @@ import dash
 from dash.development.base_component import Component
 
 import pandas as pd
-from lori.app import InterfaceException
-from lori.app.view.pages.layout import PageLayout
+from lori.application import InterfaceException
+from lori.application.view.pages.layout import PageLayout
 
 C = TypeVar("C", bound=Component)
 

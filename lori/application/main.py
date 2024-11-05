@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.app.application
-~~~~~~~~~~~~~~~~~~~~
+lori.application.main
+~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -16,7 +16,7 @@ from typing import Collection, Optional, Type
 import pandas as pd
 import pytz as tz
 from lori import Channel, Settings, System
-from lori.app import Interface, InterfaceUnavailableException
+from lori.application import Interface, InterfaceUnavailableException
 from lori.components import ComponentContext
 from lori.connectors import ConnectorContext
 from lori.data.manager import DataManager

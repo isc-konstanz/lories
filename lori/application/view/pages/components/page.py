@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.app.view.pages.components.page
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lori.application.view.pages.components.page
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -16,7 +16,7 @@ from dash import Input, Output, callback, dcc, html
 
 import pandas as pd
 from lori import Channel, Component, Configurations
-from lori.app.view.pages import Page, PageLayout
+from lori.application.view.pages import Page, PageLayout
 from lori.connectors import ConnectorAccess
 from lori.data import DataAccess
 

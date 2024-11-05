@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.app.view.pages.view
-~~~~~~~~~~~~~~~~~~~~~~~~~
+lori.application.view.pages.view
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -13,8 +13,8 @@ from typing import Callable, Dict, Optional, Type, TypeVar
 import dash_bootstrap_components as dbc
 from dash import html
 
-from lori.app.view.pages import PageFooter, PageHeader, PageLayout
-from lori.app.view.pages.components import ComponentGroup, ComponentPage, ComponentRegistry
+from lori.application.view.pages import PageFooter, PageHeader, PageLayout
+from lori.application.view.pages.components import ComponentGroup, ComponentPage, ComponentRegistry
 from lori.components import Component, ComponentContext
 from lori.system import System
 

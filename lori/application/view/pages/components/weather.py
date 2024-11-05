@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.app.view.pages.components.weather
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lori.application.view.pages.components.weather
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -9,7 +9,7 @@ lori.app.view.pages.components.weather
 from __future__ import annotations
 
 from lori import Weather
-from lori.app.view.pages import ComponentGroup, ComponentPage, register_component_group, register_component_page
+from lori.application.view.pages import ComponentGroup, ComponentPage, register_component_group, register_component_page
 
 
 @register_component_page(Weather)

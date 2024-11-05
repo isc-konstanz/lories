@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.app.interface
-~~~~~~~~~~~~~~~~~~
+lori.application.interface
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -32,7 +32,7 @@ class InterfaceMeta(ConfiguratorMeta):
 
     # noinspection PyMethodMayBeStatic, PyUnusedLocal
     def _get_class(self, configs: Configurations) -> Type[Interface]:
-        from lori.app.view import ViewInterface
+        from lori.application.view import ViewInterface
 
         return ViewInterface
 
@@ -41,7 +41,7 @@ class Interface(Configurator, metaclass=InterfaceMeta):
     SECTION: str = "interface"
 
     def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
-        from lori.app import Application
+        from lori.application import Application
 
         if context is None or not isinstance(context, Application):
             raise ResourceException(f"Invalid server context '{context}': {type(context)}")

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.app.view.pages.layout.page
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lori.application.view.pages.layout.page
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -13,7 +13,7 @@ from typing import Any, Collection, Optional
 
 from dash_bootstrap_components import Container
 
-from lori.app.view.pages.layout import PageCard
+from lori.application.view.pages.layout import PageCard
 
 
 class PageLayout(MutableSequence[Any]):

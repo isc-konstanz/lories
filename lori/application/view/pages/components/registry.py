@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.app.view.pages.components.registry
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lori.application.view.pages.components.registry
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -11,8 +11,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Callable, Collection, Generic, Optional, Type, TypeVar
 
-from lori.app.view.pages import Page
-from lori.app.view.pages.components import ComponentGroup, ComponentPage
+from lori.application.view.pages import Page
+from lori.application.view.pages.components import ComponentGroup, ComponentPage
 from lori.components import Component
 from lori.core import ResourceException
 from lori.util import parse_key, parse_name

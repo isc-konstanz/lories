@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.app
-~~~~~~~~~
+lori.application
+~~~~~~~~~~~~~~~~
 
 
 """
@@ -12,4 +12,4 @@ from .interface import (  # noqa: F401
     InterfaceUnavailableException,
 )
 
-from .application import Application  # noqa: F401
+from .main import Application  # noqa: F401

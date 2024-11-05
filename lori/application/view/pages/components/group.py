@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.app.view.pages.components.group
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lori.application.view.pages.components.group
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -14,8 +14,8 @@ import dash_bootstrap_components as dbc
 from dash import html
 
 import lori
-from lori.app.view.pages import PageGroup, PageLayout
-from lori.app.view.pages.components import ComponentPage
+from lori.application.view.pages import PageGroup, PageLayout
+from lori.application.view.pages.components import ComponentPage
 
 C = TypeVar("C", bound=lori.Component)
 

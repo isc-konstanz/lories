@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.app.view.pages.group
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+lori.application.view.pages.group
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -14,7 +14,7 @@ from itertools import chain
 from typing import Any, Collection, Generic, Iterator, List, Optional, Tuple, TypeVar
 
 import pandas as pd
-from lori.app.view.pages import Page
+from lori.application.view.pages import Page
 
 P = TypeVar("P", bound=Page)
 

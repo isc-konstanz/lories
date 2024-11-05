@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.app.view.pages.components
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lori.application.view.pages.components
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
