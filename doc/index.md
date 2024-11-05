@@ -1,8 +1,8 @@
-# Loris Software Framework
+# Lori Software Framework
 
-## What is Loris?
-Loris is an open-source software package for the ***Lo**cal **R**esource **I**ntegration
-for several **S**ystems* of ISC Konstanz e.V.  
+## What is Lori?
+Lori is an open-source software package for ***Lo**cal **R**esource **I**ntegration*,
+powered by ISC Konstanz e.V.  
 
 ```{toctree}
 ---

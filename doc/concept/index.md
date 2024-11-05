@@ -1,6 +1,6 @@
 # Concept
 
-This section contains (or will contain) information on the loris architecture concept.
+This section contains (or will contain) information on the lori architecture concept.
 
 ```{toctree}
 ---

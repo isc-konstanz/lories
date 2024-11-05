@@ -3,10 +3,10 @@ build-backend = "setuptools.build_meta"
 requires = ['setuptools >= 61.0', 'versioneer[toml]']
 
 [project]
-name = "loris"
+name = "lori"
 description = """\
-This repository provides a set of core functions for several \
-Local Resource Integration Systems of ISC Konstanz e.V."""
+This repository provides a set of core functions for \
+Local Resource Integration by ISC Konstanz e.V."""
 
 authors = [
     {name = "ISC Konstanz e.V."}
@@ -16,8 +16,8 @@ maintainers = [
 ]
 
 urls.author = "https://isc-konstanz.de"
-urls.source = "https://github.com/isc-konstanz/loris/"
-urls.issues = "https://github.com/isc-konstanz/loris/issues"
+urls.source = "https://github.com/isc-konstanz/lori/"
+urls.issues = "https://github.com/isc-konstanz/lori/issues"
 
 classifiers = [
     "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
@@ -37,7 +37,7 @@ license.file = "LICENSE"
 dynamic = ["version"]
 
 dependencies = [
-    "tomli >= 1.1.0; python_version < '3.11'",
+    "tomli >= 1.1; python_version < '3.11'",
     "numpy >= 1.16",
     "pandas >= 0.23",
     "pytz >= 2019.1",
@@ -56,13 +56,13 @@ doc = [
     "myst-parser",
 ]
 dev = [
-    # "loris[sql, doc]",
+    # "lori[sql, doc]",
     "pre-commit",
     "ruff"
 ]
 
 [tool.setuptools.package-data]
-loris = []
+lori = []
 
 [tool.setuptools.packages.find]
 namespaces = false
@@ -74,19 +74,19 @@ exclude = [
 [tool.versioneer]
 VCS = "git"
 style = "pep440"
-versionfile_source = "loris/_version.py"
-versionfile_build = "loris/_version.py"
-parentdir_prefix = "loris-"
+versionfile_source = "lori/_version.py"
+versionfile_build = "lori/_version.py"
+parentdir_prefix = "lori-"
 tag_prefix = "v"
 
 [project.scripts]
-loris = "loris.__main__:main"
+lori = "lori.__main__:main"
 
 [tool.ruff]
 indent-width = 4
 line-length = 120
 target-version = "py38"
-exclude = ["loris/_version.py"]
+exclude = ["lori/_version.py"]
 
 [tool.ruff.lint]
 select = [
@@ -101,4 +101,4 @@ select = [
 
 [tool.ruff.lint.isort]
 extra-standard-library = ["dateutil"]
-known-first-party = ["loris", "numpy", "pandas", "pytz"]
+known-first-party = ["lori", "numpy", "pandas", "pytz"]
