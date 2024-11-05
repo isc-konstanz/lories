@@ -136,6 +136,7 @@ html_context = {
     "github_user": "isc-konstanz",
     "github_repo": "lori",
     "github_version": "stable",
+    "default_mode": "light",
     "doc_path": "doc",
 }
 
