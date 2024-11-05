@@ -1,0 +1,70 @@
+@startuml lori.data.access.DataAccess
+set namespaceSeparator none
+class "Channel" as lori.data.channels.channel.Channel {
+  connector: ChannelConnector
+  logger: ChannelConnector
+  freq: str
+  timedelta: pd.Timedelta
+  timestamp: pd.Timestamp
+  value: Any
+  state: ChannelState
+  set(timestamp: pd.Timestamp, value: Any, state: Optional[str | ChannelState]) -> None
+  is_valid() -> bool
+  has_connector(id: Optional[str]) -> bool
+  has_logger() -> bool
+  from_logger() -> Channel
+  to_series(state: bool) -> pd.Series
+}
+class "ChannelConnector" as lori.data.channels.connector.ChannelConnector {
+  id: str
+  key: str
+  timestamp: pd.Timestamp
+  copy() -> ChannelConnector
+}
+class "Channels" as lori.data.channels.channels.Channels {
+  to_frame(unique: bool, states: bool) -> pd.DataFrame
+}
+class "Resources" as lori.core.resources.Resources {
+  copy() -> Resources
+  append(resource: Resource)
+  extend(resources: Iterable[Resource])
+  apply(apply: Callable[[Resource], None]) -> None
+  filter(filter: Callable[[Resource], bool]) -> Resources
+  groupby(by: str) -> Iterator[Tuple[Any, Collection[R]]]
+}
+class "Resource" as lori.core.resource.Resource {
+  id
+  key
+  name
+  type
+  copy() -> Resource
+  get(attr: str, default: Optional[Any]) -> Any
+}
+class "DataAccess" as lori.data.access.DataAccess {
+  add(id: str, **configs: Any) -> None
+}
+class "DataContext" as lori.data.context.DataContext {
+  channels: Channels
+  filter(filter: Callable[[Channel], bool]) -> Channels
+  groupby(by: str) -> List[Tuple[Any, Channels]]
+  to_frame() -> pd.DataFrame
+}
+class "Configurator" as lori.core.configs.configurator.Configurator {
+  context: Context
+  configs: Configurations
+  {abstract}configure(configs: Configurations) -> None
+  is_configured() -> bool
+  is_enabled() -> bool
+}
+lori.data.access.DataAccess --|> lori.core.configs.configurator.Configurator
+lori.data.access.DataAccess --|> lori.data.context.DataContext
+lori.core.resources.Resources - lori.core.resource.Resource : 0..*
+lori.data.channels.channel.Channel --|> lori.core.resource.Resource
+lori.data.channels.channel.Channel *-- lori.data.channels.connector.ChannelConnector : logger
+lori.data.channels.channel.Channel *-- lori.data.channels.connector.ChannelConnector : connector
+lori.data.channels.channels.Channels --|> lori.core.resources.Resources
+lori.data.channels.channels.Channels - lori.data.channels.channel.Channel : 0..*
+lori.data.context.DataContext *-- lori.data.channels.channels.Channels : channels
+lori.data.context.DataContext *-- lori.data.channels.channels.Channels : filter()
+lori.data.context.DataContext *-- lori.data.channels.channels.Channels : groupby()
+@enduml

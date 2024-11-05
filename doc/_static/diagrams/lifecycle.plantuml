@@ -1,0 +1,103 @@
+@startuml lifecycle
+participant Application [
+    =Lori
+    ----
+    ""Application""
+]
+participant DataManager << (C,#ADD1B2) >>
+participant Connector << (C,#ADD1B2) >>
+participant Component << (C,#ADD1B2) >>
+participant DataAccess << (C,#ADD1B2) >>
+
+====
+
+Application -> DataManager: configure(configs)
+activate DataManager
+
+DataManager -> DataManager: _configure(connectors)
+activate DataManager
+
+
+DataManager -> Connector: configure(configs)
+activate Connector
+
+deactivate Connector
+deactivate DataManager
+
+DataManager -> DataManager: _configure(components)
+activate DataManager
+
+DataManager -> Component: configure(configs)
+    opt Add default Channel configurations
+    activate Component
+    Component -> DataAccess: add(key, **configs)
+    end
+
+
+Component -> DataAccess: configure(configs)
+activate DataAccess
+deactivate DataAccess
+
+deactivate Component
+deactivate DataManager
+
+deactivate DataManager
+
+====
+
+Application -> DataManager: activate()
+activate DataManager
+
+DataManager -> Connector: connect(channels)
+activate Connector
+deactivate Connector
+
+
+DataManager -> DataManager: _activate(components)
+activate DataManager
+
+DataManager -> Component: activate()
+activate Component
+deactivate Component
+
+deactivate DataManager
+deactivate DataManager
+
+====
+
+loop While running
+    Application -> Application: run()
+    Activate Application
+
+    Application -> DataManager: read()
+    activate DataManager
+
+    loop Connections with Channels to be read
+        note over Connector #f5f5f5
+            Results directly written
+            into Channel values
+        end note
+        DataManager -> Connector: read(channels)
+        activate Connector
+        deactivate Connector
+    end
+    return pd.DataFrame
+
+    Application -> DataManager: log(data)
+    activate DataManager
+
+    loop Connections with updated Channels
+        DataManager -> Connector: write(data)
+        activate Connector
+        deactivate Connector
+    end
+    deactivate DataManager
+
+    loop Components with updated Channels
+        Application -> Component: run()
+        activate Component
+        deactivate Component
+    end
+    deactivate Application
+end
+@enduml

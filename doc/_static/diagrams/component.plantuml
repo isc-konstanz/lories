@@ -1,0 +1,44 @@
+@startuml lori.components.component.Component
+set namespaceSeparator none
+class "Component" as lori.components.component.Component {
+  data: DataAccess
+  connectors: ConnectorAccess
+  context: ComponentContext
+  get(start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame
+}
+class "Activator" as lori.core.activator.Activator {
+  name: str
+  {abstract}activate() -> None
+  {abstract}deactivate() -> None
+  is_active() -> bool
+}
+class "Registrator" as lori.core.register.registrator.Registrator {
+  TYPE: str
+  SECTION: str
+  SECTIONS: Collection[str]
+  context: RegistratorContext
+  id: str
+  key: str
+}
+class "Configurator" as lori.core.configs.configurator.Configurator {
+  context: Context
+  configs: Configurations
+  {abstract}configure(configs: Configurations) -> None
+  is_configured() -> bool
+  is_enabled() -> bool
+}
+class "ComponentContext" as lori.components.context.ComponentContext {
+  SECTION: str
+  filter(filter: Callable[[Component], bool]) -> Collection[Component]
+  get_all() -> Collection[Component]
+  get_first() -> Optional[Component]
+  get_last() -> Optional[Component]
+  get_types() -> Collection[str]
+  has_type() -> bool
+}
+lori.core.register.registrator.Registrator --|> lori.core.configs.configurator.Configurator
+lori.core.activator.Activator --|> lori.core.register.registrator.Registrator
+lori.components.component.Component --|> lori.core.activator.Activator
+lori.components.component.Component *-- lori.components.context.ComponentContext : __context
+lori.components.context.ComponentContext --|> lori.core.activator.Activator
+@enduml
