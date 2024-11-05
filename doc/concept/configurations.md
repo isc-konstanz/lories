@@ -18,14 +18,14 @@ The settings allow the more detailed setup of the project directory structure in
 ```toml
 [directories]
 # The directory of necessary library files
-lib_dir = "/var/lib/penguin/"
+lib_dir = "/var/lib/lori/"
 
 # The directory for temporary files
-tmp_dir = "/var/tmp/penguin/"
+tmp_dir = "/var/tmp/lori/"
 
 # The writable directory where configurations that may change during runtime
 # can be found or evaluation results will be stored in
-data_dir = "/var/opt/penguin/"
+data_dir = "/var/opt/lori/"
 ```
 
 
@@ -177,11 +177,12 @@ the `type`, `key` and `name` configs may be specified in a separate `[component]
 
 ### Channels
 
-...
+This section contains (or will contain) detailed information on the configuration of channels.
+
 
 ## Connectors
 
-...
+This section contains (or will contain) a general overview of the configuration of connectors.
 
 A more detailed overview of all connector specific configurations can be found in the
 dedicated [Connectors section](../connectors/index.md).

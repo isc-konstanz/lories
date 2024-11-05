@@ -21,7 +21,7 @@
 <br />
 <div align="center">
   <a href="https://github.com/isc-konstanz/lori">
-    <img src="doc/_images/lori-logo.png" alt="Lori Logo" width="256">
+    <img src="doc/_images/lori-logo.svg" alt="Lori Logo" width="256">
   </a>
   <h1 align="center">lori</h1>
   <p align="center">
