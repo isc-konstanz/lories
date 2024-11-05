@@ -1,15 +1,15 @@
-# Loris Software Framework
+# Lori Software Framework
 
-```{image} _images/loris-logo.png
-:alt: Loris Logo
+```{image} _images/lori-logo.png
+:alt: Lori Logo
 :width: 256px
 :align: center
 ```
 
 <div align="center">
-  <h3 align="center">Loris</h3>
+  <h3 align="center">Lori</h3>
   <p align="center">
-    Loris is an open-source software package for the <em><b>Lo</b>cal <b>R</b>esource <b>I</b>ntegration for several <b>S</b>ystems</em> of ISC Konstanz e.V.
+    Lori is an open-source software package for <em><b>Lo</b>cal <b>R</b>esource <b>I</b>ntegration</em> <br>powered by ISC Konstanz e.V.  
   </p>
 </div>
 

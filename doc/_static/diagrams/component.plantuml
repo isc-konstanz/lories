@@ -1,18 +1,18 @@
-@startuml loris.components.component.Component
+@startuml lori.components.component.Component
 set namespaceSeparator none
-class "Component" as loris.components.component.Component {
+class "Component" as lori.components.component.Component {
   data: DataAccess
   connectors: ConnectorAccess
   context: ComponentContext
   get(start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame
 }
-class "Activator" as loris.core.activator.Activator {
+class "Activator" as lori.core.activator.Activator {
   name: str
   {abstract}activate() -> None
   {abstract}deactivate() -> None
   is_active() -> bool
 }
-class "Registrator" as loris.core.register.registrator.Registrator {
+class "Registrator" as lori.core.register.registrator.Registrator {
   TYPE: str
   SECTION: str
   SECTIONS: Collection[str]
@@ -20,14 +20,14 @@ class "Registrator" as loris.core.register.registrator.Registrator {
   id: str
   key: str
 }
-class "Configurator" as loris.core.configs.configurator.Configurator {
+class "Configurator" as lori.core.configs.configurator.Configurator {
   context: Context
   configs: Configurations
   {abstract}configure(configs: Configurations) -> None
   is_configured() -> bool
   is_enabled() -> bool
 }
-class "ComponentContext" as loris.components.context.ComponentContext {
+class "ComponentContext" as lori.components.context.ComponentContext {
   SECTION: str
   filter(filter: Callable[[Component], bool]) -> Collection[Component]
   get_all() -> Collection[Component]
@@ -36,9 +36,9 @@ class "ComponentContext" as loris.components.context.ComponentContext {
   get_types() -> Collection[str]
   has_type() -> bool
 }
-loris.core.register.registrator.Registrator --|> loris.core.configs.configurator.Configurator
-loris.core.activator.Activator --|> loris.core.register.registrator.Registrator
-loris.components.component.Component --|> loris.core.activator.Activator
-loris.components.component.Component *-- loris.components.context.ComponentContext : __context
-loris.components.context.ComponentContext --|> loris.core.activator.Activator
+lori.core.register.registrator.Registrator --|> lori.core.configs.configurator.Configurator
+lori.core.activator.Activator --|> lori.core.register.registrator.Registrator
+lori.components.component.Component --|> lori.core.activator.Activator
+lori.components.component.Component *-- lori.components.context.ComponentContext : __context
+lori.components.context.ComponentContext --|> lori.core.activator.Activator
 @enduml

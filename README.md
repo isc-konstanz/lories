@@ -20,20 +20,20 @@
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/isc-konstanz/loris">
-    <img src="doc/_images/loris-logo.png" alt="Loris Logo" width="256">
+  <a href="https://github.com/isc-konstanz/lori">
+    <img src="doc/_images/lori-logo.png" alt="Lori Logo" width="256">
   </a>
-  <h3 align="center">Loris</h3>
+  <h1 align="center">lori</h1>
   <p align="center">
-    Loris is an open-source software package for the <em><b>Lo</b>cal <b>R</b>esource <b>I</b>ntegration for several <b>S</b>ystems</em> of ISC Konstanz e.V.  
+    Lori is an open-source software package for <em><b>Lo</b>cal <b>R</b>esource <b>I</b>ntegration</em> <br>powered by ISC Konstanz e.V.  
     <br />
-    <a href="https://loris.readthedocs.io"><strong>Explore the docs »</strong></a>
+    <a href="https://lori.readthedocs.io"><strong>Explore the docs »</strong></a>
     <!--
     <br />
     <br />
-    <a href="https://github.com/isc-konstanz/loris/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
+    <a href="https://github.com/isc-konstanz/lori/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
     ·
-    <a href="https://github.com/isc-konstanz/loris/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
+    <a href="https://github.com/isc-konstanz/lori/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
     -->  
   </p>
 </div>
@@ -85,12 +85,12 @@ is a good reference for virtual environments.
 
 - Clone the GitHub repository
    ```sh
-   git clone -b stable https://github.com/isc-konstanz/loris.git loris
+   git clone -b stable https://github.com/isc-konstanz/lori.git lori
    ```
 - Optionally, create or activate virtual environment
 - Install Python package
    ```sh
-   pip install loris
+   pip install lori
    ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -107,7 +107,7 @@ More detailed information about how to use the package will be added here in the
 <!-- CONTRIBUTING -->
 ## Contributing
 
-Encouraging more people to help develop loris is essential to the project's success.
+Encouraging more people to help develop lori is essential to the project's success.
 Therefore, we want to make it easy and straight forward for you to contribute.
 
 If you have a suggestion that would improve project, please take a look at how to
@@ -119,7 +119,7 @@ If you have a suggestion that would improve project, please take a look at how t
 <!-- LICENSE -->
 ## License
 
-Distributed under the LGPLv3 License. See [`LICENSE`](https://github.com/isc-konstanz/loris/blob/master/LICENSE) for more information.
+Distributed under the LGPLv3 License. See [`LICENSE`](https://github.com/isc-konstanz/lori/blob/master/LICENSE) for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -129,7 +129,7 @@ Distributed under the LGPLv3 License. See [`LICENSE`](https://github.com/isc-kon
 
 ![ISC logo](doc/_images/isc-logo-full.png)
 
-The loris project was authored by [**ISC** Konstanz e.V.](https://isc-konstanz.de/)
+The lori project was authored by [**ISC** Konstanz e.V.](https://isc-konstanz.de/)
 (International Solar Energy Research Center).
 
 To get in touch with the developers, please take a look at the [Contact](doc/contact.md) site.
@@ -139,13 +139,13 @@ To get in touch with the developers, please take a look at the [Contact](doc/con
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[contributors-shield]: https://img.shields.io/github/contributors/isc-konstanz/loris.svg?style=for-the-badge
-[contributors-url]: https://github.com/isc-konstanz/loris/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/isc-konstanz/loris.svg?style=for-the-badge
-[forks-url]: https://github.com/isc-konstanz/loris/network/members
-[stars-shield]: https://img.shields.io/github/stars/isc-konstanz/loris.svg?style=for-the-badge
-[stars-url]: https://github.com/isc-konstanz/loris/stargazers
-[issues-shield]: https://img.shields.io/github/issues/isc-konstanz/loris.svg?style=for-the-badge
-[issues-url]: https://github.com/isc-konstanz/loris/issues
-[license-shield]: https://img.shields.io/github/license/isc-konstanz/loris.svg?style=for-the-badge
-[license-url]: https://github.com/isc-konstanz/loris/blob/master/LICENSE
+[contributors-shield]: https://img.shields.io/github/contributors/isc-konstanz/lori.svg?style=for-the-badge
+[contributors-url]: https://github.com/isc-konstanz/lori/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/isc-konstanz/lori.svg?style=for-the-badge
+[forks-url]: https://github.com/isc-konstanz/lori/network/members
+[stars-shield]: https://img.shields.io/github/stars/isc-konstanz/lori.svg?style=for-the-badge
+[stars-url]: https://github.com/isc-konstanz/lori/stargazers
+[issues-shield]: https://img.shields.io/github/issues/isc-konstanz/lori.svg?style=for-the-badge
+[issues-url]: https://github.com/isc-konstanz/lori/issues
+[license-shield]: https://img.shields.io/github/license/isc-konstanz/lori.svg?style=for-the-badge
+[license-url]: https://github.com/isc-konstanz/lori/blob/master/LICENSE

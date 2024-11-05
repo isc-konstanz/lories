@@ -1,6 +1,6 @@
-@startuml loris.connectors.connector.Connector
+@startuml lori.connectors.connector.Connector
 set namespaceSeparator none
-class "Connector" as loris.connectors.connector.Connector {
+class "Connector" as lori.connectors.connector.Connector {
   channels: Channels
   resources: Resources
   is_connected() -> bool
@@ -10,7 +10,7 @@ class "Connector" as loris.connectors.connector.Connector {
   {abstract}write(data: pd.DataFrame) -> None
   set_channels(state: ChannelState) -> None
 }
-class "Registrator" as loris.core.register.registrator.Registrator {
+class "Registrator" as lori.core.register.registrator.Registrator {
   TYPE: str
   SECTION: str
   SECTIONS: Collection[str]
@@ -18,14 +18,14 @@ class "Registrator" as loris.core.register.registrator.Registrator {
   id: str
   key: str
 }
-class "Configurator" as loris.core.configs.configurator.Configurator {
+class "Configurator" as lori.core.configs.configurator.Configurator {
   context: Context
   configs: Configurations
   {abstract}configure(configs: Configurations) -> None
   is_configured() -> bool
   is_enabled() -> bool
 }
-class "ConnectorContext" as loris.connectors.context.ConnectorContext {
+class "ConnectorContext" as lori.connectors.context.ConnectorContext {
   SECTION: str
   filter(filter: Callable[[Connector], bool]) -> Collection[Connector]
   get_all() -> Collection[Connector]
@@ -34,7 +34,7 @@ class "ConnectorContext" as loris.connectors.context.ConnectorContext {
   get_types() -> Collection[str]
   has_type() -> bool
 }
-class "Resources" as loris.core.resources.Resources {
+class "Resources" as lori.core.resources.Resources {
   copy() -> Resources
   append(resource: Resource)
   extend(resources: Iterable[Resource])
@@ -42,7 +42,7 @@ class "Resources" as loris.core.resources.Resources {
   filter(filter: Callable[[Resource], bool]) -> Resources
   groupby(by: str) -> Iterator[Tuple[Any, Collection[R]]]
 }
-class "Resource" as loris.core.resource.Resource {
+class "Resource" as lori.core.resource.Resource {
   id
   key
   name
@@ -50,10 +50,10 @@ class "Resource" as loris.core.resource.Resource {
   copy() -> Resource
   get(attr: str, default: Optional[Any]) -> Any
 }
-loris.core.register.registrator.Registrator --|> loris.core.configs.configurator.Configurator
-loris.connectors.connector.Connector --|> loris.core.register.registrator.Registrator
-loris.connectors.connector.Connector *-- loris.core.resources.Resources : __resources
-loris.connectors.connector.Connector *-- loris.connectors.context.ConnectorContext : __context
-loris.connectors.context.ConnectorContext --|> loris.core.configs.configurator.Configurator
-loris.core.resource.Resource - loris.core.resources.Resources : 0..*
+lori.core.register.registrator.Registrator --|> lori.core.configs.configurator.Configurator
+lori.connectors.connector.Connector --|> lori.core.register.registrator.Registrator
+lori.connectors.connector.Connector *-- lori.core.resources.Resources : __resources
+lori.connectors.connector.Connector *-- lori.connectors.context.ConnectorContext : __context
+lori.connectors.context.ConnectorContext --|> lori.core.configs.configurator.Configurator
+lori.core.resource.Resource - lori.core.resources.Resources : 0..*
 @enduml

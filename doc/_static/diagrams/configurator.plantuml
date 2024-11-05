@@ -1,13 +1,13 @@
-@startuml loris.core.configs.configurator.Configurator
+@startuml lori.core.configs.configurator.Configurator
 set namespaceSeparator none
-class "Configurator" as loris.core.configs.configurator.Configurator {
+class "Configurator" as lori.core.configs.configurator.Configurator {
   context: Context
   configs: Configurations
   {abstract}configure(configs: Configurations) -> None
   is_configured() -> bool
   is_enabled() -> bool
 }
-class "Configurations" as loris.core.configs.configurations.Configurations {
+class "Configurations" as lori.core.configs.configurations.Configurations {
   name: str
   path: pathlib.Path
   sections -> List[Configurations]
@@ -26,7 +26,7 @@ class "Configurations" as loris.core.configs.configurations.Configurations {
   update(u: Mapping[str, Any], replace: bool) -> None
   copy() -> Configurations
 }
-class "Directories" as loris.core.configs.directories.Directories {
+class "Directories" as lori.core.configs.directories.Directories {
   conf: Directory
   data: Directory
   lib: Directory
@@ -35,11 +35,11 @@ class "Directories" as loris.core.configs.directories.Directories {
   to_dict() -> Dict[str, Optional[str]]
   update(configs: Mapping[str, str]) -> None
 }
-class "Directory" as loris.core.configs.directories.Directory {
+class "Directory" as lori.core.configs.directories.Directory {
   default : str
   is_default() -> bool
 }
-loris.core.configs.configurator.Configurator o-- loris.core.configs.configurations.Configurations : __configs
-loris.core.configs.configurations.Configurations *-- loris.core.configs.directories.Directories : __dirs
-loris.core.configs.directories.Directories *-- loris.core.configs.directories.Directory : _conf, _data, _lib, _log, _tmp
+lori.core.configs.configurator.Configurator o-- lori.core.configs.configurations.Configurations : __configs
+lori.core.configs.configurations.Configurations *-- lori.core.configs.directories.Directories : __dirs
+lori.core.configs.directories.Directories *-- lori.core.configs.directories.Directory : _conf, _data, _lib, _log, _tmp
 @enduml

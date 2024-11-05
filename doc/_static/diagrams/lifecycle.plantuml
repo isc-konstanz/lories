@@ -1,6 +1,6 @@
 @startuml lifecycle
 participant Application [
-    =Loris
+    =Lori
     ----
     ""Application""
 ]
