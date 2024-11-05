@@ -3,13 +3,13 @@ Description=Local Resource Integration System
 After=network.target
 
 [Service]
-User=loris
-Group=loris
+User=lori
+Group=lori
 Type=simple
 Restart=always
 RestartSec=60s
-ExecStart=/opt/loris/.venv/bin/loris -c /etc/loris start
-WorkingDirectory=/var/opt/loris
+ExecStart=/opt/lori/.venv/bin/lori -c /etc/lori start
+WorkingDirectory=/var/opt/lori
 
 [Install]
 WantedBy=multi-user.target
