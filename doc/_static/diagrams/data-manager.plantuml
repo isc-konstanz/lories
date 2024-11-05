@@ -1,0 +1,71 @@
+@startuml lori.data.manager.DataManager
+set namespaceSeparator none
+class "DataManager" as lori.data.manager.DataManager {
+  components: ComponentContext
+  connectors: ConnectorContext
+  connect(*connectors: Connector) -> None
+  reconnect(*connectors: Connector) -> None
+  disconnect(*connectors: Connector) -> None
+  read(channels: Optional[Channels], start: Optional[pd.Timestamp], end: Optional[pd.Timestamp]) -> pd.DataFrame
+  write(data: pd.DataFrame, channels: Optional[Channels]) -> None
+  log(channels: Optional[Channels], force: bool) -> None
+}
+class "DataContext" as lori.data.context.DataContext {
+  channels: Channels
+  filter(filter: Callable[[Channel], bool]) -> Channels
+  groupby(by: str) -> List[Tuple[Any, Channels]]
+  to_frame() -> pd.DataFrame
+}
+class "ComponentContext" as lori.components.context.ComponentContext {
+}
+class "ConnectorContext" as lori.connectors.context.ConnectorContext {
+}
+class "Activator" as lori.core.activator.Activator {
+  name: str
+  {abstract}activate() -> None
+  {abstract}deactivate() -> None
+  is_active() -> bool
+}
+class "Registrator" as lori.core.register.registrator.Registrator {
+  TYPE: str
+  SECTION: str
+  SECTIONS: Collection[str]
+  context: RegistratorContext
+  id: str
+  key: str
+}
+class "RegistratorContext" as lori.core.register.context.RegistratorContext {
+  SECTION
+  filter(filter: Callable[[R], bool]) -> Collection[R]
+  get_all() -> Collection[R]
+  get_first() -> Optional[R]
+  get_last() -> Optional[R]
+  get_types() -> Collection[str]
+  has_type() -> bool
+}
+class "Configurator" as lori.core.configs.configurator.Configurator {
+  context: Context
+  configs: Configurations
+  {abstract}configure(configs: Configurations) -> None
+  is_configured() -> bool
+  is_enabled() -> bool
+}
+class "ThreadPoolExecutor" as concurrent.futures.thread.ThreadPoolExecutor {
+  shutdown(wait)
+  submit()
+}
+
+lori.core.register.registrator.Registrator --|> lori.core.configs.configurator.Configurator
+lori.core.register.registrator.Registrator - lori.core.register.context.RegistratorContext : 0..*
+lori.core.activator.Activator --|> lori.core.register.registrator.Registrator
+lori.data.context.DataContext --|> lori.core.configs.configurator.Configurator
+lori.data.manager.DataManager --|> lori.data.context.DataContext
+lori.data.manager.DataManager --|> lori.core.activator.Activator
+lori.data.manager.DataManager *-- lori.components.context.ComponentContext : _components
+lori.data.manager.DataManager *-- lori.connectors.context.ConnectorContext : _connectors
+lori.data.manager.DataManager *-- concurrent.futures.thread.ThreadPoolExecutor : _executor
+lori.components.context.ComponentContext --|> lori.core.register.context.RegistratorContext
+lori.components.context.ComponentContext --|> lori.core.configs.configurator.Configurator
+lori.connectors.context.ConnectorContext --|> lori.core.register.context.RegistratorContext
+lori.connectors.context.ConnectorContext --|> lori.core.configs.configurator.Configurator
+@enduml
