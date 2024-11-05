@@ -1,0 +1,45 @@
+@startuml lori.core.configs.configurator.Configurator
+set namespaceSeparator none
+class "Configurator" as lori.core.configs.configurator.Configurator {
+  context: Context
+  configs: Configurations
+  {abstract}configure(configs: Configurations) -> None
+  is_configured() -> bool
+  is_enabled() -> bool
+}
+class "Configurations" as lori.core.configs.configurations.Configurations {
+  name: str
+  path: pathlib.Path
+  sections -> List[Configurations]
+  dirs: Directories
+  enabled: bool
+  get(key: str, default: Any) -> Any
+  get_bool(key: str, default: bool) -> bool
+  get_date(key: str, default: dt.datetime | pd.Timestamp) -> pd.Timestamp
+  get_float(key: str, default: float) -> float
+  get_int(key: str, default: int) -> int
+  get_section(section: str, defaults: Optional[Mapping[str, Any]]) -> Configurations
+  has_section(section: str) -> bool
+  move_to_bottom(key: str) -> None
+  move_to_top(key: str) -> None
+  set(key: str, value: Any, replace: bool) -> None
+  update(u: Mapping[str, Any], replace: bool) -> None
+  copy() -> Configurations
+}
+class "Directories" as lori.core.configs.directories.Directories {
+  conf: Directory
+  data: Directory
+  lib: Directory
+  log: Directory
+  tmp: Directory
+  to_dict() -> Dict[str, Optional[str]]
+  update(configs: Mapping[str, str]) -> None
+}
+class "Directory" as lori.core.configs.directories.Directory {
+  default : str
+  is_default() -> bool
+}
+lori.core.configs.configurator.Configurator o-- lori.core.configs.configurations.Configurations : __configs
+lori.core.configs.configurations.Configurations *-- lori.core.configs.directories.Directories : __dirs
+lori.core.configs.directories.Directories *-- lori.core.configs.directories.Directory : _conf, _data, _lib, _log, _tmp
+@enduml

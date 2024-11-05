@@ -8,16 +8,16 @@
 
 import datetime as dt
 
-import loris
+import lori
 
-project = "Loris"
+project = "Lori"
 author = "ISC Konstanz e.V."
 
 copyright = f"{dt.datetime.now().year}, ISC Konstanz e.V"
 
 # The full project version, used as the replacement for |release| and e.g. in the HTML templates.
 # For example, for the Python documentation, this may be something like 1.0.0rc1.
-release = "%s" % loris.__version__
+release = "%s" % lori.__version__
 
 # The major project version, used as the replacement for |version|.
 # For example, for the Python documentation, this may be something like 1.0.
@@ -64,7 +64,7 @@ suppress_warnings = ["autoapi.python_import_resolution"]
 # -- AutoAPI Configuration -------------------------------------------------
 # https://sphinx-autoapi.readthedocs.io/en/latest/reference/config.html#customisation-options
 
-autoapi_dirs = ["../loris"]
+autoapi_dirs = ["../lori"]
 
 autoapi_ignore = [
     "*tests/*",
@@ -108,11 +108,11 @@ html_theme = "pydata_sphinx_theme"
 # documentation.
 # https://pydata-sphinx-theme.rtfd.io/en/latest/user_guide/configuring.html
 html_theme_options = {
-    "github_url": "https://github.com/isc-konstanz/loris",
+    "github_url": "https://github.com/isc-konstanz/lori",
     "icon_links": [
         {
             "name": "PyPI",
-            "url": "https://pypi.org/project/loris/",
+            "url": "https://pypi.org/project/lori/",
             "icon": "fab fa-python",
         },
     ],
@@ -134,19 +134,20 @@ html_sidebars = {
 
 html_context = {
     "github_user": "isc-konstanz",
-    "github_repo": "loris",
+    "github_repo": "lori",
     "github_version": "stable",
+    "default_mode": "light",
     "doc_path": "doc",
 }
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-html_logo = "_images/loris-logo.png"
+html_logo = "_images/lori-logo.svg"
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
 # pixels large.
-html_favicon = "_images/loris-favicon.ico"
+html_favicon = "_images/lori-favicon.ico"
 
 # A list of paths that contain custom static files (such as style sheets or script files).
 # Relative paths are taken as relative to the configuration directory.
