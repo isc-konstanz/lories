@@ -119,7 +119,7 @@ If you have a suggestion that would improve project, please take a look at how t
 <!-- LICENSE -->
 ## License
 
-Distributed under the LGPLv3 License. See [`LICENSE`](https://github.com/isc-konstanz/lori/blob/master/LICENSE) for more information.
+Distributed under the LGPLv3 License. See [`LICENSE`](https://github.com/isc-konstanz/lori/blob/main/LICENSE) for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -148,4 +148,4 @@ To get in touch with the developers, please take a look at the [Contact](doc/con
 [issues-shield]: https://img.shields.io/github/issues/isc-konstanz/lori.svg?style=for-the-badge
 [issues-url]: https://github.com/isc-konstanz/lori/issues
 [license-shield]: https://img.shields.io/github/license/isc-konstanz/lori.svg?style=for-the-badge
-[license-url]: https://github.com/isc-konstanz/lori/blob/master/LICENSE
+[license-url]: https://github.com/isc-konstanz/lori/blob/main/LICENSE

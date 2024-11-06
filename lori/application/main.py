@@ -91,6 +91,22 @@ class Application(DataManager, Thread):
     def settings(self) -> Settings:
         return self.configs
 
+    def main(self) -> None:
+        try:
+            action = self.settings["action"]
+            if action == "run":
+                self.run()
+
+            elif action == "start":
+                self.start()
+                self.wait()
+
+        except Exception as e:
+            self._logger.warning(repr(e))
+            if self._logger.isEnabledFor(logging.DEBUG):
+                self._logger.exception(e)
+            exit(1)
+
     def start(self) -> None:
         self._logger.info(f"Starting {type(self).__name__}: {self.name}")
         self.__interrupt.clear()

@@ -87,21 +87,27 @@ class Settings(Configurations):
             )
 
 
+# noinspection PyProtectedMember
 def _parse_kwargs(parser: ArgumentParser) -> Dict[str, Any]:
     if parser is not None:
+        action_parsers = [a for a in parser._actions if a.dest == "action"]
+        if len(action_parsers) > 0:
+            action_parser = next(iter(action_parsers))
+        else:
+            action_parser = parser.add_subparsers(dest="action")
+        if not action_parser.required and action_parser.default is None:
+            action_parser.required = True
+        if "run" not in action_parser.choices.keys():
+            action_parser.add_parser("run", help="run local resources, connectors and systems")
+        if "start" not in action_parser.choices.keys():
+            action_parser.add_parser("start", help="start the local resource system")
+
         parser.add_argument(
             "-c",
             "--conf-dir",
             dest="conf_dir",
             metavar="dir",
             help="directory to expect root configuration files",
-        )
-        parser.add_argument(
-            "-l",
-            "--lib-dir",
-            dest="lib_dir",
-            metavar="dir",
-            help="directory to expect and write library files to",
         )
         parser.add_argument(
             "-d",
@@ -129,6 +135,7 @@ def _parse_kwargs(parser: ArgumentParser) -> Dict[str, Any]:
             action="store_true",
             help="flags if the configured system files should be copied to the specified data directory if it is empty",
         )
+
         args = parser.parse_args()
         kwargs = vars(args)
     else:
