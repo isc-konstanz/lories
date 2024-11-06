@@ -149,7 +149,7 @@ class ComponentPage(Page, Generic[C]):
     def _build_channel_timestamp(self, channel: Channel) -> html.Small:
         timestamp = channel.timestamp
         if not pd.isna(timestamp):
-            timestamp = timestamp.strftime("%Y-%m-%d %H:%M:%S%:z")
+            timestamp = timestamp.isoformat(sep=" ", timespec="seconds")
         return html.Small(timestamp, className="text-muted")
 
     # noinspection PyMethodMayBeStatic
