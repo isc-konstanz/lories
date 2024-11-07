@@ -108,7 +108,7 @@ class Table(Sequence[Column]):
             query = re.sub(
                 r"ON DUPLICATE KEY UPDATE.*",
                 f"ON CONFLICT ({', '.join(self.index.names)}) DO UPDATE SET "
-                f"{', '.join([f'\"{col.name}\"=EXCLUDED.\"{col.name}\"' for col in self.columns])}",
+                + ', '.join([f'\"{col.name}\"=EXCLUDED.\"{col.name}\"' for col in self.columns]),
                 query,
             )
         return query
