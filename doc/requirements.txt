@@ -1,0 +1,1 @@
+lori@git+https://github.com/isc-konstanz/lori.git@stable
