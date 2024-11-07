@@ -45,10 +45,6 @@ class PageCard(dbc.Card, MutableSequence[PageCardItem]):
     items = List[PageCardItem]
 
     def __init__(self, horizontal: bool = True, style: Dict[str, Any] = None, **kwargs) -> None:
-        if style is None:
-            style = {}
-        if "height" not in style:
-            style["height"] = "100%"
         self.items = list[PageCardItem]()
         self._body = dbc.CardBody([dbc.ListGroup(self.items, horizontal=horizontal, flush=True, style=style)])
         super().__init__(children=[self._body], **kwargs)
