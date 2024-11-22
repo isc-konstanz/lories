@@ -21,10 +21,8 @@ from lori.util import ceil_date, floor_date, parse_freq, to_timezone
 
 
 # noinspection PyShadowingBuiltins
-@register_connector_type
+@register_connector_type("csv")
 class CsvConnector(Connector):
-    TYPE: str = "csv"
-
     _data: Optional[pd.DataFrame] = None
     _data_path: Optional[str] = None
     _data_dir: str

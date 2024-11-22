@@ -16,14 +16,10 @@ import requests
 
 import numpy as np
 import pandas as pd
-from lori import ConfigurationException, Configurations, Resources
-from lori.components.weather import Weather, WeatherConnector
-from lori.components.weather.dwd._channels import get_channels
-from lori.connectors import register_connector_type
+from lori import ConfigurationException, Configurations, Resources, Weather
+from lori.components.weather import WeatherConnector
 
 
-# noinspection SpellCheckingInspection
-@register_connector_type
 class Brightsky(WeatherConnector):
     TYPE: str = "brightsky"
 
@@ -41,29 +37,6 @@ class Brightsky(WeatherConnector):
         self.horizon = configs.get_int("horizon", default=Brightsky.horizon)
         if -1 > self.horizon > 10:
             raise ConfigurationException(f"Invalid forecast horizon: {self.horizon}")
-
-        if self.forecast.is_enabled():
-            self.forecast.data.add(
-                key="timestamp_creation",
-                name="Creation Timestamp",
-                connector=self.id,
-                address="source_first_record",
-                source="forecast",
-                type=pd.Timestamp,
-                logger={
-                    "primary": True,
-                    "nullable": False,
-                },
-            )
-            for channel in get_channels(connector=self.id, source="forecast"):
-                self.forecast.data.add(**channel)
-
-        for channel in get_channels(connector=self.id, source="current, historical"):
-            if channel["key"] not in [Weather.PRECIPITATION_PROB]:
-                self.data.add(**channel)
-
-    def has_forecast(self) -> bool:
-        return True
 
     def read(
         self,

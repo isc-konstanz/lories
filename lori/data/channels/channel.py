@@ -8,24 +8,28 @@ lori.data.channels.channel
 
 from __future__ import annotations
 
+import datetime as dt
 from collections import OrderedDict
-from typing import Any, Collection, Dict, List, Mapping, Optional, Type
+from collections.abc import Callable
+from typing import Any, Collection, Dict, List, Literal, Mapping, Optional, Type
 
 import pandas as pd
 import pytz as tz
-from lori.core import Resource
+from lori.core import Context, Resource, ResourceException
 from lori.core.configs import ConfigurationException, Configurations
 from lori.data.channels import ChannelConnector, ChannelState
 from lori.util import parse_freq, to_timedelta
 
 
 class Channel(Resource):
-    logger: ChannelConnector
-    connector: ChannelConnector
+    __context: Context
 
     _timestamp: pd.Timestamp = pd.NaT
     _value: Optional[Any] = None
     _state: str | ChannelState = ChannelState.DISABLED
+
+    logger: ChannelConnector
+    connector: ChannelConnector
 
     # noinspection PyShadowingBuiltins
     def __init__(
@@ -34,16 +38,26 @@ class Channel(Resource):
         key: str = None,
         name: str = None,
         type: str | Type = None,
+        context: Context = None,
         connector: Optional[ChannelConnector] = None,
         logger: Optional[ChannelConnector] = None,
         **configs: Any,
     ) -> None:
         super().__init__(id=id, key=key, name=name, type=type, **configs)
+        self.__context = self._assert_context(context)
         self.connector = self._assert_connector(connector)
         self.logger = self._assert_connector(logger)
 
-    # noinspection PyMethodMayBeStatic
-    def _assert_connector(self, connector: Optional[ChannelConnector]) -> ChannelConnector:
+    @classmethod
+    def _assert_context(cls, context: Context) -> Context:
+        from lori.data.manager import DataManager
+
+        if context is None or not isinstance(context, DataManager):
+            raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
+        return context
+
+    @classmethod
+    def _assert_connector(cls, connector: Optional[ChannelConnector]) -> ChannelConnector:
         if connector is None:
             connector = ChannelConnector(None)
         return connector
@@ -133,12 +147,20 @@ class Channel(Resource):
         self._timestamp = timestamp
         self._value = value
         self._state = state
+        if self.is_valid():
+            self.__context.notify(self)
 
-    # noinspection PyProtectedMember
-    def from_logger(self) -> Channel:
-        channel = self.copy()
-        channel._update(**self.logger._copy_configs())
-        return channel
+    # noinspection PyShadowingBuiltins
+    def read(
+        self,
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
+    ) -> pd.DataFrame:
+        return self.__context.read(self.to_list(), start, end)
+
+    # noinspection PyShadowingBuiltins
+    def write(self, data: pd.DataFrame) -> None:
+        self.__context.write(data, self.to_list())
 
     # noinspection PyShadowingBuiltins
     def has_logger(self, *ids: Optional[str]) -> bool:
@@ -147,6 +169,11 @@ class Channel(Resource):
     # noinspection PyShadowingBuiltins
     def has_connector(self, id: Optional[str] = None) -> bool:
         return self.connector.enabled and self.connector.id == id if id is not None else True
+
+    def to_list(self):
+        from lori.data import Channels
+
+        return Channels([self])
 
     def to_series(self, state: bool = False) -> pd.Series:
         if isinstance(self.value, pd.Series):
@@ -158,12 +185,19 @@ class Channel(Resource):
                 data = self.value
             return pd.Series(index=[self.timestamp], data=[data], name=self.key)
 
+    # noinspection PyProtectedMember
+    def from_logger(self) -> Channel:
+        channel = self.copy()
+        channel._update(**self.logger._copy_configs())
+        return channel
+
     def copy(self) -> Channel:
         channel = Channel(
             id=self.id,
             key=self.key,
             name=self.name,
             type=self.type,
+            context=self.__context,
             connector=self.connector.copy(),
             logger=self.logger.copy(),
             **self._copy_configs(),
