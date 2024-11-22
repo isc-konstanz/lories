@@ -150,6 +150,14 @@ class Channel(Resource):
         if self.is_valid():
             self.__context.notify(self)
 
+    def register(
+        self,
+        function: Callable[[pd.DataFrame], None],
+        how: Literal["any", "all"] = "any",
+        unique: bool = False,
+    ) -> None:
+        self.__context.register(function, self, how=how, unique=unique)
+
     # noinspection PyShadowingBuiltins
     def read(
         self,

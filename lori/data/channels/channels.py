@@ -30,6 +30,15 @@ class Channels(Resources[Channel]):
     def keys(self) -> Sequence[str]:
         return [c.key for c in self]
 
+    def register(
+        self,
+        function: Callable[[pd.DataFrame], None],
+        how: Literal["any", "all"] = "any",
+        unique: bool = False,
+    ) -> None:
+        for channel in self:
+            channel.register(function, how=how, unique=unique)
+
     def to_frame(self, unique: bool = False, states: bool = False) -> pd.DataFrame:
         columns = []
         data = OrderedDict[pd.Timestamp, Any]()

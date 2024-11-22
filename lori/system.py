@@ -13,7 +13,6 @@ from functools import wraps
 from shutil import copytree, ignore_patterns
 from typing import List, Optional
 
-import pandas as pd
 from lori import ConfigurationException, Configurations, Settings
 from lori.components import Component, WeatherProvider
 from lori.components.context import ComponentContext
@@ -216,7 +215,3 @@ class System(ComponentContext, Activator, Identifier):
         if not self.has_component(WeatherProvider):
             raise WeatherUnavailableException(f"System '{self.name}' has no weather configured")
         return next(self.get_component_type(WeatherProvider))
-
-    # noinspection PyMethodMayBeStatic
-    def run(self, *args, **kwargs) -> Optional[pd.DataFrame]:
-        return None

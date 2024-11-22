@@ -132,6 +132,23 @@ class DataAccess(DataContext, Configurator):
             id = f"{self.__component.id}.{id}"
         return super()._get(id)
 
+    def register(
+        self,
+        function: Callable[[pd.DataFrame], None],
+        *channels: Channel | str,
+        how: Literal["any", "all"] = "any",
+        unique: bool = False,
+    ) -> None:
+        _channels = []
+        for channel in channels:
+            if isinstance(channel, str):
+                if channel in self:
+                    channel = self[channel]
+            elif not isinstance(channel, Channel):
+                raise ResourceException(f"Unable to register to '{type(channel)}' channel: {channel}")
+            _channels.append(channel)
+        self.__context.register(function, *_channels, how=how, unique=unique)
+
     # noinspection PyShadowingBuiltins
     def read(
         self,
