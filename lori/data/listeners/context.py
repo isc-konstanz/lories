@@ -86,10 +86,10 @@ class ListenerContext(Context[Listener]):
             ids = listener.channels.ids
             if any(c.id in ids for c in channels) and listener.has_update():
                 if listener.timestamp >= timestamp:
-                    self._logger.warning(f"Listener '{self.id}' already started at: {timestamp}")
+                    self._logger.warning(f"Listener '{listener.id}' already started at: {timestamp}")
                     continue
                 if listener.locked():
-                    self._logger.warning(f"Listener '{self.id}' not finished yet. Please verify your configurations")
+                    self._logger.warning(f"Listener '{listener.id}' not finished yet. Please verify your configurations")
 
                 listener.timestamp = timestamp
                 listeners.append(listener)
