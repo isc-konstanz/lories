@@ -33,6 +33,7 @@ from .data import (  # noqa: F401
     ChannelState,
     Channel,
     Channels,
+    Listener,
 )
 
 from . import connectors  # noqa: F401

@@ -29,6 +29,7 @@ from lori.core.configs import ConfigurationException, Configurations, Configurat
 from lori.core.register import RegistratorContext
 from lori.data.channels import Channel, ChannelConnector, Channels, ChannelState
 from lori.data.context import DataContext
+from lori.data.listeners import ListenerContext
 from lori.util import floor_date, get_variables, to_timedelta, validate_key
 
 
@@ -36,6 +37,8 @@ from lori.util import floor_date, get_variables, to_timedelta, validate_key
 class DataManager(DataContext, Activator, Identifier):
     _connectors: ConnectorContext
     _components: ComponentContext
+
+    _listeners: ListenerContext
 
     _executor: ThreadPoolExecutor
     __runner: Thread
@@ -50,6 +53,7 @@ class DataManager(DataContext, Activator, Identifier):
 
         self._connectors = ConnectorContext(self, configs)
         self._components = ComponentContext(self, configs)
+        self._listeners = ListenerContext(self)
         self._executor = ThreadPoolExecutor(
             thread_name_prefix=self.name, max_workers=max(int((os.cpu_count() or 1) / 2), 1)
         )
@@ -259,6 +263,23 @@ class DataManager(DataContext, Activator, Identifier):
         if self.__runner.is_alive():
             self.__runner.join()
 
+    def register(
+        self,
+        function: Callable[[pd.DataFrame], None],
+        *channels: Channel | str,
+        how: Literal["any", "all"] = "any",
+        unique: bool = False,
+    ) -> None:
+        _channels = []
+        for channel in channels:
+            if isinstance(channel, str):
+                if channel in self:
+                    channel = self[channel]
+            if not isinstance(channel, Channel):
+                raise ResourceException(f"Unable to register to '{type(channel)}' channel: {channel}")
+            _channels.append(channel)
+        self._listeners.register(function, Channels(_channels), how=how, unique=unique)
+
     @property
     def components(self) -> ComponentContext:
         return self._components
@@ -266,6 +287,26 @@ class DataManager(DataContext, Activator, Identifier):
     @property
     def connectors(self) -> ConnectorContext:
         return self._connectors
+
+    @property
+    def listeners(self) -> ListenerContext:
+        return self._listeners
+
+    def notify(self, *channels: Channel) -> None:
+        now = pd.Timestamp.now(tz.UTC)
+        with self.listeners:
+            for listener in self.listeners.notify(now, *channels):
+                listener_future = self._executor.submit(listener)
+                listener_future.add_done_callback(self._notify_callback)
+
+    # noinspection PyUnresolvedReferences
+    def _notify_callback(self, future: Future) -> None:
+        exception = future.exception()
+        if exception is not None:
+            listener = exception.listener
+            self._logger.warning(f"Error notifying listener '{listener.id}': {repr(exception)}")
+            if self._logger.isEnabledFor(logging.DEBUG):
+                self._logger.exception(exception)
 
     def start(self) -> None:
         self._logger.info(f"Starting {type(self).__name__}: {self.name}")
@@ -312,6 +353,8 @@ class DataManager(DataContext, Activator, Identifier):
                 self.read(channels)
 
             self.log()
+
+        self.listeners.wait()
         self.log()
 
     # noinspection PyShadowingBuiltins, PyTypeChecker
