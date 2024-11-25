@@ -196,7 +196,9 @@ class Configurations(MutableMapping[str, Any]):
             for s in sections
             if s in self.sections or ensure_exists
         }
-        return Configurations(self.name, self.dirs, sections)
+        section_dirs = self.__dirs.copy()
+        section_dirs.conf = str(self.__path).replace(".conf", ".d")
+        return Configurations(self.name, section_dirs, sections)
 
     def get_section(
         self,
