@@ -271,6 +271,7 @@ class DataManager(DataContext, Activator, Identifier):
         self._logger.info(f"Starting {type(self).__name__}: {self.name}")
         self.__interrupt.clear()
         self.__runner.start()
+        self.__runner.join()
 
     # noinspection PyShadowingBuiltins, PyProtectedMember
     def run(self, *args, **kwargs) -> None:

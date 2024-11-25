@@ -69,7 +69,6 @@ class Application(DataManager):
 
             elif action == "start":
                 self.start()
-                self.wait()
 
         except Exception as e:
             self._logger.warning(repr(e))
