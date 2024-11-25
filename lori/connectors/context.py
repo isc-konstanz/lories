@@ -8,56 +8,33 @@ lori.connectors.context
 
 from __future__ import annotations
 
-from typing import Callable, Optional, Type, TypeVar, overload
+from typing import Callable, Optional, Type, TypeVar
 
 from lori.connectors import Connector
-from lori.core import Context, Registrator, RegistratorContext, Registry
-from lori.core.configs import ConfigurationException, Configurations, Configurator
+from lori.core import Configurations, Context, Registrator, RegistratorContext, Registry
 
 C = TypeVar("C", bound=Connector)
 
 registry = Registry[Connector]()
 
 
-@overload
-def register_connector_type(cls: Type[C]) -> Type[C]: ...
-
-
-@overload
+# noinspection PyShadowingBuiltins
 def register_connector_type(
-    *alias: Optional[str],
-    factory: Callable[..., Type[C]] = None,
+    type: str,
+    *alias: str,
+    factory: Callable[[Registrator | Context, Optional[Configurations]], C] = None,
     replace: bool = False,
-) -> Type[C]: ...
-
-
-def register_connector_type(
-    *args: Optional[Type[C], str],
-    **kwargs,
-) -> Type[C] | Callable[[Type[C]], Type[C]]:
-    args = list(args)
-    if len(args) > 0 and isinstance(args[0], type):
-        cls = args.pop(0)
-        registry.register(cls, *args, **kwargs)
-        return cls
-
+) -> Callable[[Type[C]], Type[C]]:
     # noinspection PyShadowingNames
     def _register(cls: Type[C]) -> Type[C]:
-        registry.register(cls, *args, **kwargs)
+        registry.register(cls, type, *alias, factory=factory, replace=replace)
         return cls
 
     return _register
 
 
-class ConnectorContext(RegistratorContext[Connector], Configurator):
+class ConnectorContext(RegistratorContext[Connector]):
     SECTION: str = "connectors"
-
-    def __init__(self, context: Context, *args, **kwargs) -> None:
-        from lori.data.context import DataContext
-
-        if context is None or not isinstance(context, DataContext):
-            raise ConfigurationException(f"Invalid data context: {None if context is None else type(context)}")
-        super().__init__(context, *args, **kwargs)
 
     @property
     def _registry(self) -> Registry[Connector]:
@@ -77,9 +54,9 @@ class ConnectorContext(RegistratorContext[Connector], Configurator):
         configs = configs.copy()
         if configs.has_section(self.SECTION):
             connectors = configs.get_section(self.SECTION)
-            for section in self._get_type().SECTIONS:
+            for section in Connector.SECTIONS:
                 if section in connectors:
                     defaults.update(connectors.pop(section))
 
-            self._load_sections(context, connectors, defaults)
+            self._load_sections(context, connectors, defaults, Connector.SECTIONS)
         self._load_from_file(context, configs.dirs, configs_file, defaults)

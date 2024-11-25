@@ -12,64 +12,40 @@ import itertools
 import os
 import re
 from abc import abstractmethod
-from collections import OrderedDict
 from copy import deepcopy
-from itertools import chain
-from typing import Any, Callable, Collection, Iterator, Mapping, Optional, Tuple, Type, TypeVar, get_args
+from typing import Any, Collection, Mapping, Optional, Sequence, TypeVar, get_args
 
-import numpy as np
-import pandas as pd
-from lori.core import Configurations, Context, Directories, ResourceException
+from lori.core import Configurations, Configurator, Context, Directories, ResourceException
 from lori.core.register import Registrator, Registry
+from lori.util import validate_key
 
 R = TypeVar("R", bound=Registrator)
 
 
-class RegistratorContext(Context[R]):
-    # noinspection PyPep8Naming
-    @property
-    @abstractmethod
-    def SECTION(self) -> str:
-        pass
-
-    def __init__(self, context: Context, *args, other: Collection[R] = (), **kwargs) -> None:
-        if context is None or not isinstance(context, Context):
-            raise ResourceException(f"Invalid context: {None if context is None else type(context)}")
-        super().__init__(context, *args, **kwargs)
-        self.__map = OrderedDict[str, R](other)
-
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}({[c.id for c in self.__map.values()]})"
-
-    def __str__(self) -> str:
-        return f"{type(self).__name__}:\n\t" + "\n\t".join([f"{i} = {repr(c)}" for i, c in self.__map.items()])
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self.__map)
-
-    def __len__(self) -> int:
-        return len(self.__map)
-
-    def __contains__(self, __value: str | R) -> bool:
-        if isinstance(__value, str):
-            return __value in self.__map.keys()
-        if isinstance(__value, self._get_type()):
-            return __value in self.values()
-        return False
-
-    def __getitem__(self, __uid: str) -> R:
-        return self._get(__uid)
-
-    def __setitem__(self, __uid: str, __value: R) -> None:
-        self._set(__uid, __value)
-
-    def __delitem__(self, __uid: str) -> None:
-        del self.__map[__uid]
+class RegistratorContext(Context[R], Configurator):
+    __context: Context
 
     @property
     @abstractmethod
     def _registry(self) -> Registry[R]:
         pass
+
+    def __init__(
+        self,
+        context: Context,
+        configs: Optional[Configurations] = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(configs=configs, **kwargs)
+        self.__context = self._assert_context(context)
+
+    @classmethod
+    def _assert_context(cls, context: Context) -> Context:
+        from lori.data.manager import DataManager
+
+        if context is None or not isinstance(context, DataManager):
+            raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
+        return context
 
     # noinspection PyProtectedMember, PyUnresolvedReferences
     def _load_sections(
@@ -77,17 +53,11 @@ class RegistratorContext(Context[R]):
         context: RegistratorContext | Registrator,
         configs: Configurations,
         defaults: Optional[Mapping[str, Any]] = None,
+        default_sections: Optional[Sequence[str]] = (),
     ) -> Collection[R]:
         values = []
         if defaults is None:
             defaults = {}
-        if isinstance(context, RegistratorContext):
-            default_sections = _get_sections(context._get_type())
-        elif isinstance(context, Registrator):
-            default_sections = _get_sections(type(context))
-        else:
-            raise ResourceException(f"Unable to load sections for: {type(context)}")
-
         for section in default_sections:
             if section in configs:
                 defaults.update(configs.get(section))
@@ -148,22 +118,9 @@ class RegistratorContext(Context[R]):
                     values.append(self._update(context, configs))
         return values
 
-    def _sort(self):
-        def order(text: str) -> Tuple[Any, ...]:
-            elements = re.split(r"[^0-9A-Za-zäöüÄÖÜß]+", text)
-            elements = list(chain(*[re.split(r"([0-9])+", t) for t in elements]))
-            elements = [int(t) if t.isdigit() else t for t in elements if pd.notna(t) and t.strip()]
-            return tuple(elements)
-
-        self.__map = OrderedDict(sorted(self.__map.items(), key=lambda e: order(e[0])))
-
-    # noinspection PyShadowingBuiltins
-    def filter(self, filter: Callable[[R], bool]) -> Collection[R]:
-        return [c for c in self.__map.values() if filter(c)]
-
-    # noinspection PyUnresolvedReferences
-    def _get_type(self) -> Type[R]:
-        return get_args(self._registry.__orig_class__)[0]
+    @property
+    def context(self) -> Context:
+        return self.__context
 
     # noinspection PyMethodMayBeStatic
     def get_types(self) -> Collection[str]:
@@ -174,17 +131,19 @@ class RegistratorContext(Context[R]):
             raise ValueError("At least one type to look up required")
         return len(self.get_all(*types)) > 0
 
-    def get_all(self, *types: Optional[str | type]) -> Collection[R]:
-        length = len(types)
-
+    def get_all(self, *types: Optional[type]) -> Collection[R]:
+        # noinspection PyUnresolvedReferences
         def _is_type(value: R) -> bool:
-            return (
-                length == 0
-                or any(t.startswith(value.TYPE) for t in types if isinstance(t, str))
-                or any(isinstance(value, t) for t in types if isinstance(t, type))
-            )
+            if len(types) == 0:
+                return True
+            for _type in types:
+                if isinstance(_type, str) and self._registry.has_type(_type):
+                    return self._registry.types[_type].is_instance(value)
+                if isinstance(_type, type) and isinstance(value, _type):
+                    return True
+            return False
 
-        return [v for v in self.__map.values() if _is_type(v)]
+        return [v for v in self.values() if _is_type(v)]
 
     def get_first(self, *types: Optional[str | type]) -> Optional[R]:
         return next(iter(self.get_all(*types)))
@@ -193,24 +152,13 @@ class RegistratorContext(Context[R]):
     def get_last(self, *types: Optional[str | type]) -> Optional[R]:
         return next(reversed(self.get_all(*types)))
 
-    def _get(self, __uid: str) -> R:
-        return self.__map[__uid]
-
-    def _set(self, __uid: str, __value: R) -> None:
-        self.__map[__uid] = __value
-
-    def _add(self, *__values: R) -> None:
-        for __value in __values:
-            self._set(__value.id, __value)
-
-    # noinspection PyProtectedMember, SpellCheckingInspection
+    # noinspection PyUnresolvedReferences, PyProtectedMember, SpellCheckingInspection
     def _new(self, context: Context, configs: Configurations) -> R:
-        registrator_type = self._get_type()
-        registration_key = "_".join(os.path.splitext(configs.name)[:-1])
-        if registrator_type.SECTION not in configs.sections:
-            configs._add_section(registrator_type.SECTION, {})
-        registrator_section = configs[registrator_type.SECTION]
-        registration_type = re.split(r"[^a-zA-Z0-9\s]", registration_key)[0]
+        registration_class = get_args(self._registry.__orig_class__)[0]
+        registration_path = "_".join(os.path.splitext(configs.name)[:-1])
+        registration_key = validate_key(registration_path)
+        registration_type = re.split(r"[^a-zA-Z0-9_]", registration_path)[0]
+        registrator_section = configs.get_section(registration_class.SECTION, ensure_exists=True)
         if "type" in registrator_section:
             registration_type = registrator_section.get("type").lower()
         elif "type" in configs:
@@ -226,7 +174,7 @@ class RegistratorContext(Context[R]):
                 self._logger.debug(
                     f"Using alias \"{','.join(registration.alias)}\" " f"for registration: {registration_type}"
                 )
-        if "key" not in configs[registrator_type.SECTION]:
+        if "key" not in registrator_section:
             registrator_section["key"] = registration_key
             registrator_section.move_to_top("key")
         if "type" not in registrator_section:
@@ -242,10 +190,3 @@ class RegistratorContext(Context[R]):
         else:
             self._add(value)
         return value
-
-
-# noinspection PyShadowingBuiltins, PyTypeChecker
-def _get_sections(type: Type[R]) -> Collection[str]:
-    sections = [t.SECTIONS for t in type.mro() if t != Registrator and issubclass(t, Registrator)]
-    sections = [*itertools.chain.from_iterable(s for s in sections if isinstance(s, Collection))]
-    return np.unique(sections)

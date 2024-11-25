@@ -21,8 +21,6 @@ from lori.core import Resources
 # noinspection PyShadowingBuiltins
 @register_connector_type("dummy", "random")
 class DummyConnector(Connector):
-    TYPE: str = "dummy"
-
     _data: pd.Series
 
     def connect(self, resources: Resources) -> None:

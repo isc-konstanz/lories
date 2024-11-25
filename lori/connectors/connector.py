@@ -12,7 +12,7 @@ import datetime as dt
 from abc import abstractmethod
 from collections import OrderedDict
 from functools import wraps
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import pytz as tz
@@ -37,6 +37,7 @@ class ConnectorMeta(ConfiguratorMeta):
 
 class Connector(Registrator, metaclass=ConnectorMeta):
     SECTION: str = "connector"
+    SECTIONS: List[str] = []
 
     _connected: bool = False
     _connect_timestamp: pd.Timestamp = pd.NaT
@@ -49,10 +50,9 @@ class Connector(Registrator, metaclass=ConnectorMeta):
         self,
         context: Registrator | Context,
         configs: Optional[Configurations] = None,
-        *args,
         **kwargs,
     ) -> None:
-        super().__init__(context, configs, *args, **kwargs)
+        super().__init__(context=context, configs=configs, **kwargs)
         self.__resources = Resources()
 
     def __enter__(self) -> Connector:
@@ -63,10 +63,10 @@ class Connector(Registrator, metaclass=ConnectorMeta):
     def __exit__(self, type, value, traceback):
         self.disconnect()
 
-    # noinspection PyMethodMayBeStatic
-    def _assert_context(self, context: Optional[Context]) -> Optional[Context]:
+    @classmethod
+    def _assert_context(cls, context: Registrator | Context) -> Context:
         if context is None:
-            raise ConnectorException(f"Invalid context: {context}", connector=self)
+            raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
         return super()._assert_context(context)
 
     # noinspection PyShadowingBuiltins, PyProtectedMember
@@ -204,7 +204,7 @@ class ConnectorException(ResourceException):
     """
 
     # noinspection PyArgumentList
-    def __init__(self, *args, connector: Optional[Connector] = None, **kwargs) -> None:
+    def __init__(self, connector: Connector, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.connector = connector
 

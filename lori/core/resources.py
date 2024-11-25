@@ -43,6 +43,9 @@ class Resources(Generic[R], Sequence[R]):
     def __len__(self) -> int:
         return len(self._resources)
 
+    def __add__(self, other):
+        return type(self)([*self, *other])
+
     def append(self, resource: R) -> None:
         self._resources.append(resource)
 

@@ -19,20 +19,20 @@ from typing import Any, Callable, Collection, Dict, List, Mapping, Optional, Tup
 import numpy as np
 import pandas as pd
 import pytz as tz
-from lori.core import Context, ResourceException
+from lori.core import ResourceException
 from pandas.tseries.frequencies import to_offset
 
 # noinspection SpellCheckingInspection
 INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
 
-C = TypeVar("C", bound=Context)
+C = TypeVar("C")  # , bound=Context)
 V = TypeVar("V")
 
 
 # noinspection PyShadowingBuiltins
 def get_context(object: Any, type: Type[C] | Collection[Type[C]]) -> Optional[C]:
     _context = object
-    if _context is None:
+    if _context is None or isinstance(_context, type):
         return _context
     while not isinstance(_context, type):
         try:
@@ -414,7 +414,7 @@ def parse_name(name: str) -> str:
 
 
 # noinspection PyShadowingBuiltins
-def parse_key(id: str) -> str:
+def validate_key(id: str) -> str:
     for c in INVALID_CHARS:
         id = id.replace(c, "_")
     return re.sub(r"\W", "", id).lower()

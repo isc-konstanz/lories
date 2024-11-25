@@ -23,7 +23,6 @@ classifiers = [
     "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -32,7 +31,7 @@ classifiers = [
 ]
 
 readme = "README.md"
-requires-python = ">= 3.8"
+requires-python = ">= 3.9"
 license.file = "LICENSE"
 dynamic = ["version"]
 
@@ -85,7 +84,7 @@ lori = "lori.__main__:main"
 [tool.ruff]
 indent-width = 4
 line-length = 120
-target-version = "py38"
+target-version = "py39"
 exclude = ["lori/_version.py"]
 
 [tool.ruff.lint]
