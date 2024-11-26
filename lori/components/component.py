@@ -10,41 +10,33 @@ from __future__ import annotations
 
 import datetime as dt
 from functools import wraps
-from typing import Any, Collection, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from lori.connectors import ConnectorAccess
-from lori.core import Activator, Context, ResourceException, ResourceUnavailableException
+from lori.core import Activator, Context, Registrator, ResourceException, ResourceUnavailableException
 from lori.core.configs import ConfigurationException, Configurations
 from lori.data import DataAccess
 from lori.util import to_date
 
 
 # noinspection PyAbstractClass
-class Component(Activator):
+class Component(Registrator, Activator):
     SECTION: str = "component"
-    SECTIONS: Collection[str] = [DataAccess.SECTION, ConnectorAccess.SECTION]
+    SECTIONS: List[str] = [ConnectorAccess.SECTION, DataAccess.SECTION]
 
     __connectors: ConnectorAccess
-
     __data: DataAccess
 
     def __init__(
         self,
         context: Component | Context,
         configs: Optional[Configurations] = None,
-        *args,
         **kwargs,
     ) -> None:
-        super().__init__(context, configs, *args, **kwargs)
+        super().__init__(context=context, configs=configs, **kwargs)
         self.__connectors = ConnectorAccess(self)
         self.__data = DataAccess(self)
-
-    # noinspection PyMethodMayBeStatic
-    def _assert_context(self, context: Optional[Context]) -> Optional[Context]:
-        if context is None:
-            raise ComponentException(f"Invalid context: {context}")
-        return super()._assert_context(context)
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
@@ -56,17 +48,11 @@ class Component(Activator):
         if not configs.enabled:
             raise ConfigurationException(f"Trying to configure disabled {type(self).__name__}: {configs.name}")
 
-        self.__connectors.configure(configs.get_section(ConnectorAccess.SECTION, ensure_exists=True))
+        self.__connectors.configure(configs.get_sections([ConnectorAccess.SECTION], ensure_exists=True))
         self.__data.configure(configs.get_section(DataAccess.SECTION, ensure_exists=True))
         super()._do_configure(configs, *args, **kwargs)
 
-        self.__connectors.create()
         self.__data.create()
-
-    # Override return type, as a context is mandatory for components
-    @property
-    def context(self) -> Context:
-        return super().context
 
     @property
     def connectors(self):
@@ -113,6 +99,11 @@ class ComponentException(ResourceException):
     Raise if an error occurred accessing the connector.
 
     """
+
+    # noinspection PyArgumentList
+    def __init__(self, component: Component, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.component = component
 
 
 class ComponentUnavailableException(ResourceUnavailableException, ComponentException):

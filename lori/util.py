@@ -9,6 +9,7 @@ lori.util
 from __future__ import annotations
 
 import datetime as dt
+import dateutil.parser
 import re
 from copy import copy
 from dateutil.relativedelta import relativedelta
@@ -18,20 +19,20 @@ from typing import Any, Callable, Collection, Dict, List, Mapping, Optional, Tup
 import numpy as np
 import pandas as pd
 import pytz as tz
-from lori.core import Context, ResourceException
+from lori.core import ResourceException
 from pandas.tseries.frequencies import to_offset
 
 # noinspection SpellCheckingInspection
 INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
 
-C = TypeVar("C", bound=Context)
+C = TypeVar("C")  # , bound=Context)
 V = TypeVar("V")
 
 
 # noinspection PyShadowingBuiltins
 def get_context(object: Any, type: Type[C] | Collection[Type[C]]) -> Optional[C]:
     _context = object
-    if _context is None:
+    if _context is None or isinstance(_context, type):
         return _context
     while not isinstance(_context, type):
         try:
@@ -188,8 +189,6 @@ def convert_timezone(
     if date is None:
         return None
     if isinstance(date, str):
-        import dateutil.parser
-
         date = dateutil.parser.parse(date)
     if isinstance(date, dt.datetime):
         date = pd.Timestamp(date)
@@ -200,7 +199,7 @@ def convert_timezone(
         else:
             return date.tz_convert(timezone)
     else:
-        raise ConversionException(f"Unable to convert date of type {type(date)}")
+        raise TypeError(f"Unable to convert date of type {type(date)}")
 
 
 def slice_range(
@@ -278,15 +277,18 @@ def to_date(
 ) -> Optional[pd.Timestamp]:
     if date is None:
         return None
-    if isinstance(date, str):
-        date = pd.Timestamp(dt.datetime.strptime(date, format))
-    elif isinstance(date, int):
-        date = pd.Timestamp(dt.datetime.fromtimestamp(date))
 
-    if isinstance(date, (dt.datetime, pd.Timestamp)):
+    def _convert_timezone(_date: pd.Timestamp) -> pd.Timestamp:
         if timezone is not None:
-            date = convert_timezone(date, timezone)
-        return date
+            _date = convert_timezone(_date, timezone)
+        return _date
+
+    if issubclass(type(date), dt.datetime):
+        return _convert_timezone(date)
+    if isinstance(date, str):
+        return _convert_timezone(pd.Timestamp(dt.datetime.strptime(date, format)))
+    if isinstance(date, int):
+        return _convert_timezone(pd.Timestamp(dt.datetime.fromtimestamp(date)))
 
     raise TypeError(f"Invalid date type: {type(date)}")
 
@@ -334,22 +336,39 @@ def to_timedelta(freq: str) -> relativedelta | pd.Timedelta:
         raise ValueError(f"Invalid frequency: {freq}")
 
 
-def to_float(value: str | float) -> float:
-    if isinstance(value, str):
+def to_float(value: str | float) -> Optional[float]:
+    if value is None:
+        return None
+    if type(value) == float:  # noqa E721
+        return value
+    if isinstance(value, (str, int)) or issubclass(type(value), float):
         return float(value)
-    return value
+    raise TypeError(f"Expected str, int or float, not: {type(value)}")
 
 
-def to_int(value: str | int) -> int:
-    if isinstance(value, str):
+def to_int(value: str | int) -> Optional[int]:
+    if value is None:
+        return None
+    if type(value) == int:  # noqa E721
+        return value
+    if isinstance(value, str) or (isinstance(value, float) and int(value) == value) or issubclass(type(value), int):
         return int(value)
-    return value
+    raise TypeError(f"Expected str, float or int, not: {type(value)}")
 
 
-def to_bool(value: str | bool) -> bool:
+def to_bool(value: str | bool) -> Optional[bool]:
+    if value is None:
+        return None
+    if type(value) == bool:  # noqa E721
+        return value
     if isinstance(value, str):
-        return value.lower() in ["true", "yes", "y"]
-    return value
+        if value.lower() in ["true", "yes", "y"]:
+            return True
+        if value.lower() in ["false", "no", "n"]:
+            return False
+    if issubclass(type(value), int):
+        return bool(value)
+    raise TypeError(f"Invalid bool type: {type(value)}")
 
 
 # noinspection SpellCheckingInspection
@@ -395,13 +414,7 @@ def parse_name(name: str) -> str:
 
 
 # noinspection PyShadowingBuiltins
-def parse_key(id: str) -> str:
+def validate_key(id: str) -> str:
     for c in INVALID_CHARS:
         id = id.replace(c, "_")
-    return re.sub("[^\\w]+", "", id).lower()
-
-
-class ConversionException(ResourceException):
-    """
-    Raise if a conversion failed
-    """
+    return re.sub(r"\W", "", id).lower()

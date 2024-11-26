@@ -173,6 +173,10 @@ class Configurations(MutableMapping[str, Any]):
     def enabled(self) -> bool:
         return to_bool(self.get("enabled", default=True)) and not to_bool(self.get("disabled", default=False))
 
+    @enabled.setter
+    def enabled(self, enabled: bool) -> None:
+        self.set("enabled", enabled)
+
     @property
     def sections(self) -> List[str]:
         return [k for k, v in self.items() if isinstance(v, Configurations)]
@@ -181,6 +185,20 @@ class Configurations(MutableMapping[str, Any]):
         if section in self.sections:
             return True
         return False
+
+    def get_sections(
+        self,
+        sections: List[str],
+        ensure_exists: bool = False,
+    ) -> Configurations:
+        sections = {
+            s: self.get_section(s, defaults={}, ensure_exists=ensure_exists)
+            for s in sections
+            if s in self.sections or ensure_exists
+        }
+        section_dirs = self.__dirs.copy()
+        section_dirs.conf = str(self.__path).replace(".conf", ".d")
+        return Configurations(self.name, section_dirs, sections)
 
     def get_section(
         self,

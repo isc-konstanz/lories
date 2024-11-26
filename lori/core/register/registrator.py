@@ -8,80 +8,136 @@ lori.core.register.registrator
 
 from __future__ import annotations
 
-from abc import abstractmethod
-from typing import Collection, Optional
+import inspect
+import sys
+from collections import OrderedDict
+from collections.abc import Callable
+from typing import Any, Dict, Optional
 
-from lori.core import ConfigurationException, Configurations, Configurator, Context, ResourceException
-from lori.util import get_context, parse_key
+from lori.core import Configurations, Configurator, Context, Identifier, ResourceException
+from lori.util import get_context, validate_key
 
 
-class Registrator(Configurator):
-    # noinspection PyPep8Naming
-    @property
-    @abstractmethod
-    def TYPE(self) -> str:
-        pass
+class Registrator(Configurator, Identifier):
+    SECTION: str = "registration"
 
-    # noinspection PyPep8Naming
-    @property
-    def SECTION(self) -> str:
-        return self.TYPE
+    __context: Context
 
-    SECTIONS: Collection[str] = []
-
-    # noinspection PyProtectedMember
+    # noinspection PyProtectedMember, PyShadowingBuiltins, PyUnusedLocal
     def __init__(
         self,
-        context: Optional[Context | Registrator] = None,
+        context: Registrator | Context = None,
         configs: Optional[Configurations] = None,
+        id: Optional[str] = None,
         key: Optional[str] = None,
-        *args,
+        name: Optional[str] = None,
         **kwargs,
     ) -> None:
-        super().__init__(context, configs, *args, **kwargs)
-        self._key = self._assert_key(context, configs, key)
-        self._id = self._assert_id(context, configs, self._key)
+        key = self._build_key(key, configs=configs)
+        id = self._build_id(id, key, configs=configs, context=context)
 
-    # noinspection PyMethodMayBeStatic
-    def _assert_context(self, context: Optional[Context]) -> Optional[Context]:
-        from lori.core import RegistratorContext
+        context = self._assert_context(context)
+        if configs is None:
+            configs = Configurations(f"{key}.conf", context.configs.dirs)
+        super().__init__(
+            configs=configs,
+            name=self._build_name(name, configs=configs),
+            id=id,
+            key=key,
+            **kwargs,
+        )
+        self.__context = context
 
-        if context is None:
-            return None
-        if not isinstance(context, (RegistratorContext, Registrator)):
-            raise ResourceException(f"Invalid context: {None if context is None else type(context)}")
-        return get_context(context, Context)
+    @classmethod
+    def _assert_context(cls, context: Registrator | Context) -> Context:
+        from lori.core.register import RegistratorContext
 
-    # noinspection PyMethodMayBeStatic, PyUnusedLocal
-    def _assert_id(self, context: Optional[Context], configs: Optional[Configurations], key: str) -> str:
-        from lori.core import RegistratorContext
+        if context is None or not isinstance(context, (Registrator, RegistratorContext)):
+            raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
+        return get_context(context, RegistratorContext)
 
-        if context is None:
-            return key
-        if not isinstance(context, (Registrator, RegistratorContext)):
-            raise ResourceException(f"Invalid context: {None if context is None else type(context)}")
-        if not isinstance(context, Registrator):
-            # noinspection PyTypeChecker
-            context = get_context(context, Registrator)
-        return f"{context.id}.{key}"
+    # noinspection PyShadowingBuiltins
+    @classmethod
+    def _assert_id(cls, id: Optional[str], key: Optional[str]) -> str:
+        id = super()._assert_id(id, key)
+        if len(id.split(".")) <= 1:
+            raise ResourceException(f"Missing context in '{cls.__name__}' id: {id}")
+        return id
 
-    # noinspection PyUnusedLocal
-    def _assert_key(self, context: Optional[Context], configs: Optional[Configurations], key: Optional[str]) -> str:
+    # noinspection PyShadowingBuiltins
+    @classmethod
+    def _build_id(
+        cls,
+        id: Optional[str],
+        key: Optional[str],
+        configs: Optional[Configurations],
+        context: Context,
+    ) -> str:
         if configs is not None:
-            if configs.has_section(self.SECTION) and "key" in configs[self.SECTION]:
-                key = configs[self.SECTION]["key"]
+            if configs.has_section(cls.SECTION) and "id" in configs[cls.SECTION]:
+                id = configs[cls.SECTION]["id"]
+            elif "id" in configs:
+                id = configs["id"]
+        if id is None:
+            id = f"{get_context(context, Identifier).id}.{key}"
+        return id
+
+    @classmethod
+    def _build_key(cls, key: str, configs: Optional[Configurations]) -> str:
+        if configs is not None:
+            if configs.has_section(cls.SECTION) and "key" in configs[cls.SECTION]:
+                key = configs[cls.SECTION]["key"]
             elif "key" in configs:
                 key = configs["key"]
-            elif key is None:
-                raise ConfigurationException(f"Invalid configuration, missing specified {self.SECTION}.key")
-        elif key is None:
-            raise ConfigurationException("Missing configuration")
-        return parse_key(key)
+            else:
+                if configs.has_section(cls.SECTION) and "name" in configs[cls.SECTION]:
+                    key = validate_key(configs[cls.SECTION]["name"])
+                elif "name" in configs:
+                    key = validate_key(configs["name"])
+        return key
+
+    @classmethod
+    def _build_name(cls, name: Optional[str], configs: Optional[Configurations]) -> str:
+        if configs is not None:
+            if configs.has_section(cls.SECTION) and "name" in configs[cls.SECTION]:
+                name = configs[cls.SECTION]["name"]
+            elif "name" in configs:
+                name = configs["name"]
+        return name
+
+    # noinspection PyShadowingBuiltins
+    def _convert_vars(self, convert: Callable[[Any], str] = str) -> Dict[str, str]:
+        vars = self._get_vars()
+        values = OrderedDict()
+        try:
+            id = vars.pop("id", self.id)
+            key = vars.pop("key", self.key)
+            if id != key:
+                values["key"] = id
+            values["key"] = key
+            values["name"] = vars.pop("name", self.name)
+        except (ResourceException, AttributeError):
+            # Abstract properties are not yet instanced
+            pass
+
+        def is_from_framework(value: Any) -> bool:
+            from lori.core import Configurator, Context, Resource, Resources
+
+            if isinstance(value, (Context, Resource, Resources, Configurator, Identifier)):
+                return True
+            module = inspect.getmodule(value)
+            if module is None:
+                return False
+            base, *_ = module.__name__.partition(".")
+            return sys.modules[base] == "lori"
+
+        values.update({k: str(v) if not is_from_framework(v) else convert(v) for k, v in vars.items()})
+        values["enabled"] = str(self.is_enabled())
+        values["configured"] = str(self.is_configured())
+        values["configs"] = convert(self.configs)
+        values["context"] = convert(self.context)
+        return values
 
     @property
-    def id(self) -> str:
-        return self._id
-
-    @property
-    def key(self) -> str:
-        return self._key
+    def context(self) -> Context:
+        return self.__context

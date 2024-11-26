@@ -173,8 +173,9 @@ class Table(Sequence[Column]):
             if column.type == "DATETIME":
                 # TODO: Verify if there is a more generic way to implement time
                 raise ConnectorException(
+                    self._connector,
                     f"Unable to generate consistent hashes for table '{self.name}' "
-                    f"with DATETIME column: {column.name}"
+                    f"with DATETIME column: {column.name}",
                 )
             if column.type == "TIMESTAMP":
                 return f"UNIX_TIMESTAMP(`{column.name}`)"
