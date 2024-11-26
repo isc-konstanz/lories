@@ -100,7 +100,7 @@ class RegistratorContext(Context[R], Configurator):
     ) -> Collection[R]:
         values = []
         if os.path.isdir(configs_dir):
-            config_types = tuple(itertools.chain(*[[t.type, *t.alias] for t in self._registry.types.values()]))
+            config_types = tuple(itertools.chain(*[[t.key, *t.alias] for t in self._registry.types.values()]))
             for configs_entry in os.scandir(configs_dir):
                 if (
                     configs_entry.is_file()
@@ -170,7 +170,7 @@ class RegistratorContext(Context[R], Configurator):
 
         for registration in self._registry.types.values():
             if registration.is_alias(registration_type):
-                registration_type = registration.type
+                registration_type = registration.key
                 self._logger.debug(
                     f"Using alias \"{','.join(registration.alias)}\" " f"for registration: {registration_type}"
                 )

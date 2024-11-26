@@ -339,27 +339,27 @@ def to_timedelta(freq: str) -> relativedelta | pd.Timedelta:
 def to_float(value: str | float) -> Optional[float]:
     if value is None:
         return None
-    if type(value) == float:
+    if type(value) == float:  # noqa E721
         return value
-    if isinstance(value, str) or issubclass(type(value), float):
+    if isinstance(value, (str, int)) or issubclass(type(value), float):
         return float(value)
-    raise TypeError(f"Expected str or float, not: {type(value)}")
+    raise TypeError(f"Expected str, int or float, not: {type(value)}")
 
 
 def to_int(value: str | int) -> Optional[int]:
     if value is None:
         return None
-    if type(value) == int:
+    if type(value) == int:  # noqa E721
         return value
-    if isinstance(value, str) or issubclass(type(value), int):
+    if isinstance(value, str) or (isinstance(value, float) and int(value) == value) or issubclass(type(value), int):
         return int(value)
-    raise TypeError(f"Expected str or int, not: {type(value)}")
+    raise TypeError(f"Expected str, float or int, not: {type(value)}")
 
 
 def to_bool(value: str | bool) -> Optional[bool]:
     if value is None:
         return None
-    if type(value) == bool:
+    if type(value) == bool:  # noqa E721
         return value
     if isinstance(value, str):
         if value.lower() in ["true", "yes", "y"]:

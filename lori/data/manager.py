@@ -123,12 +123,11 @@ class DataManager(DataContext, Activator, Identifier):
         self._interval = configs.get_int("interval", default=1)
         self._load(self, configs)
 
-        self._configure(*get_variables(self._components.values(), include=ComponentContext))
-
         self._configure(self._converters)
         self._configure(self._connectors)
         self._configure(self._components)
 
+        self._configure(*get_variables(self._components.values(), include=ComponentContext))
         self._configure(*get_variables(self._components.values(), exclude=ComponentContext))
         self._configure(*get_variables(self._connectors.values(), exclude=Component))
         self._configure(*get_variables(self._converters.values(), exclude=(Component, Connector)))
@@ -304,6 +303,7 @@ class DataManager(DataContext, Activator, Identifier):
     def components(self) -> ComponentContext:
         return self._components
 
+    @property
     def listeners(self) -> ListenerContext:
         return self._listeners
 

@@ -8,7 +8,7 @@ lori.converters.context
 
 from __future__ import annotations
 
-from typing import Callable, List, Optional, Type, TypeVar, overload
+from typing import Callable, List, Optional, Type, TypeVar
 
 from lori import ResourceException
 from lori.converters.converter import (
@@ -16,49 +16,35 @@ from lori.converters.converter import (
     Converter,
     DatetimeConverter,
     FloatConverter,
+    GenericConverter,
     IntConverter,
     StringConverter,
     TimestampConverter,
 )
 from lori.core import Context, Registrator, RegistratorContext, Registry
-from lori.core.configs import ConfigurationException, Configurations, Configurator
+from lori.core.configs import Configurations, Configurator
 
 C = TypeVar("C", bound=Converter)
 
 registry = Registry[Converter]()
-registry.register(DatetimeConverter)
-registry.register(TimestampConverter)
-registry.register(StringConverter, "string")
-registry.register(FloatConverter)
-registry.register(IntConverter, "integer")
-registry.register(BoolConverter, "boolean")
+registry.register(DatetimeConverter, "datetime")
+registry.register(TimestampConverter, "timestamp")
+registry.register(StringConverter, "str", "string")
+registry.register(FloatConverter, "float")
+registry.register(IntConverter, "int", "integer")
+registry.register(BoolConverter, "bool", "boolean")
 
 
-@overload
-def register_converter_type(cls: Type[C]) -> Type[C]: ...
-
-
-@overload
+# noinspection PyShadowingBuiltins
 def register_converter_type(
-    *alias: Optional[str],
-    factory: Callable[..., Type[C]] = None,
+    type: str,
+    *alias: str,
+    factory: Callable[[Registrator | Context, Optional[Configurations]], C] = None,
     replace: bool = False,
-) -> Type[C]: ...
-
-
-def register_converter_type(
-    *args: Optional[Type[C], str],
-    **kwargs,
-) -> Type[C] | Callable[[Type[C]], Type[C]]:
-    args = list(args)
-    if len(args) > 0 and isinstance(args[0], type):
-        cls = args.pop(0)
-        registry.register(cls, *args, **kwargs)
-        return cls
-
+) -> Callable[[Type[C]], Type[C]]:
     # noinspection PyShadowingNames
     def _register(cls: Type[C]) -> Type[C]:
-        registry.register(cls, *args, **kwargs)
+        registry.register(cls, type, *alias, factory=factory, replace=replace)
         return cls
 
     return _register
@@ -66,13 +52,6 @@ def register_converter_type(
 
 class ConverterContext(RegistratorContext[Converter], Configurator):
     SECTION: str = "converters"
-
-    def __init__(self, context: Context, *args, **kwargs) -> None:
-        from lori.data.context import DataContext
-
-        if context is None or not isinstance(context, DataContext):
-            raise ConfigurationException(f"Invalid data context: {None if context is None else type(context)}")
-        super().__init__(context, *args, **kwargs)
 
     @property
     def _registry(self) -> Registry[Converter]:
@@ -82,14 +61,17 @@ class ConverterContext(RegistratorContext[Converter], Configurator):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
         converter_dirs = configs.dirs.to_dict()
-        converter_dirs["conf_dir"] = configs.dirs.conf.joinpath(self.SECTION)
-        for c in [DatetimeConverter, TimestampConverter, StringConverter, FloatConverter, IntConverter, BoolConverter]:
-            self._configure_converter(c, **converter_dirs)
+        converter_dirs["conf_dir"] = configs.dirs.conf.joinpath(f"{self.SECTION}.d")
+        converter_generics = [c.type for c in registry.types.values() if issubclass(c.type, GenericConverter)]
+        for converter in converter_generics:
+            self._configure(converter, **converter_dirs)
         self._load(self, configs)
 
     # noinspection PyTypeChecker
-    def _configure_converter(self, cls: Type[Converter], **kwargs) -> None:
-        self._add(cls(key=cls.TYPE, configs=Configurations.load(f"{cls.TYPE}.conf", require=False, **kwargs)))
+    def _configure(self, cls: Type[GenericConverter], **kwargs) -> None:
+        key = cls.dtype.__name__.lower()
+        configs = Configurations.load(f"{key}.conf", require=False, **kwargs)
+        self._add(cls(context=self, configs=configs, key=key))
 
     def _load(
         self,

@@ -54,7 +54,7 @@ class ConversionException(ResourceException, TypeError):
     """
 
 
-class GenericConvert(Converter, Generic[T]):
+class GenericConverter(Converter, Generic[T]):
     def convert(self, value: str | float | pd.Series) -> T | pd.Series:
         try:
             if issubclass(type(value), pd.Series):
@@ -63,7 +63,7 @@ class GenericConvert(Converter, Generic[T]):
                 return self._convert(value)
         except TypeError:
             pass
-        raise ConversionException(f"Expected str or {self.TYPE}, not: {type(value)}")
+        raise ConversionException(f"Expected str or {self.dtype}, not: {type(value)}")
 
     @abstractmethod
     def _convert(self, value: str | T) -> T:
@@ -75,9 +75,7 @@ class GenericConvert(Converter, Generic[T]):
         return str(value)
 
 
-class DatetimeConverter(GenericConvert[dt.datetime]):
-    TYPE: str = "datetime"
-
+class DatetimeConverter(GenericConverter[dt.datetime]):
     dtype: Type[dt.datetime] = dt.datetime
 
     def _convert(self, value: str | pd.Timestamp | dt.datetime) -> pd.Timestamp | dt.datetime:
@@ -85,41 +83,31 @@ class DatetimeConverter(GenericConvert[dt.datetime]):
 
 
 class TimestampConverter(DatetimeConverter):
-    TYPE: str = "timestamp"
-
     dtype: Type[pd.Timestamp] = pd.Timestamp
 
 
-class StringConverter(GenericConvert[str]):
-    TYPE: str = "str"
-
+class StringConverter(GenericConverter[str]):
     dtype: Type[str] = str
 
     def _convert(self, value: Any) -> str:
         return str(value)
 
 
-class FloatConverter(GenericConvert[float]):
-    TYPE: str = "float"
-
+class FloatConverter(GenericConverter[float]):
     dtype: Type[float] = float
 
     def _convert(self, value: str | float) -> float:
         return to_float(value)
 
 
-class IntConverter(GenericConvert[int]):
-    TYPE: str = "int"
-
+class IntConverter(GenericConverter[int]):
     dtype: Type[int] = int
 
     def _convert(self, value: str | int) -> int:
         return to_int(value)
 
 
-class BoolConverter(GenericConvert[bool]):
-    TYPE: str = "bool"
-
+class BoolConverter(GenericConverter[bool]):
     dtype: Type[bool] = bool
 
     def _convert(self, value: str | bool) -> bool:
