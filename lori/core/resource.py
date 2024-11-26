@@ -8,23 +8,24 @@ lori.core.resource
 
 from __future__ import annotations
 
-import builtins
 import logging
 from collections import OrderedDict
+from logging import Logger
 from typing import Any, Dict, List, Optional, Type
 
-from lori.core import ConfigurationException
-from lori.util import parse_key, parse_name, parse_type, update_recursive
+from lori.core import ConfigurationException, Identifier
+from lori.util import parse_type, update_recursive
 
 
-class Resource:
-    _id: str
+class Resource(Identifier):
+    __configs: OrderedDict[str, Any]
+
     _key: str
     _name: str
 
     _type: Type
 
-    __configs: OrderedDict[str, Any]
+    _logger: Logger
 
     # noinspection PyShadowingBuiltins
     def __init__(
@@ -35,18 +36,8 @@ class Resource:
         type: Type | str = None,
         **configs: Any,
     ) -> None:
-        self._logger = logging.getLogger(__name__)
-
-        if key is None:
-            raise ConfigurationException(f"Invalid configuration, missing specified {builtins.type(self).__name__} Key")
-        self._key = parse_key(key)
-        self._id = id if id is not None else self._key
-        if self._key != key:
-            self._logger.warning(f"{builtins.type(self).__name__} Key contains invalid characters: {key}")
-
-        if name is None:
-            name = parse_name(self.key)
-        self._name = name
+        super().__init__(id=id, key=key, name=name)
+        self._logger = logging.getLogger(self.__module__)
 
         self._type = parse_type(type)
         self.__configs = OrderedDict(configs)
@@ -76,10 +67,6 @@ class Resource:
 
     def __str__(self) -> str:
         return f"{type(self).__name__}:\n\t" + "\n\t".join(f"{k}={v}" for k, v in self._get_vars().items())
-
-    @property
-    def id(self) -> str:
-        return self._id
 
     @property
     def key(self) -> str:

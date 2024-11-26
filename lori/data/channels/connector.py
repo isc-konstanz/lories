@@ -33,8 +33,8 @@ class ChannelConnector:
 
         self.enabled = self.__configs.pop("enabled", connector is not None and connector.is_enabled())
 
-    # noinspection PyMethodMayBeStatic
-    def _assert_connector(self, connector):
+    @classmethod
+    def _assert_connector(cls, connector):
         from lori.connectors import Connector
 
         if connector is None:

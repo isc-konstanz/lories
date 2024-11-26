@@ -14,17 +14,15 @@ from typing import Mapping, Optional, Tuple
 
 import pandas as pd
 import pytz as tz
-from lori.connectors import Connector, register_connector_type
+from lori.connectors import ConnectionException, Connector, register_connector_type
 from lori.core import ConfigurationException, Configurations, Resources
 from lori.io import csv
 from lori.util import ceil_date, floor_date, parse_freq, to_timezone
 
 
 # noinspection PyShadowingBuiltins
-@register_connector_type
+@register_connector_type("csv")
 class CsvConnector(Connector):
-    TYPE: str = "csv"
-
     _data: Optional[pd.DataFrame] = None
     _data_path: Optional[str] = None
     _data_dir: str
@@ -119,16 +117,19 @@ class CsvConnector(Connector):
         columns.update({r.name: r.id for r in resources if "name" in r})
         columns.update({column: key for key, column in self.columns.items()})
 
-        if self._data_path is not None:
-            self._data = csv.read_file(
-                self._data_path,
-                index_column=self.index_column,
-                index_type=self.index_type,
-                timezone=self.timezone,
-                separator=self.separator,
-                decimal=self.decimal,
-                rename=columns,
-            )
+        try:
+            if self._data_path is not None:
+                self._data = csv.read_file(
+                    self._data_path,
+                    index_column=self.index_column,
+                    index_type=self.index_type,
+                    timezone=self.timezone,
+                    separator=self.separator,
+                    decimal=self.decimal,
+                    rename=columns,
+                )
+        except IOError as e:
+            raise ConnectionException(self, repr(e))
 
     def disconnect(self) -> None:
         self._data = None
@@ -178,9 +179,8 @@ class CsvConnector(Connector):
             data = data.rename(columns=columns)
             return data.loc[:, [r.id for r in resources if r.id in data.columns]]
 
-        except IOError:
-            # TODO: Return more informative ChannelStates or raise ConnectionException (?)
-            return pd.DataFrame()
+        except IOError as e:
+            raise ConnectionException(self, repr(e))
 
     def write(self, data: pd.DataFrame) -> None:
         columns = {r.id: r.name for r in self.resources if "name" in r}

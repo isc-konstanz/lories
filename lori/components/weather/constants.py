@@ -7,7 +7,7 @@ lori.components.weather.constants
 """
 # fmt: off
 
-from lori.components.weather import Weather
+from lori.weather import Weather
 
 DEPRECATED = {
     "total_clouds": "cloud_cover",

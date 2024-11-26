@@ -20,8 +20,8 @@ class ConnectorTask(ABC, Thread):
     connector: Connector
     channels: Channels
 
-    def __init__(self, connector: Connector, channels: Channels, name: str = None, *args, **kwargs):
-        super().__init__(name=name, target=self.__call__, *args, **kwargs)
+    def __init__(self, connector: Connector, channels: Channels, name: str = None, **kwargs):
+        super().__init__(name=name, target=self.__call__, **kwargs)
         self._logger = logging.getLogger(self.__module__)
         self.connector = connector
         self.channels = channels
@@ -40,7 +40,7 @@ class ConnectorTask(ABC, Thread):
         except ConnectorException as e:
             raise e
         except Exception as e:
-            raise ConnectorException(repr(e), connector=self.connector)
+            raise ConnectorException(self.connector, repr(e))
 
         return self
 

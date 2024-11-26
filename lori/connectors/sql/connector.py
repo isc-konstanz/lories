@@ -45,7 +45,7 @@ class SqlConnector(Connector, Mapping[str, Table]):
     @property
     def connection(self):
         if self._connection is None:
-            raise ConnectionException("SQLAlchemy Connection not open", connector=self)
+            raise ConnectionException(self, "SQLAlchemy Connection not open")
         return self._connection
 
     def __getitem__(self, table_name: str) -> Table:
@@ -93,7 +93,7 @@ class SqlConnector(Connector, Mapping[str, Table]):
             self._tables = self._connect_tables(resources)
 
         except SQLAlchemyError as e:
-            raise ConnectionException(repr(e), connector=self)
+            raise ConnectionException(self, repr(e))
 
     def disconnect(self) -> None:
         if self._connection is not None:
@@ -118,20 +118,20 @@ class SqlConnector(Connector, Mapping[str, Table]):
                 if table_configs.get_bool("create", default=True):
                     table.create()
                 else:
-                    raise ConnectorException(f"Unable to find configured table: {table_name}", connector=self)
+                    raise ConnectorException(self, f"Unable to find configured table: {table_name}")
             else:
                 table_schema = table_schemas[table.name]
                 if table.engine is not None and table.engine != table_schema["engine"]:
                     raise ConnectorException(
+                        self,
                         f"Mismatching table engine for configured table '{table_name}': {table_schema['engine']}",
-                        connector=self,
                     )
 
                 column_schemas = self._select_column_schemas(table.name)
                 for column in table:
                     if column.name not in column_schemas:
                         # TODO: Implement column creation if configured
-                        raise ConnectorException(f"Unable to find configured column: {column.name}", connector=self)
+                        raise ConnectorException(self, f"Unable to find configured column: {column.name}")
                     # column_schema = column_schemas[column.name]
                     # TODO: Implement column validation
 
@@ -210,7 +210,7 @@ class SqlConnector(Connector, Mapping[str, Table]):
         try:
             for table_name, table_resources in resources.groupby("table"):
                 if table_name not in self._tables:
-                    raise ConnectorException(f"Table '{table_name}' not available", connector=self)
+                    raise ConnectorException(self, f"Table '{table_name}' not available")
 
                 table = self.get(table_name)
                 if start is None and end is None:
@@ -221,7 +221,7 @@ class SqlConnector(Connector, Mapping[str, Table]):
                 data = data.merge(table_data, how="outer", left_index=True, right_index=True)
         except SQLAlchemyError as e:
             # TODO: Differentiate between syntax- and connection failures.
-            raise ConnectionException(repr(e), connector=self)
+            raise ConnectionException(self, repr(e))
         return data
 
     # noinspection PyTypeChecker
@@ -229,12 +229,12 @@ class SqlConnector(Connector, Mapping[str, Table]):
         try:
             for table_name, table_resources in self.resources.groupby("table"):
                 if table_name not in self._tables:
-                    raise ConnectorException(f"Table '{table_name}' not available", connector=self)
+                    raise ConnectorException(self, f"Table '{table_name}' not available")
                 table = self.get(table_name)
                 table.insert(table_resources, data)
 
         except SQLAlchemyError as e:
-            raise ConnectionException(repr(e), connector=self)
+            raise ConnectionException(self, repr(e))
 
     def is_connected(self) -> bool:
         if self._connection is not None:
