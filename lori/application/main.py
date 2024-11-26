@@ -12,7 +12,7 @@ import logging
 from typing import Optional, Type
 
 from lori import Settings, System
-from lori.application import Interface, InterfaceUnavailableException
+from lori.application import Interface
 from lori.data.manager import DataManager
 
 
@@ -28,7 +28,7 @@ class Application(DataManager):
 
     # noinspection PyProtectedMember
     def __init__(self, settings: Settings, **kwargs) -> None:
-        super().__init__(settings, **kwargs)
+        super().__init__(settings, name=settings["name"], **kwargs)
         if not settings.has_section(Interface.SECTION):
             settings._add_section(Interface.SECTION, {"enabled": False})
         self._interface = Interface(self, settings.get_section(Interface.SECTION))
@@ -66,8 +66,6 @@ class Application(DataManager):
 
     @property
     def interface(self) -> Interface:
-        if self._interface is None:
-            raise InterfaceUnavailableException(f"Application '{self.name}' has no interface configured")
         return self._interface
 
     def main(self) -> None:
@@ -86,10 +84,7 @@ class Application(DataManager):
             exit(1)
 
     def start(self) -> None:
-        self._logger.info(f"Starting {type(self).__name__}: {self.name}")
-        self.__interrupt.clear()
-        self.__runner.start()
-        if self._interface is not None and self._interface.is_enabled():
+        has_interface = self._interface.is_enabled()
+        super().start(has_interface)
+        if has_interface:
             self._interface.start()
-        else:
-            self.__runner.join()

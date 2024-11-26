@@ -323,11 +323,12 @@ class DataManager(DataContext, Activator, Identifier):
             if self._logger.isEnabledFor(logging.DEBUG):
                 self._logger.exception(exception)
 
-    def start(self) -> None:
+    def start(self, wait: bool = True) -> None:
         self._logger.info(f"Starting {type(self).__name__}: {self.name}")
         self.__interrupt.clear()
         self.__runner.start()
-        self.__runner.join()
+        if wait:
+            self.__runner.join()
 
     # noinspection PyShadowingBuiltins, PyProtectedMember
     def run(self, *args, **kwargs) -> None:

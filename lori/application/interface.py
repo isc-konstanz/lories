@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Optional, Type
 
-from lori.core import Context, ResourceException, ResourceUnavailableException
+from lori.core import Context, ResourceException
 from lori.core.configs import ConfigurationException, Configurations, Configurator, ConfiguratorMeta
 
 
@@ -56,12 +56,5 @@ class Interface(Configurator, metaclass=InterfaceMeta):
 class InterfaceException(ResourceException):
     """
     Raise if an error occurred accessing the interface.
-
-    """
-
-
-class InterfaceUnavailableException(ResourceUnavailableException, InterfaceException):
-    """
-    Raise if a configured interface access can not be found.
 
     """
