@@ -31,10 +31,19 @@ class Resources(Generic[R], Sequence[R]):
     def __str__(self) -> str:
         return f"{type(self).__name__}:\n\t" + "\n\t".join([f"{c.id} = {repr(c)}" for c in self._resources])
 
-    def __contains__(self, __x: object) -> bool:
-        return __x in self._resources
+    def __contains__(self, resource: str | R) -> bool:
+        if isinstance(resource, str):
+            return any(resource == r.id for r in self._resources)
+        return resource in self._resources
 
-    def __getitem__(self, index: int) -> R:
+    def __getitem__(self, index: Iterable[str] | str | int):
+        if isinstance(index, Iterable):
+            return type(self)([r for r in self._resources if r.id == index])
+        if isinstance(index, str):
+            for resource in self._resources:
+                if resource.id == index:
+                    return resource
+            raise KeyError(index)
         return self._resources[index]
 
     def __iter__(self) -> Iterator[R]:

@@ -441,13 +441,8 @@ class DataManager(DataContext, Activator, Identifier):
             write_channels = channels.filter(lambda c: (c.has_connector(id) and c.key in data.columns))
             if len(write_channels) == 0:
                 continue
-            for write_channel in write_channels:
-                if len(data.index) > 1:
-                    write_channel.set(data.index[0], data.loc[:, write_channel.key])
-                elif len(data.index) > 0:
-                    timestamp = data.index[-1]
-                    write_channel.set(timestamp, data.loc[timestamp, write_channel.key])
 
+            write_channels.set_frame(data)
             write_task = WriteTask(connector, write_channels)
             write_tasks[id] = write_task
             write_futures.append(self._executor.submit(write_task))

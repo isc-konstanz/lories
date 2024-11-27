@@ -14,6 +14,7 @@ from typing import Optional
 
 import pandas as pd
 import pytz as tz
+from lori import ConfigurationException
 from lori.connectors import Connector, register_connector_type
 from lori.core import Resources
 
@@ -26,6 +27,10 @@ class DummyConnector(Connector):
     def connect(self, resources: Resources) -> None:
         super().connect(resources)
         self._data = pd.Series(index=[r.id for r in resources])
+        for resource in resources:
+            for attr in ["min", "max"]:
+                if attr not in resource:
+                    raise ConfigurationException(f"Invalid dummy channel, missing '{attr}' attribute: {resource.id}")
 
     def read(
         self,
@@ -47,4 +52,11 @@ class DummyConnector(Connector):
         return self._data.to_frame(pd.Timestamp.now(tz.UTC).floor(freq="s")).T
 
     def write(self, data: pd.DataFrame) -> None:
-        raise NotImplementedError()
+        for id in data.columns:
+            channel = self.channels[id]
+            value = data.loc[data.index[-1], id]
+            if value < channel.min:
+                value = channel.min
+            if value > channel.max:
+                value = channel.max
+            self._data[id] = value
