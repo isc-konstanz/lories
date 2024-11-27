@@ -312,8 +312,8 @@ class DataManager(DataContext, Activator, Identifier):
     def notify(self, *channels: Channel) -> None:
         now = pd.Timestamp.now(tz.UTC)
         with self.listeners:
-            for listener in self.listeners.notify(now, *channels):
-                listener_future = self._executor.submit(listener)
+            for listener in self.listeners.notify(*channels):
+                listener_future = self._executor.submit(listener, now)
                 listener_future.add_done_callback(self._notify_callback)
 
     # noinspection PyUnresolvedReferences
@@ -360,7 +360,10 @@ class DataManager(DataContext, Activator, Identifier):
                     or not self.connectors.get(channel.connector.id).is_connected()
                 ):
                     return False
-                return pd.isna(channel.connector.timestamp) or timestamp >= _next(channel.connector.timestamp, freq)
+                if pd.isna(channel.connector.timestamp):
+                    return True
+                next_reading = _next(channel.connector.timestamp, freq)
+                return timestamp >= next_reading
 
             now = pd.Timestamp.now(tz.UTC)
             channels = self.channels.filter(lambda c: is_reading(c, now))
@@ -440,7 +443,7 @@ class DataManager(DataContext, Activator, Identifier):
                 def update_connector(read_channel: Channel) -> None:
                     read_channel.connector.timestamp = time
 
-                read_channels.apply(update_connector)
+                read_channels.apply(update_connector, inplace=True)
 
             except ConnectorException as e:
                 self._logger.warning(f"Error reading connector '{e.connector.id}': {repr(e)}")
@@ -452,7 +455,7 @@ class DataManager(DataContext, Activator, Identifier):
                     return channel
 
                 read_task = read_tasks[e.connector.id]
-                read_task.channels.apply(update_state)
+                read_task.channels.apply(update_state, inplace=True)
 
         if len(read_data) > 0:
             return pd.concat(read_data, axis="columns")
@@ -493,7 +496,7 @@ class DataManager(DataContext, Activator, Identifier):
                     channel.connector.timestamp = time
                     return channel
 
-                write_task.channels.apply(update_connector)
+                write_task.channels.apply(update_connector, inplace=True)
 
             except ConnectorException as e:
                 self._logger.warning(f"Error writing connector '{e.connector.id}': {repr(e)}")
@@ -506,7 +509,7 @@ class DataManager(DataContext, Activator, Identifier):
                     return channel
 
                 write_task = write_tasks[e.connector.id]
-                write_task.channels.apply(update_state)
+                write_task.channels.apply(update_state, inplace=True)
 
     # noinspection PyShadowingBuiltins
     def log(self, channels: Optional[Channels] = None, force: bool = False) -> None:
@@ -548,7 +551,7 @@ class DataManager(DataContext, Activator, Identifier):
                     channel.logger.timestamp = channel.timestamp
                     return channel
 
-                log_task.channels.apply(update_logger)
+                log_task.channels.apply(update_logger, inplace=True)
 
             except ConnectorException as e:
                 self._logger.warning(f"Error logging connector '{e.connector.id}': {repr(e)}")

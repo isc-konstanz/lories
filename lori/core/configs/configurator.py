@@ -53,7 +53,7 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
         if configs is None:
             return None
         if not isinstance(configs, Configurations):
-            raise ConfigurationException(f"Invalid configurations: {None if configs is None else type(configs)}")
+            raise ConfigurationException(f"Invalid '{cls.__name__}' configurations: {type(configs)}")
         return configs
 
     def _get_vars(self) -> Dict[str, Any]:

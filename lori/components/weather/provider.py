@@ -18,7 +18,6 @@ from typing import Optional, Type
 from lori.components import Component, register_component_type
 from lori.components.weather import WeatherForecast
 from lori.core import ActivatorMeta, Configurations, Context
-from lori.location import Location, LocationUnavailableException
 from lori.weather import Weather, WeatherException
 
 TYPE: str = "weather"
@@ -73,17 +72,6 @@ class WeatherProvider(Component, Weather, metaclass=WeatherProviderMeta):
             self.__forecast.configure(configs.get_section(WeatherForecast.SECTION))
             if len(self.__forecast.data) == 0:
                 self.__forecast.configs.enabled = False
-
-    def localize(self, configs: Configurations) -> None:
-        super().configure(configs)
-
-        if self.location is None:
-            try:
-                self.location = self.context.location
-                if not isinstance(self.location, Location):
-                    raise WeatherException(f"Invalid location type for weather '{self.id}': {type(self.location)}")
-            except (LocationUnavailableException, AttributeError):
-                raise WeatherException(f"Missing location for weather '{self.id}'")
 
     def activate(self) -> None:
         super().activate()
