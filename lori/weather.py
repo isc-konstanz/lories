@@ -13,12 +13,12 @@ from abc import abstractmethod
 from typing import Optional
 
 import pandas as pd
-from lori.core import Activator, Configurations, ResourceException, ResourceUnavailableException
-from lori.location import Location
+from lori.core import Activator, Configurations, Registrator, ResourceException, ResourceUnavailableException
+from lori.location import Location, LocationUnavailableException
 
 
 # noinspection SpellCheckingInspection
-class Weather(Activator):
+class Weather(Registrator, Activator):
     GHI = "ghi"
     DNI = "dni"
     DHI = "dhi"
@@ -60,6 +60,13 @@ class Weather(Activator):
                 country=configs.get("country", default=None),
                 state=configs.get("state", default=None),
             )
+        else:
+            try:
+                self.location = self.context.location
+                if not isinstance(self.location, Location):
+                    raise WeatherException(f"Invalid location type for weather '{self.id}': {type(self.location)}")
+            except (LocationUnavailableException, AttributeError):
+                raise WeatherException(f"Missing location for weather '{self.id}'")
 
     @abstractmethod
     def get(
