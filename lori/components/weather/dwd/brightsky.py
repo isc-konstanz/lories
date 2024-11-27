@@ -21,14 +21,8 @@ from lori.components.weather import WeatherConnector
 
 
 class Brightsky(WeatherConnector):
-    TYPE: str = "brightsky"
-
     address: str = "https://api.brightsky.dev/"
     horizon: int = 10
-
-    @property
-    def type(self) -> str:
-        return self.TYPE
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)

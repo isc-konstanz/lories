@@ -50,7 +50,7 @@ class Listener(Identifier):
         self._function = function
         self.channels = channels
 
-    def __call__(self) -> Listener:
+    def __call__(self, timestamp: pd.Timestamp) -> Listener:
         try:
             self.__lock.acquire()
             self.run()
@@ -58,6 +58,7 @@ class Listener(Identifier):
         except Exception as e:
             raise ListenerException(self, repr(e))
         finally:
+            self.timestamp = timestamp
             self.__lock.release()
         return self
 
