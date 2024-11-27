@@ -20,6 +20,7 @@ from .core import (  # noqa: F401
     ConfigurationUnavailableException,
     Configurator,
     Context,
+    Identifier,
     Resource,
     Resources,
     ResourceException,
