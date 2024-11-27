@@ -8,6 +8,7 @@ lori.application.view.pages.components.system
 
 from __future__ import annotations
 
+from functools import wraps
 from typing import Optional
 
 import dash_bootstrap_components as dbc
@@ -25,7 +26,10 @@ class SystemPage(ComponentGroup, ComponentPage[System]):
 
     @property
     def path(self) -> str:
-        return f"/{self._component.TYPE}/{self._encode_id(self._component.key)}"
+        return f"/system/{self._encode_id(self.key)}"
+
+    def create_layout(self, layout: PageLayout) -> None:
+        super().create_layout(layout)
 
     def _create_data_layout(self, layout: PageLayout, title: Optional[str] = "Data") -> None:
         if len(self.data.channels) > 0:
@@ -35,6 +39,8 @@ class SystemPage(ComponentGroup, ComponentPage[System]):
             data.append(self._build_data())
             layout.append(dbc.Row(dbc.Col(dbc.Card(dbc.CardBody(data)))))
 
+    # noinspection PyTypeChecker, PyArgumentList
+    @wraps(create_layout, updated=())
     def _do_create_layout(self) -> PageLayout:
         for page in self:
             page._do_create_layout()

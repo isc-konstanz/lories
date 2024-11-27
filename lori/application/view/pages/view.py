@@ -8,6 +8,7 @@ lori.application.view.pages.view
 
 from __future__ import annotations
 
+from functools import wraps
 from typing import Callable, Dict, Optional, Type, TypeVar
 
 import dash_bootstrap_components as dbc
@@ -20,7 +21,7 @@ from lori.system import System
 
 G = TypeVar("G", bound=ComponentGroup)
 P = TypeVar("P", bound=ComponentPage)
-C = TypeVar("C", bound=Component)
+C = TypeVar("C", Component, System)
 
 registry = ComponentRegistry()
 
@@ -42,13 +43,14 @@ def register_component_page(
 # noinspection PyShadowingBuiltins
 def register_component_group(
     *types: Type[C],
+    key: Optional[str] = None,
     name: Optional[str] = None,
     factory: Optional[Callable] = None,
     replace: bool = False,
 ) -> Callable[[Type[G]], Type[G]]:
     # noinspection PyShadowingNames
     def _register(cls: Type[G]) -> Type[G]:
-        registry.register_group(cls, *types, name=name, factory=factory, replace=replace)
+        registry.register_group(cls, *types, key=key, name=name, factory=factory, replace=replace)
         return cls
 
     return _register
@@ -59,11 +61,19 @@ class View(ComponentGroup):
 
     # noinspection PyShadowingBuiltins
     def __init__(self, id: str, header: PageHeader, footer: PageFooter, *args, **kwargs) -> None:
-        super().__init__(id=f"{id}-view", name="View", *args, **kwargs)
+        super().__init__(id=f"{id}-view", name="View", path="/", *args, **kwargs)
         self.header = header
         self.footer = footer
 
         self.groups = dict[str, ComponentGroup]()
+
+    @property
+    def key(self) -> str:
+        return "view"
+
+    @property
+    def path(self) -> str:
+        return "/"
 
     # noinspection PyProtectedMember
     def create_layout(self, layout: PageLayout) -> None:
@@ -99,6 +109,8 @@ class View(ComponentGroup):
 
             layout.append(dbc.Row([dbc.Col(card, width="auto") for card in page_cards]))
 
+    # noinspection PyTypeChecker, PyUnresolvedReferences, PyArgumentList
+    @wraps(create_layout, updated=())
     def _do_create_layout(self) -> PageLayout:
         for page in self:
             page._do_create_layout()
@@ -112,7 +124,7 @@ class View(ComponentGroup):
 
         return layout
 
-    # noinspection PyTypeChecker
+    # noinspection PyTypeChecker, PyUnresolvedReferences
     def _do_create_pages(self, components: ComponentContext) -> None:
         systems = [s for s in components.filter(lambda c: isinstance(c, System))]
         for system in systems:
@@ -137,6 +149,7 @@ class View(ComponentGroup):
             group = self._get_group(component)
             if group is not None:
                 group.append(page)
+                page.group = group
             view.append(page)
         return page
 
@@ -146,16 +159,16 @@ class View(ComponentGroup):
             return
 
         registration = registry.get_group(_type)
-        group = registration.initialize(id=f"{self.id}-{registration.id}", name=registration.name)
+        group = registration.initialize(id=f"{self.id}-{registration.key}", key=registration.key, name=registration.name)
         if group is not None:
-            self.groups[registration.id] = group
+            self.groups[registration.key] = group
         return group
 
     def _get_group(self, component: Component) -> Optional[ComponentGroup]:
         _type = type(component)
         if not registry.has_group(_type):
             return
-        group = self.groups.get(registry.get_group(_type).id, None)
+        group = self.groups.get(registry.get_group(_type).key, None)
         if group is None:
             group = self._new_group(component)
         return group
@@ -168,7 +181,3 @@ class View(ComponentGroup):
         for group in groups:
             group._do_register()
         return super()._do_register()
-
-    @property
-    def path(self) -> str:
-        return "/"

@@ -22,15 +22,17 @@ P = TypeVar("P", bound=Page)
 # noinspection PyAbstractClass
 class PageGroup(Page, MutableSequence[P], Generic[P]):
     _pages: List[P]
+    _key: str
 
     order: int = 1000
 
     # noinspection PyShadowingBuiltins
-    def __init__(self, pages: Optional[Collection[P]] = None, *args, **kwargs) -> None:
+    def __init__(self, key: Optional[str] = None, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        if pages is None:
-            pages = []
-        self._pages = list[P](pages)
+        if key is None:
+            key = self._encode_id(self.name)
+        self._key = key
+        self._pages = list[P]()
 
     def __len__(self) -> int:
         return len(self._pages)
@@ -44,14 +46,18 @@ class PageGroup(Page, MutableSequence[P], Generic[P]):
     def __getitem__(self, index: int) -> P:
         return self._pages[index]
 
-    def __setitem__(self, index: int, value: P) -> None:
-        self._pages[index] = value
+    def __setitem__(self, index: int, page: P) -> None:
+        self._pages[index] = page
 
-    def __delitem__(self, index) -> None:
-        self._pages.remove(index)
+    def __delitem__(self, index: int) -> None:
+        del self._pages[index]
 
-    def insert(self, index, value) -> None:
-        self._pages.insert(index, value)
+    def insert(self, index: int, page: P) -> None:
+        self._pages.insert(index, page)
+
+    @property
+    def key(self) -> str:
+        return self._key
 
     def sort(self) -> Sequence[Page]:
         def order(page: Page) -> Tuple[Any, ...]:
@@ -62,7 +68,3 @@ class PageGroup(Page, MutableSequence[P], Generic[P]):
 
         self._pages.sort(key=lambda p: order(p))
         return self._pages
-
-    @property
-    def path(self) -> str:
-        return f"/{self._encode_id(self.name.lower())}"

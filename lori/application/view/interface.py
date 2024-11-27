@@ -14,7 +14,6 @@ from importlib import resources
 from pathlib import Path
 from typing import Optional
 
-# import logging
 import dash
 from dash import Dash, html
 from dash_bootstrap_components import themes
@@ -79,7 +78,7 @@ class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
             assets_folder=str(assets_path),
             pages_folder=str(pages_path),
             use_pages=True,
-            server=True,  # TODO: Probably replace this with local Flask server, to create custom REST API ?
+            server=True,  # TODO: Replace this with local Flask server, to create custom REST API ?
         )
 
         theme_defaults = {
@@ -92,10 +91,6 @@ class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
         footer = PageFooter()
 
         self.view = View(context.id, header, footer)
-
-    @property
-    def context(self) -> Application:
-        return super().context
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
@@ -110,7 +105,7 @@ class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
             ],
         )
 
-    # noinspection PyAttributeOutsideInit
+    # noinspection PyArgumentList
     def _do_create_view(self) -> None:
         self.view._do_create_pages(self.context.components)
         self.view._do_create_layout()

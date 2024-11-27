@@ -37,4 +37,4 @@ class ComponentGroup(PageGroup[ComponentPage[C]], Generic[C]):
 
         for page in self.sort():
             if page.layout.has_card_items():
-                layout.append(dbc.Row(dbc.Col(page.layout.card, width="auto")))
+                layout.append(dbc.Row(dbc.Col(page.layout.card, width="auto"), align="stretch"))

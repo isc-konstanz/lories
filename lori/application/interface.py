@@ -21,8 +21,7 @@ class InterfaceMeta(ConfiguratorMeta):
         try:
             _cls = cls._get_class(configs)
 
-        except ImportError as e:
-            print(e)
+        except ModuleNotFoundError:
             # TODO: Find better way to differentiate between interface model to use
             pass
 
@@ -40,14 +39,29 @@ class InterfaceMeta(ConfiguratorMeta):
 class Interface(Configurator, metaclass=InterfaceMeta):
     SECTION: str = "interface"
 
-    def __init__(self, context: Context, configs: Configurations, *args, **kwargs) -> None:
+    __context: Context
+
+    def __init__(self, context: Context, configs: Configurations, **kwargs) -> None:
+        super().__init__(configs, **kwargs)
+        self.__context = self._assert_context(context)
+
+    @classmethod
+    def _assert_context(cls, context: Context) -> Context:
         from lori.application import Application
 
         if context is None or not isinstance(context, Application):
-            raise ResourceException(f"Invalid server context '{context}': {type(context)}")
+            raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
+        return context
+
+    @classmethod
+    def _assert_configs(cls, configs: Optional[Configurations]) -> Optional[Configurations]:
         if configs is None:
-            raise ConfigurationException("Missing configuration")
-        super().__init__(context, configs, *args, **kwargs)
+            raise ConfigurationException(f"Invalid '{cls.__name__}' configurations: {type(configs)}")
+        return super()._assert_configs(configs)
+
+    @property
+    def context(self) -> Context:
+        return self.__context
 
     def start(self) -> None:
         pass

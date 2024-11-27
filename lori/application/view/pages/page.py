@@ -47,6 +47,8 @@ class Page(ABC, metaclass=PageMeta):
 
     order: int = 100
 
+    group: Optional[Page]
+
     layout: PageLayout
 
     _created: bool = False
@@ -59,6 +61,7 @@ class Page(ABC, metaclass=PageMeta):
         title: Optional[str] = None,
         description: Optional[str] = None,
         order: Optional[int] = None,
+        group: Optional[Page] = None,
         *args,
         **kwargs,
     ) -> None:
@@ -73,10 +76,17 @@ class Page(ABC, metaclass=PageMeta):
         if not pd.isna(order):
             self.order = order
 
+        self.group = group
+
     @property
     @abstractmethod
-    def path(self) -> str:
+    def key(self) -> str:
         pass
+
+    @property
+    def path(self) -> str:
+        _path = f"/{self._encode_id(self.key)}"
+        return _path if self.group is None else self.group.path + _path
 
     def is_created(self) -> bool:
         return self._created
@@ -108,7 +118,7 @@ class Page(ABC, metaclass=PageMeta):
 
     # noinspection PyMethodMayBeStatic
     def register(self, **kwargs) -> None:
-        self._logger.debug(f"Registering '{type(self).__name__}' page: {self.id}")
+        self._logger.info(f"Registering '{type(self).__name__}' page: {self.id} at {self.path}")
         dash.register_page(
             self.id,
             path=self.path,

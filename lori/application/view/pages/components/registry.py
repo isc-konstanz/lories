@@ -15,7 +15,7 @@ from lori.application.view.pages import Page
 from lori.application.view.pages.components import ComponentGroup, ComponentPage
 from lori.components import Component
 from lori.core import ResourceException
-from lori.util import parse_key, parse_name
+from lori.util import validate_key
 
 C = TypeVar("C", bound=Component)
 CP = TypeVar("CP", bound=ComponentPage)
@@ -72,14 +72,14 @@ class PageRegistration(Registration[CP]):
 class GroupRegistration(Registration[CG]):
     types: Collection[Type[C]]
 
-    id: str
+    key: str
     name: str
 
     def __init__(
         self,
         cls: Type[CG],
         *types: Type[C],
-        id: Optional[str] = None,
+        key: Optional[str] = None,
         name: Optional[str] = None,
         factory: Optional[Callable] = None,
     ):
@@ -89,12 +89,12 @@ class GroupRegistration(Registration[CG]):
         if name is None:
             if len(types) > 1:
                 raise ValueError(f"Ambiguous ID for {len(types)} types of class: {cls.__init__()}")
-            name = parse_name(types[0].TYPE)
+            name = types[0].__name__
         self.name = name
 
-        if id is None:
-            id = parse_key(name)
-        self.id = id
+        if key is None:
+            key = validate_key(name)
+        self.key = key
 
     def has_type(self, *types: Type[CG]) -> bool:
         _types = [t for t in self.types if any(issubclass(_t, t) for _t in types)]
@@ -126,7 +126,7 @@ class ComponentRegistry:
                 for page in existing:
                     self.pages.remove(page)
             else:
-                raise ResourceException(f"Registration for '{type.TYPE}' does already exist: " + ", ".join(existing))
+                raise ResourceException(f"Registration for '{type}' does already exist: " + ", ".join(existing))
         self.pages.append(PageRegistration(cls, type, factory=factory))
 
     # noinspection PyTypeChecker, PyUnresolvedReferences
@@ -134,6 +134,7 @@ class ComponentRegistry:
         self,
         cls: Type[CG],
         *types: Type[C],
+        key: Optional[str] = None,
         name: Optional[str] = None,
         factory: Optional[Callable] = None,
         replace: bool = False,
@@ -147,7 +148,7 @@ class ComponentRegistry:
                     self.groups.remove(group)
             else:
                 raise ResourceException("Registration does already exist for types: " + ", ".join(existing))
-        self.groups.append(GroupRegistration(cls, *types, name=name, factory=factory))
+        self.groups.append(GroupRegistration(cls, *types, key=key, name=name, factory=factory))
 
     def has_page(self, *types: Type[C]) -> bool:
         return len(self._get_pages(*types)) > 0

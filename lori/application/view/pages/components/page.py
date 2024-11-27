@@ -15,7 +15,8 @@ import dash_bootstrap_components as dbc
 from dash import Input, Output, callback, dcc, html
 
 import pandas as pd
-from lori import Channel, Component, Configurations
+
+from lori import Channel, Component, Configurations, Identifier
 from lori.application.view.pages import Page, PageLayout
 from lori.connectors import ConnectorAccess
 from lori.data import DataAccess
@@ -36,6 +37,10 @@ class ComponentPage(Page, Generic[C]):
         self._component = component
 
     @property
+    def key(self) -> str:
+        return self._component.key
+
+    @property
     def configs(self) -> Configurations:
         return self._component.configs
 
@@ -46,13 +51,6 @@ class ComponentPage(Page, Generic[C]):
     @property
     def data(self) -> DataAccess:
         return self._component.data
-
-    @property
-    def path(self) -> str:
-        if isinstance(self._component.context, Component):
-            return f"/{self._encode_id(self._component.context.key)}/{self._encode_id(self._component.key)}"
-        else:
-            return f"/{self._encode_id(self._component.key)}"
 
     def is_active(self) -> bool:
         return self._component.is_active()

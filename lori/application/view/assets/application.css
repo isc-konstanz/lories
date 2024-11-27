@@ -9,6 +9,10 @@ body:has(.card-container) {
   background-color: var(--page-gray-300);
 }
 
+.align-items-stretch:has(.card) > * {
+  height: 100%;
+}
+
 .card-container,
 .page-container {
   padding-top: 1rem;
@@ -24,7 +28,8 @@ body:has(.card-container) {
 .card-container .card {
   margin-top: calc(0.5 * var(--bs-gutter-y));
   margin-bottom: calc(0.5 * var(--bs-gutter-y));
-  height: 100%
+  height: 100%;
+  width: auto;
 }
 
 .card-container a:has(h4) {

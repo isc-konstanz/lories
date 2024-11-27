@@ -85,6 +85,6 @@ class Application(DataManager):
 
     def start(self) -> None:
         has_interface = self._interface.is_enabled()
-        super().start(has_interface)
+        super().start(not has_interface)
         if has_interface:
             self._interface.start()
