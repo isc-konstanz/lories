@@ -79,20 +79,15 @@ class ListenerContext(Context[Listener]):
         else:
             self._add(Listener(id, key, function, channels, how=how, unique=unique))
 
-    def notify(self, timestamp: pd.Timestamp, *channels: Channel) -> Collection[Listener]:
+    def notify(self, *channels: Channel) -> Collection[Listener]:
         listeners = []
         for id, listener in self.items():
             ids = listener.channels.ids
             if any(c.id in ids for c in channels) and listener.has_update():
-                if listener.timestamp >= timestamp:
-                    self._logger.warning(f"Listener '{listener.id}' already started at: {timestamp}")
-                    continue
                 if listener.locked():
                     self._logger.warning(
                         f"Listener '{listener.id}' not finished yet. Please verify your configurations"
                     )
-
-                listener.timestamp = timestamp
                 listeners.append(listener)
         return listeners
 
