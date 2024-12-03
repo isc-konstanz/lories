@@ -13,7 +13,7 @@ import hashlib
 from collections.abc import Mapping
 from typing import Dict, Iterator, Optional
 
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, inspect, text, MetaData
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.schema import Column
@@ -85,16 +85,19 @@ class SqlDatabase(Database, Mapping[str, Table]):
             elif self.dialect == "mariadb":
                 prefix = "mariadb+pymysql://"
 
-            elif self.dialect == "postgres":
+            elif self.dialect == "postgresql":
                 prefix = "postgresql+psycopg2://"
             else:
                 raise ValueError("Unsupported database type")
 
-            engine = create_engine(
+            self._engine = create_engine(
                 url=f"{prefix}{self.user}:{self.password}@{self.host}:{self.port}/{self.database}",
                 pool_recycle=3600,
             )
-            session = sessionmaker(bind=engine)
+            session = sessionmaker(bind=self._engine)
+
+            self._metadata = MetaData()
+            self._metadata.reflect(bind=self._engine)
 
             self._connection = session()
 
@@ -191,21 +194,28 @@ class SqlDatabase(Database, Mapping[str, Table]):
             raise RuntimeError(f"Error fetching timezone: {e}")
 
     def _set_timezone(self, timezone: tz.BaseTzInfo) -> None:
-        # TODO: Implement timezone setting for different dialects
-        query = f"SET time_zone = '{pd.Timestamp.now(timezone).strftime('%:z')}'"
+        tz_offset = pd.Timestamp.now(timezone).strftime('%z')
+        tz_offset_formatted = tz_offset[:3] + ':' + tz_offset[3:]
+
+        if self.dialect in ('mysql', 'mariadb'):
+            query = f"SET time_zone = '{tz_offset_formatted}'"
+        elif self.dialect == 'postgresql':
+            query = f"SET TIME ZONE '{tz_offset_formatted}'"
+        else:
+            raise NotImplementedError(f"Timezone setting not implemented for dialect: {self.dialect}")
+
         self._connection.execute(text(query))
         self._connection.commit()
 
     def hash(
-        self,
-        resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
-        method: str = "MD5",
-        encoding: str = "UTF-8",
+            self,
+            resources: Resources,
+            start: Optional[pd.Timestamp | dt.datetime] = None,
+            end: Optional[pd.Timestamp | dt.datetime] = None,
+            method: str = "MD5",
+            encoding: str = "UTF-8",
     ) -> Optional[str]:
-        if method.lower() not in ["md5"]:
-            # TODO: Implement further checksum methods
+        if method.lower() not in ["md5", "sha256"]:
             raise ValueError(f"Invalid checksum method '{method}'")
 
         table_hashes = []
@@ -219,14 +229,20 @@ class SqlDatabase(Database, Mapping[str, Table]):
                 table_hashes.append(table_hash)
 
         except SQLAlchemyError as e:
-            # TODO: Differentiate between syntax- and connection failures.
-            raise ConnectionException(repr(e), connector=self)
+            if 'syntax' in str(e).lower():
+                raise SyntaxError(f"SQL Syntax Error: {repr(e)}")
+            else:
+                raise ConnectionException(f"Connection Error: {repr(e)}", connector=self)
 
         if len(table_hashes) == 0:
             return None
         elif len(table_hashes) == 1:
             return table_hashes[0]
-        return hashlib.md5(",".join(table_hashes).encode(encoding)).hexdigest()
+
+        if method.lower() == "md5":
+            return hashlib.md5(",".join(table_hashes).encode(encoding)).hexdigest()
+        elif method.lower() == "sha256":
+            return hashlib.sha256(",".join(table_hashes).encode(encoding)).hexdigest()
 
     # noinspection PyTypeChecker
     def read(
@@ -250,8 +266,10 @@ class SqlDatabase(Database, Mapping[str, Table]):
                 data = pd.concat([data, table_data], axis="index")
                 # data = data.merge(table_data, how="outer", left_index=True, right_index=True)
         except SQLAlchemyError as e:
-            # TODO: Differentiate between syntax- and connection failures.
-            raise ConnectionException(repr(e), connector=self)
+            if 'syntax' in str(e).lower():
+                raise SyntaxError(f"SQL Syntax Error: {repr(e)}")
+            else:
+                raise ConnectionException(f"Connection Error: {repr(e)}", connector=self)
         return data
 
     # noinspection PyTypeChecker
@@ -266,8 +284,10 @@ class SqlDatabase(Database, Mapping[str, Table]):
 
                 data = data.merge(table_data, how="outer", left_index=True, right_index=True)
         except SQLAlchemyError as e:
-            # TODO: Differentiate between syntax- and connection failures.
-            raise ConnectionException(repr(e), connector=self)
+            if 'syntax' in str(e).lower():
+                raise SyntaxError(f"SQL Syntax Error: {repr(e)}")
+            else:
+                raise ConnectionException(f"Connection Error: {repr(e)}", connector=self)
         return data
 
     # noinspection PyTypeChecker
@@ -311,3 +331,4 @@ class SqlDatabase(Database, Mapping[str, Table]):
             except SQLAlchemyError:
                 return False
         return False
+    

@@ -29,7 +29,7 @@ class DatetimeIndexType(Enum):
 
 # noinspection PyShadowingBuiltins
 class IndexColumn(Column):
-    DEFAULT_NAME: str = "timestamp"
+    DEFAULT_NAME: str = "ts"
     DEFAULT_TYPE: str = "TIMESTAMP"
 
     @classmethod

@@ -15,7 +15,8 @@ from collections.abc import Sequence
 from itertools import chain
 from typing import Any, Optional
 
-from sqlalchemy import TIMESTAMP, Boolean, Float, Integer, String, delete, select, text
+from sqlalchemy import TIMESTAMP, Boolean, Float, Integer, String, delete
+from sqlalchemy import select, text, func
 from sqlalchemy import Table as SATable
 from sqlalchemy.schema import Column as SAColumn
 from sqlalchemy.types import TypeEngine
@@ -159,37 +160,17 @@ class Table(Sequence[Column]):
         # TODO: Replace this placeholder more resource efficient
         return not query.empty
 
-    def select(
-        self,
-        resources: Resources,
-        start: pd.Timestamp | dt.datetime = None,
-        end: pd.Timestamp | dt.datetime = None,
-    ) -> pd.DataFrame:
-        # TODO: Implement querying only subset of resources
-        table = self.get_sqlalchemy_table()
-        query = select(table)
-
-        if start:
-            query = query.where(table.c[self.index.names[0]] >= start)
-        if end:
-            query = query.where(table.c[self.index.names[0]] <= end)
-
-        query = query.order_by(table.c[self.index.names[0]].asc())
-        result = self.connection.execute(query)
-        data = pd.DataFrame(result.fetchall(), columns=result.keys())
-        return self.index.process(resources, data)
-
     # noinspection PyProtectedMember
     def select_hash(
-        self,
-        resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
-        method: str = "MD5",
-        encoding: str = "UTF-8",
+            self,
+            resources: Resources,
+            start: Optional[pd.Timestamp | dt.datetime] = None,
+            end: Optional[pd.Timestamp | dt.datetime] = None,
+            method: str = "MD5",
+            encoding: str = "UTF-8",
     ) -> Optional[str]:
-        if method.lower() not in ["md5"]:
-            # TODO: Implement further checksum methods
+        valid_methods = ["md5", "sha1", "sha256", "sha512"]
+        if method.lower() not in valid_methods:
             raise ValueError(f"Invalid checksum method '{method}'")
 
         def _prepare(column: Column) -> str:
@@ -200,49 +181,106 @@ class Table(Sequence[Column]):
                     f"with DATETIME column: {column.name}"
                 )
             if column.type == "TIMESTAMP":
-                return f"UNIX_TIMESTAMP(`{column.name}`)"
+                return f"UNIX_TIMESTAMP({column.name})"
             else:
-                return f"`{column.name}`"
+                return f"{column.name}"
 
         columns = self.columns.get(resources)
         column_names = [_prepare(c) for c in columns]
         index_names = [_prepare(c) for c in self.index]
-        query = (
-            f"SELECT {method.upper()}(GROUP_CONCAT(CONCAT_WS(',', {', '.join(index_names + column_names)})"
-            f" {self.index.order_by('ASC')})) as `hash`,"
-            f" 1 as `in_range` FROM `{self.name}`"  # Maybe group by NULL here?
+
+        query = self.connection.query(
+            getattr(func, method.lower())(
+                func.group_concat(
+                    func.concat_ws(
+                        ',',
+                        *index_names,
+                        *column_names
+                    )
+                )
+            ).label('hash'),
+            text('1 as in_range')
+        ).filter(
+            self.index.where(start, end)
         )
 
-        query, params = self.index.where(query, start, end)
-        if len(columns) > 0:
+        if columns:
             # Make sure to only query valid values
-            query += f" AND CONCAT({','.join([f'`{c.name}`' for c in columns])}) IS NOT NULL"
+            for c in columns:
+                query = query.filter(text(f"{c.name} IS NOT NULL"))
 
-        query += " GROUP BY `in_range`"
-        query = self.is_postgresql(query)
+        query = query.group_by(text('1'))
 
-        result = self.connection.execute(text(query), params)
+        result = self.connection.execute(text(query))
         if result.rowcount > 0:
-            hashes = [r[0] for r in result.fetchall()]
+            hashes = []
+            hash_value = None
+
+            for r in result.fetchall():
+                concat_value = r[0]
+                if method.lower() == "md5":
+                    hash_value = hashlib.md5(concat_value.encode(encoding)).hexdigest()
+                elif method.lower() == "sha1":
+                    hash_value = hashlib.sha1(concat_value.encode(encoding)).hexdigest()
+                elif method.lower() == "sha256":
+                    hash_value = hashlib.sha256(concat_value.encode(encoding)).hexdigest()
+                elif method.lower() == "sha512":
+                    hash_value = hashlib.sha512(concat_value.encode(encoding)).hexdigest()
+                hashes.append(hash_value)
+
             if len(hashes) == 1:
                 return hashes[0]
             return hashlib.md5(",".join(hashes).encode(encoding)).hexdigest()
         return None
 
-    def select_first(self, resources: Resources) -> pd.DataFrame:
-        # TODO: Implement querying only subset of resources
-        table = self.get_sqlalchemy_table()
-        query = select(table).order_by(table.c[self.index.names[0]].asc()).limit(1)
+    def _get_filtered_columns(self, resources, table):
+        # Extract the column names from the resources and include the index
+        resource_column_names = [r.key for r in resources]
+        resource_column_names.append(self.index.names[0])
+
+        # Filter the columns to only include those in the resources subset
+        return [col for col in table.c if col.name in resource_column_names]
+
+    def _execute_query(self, query):
         result = self.connection.execute(query)
         data = pd.DataFrame(result.fetchall(), columns=result.keys())
+        return data
+
+    def select(
+        self,
+        resources: Resources,
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
+    ) -> pd.DataFrame:
+        table = self.get_sqlalchemy_table()
+        resource_columns = self._get_filtered_columns(resources, table)
+
+        query = select(*resource_columns)
+        if start:
+            query = query.where(table.c[self.index.names[0]] >= start)
+        if end:
+            query = query.where(table.c[self.index.names[0]] <= end)
+        query = query.order_by(table.c[self.index.names[0]].asc())
+
+        data = self._execute_query(query)
+        return self.index.process(resources, data)
+
+    def select_first(self, resources: Resources) -> pd.DataFrame:
+        table = self.get_sqlalchemy_table()
+        resource_columns = self._get_filtered_columns(resources, table)
+
+        query = select(*resource_columns).order_by(table.c[self.index.names[0]].asc()).limit(1)
+
+        data = self._execute_query(query)
         return self.index.process(resources, data)
 
     def select_last(self, resources: Resources) -> pd.DataFrame:
-        # TODO: Implement querying only subset of resources
         table = self.get_sqlalchemy_table()
-        query = select(table).order_by(table.c[self.index.names[0]].desc()).limit(1)
-        result = self.connection.execute(query)
-        data = pd.DataFrame(result.fetchall(), columns=result.keys())
+        resource_columns = self._get_filtered_columns(resources, table)
+
+        query = select(*resource_columns).order_by(table.c[self.index.names[0]].desc()).limit(1)
+
+        data = self._execute_query(query)
         return self.index.process(resources, data)
 
     def delete(self, start: pd.Timestamp | dt.datetime, end: pd.Timestamp | dt.datetime) -> None:
@@ -260,21 +298,31 @@ class Table(Sequence[Column]):
         columns = Columns(*self.index, *resource_columns)
 
         table = self.get_sqlalchemy_table()
-        query = table.insert()
-
-        # TODO: Are duplicate indexes addressed in the table.insert() query?
-        # if len(column_names) > 0:
-        #     query += f" ON DUPLICATE KEY UPDATE {', '.join([f'{c}=VALUES({c})' for c in column_names])}"
-        # query = self.is_postgresql(query)
-
-        self._logger.debug(query)
 
         def _extract(d: pd.DataFrame) -> Sequence[Any]:
             return d.apply(lambda r: columns.extract(r), axis="columns").values
 
         data.replace(np.nan, None, inplace=True)
+
         for params in chain.from_iterable(_extract(d) for d in self.index.prepare(resources, data)):
-            self.connection.execute(query, params)
+            insert_stmt = table.insert().values(**params)
+
+            # Handle duplicate indexes (upsert)
+            if self.connection.dialect.name == 'postgresql':
+                query = insert_stmt.on_conflict_do_update(
+                    index_elements=[col.name for col in self.index],
+                    set_={col.name: col for col in columns}
+                )
+            elif self.connection.dialect.name == 'mysql':
+                query = mysql_insert(table).values(**params).on_duplicate_key_update(
+                    {col.name: col for col in columns}
+                )
+            else:
+                query = insert_stmt  # Default behavior for other databases
+
+            self._logger.debug(query)
+            self.connection.execute(query)
+
         self.connection.commit()
 
     def _get_column_type(self, column_name: str) -> TypeEngine:
