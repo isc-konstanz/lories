@@ -331,8 +331,26 @@ class DataManager(DataContext, Activator, Identifier):
             self.__runner.join()
 
     # noinspection PyShadowingBuiltins, PyProtectedMember
-    def run(self, *args, **kwargs) -> None:
-        self.read(*args, **kwargs)
+    def run(self, **kwargs) -> None:
+        now = pd.Timestamp.now(tz.UTC)
+
+        def is_reading(channel: Channel, timestamp: pd.Timestamp) -> bool:
+            freq = channel.freq
+            if (
+                freq is None
+                or not channel.has_connector()
+                or not self.connectors.get(channel.connector.id, False)
+                or not self.connectors.get(channel.connector.id).is_connected()
+            ):
+                return False
+            if pd.isna(channel.connector.timestamp):
+                return True
+            next_reading = _next(channel.connector.timestamp, freq)
+            return timestamp >= next_reading
+
+        channels = self.channels.filter(lambda c: is_reading(c, now))
+        if len(channels) > 0:
+            self.read(channels, **kwargs)
 
         interval = f"{self._interval}s"
         while not self.__interrupt.is_set():
@@ -350,23 +368,9 @@ class DataManager(DataContext, Activator, Identifier):
             for connector in self.connectors.filter(lambda c: c._is_reconnectable()):
                 self.reconnect(connector)
 
-            def is_reading(channel: Channel, timestamp: pd.Timestamp) -> bool:
-                freq = channel.freq
-                if (
-                    freq is None
-                    or not channel.has_connector()
-                    or not self.connectors.get(channel.connector.id, False)
-                    or not self.connectors.get(channel.connector.id).is_connected()
-                ):
-                    return False
-                if pd.isna(channel.connector.timestamp):
-                    return True
-                next_reading = _next(channel.connector.timestamp, freq)
-                return timestamp >= next_reading
-
             now = pd.Timestamp.now(tz.UTC)
-            channels = self.channels.filter(lambda c: is_reading(c, now))
 
+            channels = self.channels.filter(lambda c: is_reading(c, now))
             if len(channels) > 0:
                 self._logger.debug(f"Reading {len(channels)} channels of application: {self.name}")
                 self.read(channels)
@@ -439,16 +443,11 @@ class DataManager(DataContext, Activator, Identifier):
             if not connector._is_connected():
                 continue
 
-            write_channels = channels.filter(lambda c: (c.has_connector(id) and c.key in data.columns))
+            write_channels = channels.filter(lambda c: (c.has_connector(id) and c.id in data.columns))
             if len(write_channels) == 0:
                 continue
-            for write_channel in write_channels:
-                if len(data.index) > 1:
-                    write_channel.set(data.index[0], data.loc[:, write_channel.key])
-                elif len(data.index) > 0:
-                    timestamp = data.index[-1]
-                    write_channel.set(timestamp, data.loc[timestamp, write_channel.key])
 
+            write_channels.set_frame(data)
             write_task = WriteTask(connector, write_channels)
             write_tasks[id] = write_task
             write_futures.append(self._executor.submit(write_task))

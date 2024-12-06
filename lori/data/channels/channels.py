@@ -15,7 +15,7 @@ from typing import Any, Literal, Sequence
 import pandas as pd
 import pytz as tz
 from lori.core import Resources
-from lori.data.channels import Channel
+from lori.data.channels import Channel, ChannelState
 
 
 class Channels(Resources[Channel]):
@@ -78,3 +78,20 @@ class Channels(Resources[Channel]):
         if len(data) > 0:
             return pd.DataFrame.from_records(list(data.values()), index=list(data.keys()), columns=columns)
         return pd.DataFrame(columns=columns)
+
+    def set_frame(self, data: pd.DataFrame) -> None:
+        for channel in self:
+            if channel.id not in data.columns or all(pd.isna(data.loc[:, channel.id])):
+                channel.state = ChannelState.NOT_AVAILABLE
+                self._logger.warning(f"Unable to update nonexisting channel: {channel.id}")
+                continue
+
+            channel_data = data.loc[:, channel.id].dropna()
+            channel_data.name = channel.key
+            if len(channel_data.index) > 1:
+                timestamp = channel_data.index[0]
+                channel.set(timestamp, channel_data)
+
+            elif len(channel_data.index) > 0:
+                timestamp = channel_data.index[-1]
+                channel.set(timestamp, channel_data[timestamp])

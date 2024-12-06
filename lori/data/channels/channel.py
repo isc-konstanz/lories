@@ -150,6 +150,7 @@ class Channel(Resource):
     ) -> None:
         self._set(timestamp, value, state)
 
+    # noinspection PyUnresolvedReferences
     def _set(
         self,
         timestamp: pd.Timestamp,
@@ -171,6 +172,7 @@ class Channel(Resource):
         if self.is_valid():
             self.__context.notify(self)
 
+    # noinspection PyUnresolvedReferences
     def register(
         self,
         function: Callable[[pd.DataFrame], None],
@@ -179,7 +181,7 @@ class Channel(Resource):
     ) -> None:
         self.__context.register(function, self, how=how, unique=unique)
 
-    # noinspection PyShadowingBuiltins
+    # noinspection PyUnresolvedReferences
     def read(
         self,
         start: Optional[pd.Timestamp | dt.datetime] = None,
@@ -187,8 +189,16 @@ class Channel(Resource):
     ) -> pd.DataFrame:
         return self.__context.read(self.to_list(), start, end)
 
-    # noinspection PyShadowingBuiltins
-    def write(self, data: pd.DataFrame) -> None:
+    # noinspection PyUnresolvedReferences
+    def write(self, data: pd.DataFrame | pd.Series | Any) -> None:
+        if data is None:
+            raise ResourceException(f"Invalid data to write '{self.id}': {data}")
+        if isinstance(data, pd.Series):
+            data.name = self.id
+            data = data.to_frame()
+        elif not isinstance(data, pd.DataFrame):
+            data = pd.DataFrame(index=[pd.Timestamp.now(tz.UTC).floor(freq="s")], data=[data], columns=[self.id])
+
         self.__context.write(data, self.to_list())
 
     # noinspection PyShadowingBuiltins
