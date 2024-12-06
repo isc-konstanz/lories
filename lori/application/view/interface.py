@@ -8,6 +8,7 @@ lori.application.view.interface
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 from importlib import resources
@@ -15,13 +16,15 @@ from pathlib import Path
 from typing import Optional
 
 import dash
-from dash import Dash, html
+from dash import Dash, dcc, html
 from dash_bootstrap_components import themes
 
 from lori import Configurations
 from lori.application import Application
 from lori.application.interface import Interface, InterfaceMeta
 from lori.application.view.pages import PageFooter, PageHeader, View
+
+logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
 
 class ViewInterfaceMeta(InterfaceMeta):
@@ -96,16 +99,21 @@ class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
         super().configure(configs)
         self._do_create_view()
 
+    # noinspection PyUnresolvedReferences
     def create_view_layout(self) -> html.Div:
         return html.Div(
             id=f"{self.context.id}",
             children=[
                 self.view.header.navbar,
                 dash.page_container,
+                dcc.Interval(
+                    id="view-update",
+                    interval=1000,
+                ),
             ],
         )
 
-    # noinspection PyArgumentList
+    # noinspection PyUnresolvedReferences, PyArgumentList
     def _do_create_view(self) -> None:
         self.view._do_create_pages(self.context.components)
         self.view._do_create_layout()

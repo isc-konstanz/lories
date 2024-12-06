@@ -12,11 +12,10 @@ from collections.abc import Sequence
 from typing import Generic, Optional, TypeVar
 
 import dash_bootstrap_components as dbc
-from dash import Input, Output, callback, dcc, html
+from dash import Input, Output, callback, html
 
 import pandas as pd
-
-from lori import Channel, Component, Configurations, Identifier
+from lori import Channel, Component, Configurations
 from lori.application.view.pages import Page, PageLayout
 from lori.connectors import ConnectorAccess
 from lori.data import DataAccess
@@ -75,10 +74,12 @@ class ComponentPage(Page, Generic[C]):
 
             layout.append(dbc.Row(data))
 
+        # TODO: append data-update separately to view
+
     def _build_data(self) -> html.Div:
         @callback(
             Output(f"{self.id}-data", "children"),
-            Input(f"{self.id}-data-update", "n_intervals"),
+            Input("view-update", "n_intervals"),
         )
         def _update_data(*_) -> Sequence[dbc.AccordionItem]:
             return [self._build_channel(channel) for channel in self.data.channels]
@@ -91,11 +92,6 @@ class ComponentPage(Page, Generic[C]):
                     start_collapsed=True,
                     always_open=True,
                     flush=True,
-                ),
-                dcc.Interval(
-                    id=f"{self.id}-data-update",
-                    interval=1000,
-                    n_intervals=0,
                 ),
             ]
         )
