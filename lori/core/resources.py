@@ -37,14 +37,13 @@ class Resources(Generic[R], Sequence[R]):
         return resource in self._resources
 
     def __getitem__(self, index: Iterable[str] | str | int):
-        if isinstance(index, Iterable):
-            return type(self)([r for r in self._resources if r.id == index])
         if isinstance(index, str):
             for resource in self._resources:
                 if resource.id == index:
                     return resource
-            raise KeyError(index)
-        return self._resources[index]
+        if isinstance(index, Iterable):
+            return type(self)([r for r in self._resources if r.id == index])
+        raise KeyError(index)
 
     def __iter__(self) -> Iterator[R]:
         return iter(self._resources)
