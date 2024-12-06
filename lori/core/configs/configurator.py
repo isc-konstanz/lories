@@ -12,11 +12,12 @@ import logging
 from abc import ABC, ABCMeta
 from collections import OrderedDict
 from functools import wraps
+from logging import Logger
 from typing import Any, Dict, Optional
 
-from lori.core import Context, ResourceException
+from lori.core import Context, Identifier
 from lori.core.configs import ConfigurationException, Configurations
-from lori.util import get_context, get_members
+from lori.util import get_members
 
 
 class ConfiguratorMeta(ABCMeta):
@@ -31,22 +32,15 @@ class ConfiguratorMeta(ABCMeta):
 
 
 class Configurator(ABC, object, metaclass=ConfiguratorMeta):
-    __context: Context
     __configs: Configurations
 
     _configured: bool = False
+    _logger: Logger
 
-    def __init__(
-        self,
-        context: Optional[Context] = None,
-        configs: Optional[Configurations] = None,
-        *args,
-        **kwargs,
-    ) -> None:
-        super().__init__(*args, **kwargs)
-        self._logger = logging.getLogger(self.__module__)
-        self.__context = self._assert_context(context)
+    def __init__(self, configs: Optional[Configurations] = None, **kwargs) -> None:
+        super().__init__(**kwargs)
         self.__configs = self._assert_configs(configs)
+        self._logger = logging.getLogger(self.__module__)
 
     def __eq__(self, other: Any) -> bool:
         return self is other
@@ -54,21 +48,13 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
     def __hash__(self) -> int:
         return hash(id(self))
 
-    # noinspection PyMethodMayBeStatic
-    def _assert_configs(self, configs: Optional[Configurations]) -> Optional[Configurations]:
+    @classmethod
+    def _assert_configs(cls, configs: Optional[Configurations]) -> Optional[Configurations]:
         if configs is None:
             return None
         if not isinstance(configs, Configurations):
-            raise ConfigurationException(f"Invalid configurations: {None if configs is None else type(configs)}")
+            raise ConfigurationException(f"Invalid '{cls.__name__}' configurations: {type(configs)}")
         return configs
-
-    # noinspection PyMethodMayBeStatic
-    def _assert_context(self, context: Optional[Context]) -> Optional[Context]:
-        if context is None:
-            return None
-        if not isinstance(context, Context):
-            raise ResourceException(f"Invalid context: {None if context is None else type(context)}")
-        return get_context(context, Context)
 
     def _get_vars(self) -> Dict[str, Any]:
         def _is_var(attr: str, var: Any) -> bool:
@@ -85,16 +71,14 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
     # noinspection PyShadowingBuiltins
     def _convert_vars(self, convert: callable = str) -> Dict[str, str]:
         def _convert(var: Any) -> str:
-            return str(var) if not isinstance(var, (Configurator, Context)) else convert(var)
+            return str(var) if not isinstance(var, (Context, Configurator, Identifier)) else convert(var)
 
         vars = self._get_vars()
         values = OrderedDict([(k, _convert(v)) for k, v in vars.items()])
-        if self.context is not None:
-            values["context"] = convert(self.context)
         if self.configs is not None:
-            values["configurations"] = convert(self.configs)
-            values["configured"] = str(self.is_configured())
             values["enabled"] = str(self.is_enabled())
+            values["configured"] = str(self.is_configured())
+            values["configs"] = convert(self.configs)
         return values
 
     # noinspection PyShadowingBuiltins
@@ -106,10 +90,6 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
     def __str__(self) -> str:
         vars = [f"{k} = {v}" for k, v in self._convert_vars(repr).items()]
         return f"{type(self).__name__}:\n\t" + "\n\t".join(vars)
-
-    @property
-    def context(self) -> Optional[Context]:
-        return self.__context
 
     def is_enabled(self) -> bool:
         return self.__configs is not None and self.__configs.enabled
@@ -136,6 +116,7 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
             self._logger.warning(f"{type(self).__name__} '{configs.path}' already configured")
             return
 
+        self._assert_configs(configs)
         self.__configure(configs, *args, **kwargs)
         self._on_configure(configs)
         if self.__configs != configs:

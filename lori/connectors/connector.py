@@ -11,7 +11,8 @@ from __future__ import annotations
 from abc import abstractmethod
 from collections import OrderedDict
 from functools import wraps
-from typing import Any, Dict, Optional
+from threading import Lock
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import pytz as tz
@@ -31,11 +32,18 @@ class ConnectorMeta(ConfiguratorMeta):
         connector._Connector__disconnect = connector.disconnect
         connector.disconnect = connector._do_disconnect
 
+        connector._Connector__read = connector.read
+        connector.read = connector._do_read
+
+        connector._Connector__write = connector.write
+        connector.write = connector._do_write
+
         return connector
 
 
 class Connector(Registrator, metaclass=ConnectorMeta):
     SECTION: str = "connector"
+    SECTIONS: List[str] = []
 
     _connected: bool = False
     _connect_timestamp: pd.Timestamp = pd.NaT
@@ -44,15 +52,17 @@ class Connector(Registrator, metaclass=ConnectorMeta):
 
     __resources: Resources
 
+    __lock: Lock
+
     def __init__(
         self,
         context: Registrator | Context,
         configs: Optional[Configurations] = None,
-        *args,
         **kwargs,
     ) -> None:
-        super().__init__(context, configs, *args, **kwargs)
+        super().__init__(context=context, configs=configs, **kwargs)
         self.__resources = Resources()
+        self.__lock = Lock()
 
     def __enter__(self) -> Connector:
         self.connect(self.__resources)
@@ -62,10 +72,10 @@ class Connector(Registrator, metaclass=ConnectorMeta):
     def __exit__(self, type, value, traceback):
         self.disconnect()
 
-    # noinspection PyMethodMayBeStatic
-    def _assert_context(self, context: Optional[Context]) -> Optional[Context]:
+    @classmethod
+    def _assert_context(cls, context: Registrator | Context) -> Context:
         if context is None:
-            raise ConnectorException(f"Invalid context: {context}", connector=self)
+            raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
         return super()._assert_context(context)
 
     # noinspection PyShadowingBuiltins, PyProtectedMember
@@ -146,20 +156,21 @@ class Connector(Registrator, metaclass=ConnectorMeta):
     # noinspection PyUnresolvedReferences, PyTypeChecker
     @wraps(connect, updated=())
     def _do_connect(self, resources: Resources, *args, **kwargs) -> None:
-        if not self.is_enabled():
-            raise ConfigurationException(f"Trying to connect disabled {type(self).__name__}: {self.id}")
-        if not self.is_configured():
-            raise ConfigurationException(f"Trying to connect unconfigured {type(self).__name__}: {self.id}")
-        if self._is_connected():
-            self._logger.warning(f"{type(self).__name__} '{self.id}' already connected")
-            return
+        with self.__lock:
+            if not self.is_enabled():
+                raise ConfigurationException(f"Trying to connect disabled {type(self).__name__}: {self.id}")
+            if not self.is_configured():
+                raise ConfigurationException(f"Trying to connect unconfigured {type(self).__name__}: {self.id}")
+            if self._is_connected():
+                self._logger.warning(f"{type(self).__name__} '{self.id}' already connected")
+                return
 
-        self.__connect(resources, *args, **kwargs)
-        self._on_connect(resources)
-        self._disconnect_timestamp = pd.NaT
-        self._connect_timestamp = pd.Timestamp.now(tz.UTC)
-        self._connected = True
-        self.__resources = resources
+            self.__connect(resources, *args, **kwargs)
+            self._on_connect(resources)
+            self._disconnect_timestamp = pd.NaT
+            self._connect_timestamp = pd.Timestamp.now(tz.UTC)
+            self._connected = True
+            self.__resources = resources
 
     def _on_connect(self, resources: Resources) -> None:
         pass
@@ -170,14 +181,15 @@ class Connector(Registrator, metaclass=ConnectorMeta):
     # noinspection PyUnresolvedReferences, PyTypeChecker
     @wraps(disconnect, updated=())
     def _do_disconnect(self) -> None:
-        if self._is_connected():
-            return
+        with self.__lock:
+            if self._is_connected():
+                return
 
-        self.__disconnect()
-        self._on_disconnect()
-        self._disconnect_timestamp = pd.Timestamp.now(tz.UTC)
-        self._connect_timestamp = pd.NaT
-        self._connected = False
+            self.__disconnect()
+            self._on_disconnect()
+            self._disconnect_timestamp = pd.Timestamp.now(tz.UTC)
+            self._connect_timestamp = pd.NaT
+            self._connected = False
 
     def _on_disconnect(self) -> None:
         pass
@@ -186,9 +198,33 @@ class Connector(Registrator, metaclass=ConnectorMeta):
     def read(self, resources: Resources) -> pd.DataFrame:
         pass
 
+    # noinspection PyUnresolvedReferences, PyTypeChecker
+    @wraps(read, updated=())
+    def _do_read(self, resources: Resources, *args, **kwargs) -> pd.DataFrame:
+        with self.__lock:
+            if not self._is_connected():
+                raise ConnectorException(f"Trying to read from unconnected {type(self).__name__}: {self.id}")
+
+            return self.__read(resources, *args, **kwargs)
+
     @abstractmethod
     def write(self, data: pd.DataFrame) -> None:
         pass
+
+    # noinspection PyUnresolvedReferences, PyTypeChecker
+    @wraps(write, updated=())
+    def _do_write(self, data: pd.DataFrame, *args, **kwargs) -> None:
+        with self.__lock:
+            if not self._is_connected():
+                raise ConnectorException(f"Trying to write to unconnected {type(self).__name__}: {self.id}")
+            unknown = [c for c in data.columns if c not in self.resources]
+            if len(unknown) > 0:
+                raise ConnectorException(
+                    f"Trying to read unknown channel{'s' if len(unknown) > 0 else ''} '{', '.join(unknown)}' for "
+                    f"{type(self).__name__}: {self.id}"
+                )
+
+            self.__write(data, *args, **kwargs)
 
 
 class ConnectorException(ResourceException):
@@ -198,7 +234,7 @@ class ConnectorException(ResourceException):
     """
 
     # noinspection PyArgumentList
-    def __init__(self, *args, connector: Optional[Connector] = None, **kwargs) -> None:
+    def __init__(self, connector: Connector, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.connector = connector
 

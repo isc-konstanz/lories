@@ -8,95 +8,41 @@ lori.components.weather.connector
 
 from __future__ import annotations
 
-import datetime as dt
-from abc import abstractmethod
-from typing import Optional
-
-import pandas as pd
-from lori.components.weather import Weather, WeatherException, WeatherForecast, WeatherMeta
-from lori.connectors import Connector, ConnectorMeta
-from lori.core import Configurations, Context
-from lori.data.context import DataContext
-from lori.util import get_context
+from lori import ResourceException
+from lori.components import Component
+from lori.connectors import Connector
+from lori.core import Configurations
+from lori.location import Location, LocationUnavailableException
+from lori.weather import WeatherException
 
 
-class WeatherConnectorMeta(WeatherMeta, ConnectorMeta):
-    # noinspection PyProtectedMember
-    def __call__(cls, context: Context, *args, **kwargs):
-        connector = super().__call__(context, *args, **kwargs)
-        connector_context = get_context(context, DataContext).connectors
-        connector_context._add(connector)
-        return connector
+# noinspection PyAbstractClass
+class WeatherConnector(Connector):
+    location: Location
 
+    def __init__(self, component: Component, **kwargs) -> None:
+        super().__init__(component, component.configs, **kwargs)
+        self.__component = component
 
-class WeatherConnector(Weather, Connector, metaclass=WeatherConnectorMeta):
-    _forecast: WeatherForecast = None
+    @classmethod
+    def _assert_context(cls, context: Component):
+        from lori.components.weather import WeatherProvider
+
+        if context is None or not isinstance(context, WeatherProvider):
+            raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
+        return super()._assert_context(context)
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        if self.has_forecast():
-            section = configs.get_section(WeatherForecast.SECTION, ensure_exists=True)
-            section.set("key", "forecast", replace=False)
-            self._forecast = WeatherForecast(self, section)
+        self.localize()
 
-    def _on_configure(self, configs: Configurations) -> None:
-        super()._on_configure(configs)
-        if self.has_forecast():
-            self._forecast.configure(configs.get_section(WeatherForecast.SECTION))
-
-    def activate(self) -> None:
-        super().activate()
-        if self.has_forecast():
-            self._forecast.activate()
-
-    def deactivate(self) -> None:
-        super().deactivate()
-        if self.has_forecast():
-            self._forecast.deactivate()
-
-    @property
-    def context(self):
-        return super(Weather, self).context
-
-    @property
-    def forecast(self) -> WeatherForecast:
-        if not self.has_forecast() or self._forecast is None:
-            raise WeatherException(f"Weather '{self.name}' has no forecast configured")
-        return self._forecast
-
-    @abstractmethod
-    def has_forecast(self) -> bool:
-        pass
-
-    def get(
-        self,
-        start: Optional[pd.Timestamp, dt.datetime, str] = None,
-        end: Optional[pd.Timestamp, dt.datetime, str] = None,
-        **kwargs,
-    ) -> pd.DataFrame:
-        """
-        Retrieves the weather data for a specified time interval
-
-        :param start:
-            the start timestamp for which weather data will be looked up for.
-            For many applications, passing datetime.datetime.now() will suffice.
-        :type start:
-            :class:`pandas.Timestamp` or datetime
-
-        :param end:
-            the end timestamp for which weather data will be looked up for.
-        :type end:
-            :class:`pandas.Timestamp` or datetime
-
-        :returns:
-            the weather data, indexed in a specific time interval.
-
-        :rtype:
-            :class:`pandas.DataFrame`
-        """
-        weather = super().get(start, end, **kwargs)
-        if self.has_forecast():
-            weather_forecast = self.forecast.get(start, end, **kwargs)
-            if not weather_forecast.empty:
-                weather = weather.combine_first(weather_forecast)
-        return weather
+    # noinspection PyUnresolvedReferences
+    def localize(self) -> None:
+        try:
+            self.location = self.__component.location
+            if not isinstance(self.location, Location):
+                raise WeatherException(
+                    f"Invalid location type for weather connector '{self.id}': {type(self.location)}"
+                )
+        except (LocationUnavailableException, AttributeError):
+            raise WeatherException(f"Missing location for weather connector '{self.id}'")

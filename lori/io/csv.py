@@ -15,7 +15,7 @@ from typing import List, Mapping, Optional
 
 import pandas as pd
 import pytz as tz
-from lori.connectors import ConnectionException
+from lori.core import ResourceException
 from lori.util import ceil_date, floor_date, to_date, to_timedelta
 
 
@@ -302,7 +302,7 @@ def get_files(
             if next_offset.seconds > 0:
                 next_date = floor_date(next_date + next_offset, timezone=timezone, freq=freq)
             else:
-                ConnectionException(f"Unable to increment date for freq '{freq}'")
+                ResourceException(f"Unable to increment date for freq '{freq}'")
         return next_date
 
     files = []

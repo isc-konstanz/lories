@@ -31,17 +31,28 @@ class Resources(Generic[R], Sequence[R]):
     def __str__(self) -> str:
         return f"{type(self).__name__}:\n\t" + "\n\t".join([f"{c.id} = {repr(c)}" for c in self._resources])
 
-    def __contains__(self, __x: object) -> bool:
-        return __x in self._resources
+    def __contains__(self, resource: str | R) -> bool:
+        if isinstance(resource, str):
+            return any(resource == r.id for r in self._resources)
+        return resource in self._resources
 
-    def __getitem__(self, index: int) -> R:
-        return self._resources[index]
+    def __getitem__(self, index: Iterable[str] | str | int):
+        if isinstance(index, str):
+            for resource in self._resources:
+                if resource.id == index:
+                    return resource
+        if isinstance(index, Iterable):
+            return type(self)([r for r in self._resources if r.id == index])
+        raise KeyError(index)
 
     def __iter__(self) -> Iterator[R]:
         return iter(self._resources)
 
     def __len__(self) -> int:
         return len(self._resources)
+
+    def __add__(self, other):
+        return type(self)([*self, *other])
 
     def append(self, resource: R) -> None:
         self._resources.append(resource)
@@ -58,8 +69,9 @@ class Resources(Generic[R], Sequence[R]):
     def copy(self):
         return type(self)([resource.copy() for resource in self._resources])
 
-    def apply(self, apply: Callable[[R], R]):
-        return type(self)([apply(resource.copy()) for resource in self._resources])
+    def apply(self, apply: Callable[[R], R], inplace: bool = False):
+        resources = self._resources if not inplace else self._resources.copy()
+        return type(self)([apply(resource) for resource in resources])
 
     # noinspection PyShadowingBuiltins
     def filter(self, filter: Callable[[R], bool]):

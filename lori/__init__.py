@@ -20,6 +20,7 @@ from .core import (  # noqa: F401
     ConfigurationUnavailableException,
     Configurator,
     Context,
+    Identifier,
     Resource,
     Resources,
     ResourceException,
@@ -33,6 +34,7 @@ from .data import (  # noqa: F401
     ChannelState,
     Channel,
     Channels,
+    Listener,
 )
 
 from . import connectors  # noqa: F401
@@ -49,18 +51,17 @@ from .location import (  # noqa: F401
     LocationUnavailableException,
 )
 
+from .weather import (  # noqa: F401
+    Weather,
+    WeatherException,
+    WeatherUnavailableException,
+)
+
 from . import components  # noqa: F401
 from .components import (  # noqa: F401
     Component,
     ComponentException,
     ComponentUnavailableException,
-)
-
-from .components import weather  # noqa: F401
-from .components.weather import (  # noqa: F401
-    Weather,
-    WeatherException,
-    WeatherUnavailableException,
 )
 
 from . import system  # noqa: F401

@@ -9,11 +9,11 @@ lori.data.access
 from __future__ import annotations
 
 import datetime as dt
-from typing import Any, Optional
+from typing import Any, Callable, Literal, Optional
 
 import pandas as pd
-from lori.core import Configurations, Configurator
-from lori.data import Channel, DataContext
+from lori.core import Configurations, Configurator, Context, ResourceException
+from lori.data import Channel, Channels, DataContext
 from lori.util import get_context, update_recursive
 
 
@@ -21,26 +21,66 @@ from lori.util import get_context, update_recursive
 class DataAccess(DataContext, Configurator):
     _created: bool = False
 
-    def __init__(self, component, **channels: Channel) -> None:
-        from lori import Component, ComponentException
-        from lori.data.context import DataContext
+    def __init__(self, component) -> None:
+        self.__component = self._assert_component(component)
+        self.__context = self._assert_context(component.context)
+        super().__init__(component.configs.get_section(self.SECTION, ensure_exists=True))
 
-        context = get_context(component.context, DataContext)
-        configs = component.configs.get_section(self.SECTION, ensure_exists=True)
+    @classmethod
+    def _assert_component(cls, component):
+        from lori.components import Component
+
+        if component is None or not isinstance(component, (Component, Context)):
+            raise ResourceException(f"Invalid '{cls.__name__}' component: {type(component)}")
+        return component
+
+    @classmethod
+    def _assert_context(cls, context: Context) -> Context:
+        from lori.components import Component
+        from lori.data.manager import DataManager
+
+        if context is None or not isinstance(context, (Component, Context)):
+            raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
+        return get_context(context, DataManager)
+
+    @classmethod
+    def _assert_configs(cls, configs: Configurations) -> Configurations:
+        configs = super()._assert_configs(configs)
+        if configs is None:
+            raise ResourceException(f"Invalid '{cls.__name__}' NoneType configurations")
         if not configs.has_section("channels"):
             configs._add_section("channels", {})
-        super().__init__(channels, context, configs)
-        if component is None or not isinstance(component, Component):
-            raise ComponentException(f"Invalid component: {None if component is None else type(component)}")
-        self.__component = component
+        return configs
+
+    # noinspection PyArgumentList
+    def __contains__(self, __channel: str | Channel) -> bool:
+        channels = Context.__getattribute__(self, f"_{Context.__name__}__map")
+        if isinstance(__channel, str):
+            if not len(__channel.split(".")) > 1:
+                __channel = f"{self.__component.id}.{__channel}"
+            return __channel in channels.keys()
+        if isinstance(__channel, Channel):
+            return __channel in channels.values()
+        return False
 
     # noinspection PyArgumentList
     def __getattr__(self, attr):
-        channels = DataContext.__getattribute__(self, "_channels")
+        channels = Context.__getattribute__(self, f"_{Context.__name__}__map")
         channels_by_key = {c.key: c for c in channels.values()}
         if attr in channels_by_key:
             return channels_by_key[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no channel '{attr}'")
+
+    def __delitem__(self, __uid: str) -> None:
+        if not len(__uid.split(".")) > 1:
+            __uid = f"{self.__component.id}.{__uid}"
+        del self.__context[__uid]
+        del self[__uid]
+
+    # noinspection PyTypeChecker
+    @property
+    def context(self) -> DataContext:
+        return self.__context
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
@@ -78,13 +118,14 @@ class DataAccess(DataContext, Configurator):
             channel_id = f"{self.__component.id}.{key}"
             self._update(id=channel_id, key=key, **channel_configs)
 
-    def _add(self, channel: Channel) -> None:
-        self.context._add(channel)
-        super()._add(channel)
-
     # noinspection PyShadowingBuiltins
-    def _new(self, id: str, key: str, **configs: Any) -> Channel:
-        return self.context._new(id=id, key=key, **configs)
+    def _set(self, id: str, channel: Channel) -> None:
+        self.__context._set(id, channel)
+        super()._set(id, channel)
+
+    # noinspection PyShadowingBuiltins, PyUnresolvedReferences
+    def _new(self, id: str, key: str, type: Type, **configs: Any) -> Channel:
+        return self.__context._new(id=id, key=key, type=type, **configs)
 
     # noinspection PyShadowingBuiltins
     def _get(self, id: str) -> Channel:
@@ -92,28 +133,42 @@ class DataAccess(DataContext, Configurator):
             id = f"{self.__component.id}.{id}"
         return super()._get(id)
 
-    # noinspection PyShadowingBuiltins
-    def _contains(self, id: str) -> bool:
-        if not len(id.split(".")) > 1:
-            id = f"{self.__component.id}.{id}"
-        return id in self._channels.keys()
+    # noinspection PyUnresolvedReferences
+    def register(
+        self,
+        function: Callable[[pd.DataFrame], None],
+        *channels: Channel | str,
+        how: Literal["any", "all"] = "any",
+        unique: bool = False,
+    ) -> None:
+        _channels = []
+        for channel in channels:
+            if isinstance(channel, str):
+                if channel in self:
+                    channel = self[channel]
+            elif not isinstance(channel, Channel):
+                raise ResourceException(f"Unable to register to '{type(channel)}' channel: {channel}")
+            _channels.append(channel)
 
-    # noinspection PyShadowingBuiltins
-    def _remove(self, id: str) -> None:
-        if not len(id.split(".")) > 1:
-            id = f"{self.__component.id}.{id}"
-        channel = self._channels.get(id)
-        self.context.remove(channel)
-        del self._channels[id]
+        self.__context.register(function, *_channels, how=how, unique=unique)
 
-    # noinspection PyShadowingBuiltins
+    # noinspection PyUnresolvedReferences
     def read(
         self,
+        channels: Optional[Channels] = None,
         start: Optional[pd.Timestamp | dt.datetime] = None,
         end: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> pd.DataFrame:
-        return self.context.read(self.channels, start, end)
+        if channels is None:
+            channels = self.channels
 
-    # noinspection PyShadowingBuiltins
-    def write(self, data: pd.DataFrame) -> None:
-        self.context.write(data, self.channels)
+        return self.__context.read(channels, start, end)
+
+    # noinspection PyUnresolvedReferences
+    def write(self, data: pd.DataFrame, channels: Optional[Channels] = None) -> None:
+        if channels is None:
+            channels = self.channels
+        if data is None:
+            raise ResourceException(f"Invalid data to write '{self.id}': {data}")
+
+        self.__context.write(data.rename(columns={c.key: c.id for c in channels}), channels)

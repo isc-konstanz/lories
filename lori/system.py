@@ -9,21 +9,28 @@ lori.system
 from __future__ import annotations
 
 import os
+from functools import wraps
 from shutil import copytree, ignore_patterns
 from typing import List, Optional
 
-import pandas as pd
 from lori import ConfigurationException, Configurations, Settings
-from lori.components import Component, Weather, WeatherUnavailableException
+from lori.components import Component, WeatherProvider
 from lori.components.context import ComponentContext
-from lori.core import Context, RegistratorContext
-from lori.data.context import DataContext
+from lori.connectors import ConnectorAccess
+from lori.core import Activator, Context, Identifier, ResourceException
+from lori.data import DataAccess, DataContext
 from lori.location import Location, LocationUnavailableException
-from lori.util import parse_key
+from lori.util import validate_key
+from lori.weather import Weather, WeatherUnavailableException
 
 
-class System(Component, ComponentContext):
-    TYPE: str = "system"
+# noinspection PyProtectedMember
+class System(ComponentContext, Activator, Identifier):
+    SECTION: str = "system"
+    SECTIONS: List[str] = [ConnectorAccess.SECTION, DataAccess.SECTION]
+
+    __connectors: ConnectorAccess
+    __data: DataAccess
 
     _location: Optional[Location] = None
 
@@ -32,9 +39,9 @@ class System(Component, ComponentContext):
     def copy(cls, settings: Settings) -> bool:
         configs = Configurations.load(f"{cls.__name__.lower()}.conf", **settings.dirs.to_dict())
         if "key" in configs:
-            key = parse_key(configs["key"])
+            key = validate_key(configs["key"])
         elif "name" in configs:
-            key = parse_key(configs["name"])
+            key = validate_key(configs["name"])
             configs["key"] = key
         else:
             raise ConfigurationException("Invalid configuration, missing specified system name")
@@ -72,20 +79,76 @@ class System(Component, ComponentContext):
     def load(cls, context: DataContext = None, **kwargs) -> System:
         return cls(context, Configurations.load(f"{cls.__name__.lower()}.conf", **kwargs))
 
-    def __repr__(self) -> str:
-        return Component.__repr__(self)
-
-    def __str__(self) -> str:
-        return Component.__str__(self)
+    # noinspection PyShadowingBuiltins, PyUnusedLocal
+    def __init__(
+        self,
+        context: Context = None,
+        configs: Optional[Configurations] = None,
+        id: Optional[str] = None,
+        key: Optional[str] = None,
+        name: Optional[str] = None,
+        **kwargs,
+    ) -> None:
+        key = self._build_key(key, configs=configs)
+        super().__init__(
+            context=context,
+            configs=configs,
+            id=self._build_id(id, key, configs=configs, context=context),
+            name=self._build_name(name, configs=configs),
+            key=key,
+            **kwargs,
+        )
+        self.__connectors = ConnectorAccess(self)
+        self.__data = DataAccess(self)
 
     # noinspection PyShadowingNames, PyArgumentList
     def __getattr__(self, attr):
         # __getattr__ gets called when the item is not found via __getattribute__
         # To avoid recursion, call __getattribute__ directly to get components dict
-        components = RegistratorContext.__getattribute__(self, f"_{RegistratorContext.__name__}__map")
+        components = Context.__getattribute__(self, f"_{Context.__name__}__map")
         if attr in components.keys():
             return components[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no component '{attr}'")
+
+    # noinspection PyShadowingBuiltins
+    @classmethod
+    def _assert_id(cls, id: Optional[str], key: Optional[str]) -> str:
+        id = super()._assert_id(id, key)
+        if len(id.split(".")) <= 1:
+            raise ResourceException(f"Missing context in '{cls.__name__}' id: {id}")
+        return id
+
+    # noinspection PyShadowingBuiltins
+    @classmethod
+    def _build_id(
+        cls,
+        id: Optional[str],
+        key: Optional[str],
+        configs: Optional[Configurations],
+        context: Context,
+    ) -> str:
+        if configs is not None:
+            if "id" in configs:
+                id = configs["id"]
+        if id is None:
+            id = f"{context.id}.{key}"
+        return id
+
+    @classmethod
+    def _build_key(cls, key: str, configs: Optional[Configurations]) -> str:
+        if configs is not None:
+            if "key" in configs:
+                key = configs["key"]
+            elif "name" in configs:
+                key = validate_key(configs["name"])
+        return key
+
+    @classmethod
+    def _build_name(cls, name: Optional[str], configs: Optional[Configurations]) -> str:
+        if configs is not None:
+            if "name" in configs:
+                name = configs["name"]
+        return name
 
     # noinspection PyProtectedMember
     def _add(self, *components: Component) -> None:
@@ -104,7 +167,7 @@ class System(Component, ComponentContext):
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self._sort()
+        self.sort()
         self.localize(configs.get_section(Location.SECTION, defaults={}))
 
     def localize(self, configs: Configurations) -> None:
@@ -120,6 +183,26 @@ class System(Component, ComponentContext):
         else:
             self._location = None
 
+    @wraps(configure, updated=())
+    def _do_configure(self, configs: Configurations, *args, **kwargs) -> None:
+        if configs is None:
+            raise ConfigurationException(f"Invalid NoneType configuration for {type(self).__name__}: {self.name}")
+        if not configs.enabled:
+            raise ConfigurationException(f"Trying to configure disabled {type(self).__name__}: {configs.name}")
+
+        self.__connectors.configure(configs.get_sections([ConnectorAccess.SECTION], ensure_exists=True))
+        self.__data.configure(configs.get_section(DataAccess.SECTION, ensure_exists=True))
+        super()._do_configure(configs, *args, **kwargs)
+        self.__data.create()
+
+    @property
+    def connectors(self):
+        return self.__connectors
+
+    @property
+    def data(self):
+        return self.__data
+
     @property
     def location(self) -> Location:
         if self._location is None:
@@ -129,14 +212,6 @@ class System(Component, ComponentContext):
     # noinspection PyTypeChecker
     @property
     def weather(self) -> Weather:
-        if not self.has_component(Weather.TYPE):
+        if not self.has_component(WeatherProvider):
             raise WeatherUnavailableException(f"System '{self.name}' has no weather configured")
-        return next(self.get_component_type(Weather.TYPE))
-
-    @property
-    def type(self) -> str:
-        return self.TYPE
-
-    # noinspection PyMethodMayBeStatic
-    def run(self, *args, **kwargs) -> Optional[pd.DataFrame]:
-        return None
+        return next(self.get_component_type(WeatherProvider))

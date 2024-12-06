@@ -13,17 +13,15 @@ import os
 from typing import Mapping, Optional, Tuple
 
 import pandas as pd
-from lori.connectors import Database, register_connector_type
+from lori.connectors import ConnectionException, Database, register_connector_type
 from lori.core import ConfigurationException, Configurations, Resources
 from lori.io import csv
 from lori.util import ceil_date, floor_date, parse_freq
 
 
 # noinspection PyShadowingBuiltins
-@register_connector_type
+@register_connector_type("csv")
 class CsvDatabase(Database):
-    TYPE: str = "csv"
-
     _data: Optional[pd.DataFrame] = None
     _data_path: Optional[str] = None
     _data_dir: str
@@ -111,16 +109,19 @@ class CsvDatabase(Database):
         columns.update({r.name: r.id for r in resources if "name" in r})
         columns.update({column: key for key, column in self.columns.items()})
 
-        if self._data_path is not None:
-            self._data = csv.read_file(
-                self._data_path,
-                index_column=self.index_column,
-                index_type=self.index_type,
-                timezone=self.timezone,
-                separator=self.separator,
-                decimal=self.decimal,
-                rename=columns,
-            )
+        try:
+            if self._data_path is not None:
+                self._data = csv.read_file(
+                    self._data_path,
+                    index_column=self.index_column,
+                    index_type=self.index_type,
+                    timezone=self.timezone,
+                    separator=self.separator,
+                    decimal=self.decimal,
+                    rename=columns,
+                )
+        except IOError as e:
+            raise ConnectionException(self, repr(e))
 
     def disconnect(self) -> None:
         self._data = None
@@ -170,9 +171,8 @@ class CsvDatabase(Database):
             data = data.rename(columns=columns)
             return data.loc[:, [r.id for r in resources if r.id in data.columns]]
 
-        except IOError:
-            # TODO: Return more informative ChannelStates or raise ConnectionException (?)
-            return pd.DataFrame()
+        except IOError as e:
+            raise ConnectionException(self, repr(e))
 
     # noinspection PyTypeChecker
     def read_first(self, resources: Resources) -> Optional[pd.DataFrame]:
