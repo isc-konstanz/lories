@@ -109,20 +109,19 @@ class View(ComponentGroup):
 
             layout.append(dbc.Row([dbc.Col(card, width="auto") for card in page_cards]))
 
-    # noinspection PyTypeChecker, PyUnresolvedReferences, PyArgumentList
+    # noinspection PyTypeChecker, PyUnresolvedReferences
     @wraps(create_layout, updated=())
-    def _do_create_layout(self) -> PageLayout:
+    def _do_create_layout(self, *args, **kwargs) -> None:
         for page in self:
-            page._do_create_layout()
+            page._do_create_layout(*args, **kwargs)
         for group in self.groups.values():
-            group_layout = group._do_create_layout()
+            group._do_create_layout(*args, **kwargs)
+            group_layout = group.layout
             if group_layout.has_menu_item():
                 self.header.menu.append(group_layout.menu)
 
-        layout = super()._do_create_layout()
-        self.header.menu.insert(0, layout.menu)
-
-        return layout
+        super()._do_create_layout(*args, **kwargs)
+        self.header.menu.insert(0, self.layout.menu)
 
     # noinspection PyTypeChecker, PyUnresolvedReferences
     def _do_create_pages(self, components: ComponentContext) -> None:
@@ -159,7 +158,9 @@ class View(ComponentGroup):
             return
 
         registration = registry.get_group(_type)
-        group = registration.initialize(id=f"{self.id}-{registration.key}", key=registration.key, name=registration.name)
+        group = registration.initialize(
+            id=f"{self.id}-{registration.key}", key=registration.key, name=registration.name
+        )
         if group is not None:
             self.groups[registration.key] = group
         return group

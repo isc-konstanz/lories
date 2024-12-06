@@ -25,6 +25,10 @@ class SystemPage(ComponentGroup, ComponentPage[System]):
         super().__init__(component=system, *args, **kwargs)
 
     @property
+    def key(self) -> str:
+        return self._component.key
+
+    @property
     def path(self) -> str:
         return f"/system/{self._encode_id(self.key)}"
 
@@ -39,12 +43,12 @@ class SystemPage(ComponentGroup, ComponentPage[System]):
             data.append(self._build_data())
             layout.append(dbc.Row(dbc.Col(dbc.Card(dbc.CardBody(data)))))
 
-    # noinspection PyTypeChecker, PyArgumentList
+    # noinspection PyTypeChecker
     @wraps(create_layout, updated=())
-    def _do_create_layout(self) -> PageLayout:
+    def _do_create_layout(self, *args, **kwargs) -> None:
         for page in self:
-            page._do_create_layout()
-        return super()._do_create_layout()
+            page._do_create_layout(*args, **kwargs)
+        super()._do_create_layout(*args, **kwargs)
 
     def _do_register(self) -> None:
         super()._do_register()

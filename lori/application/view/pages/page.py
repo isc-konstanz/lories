@@ -97,18 +97,16 @@ class Page(ABC, metaclass=PageMeta):
 
     # noinspection PyUnresolvedReferences
     @wraps(create_layout, updated=())
-    def _do_create_layout(self) -> PageLayout:
+    def _do_create_layout(self, *args, **kwargs) -> None:
         if self.is_registered():
             raise PageException(f"Trying to create layout of already registered {type(self).__name__}: {self.name}")
         if self.is_created():
             self._logger.warning(f"{type(self).__name__} '{self.id}' layout already created")
         else:
             self.layout = PageLayout(id=f"{self.id}-container")
-            self.__create_layout(self.layout)
+            self.__create_layout(self.layout, *args, **kwargs)
             self._on_create_layout(self.layout)
             self._created = True
-
-        return self.layout
 
     def _on_create_layout(self, layout: PageLayout) -> None:
         pass
