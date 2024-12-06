@@ -124,8 +124,8 @@ class DataAccess(DataContext, Configurator):
         super()._set(id, channel)
 
     # noinspection PyShadowingBuiltins, PyUnresolvedReferences
-    def _new(self, id: str, key: str, **configs: Any) -> Channel:
-        return self.__context._new(id=id, key=key, **configs)
+    def _new(self, id: str, key: str, type: Type, **configs: Any) -> Channel:
+        return self.__context._new(id=id, key=key, type=type, **configs)
 
     # noinspection PyShadowingBuiltins
     def _get(self, id: str) -> Channel:
@@ -149,16 +149,26 @@ class DataAccess(DataContext, Configurator):
             elif not isinstance(channel, Channel):
                 raise ResourceException(f"Unable to register to '{type(channel)}' channel: {channel}")
             _channels.append(channel)
+
         self.__context.register(function, *_channels, how=how, unique=unique)
 
     # noinspection PyUnresolvedReferences
     def read(
         self,
+        channels: Optional[Channels] = None,
         start: Optional[pd.Timestamp | dt.datetime] = None,
         end: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> pd.DataFrame:
-        return self.__context.read(self.channels, start, end)
+        if channels is None:
+            channels = self.channels
+
+        return self.__context.read(channels, start, end)
 
     # noinspection PyUnresolvedReferences
-    def write(self, data: pd.DataFrame) -> None:
-        self.__context.write(data, self.channels)
+    def write(self, data: pd.DataFrame, channels: Optional[Channels] = None) -> None:
+        if channels is None:
+            channels = self.channels
+        if data is None:
+            raise ResourceException(f"Invalid data to write '{self.id}': {data}")
+
+        self.__context.write(data.rename(columns={c.key: c.id for c in channels}), channels)

@@ -189,8 +189,16 @@ class Channel(Resource):
     ) -> pd.DataFrame:
         return self.__context.read(self.to_list(), start, end)
 
-    # noinspection PyShadowingBuiltins
-    def write(self, data: pd.DataFrame) -> None:
+    # noinspection PyUnresolvedReferences
+    def write(self, data: pd.DataFrame | pd.Series | Any) -> None:
+        if data is None:
+            raise ResourceException(f"Invalid data to write '{self.id}': {data}")
+        if isinstance(data, pd.Series):
+            data.name = self.id
+            data = data.to_frame()
+        elif not isinstance(data, pd.DataFrame):
+            data = pd.DataFrame(index=[pd.Timestamp.now(tz.UTC).floor(freq="s")], data=[data], columns=[self.id])
+
         self.__context.write(data, self.to_list())
 
     # noinspection PyShadowingBuiltins
