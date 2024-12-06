@@ -13,7 +13,7 @@ from typing import Any, Callable, Literal, Optional
 
 import pandas as pd
 from lori.core import Configurations, Configurator, Context, ResourceException
-from lori.data import Channel, DataContext
+from lori.data import Channel, Channels, DataContext
 from lori.util import get_context, update_recursive
 
 
@@ -77,6 +77,7 @@ class DataAccess(DataContext, Configurator):
         del self.__context[__uid]
         del self[__uid]
 
+    # noinspection PyTypeChecker
     @property
     def context(self) -> DataContext:
         return self.__context
@@ -122,7 +123,7 @@ class DataAccess(DataContext, Configurator):
         self.__context._set(id, channel)
         super()._set(id, channel)
 
-    # noinspection PyShadowingBuiltins
+    # noinspection PyShadowingBuiltins, PyUnresolvedReferences
     def _new(self, id: str, key: str, **configs: Any) -> Channel:
         return self.__context._new(id=id, key=key, **configs)
 
@@ -132,6 +133,7 @@ class DataAccess(DataContext, Configurator):
             id = f"{self.__component.id}.{id}"
         return super()._get(id)
 
+    # noinspection PyUnresolvedReferences
     def register(
         self,
         function: Callable[[pd.DataFrame], None],
@@ -149,7 +151,7 @@ class DataAccess(DataContext, Configurator):
             _channels.append(channel)
         self.__context.register(function, *_channels, how=how, unique=unique)
 
-    # noinspection PyShadowingBuiltins
+    # noinspection PyUnresolvedReferences
     def read(
         self,
         start: Optional[pd.Timestamp | dt.datetime] = None,
@@ -157,6 +159,6 @@ class DataAccess(DataContext, Configurator):
     ) -> pd.DataFrame:
         return self.__context.read(self.channels, start, end)
 
-    # noinspection PyShadowingBuiltins
+    # noinspection PyUnresolvedReferences
     def write(self, data: pd.DataFrame) -> None:
         self.__context.write(data, self.channels)

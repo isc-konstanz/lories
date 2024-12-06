@@ -150,6 +150,7 @@ class Channel(Resource):
     ) -> None:
         self._set(timestamp, value, state)
 
+    # noinspection PyUnresolvedReferences
     def _set(
         self,
         timestamp: pd.Timestamp,
@@ -171,6 +172,7 @@ class Channel(Resource):
         if self.is_valid():
             self.__context.notify(self)
 
+    # noinspection PyUnresolvedReferences
     def register(
         self,
         function: Callable[[pd.DataFrame], None],
@@ -179,7 +181,7 @@ class Channel(Resource):
     ) -> None:
         self.__context.register(function, self, how=how, unique=unique)
 
-    # noinspection PyShadowingBuiltins
+    # noinspection PyUnresolvedReferences
     def read(
         self,
         start: Optional[pd.Timestamp | dt.datetime] = None,

@@ -336,14 +336,34 @@ def to_timedelta(freq: str) -> relativedelta | pd.Timedelta:
         raise ValueError(f"Invalid frequency: {freq}")
 
 
+def is_float(value: str | float) -> bool:
+    if (
+        isinstance(value, int)
+        or (isinstance(value, str) and value.isnumeric())
+        or issubclass(type(value), (np.floating, float))
+    ):
+        return True
+    return False
+
+
 def to_float(value: str | float) -> Optional[float]:
     if value is None:
         return None
     if type(value) == float:  # noqa E721
         return value
-    if isinstance(value, (str, int)) or issubclass(type(value), float):
+    if is_float(value):
         return float(value)
     raise TypeError(f"Expected str, int or float, not: {type(value)}")
+
+
+def is_int(value: str | int) -> bool:
+    if (
+        (isinstance(value, float) and int(value) == value)
+        or (isinstance(value, str) and value.isnumeric())
+        or issubclass(type(value), (np.integer, int))
+    ):
+        return True
+    return False
 
 
 def to_int(value: str | int) -> Optional[int]:
@@ -351,9 +371,17 @@ def to_int(value: str | int) -> Optional[int]:
         return None
     if type(value) == int:  # noqa E721
         return value
-    if isinstance(value, str) or (isinstance(value, float) and int(value) == value) or issubclass(type(value), int):
+    if is_int(value):
         return int(value)
     raise TypeError(f"Expected str, float or int, not: {type(value)}")
+
+
+def is_bool(value: str | bool) -> bool:
+    if issubclass(type(value), (np.bool, bool, int)) or (
+        isinstance(value, str) and (value.lower() in ["true", "false" "yes", "no", "y", "n"])
+    ):
+        return True
+    return False
 
 
 def to_bool(value: str | bool) -> Optional[bool]:
@@ -366,7 +394,7 @@ def to_bool(value: str | bool) -> Optional[bool]:
             return True
         if value.lower() in ["false", "no", "n"]:
             return False
-    if issubclass(type(value), int):
+    if issubclass(type(value), (np.bool, bool, int)):
         return bool(value)
     raise TypeError(f"Invalid bool type: {type(value)}")
 
