@@ -6,5 +6,5 @@ numpy~=2.0
 pandas~=2.2
 requests~=2.32
 pymysql~=1.1
-psycopg~=2.9
+psycopg2~=2.9
 sqlalchemy~=2.0
