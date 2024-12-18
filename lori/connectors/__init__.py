@@ -35,5 +35,5 @@ from .csv import CsvDatabase  # noqa: F401
 try:
     from .sql import SqlDatabase  # noqa: F401
 
-except ImportError:
+except ModuleNotFoundError:
     pass

@@ -293,7 +293,7 @@ class DataManager(DataContext, Activator, Identifier):
         self._listeners.register(function, Channels(_channels), how=how, unique=unique)
 
     @property
-    def converters(self) -> ConnectorContext:
+    def converters(self) -> ConverterContext:
         return self._converters
 
     @property

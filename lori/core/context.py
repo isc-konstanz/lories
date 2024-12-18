@@ -28,10 +28,10 @@ class Context(Generic[ID], MutableMapping[str, ID]):
         self.__map = OrderedDict[str, ID]()
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({[c.id for c in self.__map.values()]})"
+        return f"{type(self).__name__}({', '.join(str(c.id) for c in self.__map.values())})"
 
     def __str__(self) -> str:
-        return f"{type(self).__name__}:\n\t" + "\n\t".join([f"{i} = {repr(c)}" for i, c in self.__map.items()])
+        return f"{type(self).__name__}:\n\t" + "\n\t".join(f"{i} = {repr(c)}" for i, c in self.__map.items())
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.__map)

@@ -6,7 +6,7 @@ lori.core.identifier
 
 """
 
-from typing import Optional
+from typing import Any, Optional
 
 from lori.core import ResourceException
 from lori.util import parse_name, validate_key
@@ -34,6 +34,12 @@ class Identifier:
         self._id = id
         self._key = key
         self._name = self._assert_name(name, key)
+
+    def __eq__(self, other: Any) -> bool:
+        return self is other
+
+    def __hash__(self) -> int:
+        return hash(id(self))
 
     # noinspection PyShadowingBuiltins
     @classmethod

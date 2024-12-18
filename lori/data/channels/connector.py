@@ -31,7 +31,7 @@ class ChannelConnector:
         self.__configs = OrderedDict(configs)
         self._connector = self._assert_connector(connector)
 
-        self.enabled = self.__configs.pop("enabled", connector is not None and connector.is_enabled())
+        self.enabled = to_bool(self.__configs.pop("enabled", connector is not None and connector.is_enabled()))
 
     @classmethod
     def _assert_connector(cls, connector):
@@ -49,6 +49,12 @@ class ChannelConnector:
         vars["timestamp"] = self.timestamp
         vars["enabled"] = self.enabled
         return vars
+
+    def __eq__(self, other: Any) -> bool:
+        return self is other
+
+    def __hash__(self) -> int:
+        return hash(id(self))
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.id})"
@@ -73,6 +79,12 @@ class ChannelConnector:
     @property
     def key(self) -> str:
         return self._connector.key if self._connector is not None else None
+
+    def is_configured(self) -> bool:
+        return self._connector.is_configured() if self.enabled else False
+
+    def is_connected(self) -> bool:
+        return self._connector.is_connected() if self.enabled else False
 
     # noinspection PyShadowingBuiltins
     def _update(
