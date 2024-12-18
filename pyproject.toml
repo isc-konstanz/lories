@@ -41,12 +41,21 @@ dependencies = [
     "pandas >= 0.23",
     "pytz >= 2019.1",
     "tzlocal",
-    "requests"
+    "requests",
 ]
 
 [project.optional-dependencies]
-sql = [
-    "pymysql"
+postgresql = [
+    "sqlalchemy",
+    "psycopg2",
+]
+mariadb = [
+    "sqlalchemy",
+    "pymysql",
+]
+mysql = [
+    "sqlalchemy",
+    "pymysql",
 ]
 doc = [
     "graphviz",
@@ -58,7 +67,7 @@ doc = [
 dev = [
     # "lori[sql, doc]",
     "pre-commit",
-    "ruff"
+    "ruff",
 ]
 
 [tool.setuptools.package-data]

@@ -70,11 +70,8 @@ class Application(DataManager):
             elif action == "start":
                 self.start()
 
-            elif action == "backup":
-                self.backup(full=self.settings["full"])
-
-            elif action == "sync":
-                self.synchronize(full=self.settings["full"])
+            elif action == "replicate":
+                self.replicate(full=self.settings["full"])
 
         except Exception as e:
             self._logger.warning(repr(e))

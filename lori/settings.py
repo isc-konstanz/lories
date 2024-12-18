@@ -101,27 +101,16 @@ def _parse_kwargs(parser: ArgumentParser) -> Dict[str, Any]:
             action_parser.add_parser("run", help="run local resources, connectors and systems")
         if "start" not in action_parser.choices.keys():
             action_parser.add_parser("start", help="start the local resource system")
-        if "backup" not in action_parser.choices.keys():
-            backup_parser = action_parser.add_parser(
-                name="backup",
-                help="backup the local resources and configured data",
+        if "replicate" not in action_parser.choices.keys():
+            replicate_parser = action_parser.add_parser(
+                name="replicate",
+                help="replicate data from a remote database",
             )
-            backup_parser.add_argument(
+            replicate_parser.add_argument(
                 "--full",
                 dest="full",
                 action="store_true",
-                help="flags if the backup should be executed for all data",
-            )
-        if "sync" not in action_parser.choices.keys():
-            sync_parser = action_parser.add_parser(
-                name="sync",
-                help="synchronize the local data to a remote system",
-            )
-            sync_parser.add_argument(
-                "--full",
-                dest="full",
-                action="store_true",
-                help="flags if the synchronization should be executed for all data",
+                help="flags if the replication should be executed for all data",
             )
 
         parser.add_argument(

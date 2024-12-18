@@ -23,7 +23,6 @@ from lori.components.component import Component
 from lori.components.context import ComponentContext
 from lori.connectors import Connector, ConnectorException
 from lori.connectors.context import ConnectorContext
-from lori.connectors.database import Database
 from lori.connectors.tasks import ConnectTask, LogTask, ReadTask, WriteTask
 from lori.converters.context import ConverterContext
 from lori.core import Activator, Context, Identifier, ResourceException
@@ -382,38 +381,33 @@ class DataManager(DataContext, Activator, Identifier):
         self.listeners.wait()
         self.log()
 
-    # noinspection PyShadowingBuiltins
-    def backup(self, **kwargs) -> None:
-        # TODO: Backup local configurations and relevant resource files
-        self.synchronize(**kwargs)
-
-    # noinspection PyShadowingBuiltins
-    def synchronize(self, **kwargs) -> None:
-        section = self.configs.get_section("synchronize", defaults={})
-        if not section.enabled:
-            self._logger.error("Unable to synchronize for disabled configuration section 'synchronize'")
+    # noinspection PyShadowingBuiltins, PyTypeChecker
+    def replicate(self, **kwargs) -> None:
+        configs = self.configs.get_section("replication", defaults={})
+        configs._load(require=False)
+        if not configs.enabled:
+            self._logger.error("Unable to replicate for disabled configuration section 'replication'")
             return
-        kwargs.update(section)
+        kwargs.update({k: v for k, v in configs.items() if k not in configs.sections})
 
-        databases = Databases(self)
+        databases = Databases(self, configs)
         self._configure(databases)
         self._configure(*databases.values())
+        for database in databases.values():
+            channels = self.channels.filter(lambda c: Databases.is_database(c.logger) and c.has_logger(database.id))
+            if len(channels) == 0:
+                continue
+            self.connect(database, channels=channels)
+            try:
+                databases.replicate(database, channels.apply(lambda c: c.from_logger()), **kwargs)
+            finally:
+                self.disconnect(database)
 
-        # noinspection PyShadowingNames
-        def is_database(connector: Connector) -> bool:
-            return isinstance(connector, Database) and connector._is_connected()
+        def is_convertable(channel: Channel) -> bool:
+            return Databases.is_database(channel.connector) and Databases.is_database(channel.logger)
 
-        connectors = self.connectors.filter(is_database)
-        connector_ids = [c.id for c in connectors]
-
-        # Pass copied connectors instead of actual objects, including parsed logger specific connector configurations
-        channels = self.channels.filter(lambda c: c.has_logger(*connector_ids)).apply(lambda c: c.from_logger())
-        self.connect(*databases.values(), channels=channels)
-        try:
-            for connector in connectors:
-                databases.synchronize(connector, channels.filter(lambda c: c.has_logger(connector.id)), **kwargs)
-        finally:
-            self.disconnect(*databases.values())
+        for database, channels in self.channels.filter(is_convertable).groupby(lambda c: c.connector._connector):
+            databases.replicate(database, channels, **kwargs)
 
     # noinspection PyShadowingBuiltins, PyTypeChecker
     def read(

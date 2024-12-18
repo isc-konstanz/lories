@@ -12,7 +12,7 @@ import datetime as dt
 import hashlib
 from abc import abstractmethod
 from functools import wraps
-from typing import Any, Optional, overload
+from typing import Any, Literal, Optional, overload
 
 import tzlocal
 
@@ -35,8 +35,8 @@ class DatabaseMeta(ConnectorMeta):
     def __call__(cls, *args, **kwargs):
         database = super().__call__(*args, **kwargs)
 
-        database._Database__read = database.read
-        database.read = database._do_read
+        database._Database__read = database._Connector__read
+        del database._Connector__read
 
         database._Database__read_first = database.read_first
         database.read_first = database._do_read_first
@@ -70,7 +70,7 @@ class Database(Connector, metaclass=DatabaseMeta):
         resources: Resources,
         start: Optional[pd.Timestamp | dt.datetime] = None,
         end: Optional[pd.Timestamp | dt.datetime] = None,
-        method: str = "MD5",
+        method: Literal["MD5", "SHA1", "SHA256", "SHA512"] = "MD5",
         encoding: str = "UTF-8",
     ) -> Optional[str]:
         data = self.read(resources, start, end)
@@ -87,13 +87,22 @@ class Database(Connector, metaclass=DatabaseMeta):
 
         csv = data[columns].to_csv(index=False, header=False, sep=",", decimal=".", float_format="%.10g")
         csv = ",".join(csv.replace(",,", ",").splitlines())
-        if method.lower() == "md5":
-            hash = hashlib.md5(csv.encode(encoding)).hexdigest()
-        # elif method.lower() == "sha256":
-        #     hash = hashlib.sha256(bytes).hexdigest()
-        else:
-            raise ValueError(f"Invalid checksum method '{method}'")
+        hash = self._hash(csv, method, encoding)
         return hash
+
+    @staticmethod
+    def _hash(value: str, method: Literal["MD5", "SHA1", "SHA256", "SHA512"], encoding: str = "UTF-8") -> str:
+        method = method.lower()
+        if method not in ["md5", "sha1", "sha256", "sha512"]:
+            raise ValueError(f"Invalid checksum method '{method}'")
+        if method == "md5":
+            return hashlib.md5(value.encode(encoding)).hexdigest()
+        if method == "sha1":
+            return hashlib.sha1(value.encode(encoding)).hexdigest()
+        if method == "sha256":
+            return hashlib.sha256(value.encode(encoding)).hexdigest()
+        if method == "sha512":
+            return hashlib.sha512(value.encode(encoding)).hexdigest()
 
     def exists(
         self,
@@ -135,7 +144,7 @@ class Database(Connector, metaclass=DatabaseMeta):
         **kwargs,
     ) -> pd.DataFrame:
         if not self._is_connected():
-            raise ConnectionException(f"Database '{self.id}' not connected")
+            raise ConnectionException(self, f"Database '{self.id}' not connected")
 
         data = self.__read(resources, start=start, end=end, *args, **kwargs)
         data = self._validate_timezone(resources, data)
@@ -149,7 +158,7 @@ class Database(Connector, metaclass=DatabaseMeta):
     @wraps(read_first, updated=())
     def _do_read_first(self, resources: Resources, *args, **kwargs) -> Optional[pd.DataFrame]:
         if not self._is_connected():
-            raise ConnectionException(f"Database '{self.id}' not connected")
+            raise ConnectionException(self, f"Database '{self.id}' not connected")
 
         data = self.__read_first(resources, *args, **kwargs)
         data = self._validate_timezone(resources, data)
@@ -165,7 +174,7 @@ class Database(Connector, metaclass=DatabaseMeta):
     @wraps(read_first_index, updated=())
     def _do_read_first_index(self, resources: Resources, *args, **kwargs) -> Optional[Any]:
         if not self._is_connected():
-            raise ConnectionException(f"Database '{self.id}' not connected")
+            raise ConnectionException(self, f"Database '{self.id}' not connected")
 
         index = self.__read_first_index(resources, *args, **kwargs)
         if isinstance(index, dt.datetime):
@@ -180,7 +189,7 @@ class Database(Connector, metaclass=DatabaseMeta):
     @wraps(read_last, updated=())
     def _do_read_last(self, resources: Resources, *args, **kwargs) -> Optional[pd.DataFrame]:
         if not self._is_connected():
-            raise ConnectionException(f"Database '{self.id}' not connected")
+            raise ConnectionException(self, f"Database '{self.id}' not connected")
 
         data = self.__read_last(resources, *args, **kwargs)
         data = self._validate_timezone(resources, data)
@@ -196,7 +205,7 @@ class Database(Connector, metaclass=DatabaseMeta):
     @wraps(read_last_index, updated=())
     def _do_read_last_index(self, resources: Resources, *args, **kwargs) -> Optional[Any]:
         if not self._is_connected():
-            raise ConnectionException(f"Database '{self.id}' not connected")
+            raise ConnectionException(self, f"Database '{self.id}' not connected")
 
         index = self.__read_last_index(resources, *args, **kwargs)
         if isinstance(index, dt.datetime):
@@ -217,12 +226,13 @@ class Database(Connector, metaclass=DatabaseMeta):
         if not data.empty:
             data.index = _validate_series(data.index)
             for resource in resources:
+                if resource.id not in data:
+                    continue
                 if resource.type in [pd.Timestamp, dt.datetime]:
-                    column = resource.column if "column" in resource else resource.id
-                    series = data[column]
-                    if pd.api.types.is_string_dtype(series.values):
-                        series = pd.to_datetime(series)
-                    data[column] = _validate_series(series)
+                    resource_data = data[resource.id]
+                    if pd.api.types.is_string_dtype(resource_data.values):
+                        resource_data = pd.to_datetime(resource_data)
+                    data[resource.id] = _validate_series(resource_data)
         return data
 
     @staticmethod
