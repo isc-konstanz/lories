@@ -16,7 +16,7 @@ from typing import Any, Callable, Collection, List, Literal, Optional, Tuple, Ty
 
 import numpy as np
 import pandas as pd
-from lori.core import ConfigurationException, Configurations, Context, Directories, Registrator, ResourceException
+from lori.core import ConfigurationException, Configurations, Context, Directories, Identifier, ResourceException
 from lori.data.channels import Channel, Channels
 from lori.util import update_recursive, validate_key
 
@@ -24,16 +24,17 @@ from lori.util import update_recursive, validate_key
 class DataContext(Context[Channel]):
     SECTION: str = "data"
 
+    # noinspection PyProtectedMember
     def _load(
         self,
-        context: Registrator,
+        context: Identifier,
         configs: Configurations,
     ) -> None:
         defaults = {}
         configs = configs.copy()
         if configs.has_section(self.SECTION):
             data = configs.get_section(self.SECTION)
-            self._update_configs(defaults, self._build_defaults(configs))
+            update_recursive(defaults, Channel._build_defaults(configs))
             if data.has_section("channels"):
                 self._load_sections(context, data.get_section("channels"), defaults)
         self._load_from_file(context, configs.dirs, defaults=defaults)
@@ -41,7 +42,7 @@ class DataContext(Context[Channel]):
     # noinspection PyProtectedMember
     def _load_sections(
         self,
-        context: Registrator,
+        context: Identifier,
         configs: Configurations,
         defaults: Optional[Mapping[str, Any]] = None,
     ) -> Collection[Channel]:
@@ -61,7 +62,7 @@ class DataContext(Context[Channel]):
     # noinspection PyProtectedMember
     def _load_from_file(
         self,
-        context: Registrator,
+        context: Identifier,
         configs_dirs: Directories,
         configs_file: str = "channels.conf",
         defaults: Mapping[str, Any] = None,
@@ -74,12 +75,12 @@ class DataContext(Context[Channel]):
         return channels
 
     # noinspection PyShadowingBuiltins, PyProtectedMember
-    def _update(self, id: str, key: str, **configs: Any) -> Channel:
+    def _update(self, id: str, key: str, type: Type, **configs: Any) -> Channel:
         if id in self:
             channel = self._get(id)
-            channel._update(**configs)
+            channel._update(type=type, **configs)
         else:
-            channel = self._new(id=id, key=key, **configs)
+            channel = self._new(id=id, key=key, type=type, **configs)
         self._add(channel)
         return channel
 

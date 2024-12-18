@@ -29,5 +29,5 @@ from .csv import CsvConnector  # noqa: F401
 try:
     from .sql import SqlConnector  # noqa: F401
 
-except ImportError:
+except ModuleNotFoundError:
     pass

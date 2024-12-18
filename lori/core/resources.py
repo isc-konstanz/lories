@@ -26,10 +26,10 @@ class Resources(Generic[R], Sequence[R]):
         self._resources = [*resources]
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({[c.id for c in self._resources]})"
+        return f"{type(self).__name__}({', '.join(str(r.id) for r in self._resources)})"
 
     def __str__(self) -> str:
-        return f"{type(self).__name__}:\n\t" + "\n\t".join([f"{c.id} = {repr(c)}" for c in self._resources])
+        return f"{type(self).__name__}:\n\t" + "\n\t".join(f"{r.id} = {repr(r)}" for r in self._resources)
 
     def __contains__(self, resource: str | R) -> bool:
         if isinstance(resource, str):
