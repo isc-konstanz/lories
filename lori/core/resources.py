@@ -12,7 +12,6 @@ import logging
 from collections.abc import Sequence
 from typing import Any, Callable, Generic, Iterable, Iterator, List, Tuple, TypeVar
 
-import numpy as np
 from lori.core import Resource
 
 R = TypeVar("R", bound=Resource)
@@ -66,6 +65,14 @@ class Resources(Generic[R], Sequence[R]):
             self._resources.remove(resource)
         self._resources.extend(resources)
 
+    @property
+    def ids(self) -> Sequence[str]:
+        return [resource.id for resource in self._resources]
+
+    @property
+    def keys(self) -> Sequence[str]:
+        return [resource.key for resource in self._resources]
+
     def copy(self):
         return type(self)([resource.copy() for resource in self._resources])
 
@@ -77,7 +84,11 @@ class Resources(Generic[R], Sequence[R]):
     def filter(self, filter: Callable[[R], bool]):
         return type(self)([resource for resource in self._resources if filter(resource)])
 
-    # noinspection SpellCheckingInspection
-    def groupby(self, by: str) -> Iterator[Tuple[Any, Sequence[R]]]:
-        for group_by in np.unique([getattr(r, by) for r in self]):
-            yield group_by, self.filter(lambda r: getattr(r, by) == group_by)
+    # noinspection PyShadowingBuiltins, SpellCheckingInspection
+    def groupby(self, by: Callable[[R], Any] | str) -> Iterator[Tuple[Any, Resources]]:
+        def _by(r: R) -> Any:
+            return r.get(by, default=None)
+
+        filter = _by if isinstance(by, str) else by
+        for group_by in list(dict.fromkeys([filter(r) for r in self])):
+            yield group_by, self.filter(lambda r: filter(r) == group_by)

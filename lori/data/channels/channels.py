@@ -22,14 +22,6 @@ class Channels(Resources[Channel]):
     def __str__(self) -> str:
         return str(self.to_frame(unique=True, states=True))
 
-    @property
-    def ids(self) -> Sequence[str]:
-        return [c.id for c in self]
-
-    @property
-    def keys(self) -> Sequence[str]:
-        return [c.key for c in self]
-
     def register(
         self,
         function: Callable[[pd.DataFrame], None],

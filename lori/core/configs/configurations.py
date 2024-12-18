@@ -158,6 +158,10 @@ class Configurations(MutableMapping[str, Any]):
         return Configurations(self.name, self.dirs, deepcopy(self.__configs))
 
     @property
+    def key(self) -> str:
+        return str(self.__path.name.removesuffix(".conf"))
+
+    @property
     def name(self) -> str:
         return str(self.__path.name)
 
