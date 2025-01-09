@@ -67,12 +67,12 @@ class DatetimeColumn(Column):
             raise ResourceException(f"Unable to prepare datetime index from '{type(data)}' data: {data}")
 
         if isinstance(data, (pd.DatetimeIndex, pd.Timestamp)):
-            data = data.tz_convert(self.timezone)
+            data = data.tz_convert(self.timezone).tz_localize(None)
 
         elif isinstance(data, pd.Series):
-            data = data.dt.tz_convert(self.timezone)
+            data = data.dt.tz_convert(self.timezone).dt.tz_localize(None)
         else:
-            data = data.astimezone(self.timezone)
+            data = data.astimezone(self.timezone).replace(tzinfo=None)
 
         if type == DATE:
             if isinstance(data, (pd.DatetimeIndex, pd.Series)):
