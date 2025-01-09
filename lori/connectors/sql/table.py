@@ -206,13 +206,7 @@ class Table(sql.Table):
                 index_elements=[c.name for c in primary_columns],
                 set_={c.name: c for c in resource_columns},
             )
-        elif self.dialect.name == "mariadb":
-            from sqlalchemy.dialects.mysql import mariadb
-
-            query = mariadb.insert(self).values(params)
-            return query.on_duplicate_key_update({c.name: c for c in resource_columns})
-
-        elif self.dialect.name == "mysql":
+        elif self.dialect.name in ["mariadb", "mysql"]:
             from sqlalchemy.dialects import mysql
 
             query = mysql.insert(self).values(params)
