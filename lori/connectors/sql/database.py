@@ -153,8 +153,9 @@ class SqlDatabase(Database, Mapping[str, Table]):
             raise RuntimeError(f"Error fetching timezone: {e}")
 
     def _set_timezone(self, timezone: tz.BaseTzInfo) -> None:
-        tz_offset = pd.Timestamp.now(timezone).strftime("%:z")
-        # tz_offset_formatted = tz_offset[:3] + ':' + tz_offset[3:]
+        #tz_offset = pd.Timestamp.now(timezone).strftime("%:z")
+        tz_offset = pd.Timestamp.now(timezone).strftime("%z")
+        tz_offset = tz_offset[:3] + ':' + tz_offset[3:]
 
         if self.dialect.name == "postgresql":
             query = f"SET TIME ZONE '{tz_offset}'"
