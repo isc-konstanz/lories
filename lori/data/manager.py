@@ -100,11 +100,12 @@ class DataManager(DataContext, Activator, Identifier):
 
             registrator_id = registrator_section.pop(registrator_type)
             if "." not in registrator_id:
-                _registrator_id = id.replace(key, registrator_id)
-                if _registrator_id in registrator_context.keys():
-                    registrator_id = _registrator_id
-                else:
-                    registrator_id = f"{self.id}.{registrator_id}"
+                registrator_path = id.split(".")
+                for i in reversed(range(1, len(registrator_path))):
+                    _registrator_id = ".".join([*registrator_path[:i], registrator_id])
+                    if _registrator_id in registrator_context.keys():
+                        registrator_id = _registrator_id
+                        break
             return {registrator_type: registrator_context.get(registrator_id, None), **registrator_section}
 
         if "converter" not in configs:
@@ -292,7 +293,7 @@ class DataManager(DataContext, Activator, Identifier):
         self._listeners.register(function, Channels(_channels), how=how, unique=unique)
 
     @property
-    def converters(self) -> ConnectorContext:
+    def converters(self) -> ConverterContext:
         return self._converters
 
     @property

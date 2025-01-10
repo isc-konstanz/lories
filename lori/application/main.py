@@ -45,8 +45,7 @@ class Application(DataManager):
             if self.settings["systems"]["copy"]:
                 factory.copy(self.settings)
             system_dirs["scan_dir"] = str(self.settings.dirs.data)
-            for system in factory.scan(self, **system_dirs, flat=systems_flat):
-                systems.append(system)
+            systems.extend(factory.scan(self, **system_dirs, flat=systems_flat))
         else:
             systems.append(factory.load(self, **system_dirs, flat=systems_flat))
         for system in systems:

@@ -53,8 +53,14 @@ class Resource(Identifier):
             return configs[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
 
+    def __getitem__(self, attr: str) -> Any:
+        value = self.get(attr)
+        if value is not None:
+            return value
+        raise KeyError(attr)
+
     def get(self, attr: str, default: Optional[Any] = None) -> Any:
-        return self.__configs.get(attr, default)
+        return self._get_vars().get(attr, default)
 
     def _get_attrs(self) -> List[str]:
         return ["id", "key", "name", "type", *self._copy_configs().keys()]
