@@ -54,11 +54,11 @@ class ComponentContext(RegistratorContext[Component]):
         configs = configs.copy()
         if configs.has_section(self.SECTION):
             components = configs.get_section(self.SECTION)
-            for section in Component.SECTIONS:
+            for section in Component.INCLUDES:
                 if section in components:
                     defaults.update(components.pop(section))
 
-            self._load_sections(context, components, defaults, Component.SECTIONS)
+            self._load_sections(context, components, defaults, Component.INCLUDES)
 
         context_dirs = [
             str(c.configs.dirs.conf)

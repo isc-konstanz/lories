@@ -20,7 +20,7 @@ from lori.data.manager import DataManager
 class Application(DataManager):
     TYPE: str = "app"
     SECTION: str = "application"
-    SECTIONS: Collection[str] = [ComponentContext.SECTION, ConnectorContext.SECTION]
+    INCLUDES: Collection[str] = [ComponentContext.SECTION, ConnectorContext.SECTION]
 
     @classmethod
     def load(cls, name: str, factory: Type[System] = System, **kwargs) -> Application:

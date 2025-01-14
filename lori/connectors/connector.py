@@ -44,7 +44,7 @@ class ConnectorMeta(ConfiguratorMeta):
 
 class Connector(Registrator, metaclass=ConnectorMeta):
     SECTION: str = "connector"
-    SECTIONS: List[str] = []
+    INCLUDES: List[str] = []
 
     _connected: bool = False
     _connect_timestamp: pd.Timestamp = pd.NaT

@@ -23,7 +23,7 @@ from lori.util import to_date
 # noinspection PyAbstractClass
 class Component(Registrator, Activator):
     SECTION: str = "component"
-    SECTIONS: List[str] = [ConnectorAccess.SECTION, DataAccess.SECTION]
+    INCLUDES: List[str] = [ConnectorAccess.SECTION, DataAccess.SECTION]
 
     __connectors: ConnectorAccess
     __data: DataAccess
