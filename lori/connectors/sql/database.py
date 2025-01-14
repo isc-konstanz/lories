@@ -153,9 +153,9 @@ class SqlDatabase(Database, Mapping[str, Table]):
             raise RuntimeError(f"Error fetching timezone: {e}")
 
     def _set_timezone(self, timezone: tz.BaseTzInfo) -> None:
-        #tz_offset = pd.Timestamp.now(timezone).strftime("%:z")
+        # tz_offset = pd.Timestamp.now(timezone).strftime("%:z")
         tz_offset = pd.Timestamp.now(timezone).strftime("%z")
-        tz_offset = tz_offset[:3] + ':' + tz_offset[3:]
+        tz_offset = tz_offset[:3] + ":" + tz_offset[3:]
 
         if self.dialect.name == "postgresql":
             query = f"SET TIME ZONE '{tz_offset}'"
@@ -244,12 +244,13 @@ class SqlDatabase(Database, Mapping[str, Table]):
         try:
             for table_schema, schema_resources in resources.groupby("schema"):
                 for table_name, table_resources in schema_resources.groupby("table"):
-                    if table_name not in self.__tables:
-                        raise ConnectorException(self, f"Table '{table_name}' not available")
+                    table_key = table_name if table_schema is None else f"{table_schema}.{table_name}"
+                    if table_key not in self.__tables:
+                        raise ConnectorException(self, f"Table '{table_key}' not available")
 
-                    table = self.get(table_name)
+                    table = self.get(table_key)
                     if start is None and end is None:
-                        select = table.read(table_resources).limit(1)
+                        select = table.read(table_resources, order_by="desc").limit(1)
                     else:
                         select = table.read(table_resources, start, end)
 

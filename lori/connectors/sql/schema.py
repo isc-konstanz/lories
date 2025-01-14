@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Collection, Dict, Iterable
 
-from sqlalchemy import Column, Connection, Dialect, Engine, MetaData, inspect
+from sqlalchemy import Connection, Dialect, Engine, MetaData, inspect
 
 import pytz as tz
 from lori.connectors.sql.columns import (
@@ -56,7 +56,7 @@ class Schema(Configurator, MetaData):
             for name, table_resources in schema_resources.groupby("table"):
                 if name is None:
                     raise ConfigurationException(
-                        "Missing 'table' configuration for resources: " + ", ".join(table_resources)
+                        "Missing 'table' configuration for resources: " + ", ".join([r.id for r in table_resources])
                     )
                 configs = self.configs.get_section(name, defaults=defaults)
                 columns_configs = configs.get_section("columns")
@@ -69,6 +69,17 @@ class Schema(Configurator, MetaData):
                 columns.extend(Schema._create_primary_key(configs.get_section("index"), *_filter_primary(True)))
                 columns.extend(Schema._create_columns(*_filter_primary(False)))
 
+                def _filter_duplicates() -> Collection[Column]:
+                    unique = set()
+                    return [c for c in columns if (c.name in unique or unique.add(c.name))]
+
+                # Remove duplicate columns that will be created for tables with surrogate keys,
+                # which will have duplicate resource configurations.
+                for duplicate in _filter_duplicates():
+                    if not any(self._validate_column(column, duplicate) for column in columns):
+                        raise ConfigurationException(f"Duplicate column for table '{name}': {duplicate}")
+                    columns.remove(duplicate)
+
                 table = Table(name, self, *columns, schema=schema, quote=True, quote_schema=True)
                 tables[table.key] = table
         return tables
@@ -80,10 +91,10 @@ class Schema(Configurator, MetaData):
         type = configs.get("type", default="default")
         if type.lower() in ["default", "none"]:
             type = DatetimeIndexType.TIMESTAMP
-            columns = type.columns(configs.get("name", default=None))
+            columns = type.columns(configs.get("column", default=None))
         elif type.lower() != "custom":
             type = DatetimeIndexType.get(type.upper())
-            columns = type.columns(configs.get("name", default=None))
+            columns = type.columns(configs.get("column", default=None))
 
         columns.extend(Schema._create_columns(*resources))
         return columns
@@ -123,10 +134,21 @@ class Schema(Configurator, MetaData):
             column_names = [c["name"] for c in columns]
             for column in table.columns.values():
                 if column.name in column_names:
-                    column_schema = next(c for c in columns if c["name"] == column.name)
+                    column_schema = next(c for c in columns if c["name"] == column.name)  # noqa F841
                     # TODO: Implement column validation
                 else:
                     if self.configs.get_bool("create", default=True):
-                        column.create(table)
+                        raise ResourceException(f"Now yet implemented to create missing column: {column.name}")
                     else:
                         raise ResourceException(f"Unable to find configured column: {column.name}")
+
+    @staticmethod
+    def _validate_column(column: Column, other: Column) -> bool:
+        return (
+            column.name == other.name
+            and column.type == other.type
+            and column.nullable == column.nullable
+            and column.primary_key == other.primary_key
+            and column.server_default == column.server_default
+            and column.server_onupdate == column.server_onupdate
+        )

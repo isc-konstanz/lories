@@ -130,7 +130,7 @@ class Table(sql.Table):
 
     def exists(
         self,
-        resources: Optional[Resources] = None,
+        resources: Resources,
         start: Optional[pd.Timestamp | dt.datetime] = None,
         end: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> Select:
@@ -183,7 +183,7 @@ class Table(sql.Table):
         resources: Resources,
         start: Optional[pd.Timestamp | dt.datetime] = None,
         end: Optional[pd.Timestamp | dt.datetime] = None,
-        order_by: Literal["asc", "desc"] = "asc",
+        order_by: Literal["asc", "desc"] = "desc",
     ) -> Select:
         columns = self.__get_columns(resources)
         query = sql.select(*columns)
@@ -214,12 +214,16 @@ class Table(sql.Table):
         else:
             return sql.insert(self).values(params)
 
-    # def delete(self, start: pd.Timestamp | dt.datetime, end: pd.Timestamp | dt.datetime) -> None:
-    #     query = delete(column).where((column.c[self.index.names[0]] >= start) & (column.c[self.index.names[0]] <= end))
-    #
-    #     self._logger.debug(query)
-    #     self.session.execute(query)
-    #     self.session.commit()
+    #  def delete(
+    #      self,
+    #      resources: Resources,
+    #      start: Optional[pd.Timestamp | dt.datetime] = None,
+    #      end: Optional[pd.Timestamp | dt.datetime] = None,
+    # ) -> Delete:
+    #      columns = self.__get_columns(resources)
+    #      query = sql.delete(*columns)
+    #      query = query.where(and_(*self._primary_clauses(start, end)))
+    #      return query
 
     def _validate(self, resources: Resources, data: pd.DataFrame) -> List[Dict[str, Any]]:
         values = []
