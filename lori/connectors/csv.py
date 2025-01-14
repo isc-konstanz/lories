@@ -129,7 +129,7 @@ class CsvConnector(Connector):
                     rename=columns,
                 )
         except IOError as e:
-            raise ConnectionException(self, repr(e))
+            raise ConnectionException(self, str(e))
 
     def disconnect(self) -> None:
         self._data = None
@@ -180,7 +180,7 @@ class CsvConnector(Connector):
             return data.loc[:, [r.id for r in resources if r.id in data.columns]]
 
         except IOError as e:
-            raise ConnectionException(self, repr(e))
+            raise ConnectionException(self, str(e))
 
     def write(self, data: pd.DataFrame) -> None:
         columns = {r.id: r.name for r in self.resources if "name" in r}
