@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Callable
-from typing import Any, Literal, Sequence
+from typing import Any, Literal
 
 import pandas as pd
 import pytz as tz
@@ -75,7 +75,10 @@ class Channels(Resources[Channel]):
         for channel in self:
             if channel.id not in data.columns or all(pd.isna(data.loc[:, channel.id])):
                 channel.state = ChannelState.NOT_AVAILABLE
-                self._logger.warning(f"Unable to update nonexisting channel: {channel.id}")
+                if channel.id in data.columns:
+                    self._logger.debug(f"Unable to update None value for channel: {channel.id}")
+                else:
+                    self._logger.warning(f"Unable to update unconfigured channel: {channel.id}")
                 continue
 
             channel_data = data.loc[:, channel.id].dropna()

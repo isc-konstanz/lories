@@ -17,7 +17,7 @@ from typing import Any, Collection, Mapping, Optional, Sequence, TypeVar, get_ar
 
 from lori.core import Configurations, Configurator, Context, Directories, ResourceException
 from lori.core.register import Registrator, Registry
-from lori.util import validate_key
+from lori.util import update_recursive, validate_key
 
 R = TypeVar("R", bound=Registrator)
 
@@ -53,16 +53,16 @@ class RegistratorContext(Context[R], Configurator):
         context: RegistratorContext | Registrator,
         configs: Configurations,
         defaults: Optional[Mapping[str, Any]] = None,
-        default_sections: Optional[Sequence[str]] = (),
+        includes: Optional[Sequence[str]] = (),
     ) -> Collection[R]:
         values = []
         if defaults is None:
             defaults = {}
-        for section in default_sections:
-            if section in configs:
-                defaults.update(configs.get(section))
+        for include in includes:
+            if include in configs:
+                defaults = update_recursive(defaults, configs.get(include))
         for section_name in configs.sections:
-            if section_name in default_sections:
+            if section_name in includes:
                 continue
             section_file = f"{section_name}.conf"
             section_default = deepcopy(defaults)
@@ -160,9 +160,9 @@ class RegistratorContext(Context[R], Configurator):
         registration_type = re.split(r"[^a-zA-Z0-9_]", registration_path)[0]
         registrator_section = configs.get_section(registration_class.SECTION, ensure_exists=True)
         if "type" in registrator_section:
-            registration_type = registrator_section.get("type").lower()
+            registration_type = validate_key(registrator_section.get("type"))
         elif "type" in configs:
-            _registration_type = configs.get("type").lower()
+            _registration_type = validate_key(configs.get("type"))
             if self._registry.has_type(_registration_type):
                 registration_type = _registration_type
         if not self._registry.has_type(registration_type):
