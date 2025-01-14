@@ -56,7 +56,7 @@ class Listener(Identifier):
             self.run()
 
         except Exception as e:
-            raise ListenerException(self, repr(e))
+            raise ListenerException(self, str(e))
         finally:
             self.timestamp = timestamp
             self.__lock.release()

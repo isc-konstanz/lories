@@ -42,31 +42,45 @@ def get_context(object: Any, type: Type[C] | Collection[Type[C]]) -> Optional[C]
     return _context
 
 
+# noinspection PyShadowingBuiltins
+def get_includes(type: Type) -> List[str]:
+    includes = []
+    for _type in type.mro():
+        if not hasattr(_type, "INCLUDES"):
+            continue
+        _includes = getattr(_type, "INCLUDES")
+        if not isinstance(_includes, Collection) or isinstance(_includes, str):
+            continue
+        for include in _includes:
+            if include not in includes:
+                includes.append(include)
+    return includes
+
 # noinspection PyShadowingBuiltins, PyShadowingNames
 def get_variables(
-    obj: Any,
+    object: Any,
     include: Optional[Type[V]] = object,
     exclude: Optional[Type | Tuple[Type, ...]] = None,
 ) -> List[V]:
     def _is_type(o) -> bool:
         return isinstance(o, include) and (exclude is None or not isinstance(o, exclude))
 
-    if isinstance(obj, Collection):
-        return [o for o in obj if _is_type(o)]
-    return list(get_members(obj, lambda attr, member: _is_type(member)).values())
+    if isinstance(object, Collection):
+        return [o for o in object if _is_type(o)]
+    return list(get_members(object, lambda attr, member: _is_type(member)).values())
 
 
 # noinspection PyShadowingBuiltins
 def get_members(
-    obj: Any,
+    object: Any,
     filter: Optional[Callable] = None,
     private: bool = False,
 ) -> Dict[str, Any]:
     members = dict()
     processed = set()
-    for attr in dir(obj):
+    for attr in dir(object):
         try:
-            member = getattr(obj, attr)
+            member = getattr(object, attr)
             # Handle duplicate attr
             if attr in processed:
                 raise AttributeError

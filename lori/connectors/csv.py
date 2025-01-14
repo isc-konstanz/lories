@@ -121,7 +121,7 @@ class CsvDatabase(Database):
                     rename=columns,
                 )
         except IOError as e:
-            raise ConnectionException(self, repr(e))
+            raise ConnectionException(self, str(e))
 
     def disconnect(self) -> None:
         self._data = None
@@ -172,7 +172,7 @@ class CsvDatabase(Database):
             return data.loc[:, [r.id for r in resources if r.id in data.columns]]
 
         except IOError as e:
-            raise ConnectionException(self, repr(e))
+            raise ConnectionException(self, str(e))
 
     # noinspection PyTypeChecker
     def read_first(self, resources: Resources) -> Optional[pd.DataFrame]:

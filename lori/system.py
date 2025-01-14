@@ -27,7 +27,7 @@ from lori.weather import Weather, WeatherUnavailableException
 # noinspection PyProtectedMember
 class System(ComponentContext, Activator, Identifier):
     SECTION: str = "system"
-    SECTIONS: List[str] = [ConnectorAccess.SECTION, DataAccess.SECTION]
+    INCLUDES: List[str] = [ConnectorAccess.SECTION, DataAccess.SECTION]
 
     __connectors: ConnectorAccess
     __data: DataAccess
