@@ -82,7 +82,7 @@ class ConverterContext(RegistratorContext[Converter], Configurator):
         configs = configs.copy()
         if configs.has_section(self.SECTION):
             converters = configs.get_section(self.SECTION)
-            for section in self._get_type().SECTIONS:
+            for section in self._get_type().INCLUDES:
                 if section in converters:
                     defaults.update(converters.pop(section))
 

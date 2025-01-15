@@ -54,9 +54,9 @@ class ConnectorContext(RegistratorContext[Connector]):
         configs = configs.copy()
         if configs.has_section(self.SECTION):
             connectors = configs.get_section(self.SECTION)
-            for section in Connector.SECTIONS:
+            for section in Connector.INCLUDES:
                 if section in connectors:
                     defaults.update(connectors.pop(section))
 
-            self._load_sections(context, connectors, defaults, Connector.SECTIONS)
+            self._load_sections(context, connectors, defaults, Connector.INCLUDES)
         self._load_from_file(context, configs.dirs, configs_file, defaults)

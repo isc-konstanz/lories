@@ -9,14 +9,18 @@ lori.application.main
 from __future__ import annotations
 
 import logging
-from typing import Optional, Type
+from typing import Collection, Optional, Type
 
 from lori import Settings, System
 from lori.application import Interface
+from lori.components import ComponentContext
+from lori.connectors import ConnectorContext
 from lori.data.manager import DataManager
 
 
 class Application(DataManager):
+    INCLUDES: Collection[str] = [ComponentContext.SECTION, ConnectorContext.SECTION]
+
     _interface: Optional[Interface] = None
 
     @classmethod
@@ -82,8 +86,11 @@ class Application(DataManager):
                 self._logger.exception(e)
             exit(1)
 
-    def start(self) -> None:
+    def start(self, wait: bool = True) -> None:
         has_interface = self._interface.is_enabled()
-        super().start(not has_interface)
+        if has_interface:
+            wait = False
+        super().start(wait)
+
         if has_interface:
             self._interface.start()

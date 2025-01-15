@@ -9,7 +9,7 @@ lori.data.access
 from __future__ import annotations
 
 import datetime as dt
-from typing import Any, Callable, Literal, Optional
+from typing import Any, Callable, Literal, Optional, Type
 
 import pandas as pd
 from lori.core import Configurations, Configurator, Context, ResourceException

@@ -32,7 +32,7 @@ class ListenerContext(Context[Listener]):
 
         self.__lock = Lock()
 
-    def __enter__(self) -> Listener:
+    def __enter__(self) -> ListenerContext:
         self.__lock.acquire()
         return self
 

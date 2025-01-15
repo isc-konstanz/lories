@@ -12,7 +12,7 @@ import re
 from collections import OrderedDict
 from collections.abc import Callable, Collection, MutableMapping
 from itertools import chain
-from typing import Any, Generic, Iterator, Tuple, TypeVar
+from typing import Any, Generic, Iterable, Iterator, Tuple, TypeVar
 
 import pandas as pd
 from lori.core import Identifier
@@ -46,8 +46,12 @@ class Context(Generic[ID], MutableMapping[str, ID]):
             return __object in self.__map.values()
         return False
 
-    def __getitem__(self, __uid: str) -> ID:
-        return self._get(__uid)
+    def __getitem__(self, __uid: Iterable[str] | str) -> ID | Collection[ID]:
+        if isinstance(__uid, str):
+            return self._get(__uid)
+        if isinstance(__uid, Iterable):
+            return [self._get(i) for i in __uid]
+        raise KeyError(__uid)
 
     def __setitem__(self, __uid: str, __object: ID) -> None:
         self._set(__uid, __object)

@@ -15,7 +15,7 @@ from collections import OrderedDict
 from collections.abc import Mapping, MutableMapping
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Iterable, List, Optional
 
 import pandas as pd
 from lori.core import ResourceException, ResourceUnavailableException
@@ -127,20 +127,29 @@ class Configurations(MutableMapping[str, Any]):
     def __getitem__(self, key: str) -> Any:
         return self.__configs[key]
 
-    def get(self, key: str, default: Any = None) -> Any:
+    def _get(self, key: str, default: Any = None) -> Any:
         return self.__configs.get(key, default)
 
+    def get(self, key: str | Iterable[str], default: Any = None) -> Any:
+        if not isinstance(key, Iterable) or isinstance(key, str):
+            return self._get(key, default)
+        return {
+            k: self._get(k, default=default[k] if default is not None and isinstance(default, Mapping) else None)
+            for k in key
+            if k in self
+        }
+
     def get_bool(self, key: str, default: bool = None) -> bool:
-        return to_bool(self.get(key, default))
+        return to_bool(self._get(key, default))
 
     def get_int(self, key: str, default: int = None) -> int:
-        return to_int(self.get(key, default))
+        return to_int(self._get(key, default))
 
     def get_float(self, key: str, default: float = None) -> float:
-        return to_float(self.get(key, default))
+        return to_float(self._get(key, default))
 
     def get_date(self, key: str, default: dt.datetime | pd.Timestamp = None) -> pd.Timestamp:
-        return to_date(self.get(key, default))
+        return to_date(self._get(key, default))
 
     def __iter__(self):
         return iter(self.__configs)
@@ -175,7 +184,7 @@ class Configurations(MutableMapping[str, Any]):
 
     @property
     def enabled(self) -> bool:
-        return to_bool(self.get("enabled", default=True)) and not to_bool(self.get("disabled", default=False))
+        return to_bool(self._get("enabled", default=True)) and not to_bool(self._get("disabled", default=False))
 
     @enabled.setter
     def enabled(self, enabled: bool) -> None:
