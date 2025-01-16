@@ -163,7 +163,7 @@ class RegistratorContext(Context[R], Configurator):
             registration_type = validate_key(registrator_section.get("type"))
         elif "type" in configs:
             _registration_type = validate_key(configs.get("type"))
-            if self._registry.has_type(_registration_type):
+            if self._registry.has_type(_registration_type) or not self._registry.has_type(registration_type):
                 registration_type = _registration_type
         if not self._registry.has_type(registration_type):
             raise ResourceException(f"Invalid registration type: {registration_type}")
