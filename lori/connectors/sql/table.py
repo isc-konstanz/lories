@@ -9,235 +9,296 @@ lori.connectors.sql.table
 from __future__ import annotations
 
 import datetime as dt
-import logging
-import re
-from collections.abc import Sequence
-from itertools import chain
-from typing import Any, Optional
+from typing import Any, Dict, Iterator, List, Literal, Optional, Tuple
 
-from sqlalchemy import MetaData, text
-from sqlalchemy.ext.declarative import declarative_base
+import sqlalchemy as sql
+from sqlalchemy import ClauseElement, Dialect, Result, UnaryExpression
+from sqlalchemy.sql import Insert, Select, and_, asc, between, desc, func, literal, not_, text
+from sqlalchemy.types import DATETIME, TIMESTAMP
 
+import numpy as np
 import pandas as pd
-from lori.connectors.sql import Column, Columns, Index
-from lori.core import Configurations, Resources
+import pytz as tz
+from lori.connectors.sql.columns import Column, DatetimeColumn, SurrogateKeyColumn
+from lori.connectors.sql.index import DatetimeIndexType
+from lori.core import Resource, ResourceException, Resources
 
-Base = declarative_base()
-metadata = MetaData()
 
-
-class Table(Sequence[Column]):
-    SECTION = "tables"
-
-    index: Index
-    columns: Columns
-
-    # noinspection PyProtectedMember
-    @classmethod
-    def from_configs(cls, connector, name: str, configs: Configurations, resources: Resources) -> Table:
-        index = Index.from_configs(configs.get_section("index", defaults={}), timezone=connector._timezone)
-
-        columns_configs = configs.get_section("columns", defaults={})
-        columns_type = columns_configs.get("type", default=Column.DEFAULT_TYPE)
-        columns = Columns()
-
-        for column_name in columns_configs.sections:
-            column = columns_configs[column_name]
-            column_type = column.pop("type", columns_type)
-            if column.get_bool("primary", default=False) or "attribute" in column:
-                del column["primary"]
-                index.add(column_name, column_type, **column)
-            else:
-                columns.add(column_name, column_type, **column)
-
-        for resource in resources:
-            column_name = resource.column if "column" in resource else resource.key
-            column_args = {}
-            if "length" in resource:
-                column_args["length"] = resource.length
-            if "primary" in resource and resource.primary:
-                index.add(column_name, resource.type, **column_args)
-            else:
-                if "nullable" in resource:
-                    column_args["nullable"] = resource.nullable
-
-                column_type = resource.type if "type" in resource else columns_type
-                columns.add(column_name, column_type, **column_args)
-
-        return Table(connector, name, index, columns)
-
+class Table(sql.Table):
     def __init__(
         self,
-        connector,
         name: str,
-        index: Optional[Index] = None,
-        columns: Optional[Columns] = None,
-        engine: str = None,  # 'MyISAM'
-    ):
-        self._connector = connector
+        *args,
+        **kwargs,
+    ) -> None:
+        super().__init__(name, *args, **kwargs)
+        self.datetime_index_type = DatetimeIndexType.NONE
+        for datetime_index_type in [
+            DatetimeIndexType.DATE_AND_TIME,
+            DatetimeIndexType.DATETIME,
+            DatetimeIndexType.TIMESTAMP,
+            DatetimeIndexType.TIMESTAMP_UNIX,
+        ]:
+            if self.__has_datetime_index(datetime_index_type):
+                self.datetime_index_type = datetime_index_type
+                break
 
-        self.name = name
-
-        if index is None:
-            index = Index.from_defaults()
-        self.index = index
-        if columns is None:
-            columns = Columns.from_defaults()
-        self.columns = columns
-
-        self.engine = engine
-
-        self._logger = logging.getLogger(__name__)
-
-    def __getitem__(self, index: int) -> Column:
-        columns = [*self.index, *self.columns]
-        return columns[index]
-
-    def __len__(self):
-        return len(self.index) + len(self.columns)
+    # noinspection PyUnresolvedReferences
+    @property
+    def dialect(self) -> Dialect:
+        return self.metadata.dialect
 
     @property
-    def connection(self):
-        return self._connector.connection
+    def primary_index(self) -> Column:
+        return self.primary_key.columns[0]
 
-    def is_postgresql(self, query: str) -> str:
-        if self._connector.db_type == "postgres":
-            # Replace backticks with double quotes
-            query = query.replace("`", '"')
-            # Replace MySQL's ON DUPLICATE KEY UPDATE with PostgreSQL's ON CONFLICT
-            query = re.sub(
-                r"ON DUPLICATE KEY UPDATE.*",
-                f"ON CONFLICT ({', '.join(self.index.names)}) DO UPDATE SET "
-                + ", ".join([f'"{col.name}"=EXCLUDED."{col.name}"' for col in self.columns]),
-                query,
+    def _primary_order(self, order: Literal["asc", "desc"] = "asc") -> List[UnaryExpression]:
+        clauses = []
+        for primary_key in reversed(self.primary_key.columns):
+            # if isinstance(primary_key, SurrogateKeyColumn):
+            #     continue
+            if order == "asc":
+                clauses.append(asc(primary_key))
+            elif order == "desc":
+                clauses.append(desc(primary_key))
+            else:
+                raise ValueError(f"Unknown order '{order}'")
+        return clauses
+
+    def _primary_clauses(
+        self,
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
+    ) -> List[ClauseElement]:
+        clauses = []
+        primary_index = self.primary_index
+        if self.__is_datetime_index(primary_index):
+            if start is not None and end is not None:
+                clauses.append(between(primary_index, primary_index.validate(start), primary_index.validate(end)))
+            if start is not None:
+                clauses.append(primary_index >= primary_index.validate(start))
+            if end is not None:
+                clauses.append(primary_index <= primary_index.validate(end))
+        return clauses
+
+    def extract(self, resources: Resources, result: Result[Any]) -> pd.DataFrame:
+        result_columns = [r.id for r in resources]
+        results = []
+
+        # noinspection PyUnresolvedReferences
+        if result.rowcount < 1:
+            return pd.DataFrame(columns=result_columns)
+
+        data = pd.DataFrame(result.fetchall(), columns=list(result.keys()))
+        for group, group_resources in self._groupby(resources):
+
+            def _is_group(row: pd.Series) -> bool:
+                return all(row[col] == val for col, val in group.items())
+
+            group_columns = self.__get_columns(group_resources)
+            group_data = data[data.apply(_is_group, axis="columns")]
+
+            for column in [c for c in group_columns if isinstance(c, DatetimeColumn)]:
+                group_data[column.name] = group_data[column.name].dt.tz_localize(column.timezone)
+
+            if self.datetime_index_type == DatetimeIndexType.DATE_AND_TIME:
+                date_column, time_column, *_ = self.primary_key.columns
+                index_column = date_column.name + time_column.name
+                index_data = pd.to_datetime(group_data[date_column.name]) + group_data[time_column.name]
+                group_data.loc[:, [index_column]] = index_data
+                group_data.drop([date_column.name, time_column.name], inplace=True, axis="columns")
+                group_data = group_data.set_index(index_column)  # .tz_localize(tz.UTC)
+
+            elif self.datetime_index_type in (DatetimeIndexType.TIMESTAMP, DatetimeIndexType.DATETIME):
+                index_column, *_ = self.primary_key.columns
+                group_data = group_data.set_index(index_column.name)
+
+            elif self.datetime_index_type == DatetimeIndexType.TIMESTAMP_UNIX:
+                index_column, *_ = self.primary_key.columns
+                group_data.loc[:, [index_column.name]] = pd.to_datetime(group_data[index_column.name], unit="s")
+                group_data = group_data.set_index(index_column.name).tz_localize(tz.UTC)
+
+            group_data = group_data.dropna(axis="index", how="all").rename(
+                columns={r.get("column", default=r.key): r.id for r in group_resources}
             )
-        return query
+            results.append(group_data[group_resources.ids])
 
-    def create(self):
-        columns = [*self.index, *self.columns]
-        query = (
-            f"CREATE TABLE IF NOT EXISTS `{self.name}` "
-            f"({', '.join([str(c) for c in columns])}, PRIMARY KEY ({', '.join(self.index.names)}))"
-        )
-        if self.engine is not None:
-            query += f" ENGINE={self.engine}"
-
-        query = self.is_postgresql(query)
-
-        self._logger.debug(query)
-        self.connection.execute(text(query))
-        self.connection.commit()
-
-        return self
+        results = pd.concat(results, axis="index")
+        for result_column in [c for c in result_columns if c not in results.columns]:
+            results.loc[:, [result_column]] = np.nan
+        return results
 
     def exists(
         self,
-        resources: Optional[Resources] = None,
+        resources: Resources,
         start: Optional[pd.Timestamp | dt.datetime] = None,
         end: Optional[pd.Timestamp | dt.datetime] = None,
-    ) -> bool:
-        # TODO: Replace this placeholder more resource efficient
-        return not self.select(resources, start, end).empty
+    ) -> Select:
+        columns = self.__get_columns(resources)
+        query = sql.select(*columns).where(and_(*self._primary_clauses(start, end))).subquery()
+        query = sql.select(func.count().label("count")).select_from(query)
+        return query
 
-    def select(
+    # noinspection PyShadowingBuiltins, PyProtectedMember, PyArgumentList
+    def hash(
         self,
         resources: Resources,
-        start: pd.Timestamp | dt.datetime = None,
-        end: pd.Timestamp | dt.datetime = None,
-    ) -> pd.DataFrame:
-        query = f"SELECT {self.index.names}, {self.columns.names} FROM `{self.name}`"
-        query, params = self.index.where(query, start, end)
-        query += f" {self.index.order_by('ASC')}"
-        query = self.is_postgresql(query)
-        return self._select(resources, query, params)
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
+        method: Literal["MD5", "SHA1", "SHA256", "SHA512"] = "MD5",
+    ) -> Select:
+        if method.lower() not in ["md5", "sha1", "sha256", "sha512"]:
+            raise ValueError(f"Invalid checksum method '{method}'")
+        method = getattr(func, method.lower())
+        columns = self.__get_columns(resources)
 
-    def select_first(self, resources: Resources) -> pd.DataFrame:
-        query = (
-            f"SELECT {self.index.names}, {self.columns.names} "
-            f"FROM `{self.name}` {self.index.order_by('ASC')} LIMIT 1;"
-        )
-        query = self.is_postgresql(query)
-        return self._select(resources, query)
+        def _validate(column: Column) -> ClauseElement:
+            if column.type == DATETIME or isinstance(column.type, DATETIME):
+                # TODO: Verify if there is a more generic way to implement time
+                raise ValueError(
+                    f"Unable to generate consistent hashes for column '{self.name}' "
+                    f"with DATETIME column: {column.name}",
+                )
+            if column.type == TIMESTAMP or isinstance(column.type, TIMESTAMP):
+                return func.unix_timestamp(column)
+            else:
+                return column
 
-    def select_last(self, resources: Resources) -> pd.DataFrame:
-        query = (
-            f"SELECT {self.index.names}, {self.columns.names} "
-            f"FROM `{self.name}` {self.index.order_by('DESC')} LIMIT 1;"
-        )
-        query = self.is_postgresql(query)
-        return self._select(resources, query)
+        select = sql.select(*[_validate(c) for c in columns])
+        nullable = [c.name for c in columns if c.nullable]
+        if len(nullable) > 0:
+            # Make sure to only query valid values
+            select = select.filter(not_(and_(*[c.is_(None) for c in columns if c.nullable])))
+        select = select.where(and_(*self._primary_clauses(start, end)))
+        select = select.order_by(*self._primary_order("asc"))
+        select = select.subquery(name="hash_range")
 
-    def _select(
+        concat = func.aggregate_strings(func.concat_ws(",", *select.exported_columns.values()), ",")
+
+        query = sql.select(method(concat).label("hash"), literal(True).label("in_range")).group_by(text("in_range"))
+        return query.select_from(select)
+
+    def read(
         self,
         resources: Resources,
-        query: str,
-        parameters: Sequence[Any] = (),
-    ) -> pd.DataFrame:
-        self._logger.debug(query)
-        result = self.connection.execute(text(query), parameters)
-
-        if result.rowcount > 0:
-            data = pd.DataFrame(result.fetchall(), columns=result.keys())
-        else:
-            data = pd.DataFrame()
-
-        return self.index.process(resources, data)
-
-    def delete(self, start: pd.Timestamp | dt.datetime, end: pd.Timestamp | dt.datetime) -> None:
-        query = f"DELETE FROM `{self.name}`"
-        query = self.is_postgresql(query)
-        query, params = self.index.where(query, start, end)
-
-        self._logger.debug(query)
-        self.connection.execute(text(query), params)
-        self.connection.commit()
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
+        order_by: Literal["asc", "desc"] = "desc",
+    ) -> Select:
+        columns = self.__get_columns(resources)
+        query = sql.select(*columns)
+        query = query.where(and_(*self._primary_clauses(start, end)))
+        return query.order_by(*self._primary_order(order_by))
 
     # noinspection PyUnresolvedReferences
-    def insert(self, resources: Resources, data: pd.DataFrame) -> None:
-        def _extract(d: pd.DataFrame) -> Sequence[Any]:
-            return d.apply(lambda r: self.index.extract(r) + self.columns.extract(r), axis="columns").values
+    def write(self, resources: Resources, data: pd.DataFrame) -> Insert:
+        resources = resources.filter(lambda r: r.id in data.columns)
+        resource_columns = self.__get_resource_columns(resources)
+        primary_columns = self.primary_key.columns
+        params = self._validate(resources, data.replace(np.nan, None))
 
-        query = (
-            f"INSERT INTO `{self.name}` ({self.index}, {self.columns}) "
-            f"VALUES ({', '.join([':' + col for col in self.index.names + self.columns.names])}) "
-            f"ON DUPLICATE KEY UPDATE {', '.join([f'`{col.name}`=VALUES(`{col.name}`)' for col in self.columns])}"
-        )
-        query = self.is_postgresql(query)
+        # Handle duplicate primary keys (upsert)
+        if self.dialect.name == "postgresql":
+            from sqlalchemy.dialects import postgresql
 
-        self._logger.debug(query)
+            query = postgresql.insert(self).values(params)
+            return query.on_conflict_do_update(
+                index_elements=[c.name for c in primary_columns],
+                set_={c.name: c for c in resource_columns},
+            )
+        elif self.dialect.name in ["mariadb", "mysql"]:
+            from sqlalchemy.dialects import mysql
 
-        params = list(chain.from_iterable(_extract(d) for d in self.index.prepare(resources, data)))
-
-        for param in params:
-            param_dict = {
-                key.name if hasattr(key, "name") else str(key): value
-                for key, value in zip(self.index.names + self.columns.names, param)
-            }
-
-            if self._connector.db_type == "postgres" and "timestamp" in param_dict.keys():
-                # Convert to string in the desired format
-                param_dict["timestamp"] = param_dict["timestamp"].strftime("%Y-%m-%d %H:%M:%S%")
-
-            self.connection.execute(text(query), param_dict)
-
-        self.connection.commit()
-
-    def _get_column_type(self, column: str) -> str:
-        query = (
-            "SELECT `data_type` FROM information_schema.COLUMNS "
-            "WHERE `table_schema` = :database "
-            "AND `table_name` = :table_name "
-            "AND `column_name` = :column"
-        )
-        query = self.is_postgresql(query)
-        params = {
-            "database": self.connection.engine.url.database,
-            "table_name": self.name,
-            "column": column,
-        }
-        result = self.connection.execute(text(query), params)
-        row = result.fetchone()
-        if row:
-            return row[0].upper()
+            query = mysql.insert(self).values(params)
+            return query.on_duplicate_key_update({c.name: c for c in resource_columns})
         else:
-            raise ValueError(f"Column '{column}' not found in table '{self.name}'.")
+            return sql.insert(self).values(params)
+
+    #  def delete(
+    #      self,
+    #      resources: Resources,
+    #      start: Optional[pd.Timestamp | dt.datetime] = None,
+    #      end: Optional[pd.Timestamp | dt.datetime] = None,
+    # ) -> Delete:
+    #      columns = self.__get_columns(resources)
+    #      query = sql.delete(*columns)
+    #      query = query.where(and_(*self._primary_clauses(start, end)))
+    #      return query
+
+    def _validate(self, resources: Resources, data: pd.DataFrame) -> List[Dict[str, Any]]:
+        values = []
+
+        for group, group_resources in self._groupby(resources):
+            group_columns = self.__get_columns(group_resources)
+            group_data = data[group_resources.ids].dropna(axis="index", how="all")
+            group_data.rename(columns={r.id: r.get("column", default=r.key) for r in group_resources}, inplace=True)
+
+            for column in group_columns:
+                if self.__is_datetime_index(column):
+                    column_data = group_data.index
+                elif column.name in group_data.columns:
+                    column_data = group_data[column.name]
+                else:
+                    continue
+                group_data[column.name] = column.validate(column_data)
+
+            values.extend(group_data.to_dict(orient="records"))
+        return values
+
+    # noinspection SpellCheckingInspection
+    def _groupby(self, resources: Resources) -> Iterator[Tuple[Dict[str, Any], Resources]]:
+        groups = list[Tuple[Dict[str, Any], Resources]]()
+
+        def _group(resource: Resource) -> Resource:
+            attributes = {}
+            surrogate_keys = [c for c in self.primary_key.columns if isinstance(c, SurrogateKeyColumn)]
+            for column in surrogate_keys:
+                if not hasattr(resource, column.attribute):
+                    raise ResourceException(
+                        f"SQL resource '{resource.id}' missing surrogate key attribute: {column.attribute}"
+                    )
+                attributes[column.name] = getattr(resource, column.attribute)
+            for group in groups:
+                if group[0] == attributes:
+                    group[1].append(resource)
+                    return resource
+            groups.append((attributes, Resources([resource])))
+            return resource
+
+        resources.apply(_group)
+        return iter(groups)
+
+    def __get_columns(self, resources: Resources) -> List[Column]:
+        return [*self.primary_key.columns, *self.__get_resource_columns(resources)]
+
+    def __get_resource_columns(self, resources: Resources) -> List[Column]:
+        columns = []
+        for resource in resources:
+            column_name = resource.get("column", default=resource.key)
+            if column_name in self.columns:
+                column = self.columns[column_name]
+                if column not in columns + self.primary_key.columns.values():
+                    columns.append(column)
+        return columns
+
+    # noinspection PyShadowingBuiltins, PyProtectedMember
+    def __get_datetime_index(self, type: DatetimeIndexType) -> List[Column]:
+        # Datetime index column should be the first column(s), otherwise they will be ignored
+        columns = []
+        for i in range(len(type.value)):
+            if i >= len(self.primary_key.columns):
+                break
+            column = self.primary_key.columns[i]
+            if column.type in type:
+                columns.append(column)
+        return columns
+
+    # noinspection PyShadowingBuiltins
+    def __has_datetime_index(self, *types: DatetimeIndexType) -> bool:
+        return any(len(self.__get_datetime_index(t)) == len(t.value) for t in types)
+
+    # noinspection PyShadowingBuiltins
+    def __is_datetime_index(self, column: Column) -> bool:
+        if self.datetime_index_type == DatetimeIndexType.NONE:
+            return False
+        return column in self.__get_datetime_index(self.datetime_index_type)

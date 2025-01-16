@@ -30,6 +30,7 @@ from lori.core.configs import ConfigurationException, Configurations, Configurat
 from lori.core.register import RegistratorContext
 from lori.data.channels import Channel, ChannelConnector, ChannelConverter, Channels, ChannelState
 from lori.data.context import DataContext
+from lori.data.databases import Databases
 from lori.data.listeners import ListenerContext
 from lori.util import floor_date, get_variables, parse_type, to_timedelta, validate_key
 
@@ -380,6 +381,34 @@ class DataManager(DataContext, Activator, Identifier):
 
         self.listeners.wait()
         self.log()
+
+    # noinspection PyShadowingBuiltins, PyTypeChecker
+    def replicate(self, **kwargs) -> None:
+        configs = self.configs.get_section("replication", defaults={})
+        configs._load(require=False)
+        if not configs.enabled:
+            self._logger.error("Unable to replicate for disabled configuration section 'replication'")
+            return
+        kwargs.update({k: v for k, v in configs.items() if k not in configs.sections})
+
+        databases = Databases(self, configs)
+        self._configure(databases)
+        self._configure(*databases.values())
+        for database in databases.values():
+            channels = self.channels.filter(lambda c: Databases.is_database(c.logger) and c.has_logger(database.id))
+            if len(channels) == 0:
+                continue
+            self.connect(database, channels=channels)
+            try:
+                databases.replicate(database, channels.apply(lambda c: c.from_logger()), **kwargs)
+            finally:
+                self.disconnect(database)
+
+        def is_convertable(channel: Channel) -> bool:
+            return Databases.is_database(channel.connector) and Databases.is_database(channel.logger)
+
+        for database, channels in self.channels.filter(is_convertable).groupby(lambda c: c.connector._connector):
+            databases.replicate(database, channels, **kwargs)
 
     # noinspection PyShadowingBuiltins, PyTypeChecker
     def read(

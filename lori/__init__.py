@@ -42,6 +42,7 @@ from .connectors import (  # noqa: F401
     Connector,
     ConnectorException,
     ConnectionException,
+    Database,
 )
 
 from .location import (  # noqa: F401

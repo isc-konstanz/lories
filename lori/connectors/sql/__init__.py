@@ -6,15 +6,17 @@ lori.connectors.sql
 
 """
 
-from .column import (  # noqa: F401
+from .columns import (  # noqa: F401
     Column,
-    Columns,
+    DatetimeColumn,
+    UnixTimestampColumn,
+    SurrogateKeyColumn,
 )
-from .index import (  # noqa: F401
-    Index,
-    IndexColumn,
-    DatetimeIndexType,
-)
+
+from .index import DatetimeIndexType  # noqa: F401
+
 from .table import Table  # noqa: F401
 
-from .connector import SqlConnector  # noqa: F401
+from .schema import Schema  # noqa: F401
+
+from .database import SqlDatabase  # noqa: F401

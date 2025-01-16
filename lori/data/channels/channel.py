@@ -235,6 +235,7 @@ class Channel(Resource):
             id=self.id,
             key=self.key,
             name=self.name,
+            group=self.group,
             type=self.type,
             context=self.__context,
             converter=self.converter.copy(),

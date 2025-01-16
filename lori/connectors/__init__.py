@@ -23,11 +23,17 @@ from .context import (  # noqa: F401
 
 from .access import ConnectorAccess  # noqa: F401
 
+from .database import (  # noqa: F401
+    Database,
+    DatabaseException,
+    DatabaseUnavailableException,
+)
+
 from .dummy import DummyConnector  # noqa: F401
-from .csv import CsvConnector  # noqa: F401
+from .csv import CsvDatabase  # noqa: F401
 
 try:
-    from .sql import SqlConnector  # noqa: F401
+    from .sql import SqlDatabase  # noqa: F401
 
 except ModuleNotFoundError:
     pass

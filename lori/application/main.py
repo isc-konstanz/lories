@@ -80,6 +80,9 @@ class Application(DataManager):
             elif action == "start":
                 self.start()
 
+            elif action == "replicate":
+                self.replicate(full=self.settings["full"])
+
         except Exception as e:
             self._logger.warning(repr(e))
             if self._logger.isEnabledFor(logging.DEBUG):

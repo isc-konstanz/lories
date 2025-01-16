@@ -40,12 +40,22 @@ dependencies = [
     "numpy >= 1.16",
     "pandas >= 0.23",
     "pytz >= 2019.1",
-    "requests"
+    "tzlocal",
+    "requests",
 ]
 
 [project.optional-dependencies]
-sql = [
-    "mysql-connector-python"
+postgresql = [
+    "sqlalchemy",
+    "psycopg2",
+]
+mariadb = [
+    "sqlalchemy",
+    "pymysql",
+]
+mysql = [
+    "sqlalchemy",
+    "pymysql",
 ]
 doc = [
     "graphviz",
@@ -57,7 +67,7 @@ doc = [
 dev = [
     # "lori[sql, doc]",
     "pre-commit",
-    "ruff"
+    "ruff",
 ]
 
 [tool.setuptools.package-data]
