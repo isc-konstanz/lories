@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.application
-~~~~~~~~~~~~~~~~
+lori.application.main
+~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -9,18 +9,19 @@ lori.application
 from __future__ import annotations
 
 import logging
-from typing import Collection, Type
+from typing import Collection, Optional, Type
 
 from lori import Settings, System
+from lori.application import Interface
 from lori.components import ComponentContext
 from lori.connectors import ConnectorContext
 from lori.data.manager import DataManager
 
 
 class Application(DataManager):
-    TYPE: str = "app"
-    SECTION: str = "application"
     INCLUDES: Collection[str] = [ComponentContext.SECTION, ConnectorContext.SECTION]
+
+    _interface: Optional[Interface] = None
 
     @classmethod
     def load(cls, name: str, factory: Type[System] = System, **kwargs) -> Application:
@@ -29,8 +30,12 @@ class Application(DataManager):
         app.configure(settings, factory)
         return app
 
+    # noinspection PyProtectedMember
     def __init__(self, settings: Settings, **kwargs) -> None:
         super().__init__(settings, name=settings["name"], **kwargs)
+        if not settings.has_section(Interface.SECTION):
+            settings._add_section(Interface.SECTION, {"enabled": False})
+        self._interface = Interface(self, settings.get_section(Interface.SECTION))
 
     # noinspection PyProtectedMember
     def configure(self, settings: Settings, factory: Type[System]) -> None:
@@ -54,11 +59,17 @@ class Application(DataManager):
                 self._components._add(system)
 
         super().configure(settings)
+        if self._interface.is_enabled():
+            self._interface.configure(settings.get_section(Interface.SECTION))
 
     # noinspection PyTypeChecker
     @property
     def settings(self) -> Settings:
         return self.configs
+
+    @property
+    def interface(self) -> Interface:
+        return self._interface
 
     def main(self) -> None:
         try:
@@ -74,3 +85,12 @@ class Application(DataManager):
             if self._logger.isEnabledFor(logging.DEBUG):
                 self._logger.exception(e)
             exit(1)
+
+    def start(self, wait: bool = True) -> None:
+        has_interface = self._interface.is_enabled()
+        if has_interface:
+            wait = False
+        super().start(wait)
+
+        if has_interface:
+            self._interface.start()

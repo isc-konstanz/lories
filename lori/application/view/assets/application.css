@@ -1,0 +1,57 @@
+/* set application specific styles */
+:root {
+  --page-gray-100: #f8f9fa;
+  --page-gray-200: #edeeef;
+  --page-gray-300: #e4e5e6;
+}
+
+body:has(.card-container) {
+  background-color: var(--page-gray-300);
+}
+
+.align-items-stretch:has(.card) > * {
+  height: 100%;
+}
+
+.card-container,
+.page-container {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.card-container .card,
+.card-container .row {
+  --bs-gutter-y: 1rem;
+  --bs-gutter-x: 1rem;
+}
+
+.card-container .card {
+  margin-top: calc(0.5 * var(--bs-gutter-y));
+  margin-bottom: calc(0.5 * var(--bs-gutter-y));
+  height: 100%;
+  width: auto;
+}
+
+.card-container a:has(h4) {
+  color: var(--bs-heading-color);
+  text-decoration: unset;
+}
+.card-container a:has(h4):hover {
+  text-decoration: underline;
+}
+
+.card-container .card,
+.card-container .card-item,
+.card-container .card-focus {
+  border: unset;
+}
+.card-container.card-focus .card-item {
+  display: none;
+}
+
+.card-container .card-footer {
+  border-top: unset;
+}
+.card-container .card-footer .card-button {
+  float: right;
+}
