@@ -22,10 +22,8 @@ from lori.core import Configurations, Resources
 from lori.util import to_timezone
 
 
-@register_connector_type
+@register_connector_type("sql")
 class SqlConnector(Connector, Mapping[str, Table]):
-    TYPE: str = "sql"
-
     _connection = None
     _engine = None
     _session = None
