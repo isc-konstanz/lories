@@ -6,6 +6,7 @@ lori.application.view
 
 """
 
+from . import pages  # noqa: F401
 from .pages import (  # noqa: F401
     Page,
     PageGroup,

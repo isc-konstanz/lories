@@ -9,55 +9,70 @@ lori.application.view.pages.view
 from __future__ import annotations
 
 from functools import wraps
-from typing import Callable, Dict, Optional, Type, TypeVar
+from typing import Any, Callable, Dict, Optional, Type, TypeVar
 
 import dash_bootstrap_components as dbc
 from dash import html
 
-from lori.application.view.pages import PageFooter, PageHeader, PageLayout
-from lori.application.view.pages.components import ComponentGroup, ComponentPage, ComponentRegistry
+from lori import Configurator
+from lori.application.view.pages import Page, PageFooter, PageGroup, PageHeader, PageLayout, PageRegistry
 from lori.components import Component, ComponentContext
 from lori.system import System
+from lori.util import validate_key
 
-G = TypeVar("G", bound=ComponentGroup)
-P = TypeVar("P", bound=ComponentPage)
-C = TypeVar("C", Component, System)
+PageType = TypeVar("PageType", bound=Page)
 
-registry = ComponentRegistry()
+ComponentType = TypeVar("ComponentType", bound=Component)
+ChildrenType = TypeVar("ChildrenType", bound=Dict[str, Type[Page]])
+
+registry = PageRegistry()
 
 
 # noinspection PyShadowingBuiltins
 def register_component_page(
-    *types: Type[C],
+    *types: Type[ComponentType],
     factory: Optional[Callable] = None,
+    children: Optional[ChildrenType] = None,
     replace: bool = False,
-) -> Callable[[Type[P]], Type[P]]:
+) -> Callable[[Type[PageType]], Type[PageType]]:
     # noinspection PyShadowingNames
-    def _register(cls: Type[P]) -> Type[P]:
-        registry.register_page(cls, *types, factory=factory, replace=replace)
+    def _register(cls: Type[PageType]) -> Type[PageType]:
+        registry.register_page(cls, *types, factory=factory, children=children, replace=replace)
         return cls
 
     return _register
 
 
-# noinspection PyShadowingBuiltins
 def register_component_group(
-    *types: Type[C],
+    *types: Type[ComponentType],
     key: Optional[str] = None,
     name: Optional[str] = None,
     factory: Optional[Callable] = None,
+    custom: bool = False,
     replace: bool = False,
-) -> Callable[[Type[G]], Type[G]]:
-    # noinspection PyShadowingNames
-    def _register(cls: Type[G]) -> Type[G]:
-        registry.register_group(cls, *types, key=key, name=name, factory=factory, replace=replace)
+) -> Callable[[Type[PageType]], Type[PageType]]:
+    if name is None:
+        name = types[0].__name__
+    if key is None:
+        key = validate_key(name)
+
+    # noinspection PyShadowingBuiltins
+    def _register(cls: Type[PageType]) -> Type[PageType]:
+        if custom:
+            if not issubclass(cls, PageGroup):
+                raise ValueError(f"Unknown page group type: {cls.__name__}")
+            type = cls
+        else:
+            type = PageGroup
+
+        registry.register_group(type, *types, key=key, name=name, factory=factory, replace=replace)
         return cls
 
     return _register
 
 
-class View(ComponentGroup):
-    groups: Dict[str, ComponentGroup]
+class View(PageGroup):
+    groups: Dict[str, PageGroup]
 
     # noinspection PyShadowingBuiltins
     def __init__(self, id: str, header: PageHeader, footer: PageFooter, *args, **kwargs) -> None:
@@ -65,7 +80,7 @@ class View(ComponentGroup):
         self.header = header
         self.footer = footer
 
-        self.groups = dict[str, ComponentGroup]()
+        self.groups = dict[str, PageGroup]()
 
     @property
     def key(self) -> str:
@@ -96,7 +111,7 @@ class View(ComponentGroup):
         layout.container.children = []
         for page in self._pages:
             page_cards = []
-            if isinstance(page, ComponentGroup):
+            if isinstance(page, PageGroup):
                 layout.append(
                     dbc.Row(dbc.Col(html.A(html.H4(f"{page.name}:"), className="card-header", href=page.path)))
                 )
@@ -123,7 +138,7 @@ class View(ComponentGroup):
         super()._do_create_layout(*args, **kwargs)
         self.header.menu.insert(0, self.layout.menu)
 
-    # noinspection PyTypeChecker, PyUnresolvedReferences
+    # noinspection PyUnresolvedReferences, PyTypeChecker
     def _do_create_pages(self, components: ComponentContext) -> None:
         systems = [s for s in components.filter(lambda c: isinstance(c, System))]
         for system in systems:
@@ -134,8 +149,9 @@ class View(ComponentGroup):
         for component in components.filter(lambda c: all(c != s and c not in s for s in systems)):
             self._new_page(self, component)
 
-    def _new_page(self, view: ComponentGroup, component: Component) -> Optional[ComponentPage]:
-        if not component.is_enabled():
+    # noinspection PyUnresolvedReferences
+    def _new_page(self, view: PageGroup, component: Any) -> Optional[Page]:
+        if isinstance(component, Configurator) and not component.is_enabled():
             self._logger.debug(f"Skipping page creation for disabled {type(component).__name__} '{component.id}'")
             return
 
@@ -143,7 +159,11 @@ class View(ComponentGroup):
         if not registry.has_page(_type):
             return
 
-        page = registry.get_page(_type).initialize(component)
+        registration = registry.get_page(_type)
+        page = registration.initialize(
+            component=component,
+            group=view,
+        )
         if page is not None:
             group = self._get_group(component)
             if group is not None:
@@ -152,20 +172,22 @@ class View(ComponentGroup):
             view.append(page)
         return page
 
-    def _new_group(self, component: Component) -> Optional[ComponentGroup]:
+    def _new_group(self, component: Any) -> Optional[PageGroup]:
         _type = type(component)
         if not registry.has_group(_type):
             return
 
         registration = registry.get_group(_type)
         group = registration.initialize(
-            id=f"{self.id}-{registration.key}", key=registration.key, name=registration.name
+            id=f"{self.id}-{registration.key}",
+            key=registration.key,
+            name=registration.name,
         )
         if group is not None:
             self.groups[registration.key] = group
         return group
 
-    def _get_group(self, component: Component) -> Optional[ComponentGroup]:
+    def _get_group(self, component: Any) -> Optional[PageGroup]:
         _type = type(component)
         if not registry.has_group(_type):
             return

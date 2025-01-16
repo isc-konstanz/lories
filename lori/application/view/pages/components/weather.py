@@ -8,18 +8,11 @@ lori.application.view.pages.components.weather
 
 from __future__ import annotations
 
+from lori.application.view.pages import ComponentPage, register_component_group, register_component_page
 from lori.components import WeatherProvider as Weather
-from lori.application.view.pages import ComponentGroup, ComponentPage, register_component_group, register_component_page
-
-KEY = "weather"
-NAME = "Weather"
 
 
 @register_component_page(Weather)
+@register_component_group(Weather, name="Weather")
 class WeatherPage(ComponentPage[Weather]):
-    pass
-
-
-@register_component_group(Weather, key=KEY, name=NAME)
-class WeatherGroup(ComponentGroup[Weather]):
     pass

@@ -39,23 +39,27 @@ class ViewInterfaceMeta(InterfaceMeta):
 # noinspection PyProtectedMember
 class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
     def __init__(self, context: Application, configs: Configurations) -> None:
-        view_path = resources.files("lori.application.view")
-
-        def get_custom_path(key: str) -> Path:
-            custom_path = view_path.joinpath(key)
+        def get_custom_path(key: str, default: Optional[str] = None) -> str:
             if "pages" in configs:
-                if os.path.isabs(configs[key]):
-                    custom_path = Path(configs[key])
-                else:
-                    custom_path = Path(configs.dirs.data, configs[key])
-            if not custom_path.exists():
+                custom_path = configs[key]
+            else:
+                custom_path = default
+            if custom_path is None:
+                return ""
+            if os.path.isabs(custom_path):
+                custom_path = Path(custom_path)
+            else:
+                custom_path = Path(configs.dirs.data, custom_path)
+            if custom_path is not None and not custom_path.exists():
                 custom_path.mkdir(exist_ok=True)
-            return custom_path
+            return str(custom_path)
 
+        view_path = resources.files("lori.application.view")
         pages_path = get_custom_path("pages")
-        assets_path = get_custom_path("assets")
-        assets_default = view_path.joinpath("assets")
-        if assets_default != assets_path:
+
+        assets_default = str(view_path.joinpath("assets"))
+        assets_path = get_custom_path("assets", default=assets_default)
+        if assets_path != assets_default:
 
             def copy_assets(src, dest):
                 dest = Path(dest)
@@ -66,8 +70,8 @@ class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
                 shutil.copy2(src, dest)
 
             shutil.copytree(
-                str(assets_default),
-                str(assets_path),
+                assets_default,
+                assets_path,
                 dirs_exist_ok=True,
                 copy_function=copy_assets,
             )
@@ -78,15 +82,15 @@ class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
             context=context,
             configs=configs,
             external_stylesheets=[themes.BOOTSTRAP],
-            assets_folder=str(assets_path),
-            pages_folder=str(pages_path),
+            assets_folder=assets_path,
+            pages_folder=pages_path,
             use_pages=True,
             server=True,  # TODO: Replace this with local Flask server, to create custom REST API ?
         )
 
         theme_defaults = {
             "name": context.name,
-            "logo": assets_path.joinpath("logo.png"),
+            "logo": os.path.join(assets_path, "logo.png"),
         }
         theme = configs.get_section("theme", defaults=theme_defaults)
 

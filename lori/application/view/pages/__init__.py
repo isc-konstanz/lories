@@ -30,6 +30,8 @@ from .components import (  # noqa: F401
 from .header import PageHeader  # noqa: F401
 from .footer import PageFooter  # noqa: F401
 
+from .registry import PageRegistry  # noqa: F401
+
 from .view import (  # noqa: F401
     View,
     register_component_page,
@@ -37,5 +39,8 @@ from .view import (  # noqa: F401
     registry,
 )
 
+from .components import system  # noqa: F401
 from .components.system import SystemPage  # noqa: F401
+
+from .components import weather  # noqa: F401
 from .components.weather import WeatherPage  # noqa: F401
