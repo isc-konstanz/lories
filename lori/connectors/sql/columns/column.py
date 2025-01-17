@@ -8,6 +8,7 @@ lori.connectors.sql.column
 
 from __future__ import annotations
 
+import builtins
 import datetime as dt
 from typing import Any, AnyStr, Optional, Type, TypeVar
 
@@ -48,17 +49,19 @@ class Column(sql.Column):
 
 # noinspection PyShadowingBuiltins
 def parse_type(type: Type | AnyStr, length: Optional[int] = None) -> Type[TypeEngine] | TypeEngine:
-    if issubclass(type, float):
-        type = "FLOAT"
-    elif issubclass(type, int):
-        type = "INTEGER"
-    elif issubclass(type, bool):
-        type = "BOOL"
-    elif issubclass(type, (pd.Timestamp, dt.datetime)):
-        type = "TIMESTAMP"
-    elif issubclass(type, str):
-        type = "STRING"
-    elif isinstance(type, str):
+    if isinstance(type, builtins.type):
+        if issubclass(type, float):
+            type = "FLOAT"
+        elif issubclass(type, int):
+            type = "INTEGER"
+        elif issubclass(type, bool):
+            type = "BOOL"
+        elif issubclass(type, (pd.Timestamp, dt.datetime)):
+            type = "TIMESTAMP"
+        elif issubclass(type, str):
+            type = "STRING"
+
+    if isinstance(type, str):
         type = type.upper()
     else:
         raise ConfigurationException(f"Unknown SQL data type: {type}")
@@ -70,7 +73,7 @@ def parse_type(type: Type | AnyStr, length: Optional[int] = None) -> Type[TypeEn
 def to_type_engine(type: Type | AnyStr, length: Optional[int] = None) -> Type[TypeEngine] | TypeEngine:
     if type == "FLOAT":
         return FLOAT
-    if type in ["IN", "INTEGER"]:
+    if type in ["INT", "INTEGER"]:
         return INTEGER
     if type in ["BOOL", "BOOLEAN"]:
         return BOOLEAN
