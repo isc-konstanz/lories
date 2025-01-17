@@ -20,12 +20,12 @@ from lori.application.view.pages import PageGroup, PageLayout
 from lori.application.view.pages.components import ComponentPage
 
 ComponentType = TypeVar("ComponentType", bound=Component)
-ChildrenType = TypeVar("ChildrenType", bound=Dict[str, Collection[Type[ComponentPage]]])
+ChildrenType = TypeVar("ChildrenType", bound=Dict[str, Type[ComponentPage]])
 
 
 # noinspection PyShadowingBuiltins
 class ComponentGroup(PageGroup[ComponentPage], ComponentPage[ComponentType], Generic[ComponentType]):
-    def __init__(self, component: ComponentType, children: ChildrenType = None, *args, **kwargs) -> None:
+    def __init__(self, component: ComponentType, children: Optional[ChildrenType] = None, *args, **kwargs) -> None:
         super().__init__(component=component, *args, **kwargs)
         if children is not None:
             for attr, factory in children.items():
