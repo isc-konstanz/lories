@@ -118,7 +118,7 @@ class Brightsky(WeatherConnector):
         data["solar"] = data["solar"] * hours * 1000
 
         if data[Weather.CLOUD_COVER].isna().any():
-            data[Weather.CLOUD_COVER].interpolate(method="linear", inplace=True)
+            data[Weather.CLOUD_COVER] = data[Weather.CLOUD_COVER].interpolate(method="linear")
 
         return data.dropna(how="all", axis="columns"), sources
 
