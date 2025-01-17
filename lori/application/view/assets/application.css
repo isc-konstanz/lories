@@ -30,6 +30,7 @@ body:has(.card-container) {
   margin-bottom: calc(0.5 * var(--bs-gutter-y));
   height: 100%;
   width: auto;
+  min-width: 12rem;
 }
 
 .card-container a:has(h4) {
