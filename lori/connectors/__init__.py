@@ -37,3 +37,8 @@ try:
 
 except ModuleNotFoundError:
     pass
+try:
+    from .revpi import RevPiConnector  # noqa: F401
+
+except ModuleNotFoundError:
+    pass

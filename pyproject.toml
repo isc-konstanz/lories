@@ -57,6 +57,9 @@ mysql = [
     "sqlalchemy",
     "pymysql",
 ]
+revpi = [
+    "revpimodio2",
+]
 doc = [
     "graphviz",
     "sphinx",
