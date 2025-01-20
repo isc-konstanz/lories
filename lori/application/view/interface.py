@@ -38,6 +38,9 @@ class ViewInterfaceMeta(InterfaceMeta):
 
 # noinspection PyProtectedMember
 class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
+    _host: str
+    _port: int
+
     def __init__(self, context: Application, configs: Configurations) -> None:
         def get_custom_path(key: str, default: Optional[str] = None) -> str:
             if "pages" in configs:
@@ -102,6 +105,8 @@ class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
         self._do_create_view()
+        self._host = configs.get("host", default="127.0.0.1")
+        self._port = configs.get_int("port", default=8050)
 
     # noinspection PyUnresolvedReferences
     def create_view_layout(self) -> html.Div:
@@ -125,7 +130,7 @@ class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
 
     def start(self) -> None:
         self.view._do_register()
-        self.run()  # debug=self._logger.isEnabledFor(logging.DEBUG))
+        self.run(host=self._host, port=self._port)  # debug=self._logger.isEnabledFor(logging.DEBUG))
 
 
 _instance: Optional[ViewInterface] = None
