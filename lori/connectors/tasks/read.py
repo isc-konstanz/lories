@@ -12,6 +12,7 @@ import datetime as dt
 from typing import Optional
 
 import pandas as pd
+from lori.connectors import Database
 from lori.connectors.tasks.task import ConnectorTask
 
 
@@ -22,6 +23,15 @@ class ReadTask(ConnectorTask):
         end: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> None:
         self._logger.debug(
-            f"Reading {len(self.channels)} channels of " f"{type(self.connector).__name__}: " f"{self.connector.id}"
+            f"Reading {len(self.channels)} channels of '{type(self.connector).__name__}': {self.connector.id}"
         )
-        self.channels.set_frame(self.connector.read(self.channels, start, end))
+        if isinstance(self.connector, Database):
+            data = self.connector.read(self.channels, start=start, end=end)
+        else:
+            if start is not None or end is not None:
+                self._logger.warning(
+                    f"Trying to read slice of Connector '{self.connector.id}' from {start} to {end}"
+                )
+            data = self.connector.read(self.channels)
+
+        self.channels.set_frame(data)

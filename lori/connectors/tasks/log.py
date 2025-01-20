@@ -13,7 +13,7 @@ from lori.data.channels import Channels
 class LogTask(ConnectorTask):
     def run(self) -> None:
         self._logger.debug(
-            f"Logging {len(self.channels)} channels of " f"{type(self.connector).__name__}: " f"{self.connector.id}"
+            f"Logging {len(self.channels)} channels of '{type(self.connector).__name__}': {self.connector.id}"
         )
         # Pass copied connectors instead of actual objects, including parsed logger specific connector configurations
         channels = Channels(c.from_logger() for c in self.channels)
