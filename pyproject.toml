@@ -71,7 +71,12 @@ dev = [
 ]
 
 [tool.setuptools.package-data]
-lori = []
+lori = [
+    "application/view/assets/*.css",
+    "application/view/assets/*.ico",
+	"application/view/assets/*.jpg",
+	"application/view/assets/*.png"
+]
 
 [tool.setuptools.packages.find]
 namespaces = false
