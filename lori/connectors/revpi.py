@@ -27,7 +27,6 @@ _core.handlesignalend(_core.cleanup)
 # noinspection PyShadowingBuiltins, SpellCheckingInspection
 @register_connector_type("revpi", "revpi_io", "revpi_aio", "revpi_ro", "revolutionpi")
 class RevPiConnector(Connector):
-
     _listeners: Dict[str, RevPiListener]
 
     def __init__(self, *args, **kwargs):
@@ -37,18 +36,18 @@ class RevPiConnector(Connector):
     def connect(self, resources: Resources) -> None:
         super().connect(resources)
         # TODO: register listeners
-        #self._core.io[""].reg_event(None, as_thread=True, prefire=True)
+        # self._core.io[""].reg_event(None, as_thread=True, prefire=True)
 
         # TODO: set all IO output values to optional default attribute value
 
     def disconnect(self) -> None:
         super().disconnect()
         # TODO: unregister listeners
-        #.unreg_event([func=None, edge=None])
+        # .unreg_event([func=None, edge=None])
 
         # TODO: set all IO output values to optional default attribute value
 
-        #self._core.cleanup()
+        # self._core.cleanup()
 
     def read(self, resources: Resources) -> pd.DataFrame:
         now = pd.Timestamp.now(tz=tz.UTC)

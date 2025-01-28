@@ -9,7 +9,7 @@ lori.application.view.pages.components.group
 from __future__ import annotations
 
 from functools import wraps
-from typing import Collection, Dict, Generic, Iterable, Optional, Type, TypeVar
+from typing import Dict, Generic, Iterable, Optional, Type, TypeVar
 
 import dash_bootstrap_components as dbc
 from dash import html

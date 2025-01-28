@@ -29,9 +29,7 @@ class ReadTask(ConnectorTask):
             data = self.connector.read(self.channels, start=start, end=end)
         else:
             if start is not None or end is not None:
-                self._logger.warning(
-                    f"Trying to read slice of Connector '{self.connector.id}' from {start} to {end}"
-                )
+                self._logger.warning(f"Trying to read slice of Connector '{self.connector.id}' from {start} to {end}")
             data = self.connector.read(self.channels)
 
         self.channels.set_frame(data)

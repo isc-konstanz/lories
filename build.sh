@@ -37,7 +37,7 @@ echo "$build_dir/debian/version"
 if [ -f "$build_dir/debian/version" ]; then
     echo "Yep"
 fi
-version=$(cat "$build_dir/debian/version")
+version=$(cat "$build_dir/debian/version" | tr -d "\n")
 rm "$build_dir/debian/version"
 
 sed -i "s/<version>/$version/g" "$build_dir/debian/changelog"
