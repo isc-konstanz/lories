@@ -22,7 +22,7 @@ while [ -h "$dir" ] ; do
 done
 cd "`dirname \"$dir\"`" >/dev/null
 lori_dir="`pwd -P`"
-build_dir="$lori_dir/build/dpkg"
+build_dir="$lori_dir/build/dpkg/lori"
 
 rm -rf $build_dir
 mkdir -p $build_dir
