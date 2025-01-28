@@ -1,0 +1,20 @@
+#!/bin/sh
+set -e
+
+# Set permissions of the framework directories
+chown lori:lori -R /opt/lori /var/opt/lori /var/log/lori /var/tmp/lori
+
+case "$1" in
+    install)
+        # Install the current version package via git version tag
+        repository="https://github.com/isc-konstanz/lori.git"
+
+        sudo -u lori /opt/lori/bin/pip --no-cache-dir install lori@git+$repository@v<version>
+        ;;
+    *)
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

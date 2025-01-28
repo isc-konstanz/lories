@@ -1,0 +1,24 @@
+#!/bin/sh
+set -e
+
+#DEBHELPER#
+
+case "$1" in
+    install)
+        # Add the Multi Utility Communication user, if it does not exist
+        if ! grep -E "^lori:" /etc/passwd > /dev/null 2>&1; then
+            useradd --system --no-create-home --comment="Local Resource Integrator" "lori"
+        fi
+        # Initiate the virtual environment, if it does not exist
+        if [ ! -e /opt/lori/bin/python3 ]; then
+            python3 -m venv /opt/lori
+        fi
+        ;;
+    *)
+        ;;
+esac
+
+# Make sure all framework related directories exist
+mkdir -p /var/opt/lori /var/log/lori /var/tmp/lori
+
+exit 0

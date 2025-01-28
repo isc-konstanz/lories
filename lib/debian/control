@@ -1,0 +1,14 @@
+Source: lori
+Section: contrib/electronics
+Priority: optional
+Standards-Version: <version>
+Build-Depends: debhelper (>= 10), dh-systemd (>= 1.5)
+Maintainer: Adrian Minde <adrian.minde@isc-konstanz.de>
+Homepage: https://isc-konstanz.de
+Vcs-Browser: https://github.com/isc-konstanz/lori/
+Vcs-Git: https://github.com/isc-konstanz/lori.git
+
+Package: lori
+Architecture: all
+Depends: ${misc:Depends}, git, python3, python3-venv
+Description: Debian package of the lori framework.

@@ -1,5 +1,5 @@
 [Unit]
-Description=Local Resource Integration System
+Description=Local Resource Integration Service
 After=network.target
 
 [Service]
@@ -8,7 +8,7 @@ Group=lori
 Type=simple
 Restart=always
 RestartSec=60s
-ExecStart=/opt/lori/.venv/bin/lori -c /etc/lori start
+ExecStart=/opt/lori/bin/lori -c /etc/lori start
 WorkingDirectory=/var/opt/lori
 
 [Install]
