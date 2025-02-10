@@ -168,8 +168,15 @@ class CsvDatabase(Database):
                 index = data.index.tz_convert(self.timezone).get_indexer([now], method="nearest")
                 data = data.iloc[[index[-1]], :]
 
-            data = data.rename(columns=columns)
-            return data.loc[:, [r.id for r in resources if r.id in data.columns]]
+            results = []
+            for resource in resources:
+                column = resource.id
+                if column not in data.columns:
+                    column = resource.get("column", default=resource.key)
+                result = data.loc[:, column].copy()
+                result.name = resource.id
+                results.append(result)
+            return pd.concat(results, axis="columns")
 
         except IOError as e:
             raise ConnectionException(self, str(e))
@@ -179,58 +186,82 @@ class CsvDatabase(Database):
         columns = {r.name: r.id for r in self.resources if "name" in r}
         columns.update({r.name: r.id for r in resources if "name" in r})
         columns.update({column: key for key, column in self.columns.items()})
-        if self._data is not None:
-            data = self._data
-        else:
-            files = csv.get_files(
-                self._data_dir,
-                self.freq,
-                self.format,
-                timezone=self.timezone,
-            )
-            if len(files) == 0:
+        try:
+            if self._data is not None:
+                data = self._data
+            else:
+                files = csv.get_files(
+                    self._data_dir,
+                    self.freq,
+                    self.format,
+                    timezone=self.timezone,
+                )
+                if len(files) == 0:
+                    return None
+                data = csv.read_file(
+                    files[0],
+                    index_column=self.index_column,
+                    index_type=self.index_type,
+                    timezone=self.timezone,
+                    separator=self.separator,
+                    decimal=self.decimal,
+                    rename=columns,
+                )
+            if data is None or data.empty:
                 return None
-            data = csv.read_file(
-                files[0],
-                index_column=self.index_column,
-                index_type=self.index_type,
-                timezone=self.timezone,
-                separator=self.separator,
-                decimal=self.decimal,
-                rename=columns,
-            )
-        if data is None or data.empty:
-            return None
-        return data.head()
+            results = []
+            for resource in resources:
+                column = resource.id
+                if column not in data.columns:
+                    column = resource.get("column", default=resource.key)
+                result = data.loc[:, column].copy()
+                result.name = resource.id
+                results.append(result)
+            return pd.concat(results, axis="columns").head(1)
+
+        except IOError as e:
+            raise ConnectionException(self, str(e))
 
     # noinspection PyTypeChecker
     def read_last(self, resources: Resources) -> Optional[pd.DataFrame]:
         columns = {r.name: r.id for r in self.resources if "name" in r}
         columns.update({r.name: r.id for r in resources if "name" in r})
         columns.update({column: key for key, column in self.columns.items()})
-        if self._data is not None:
-            data = self._data
-        else:
-            files = csv.get_files(
-                self._data_dir,
-                self.freq,
-                self.format,
-                timezone=self.timezone,
-            )
-            if len(files) == 0:
+        try:
+            if self._data is not None:
+                data = self._data
+            else:
+                files = csv.get_files(
+                    self._data_dir,
+                    self.freq,
+                    self.format,
+                    timezone=self.timezone,
+                )
+                if len(files) == 0:
+                    return None
+                data = csv.read_file(
+                    files[-1],
+                    index_column=self.index_column,
+                    index_type=self.index_type,
+                    timezone=self.timezone,
+                    separator=self.separator,
+                    decimal=self.decimal,
+                    rename=columns,
+                )
+            if data is None or data.empty:
                 return None
-            data = csv.read_file(
-                files[-1],
-                index_column=self.index_column,
-                index_type=self.index_type,
-                timezone=self.timezone,
-                separator=self.separator,
-                decimal=self.decimal,
-                rename=columns,
-            )
-        if data is None or data.empty:
-            return None
-        return data.tail(1)
+            results = []
+            for resource in resources:
+                column = resource.id
+                if column not in data.columns:
+                    column = resource.get("column", default=resource.key)
+                result = data.loc[:, column].copy()
+                result.name = resource.id
+                results.append(result)
+            return pd.concat(results, axis="columns").tail(1)
+
+        except IOError as e:
+            raise ConnectionException(self, str(e))
 
     def write(self, data: pd.DataFrame) -> None:
         columns = {r.id: r.name for r in self.resources if "name" in r}
