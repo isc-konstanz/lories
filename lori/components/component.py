@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from lori.connectors import ConnectorAccess
+from lori.converters import ConverterAccess
 from lori.core import Activator, Context, Registrator, ResourceException, ResourceUnavailableException
 from lori.core.configs import ConfigurationException, Configurations
 from lori.data import DataAccess
@@ -23,8 +24,9 @@ from lori.util import to_date
 # noinspection PyAbstractClass
 class Component(Registrator, Activator):
     SECTION: str = "component"
-    INCLUDES: List[str] = [ConnectorAccess.SECTION, DataAccess.SECTION]
+    INCLUDES: List[str] = [ConverterAccess.SECTION, ConnectorAccess.SECTION, DataAccess.SECTION]
 
+    __converters: ConverterAccess
     __connectors: ConnectorAccess
     __data: DataAccess
 
@@ -35,6 +37,7 @@ class Component(Registrator, Activator):
         **kwargs,
     ) -> None:
         super().__init__(context=context, configs=configs, **kwargs)
+        self.__converters = ConverterAccess(self)
         self.__connectors = ConnectorAccess(self)
         self.__data = DataAccess(self)
 
@@ -48,11 +51,16 @@ class Component(Registrator, Activator):
         if not configs.enabled:
             raise ConfigurationException(f"Trying to configure disabled {type(self).__name__}: {configs.name}")
 
+        self.__converters.configure(configs.get_sections([ConverterAccess.SECTION], ensure_exists=True))
         self.__connectors.configure(configs.get_sections([ConnectorAccess.SECTION], ensure_exists=True))
         self.__data.configure(configs.get_section(DataAccess.SECTION, ensure_exists=True))
         super()._do_configure(configs, *args, **kwargs)
 
         self.__data.create()
+
+    @property
+    def converters(self):
+        return self.__converters
 
     @property
     def connectors(self):

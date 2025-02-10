@@ -77,17 +77,18 @@ class ConverterContext(RegistratorContext[Converter], Configurator):
         self,
         context: Registrator | RegistratorContext,
         configs: Configurations,
+        configs_file: str = "converters.conf",
     ) -> None:
         defaults = {}
         configs = configs.copy()
         if configs.has_section(self.SECTION):
-            converters = configs.get_section(self.SECTION)
-            for section in self._get_type().INCLUDES:
-                if section in converters:
-                    defaults.update(converters.pop(section))
+            connectors = configs.get_section(self.SECTION)
+            for section in Converter.INCLUDES:
+                if section in connectors:
+                    defaults.update(connectors.pop(section))
 
-            self._load_sections(context, converters, defaults)
-        self._load_from_file(context, configs.dirs, "converters.conf", defaults)
+            self._load_sections(context, connectors, defaults, Converter.INCLUDES)
+        self._load_from_file(context, configs.dirs, configs_file, defaults)
 
     def has_dtype(self, *dtypes: Type) -> bool:
         return len(self._get_by_dtypes(*dtypes)) > 0

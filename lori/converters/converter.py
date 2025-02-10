@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 from abc import abstractmethod
-from typing import Any, Generic, Type, TypeVar, overload
+from typing import Any, Generic, List, Type, TypeVar, overload
 
 import pandas as pd
 from lori.core import Registrator, ResourceException
@@ -21,6 +21,7 @@ T = TypeVar("T", bound=Any)
 
 class Converter(Registrator, Generic[T]):
     SECTION: str = "converter"
+    INCLUDES: List[str] = []
 
     @property
     @abstractmethod

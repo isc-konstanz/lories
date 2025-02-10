@@ -16,6 +16,7 @@ from typing import List, Optional
 from lori import ConfigurationException, Configurations, Settings
 from lori.components import Component, WeatherProvider
 from lori.components.context import ComponentContext
+from lori.converters import ConverterAccess
 from lori.connectors import ConnectorAccess
 from lori.core import Activator, Context, Identifier, ResourceException
 from lori.data import DataAccess, DataContext
@@ -27,8 +28,9 @@ from lori.weather import Weather, WeatherUnavailableException
 # noinspection PyProtectedMember
 class System(ComponentContext, Activator, Identifier):
     SECTION: str = "system"
-    INCLUDES: List[str] = [ConnectorAccess.SECTION, DataAccess.SECTION]
+    INCLUDES: List[str] = [ConverterAccess.SECTION, ConnectorAccess.SECTION, DataAccess.SECTION]
 
+    __converters: ConverterAccess
     __connectors: ConnectorAccess
     __data: DataAccess
 
@@ -98,6 +100,7 @@ class System(ComponentContext, Activator, Identifier):
             key=key,
             **kwargs,
         )
+        self.__converters = ConverterAccess(self)
         self.__connectors = ConnectorAccess(self)
         self.__data = DataAccess(self)
 
@@ -190,10 +193,15 @@ class System(ComponentContext, Activator, Identifier):
         if not configs.enabled:
             raise ConfigurationException(f"Trying to configure disabled {type(self).__name__}: {configs.name}")
 
+        self.__converters.configure(configs.get_sections([ConverterAccess.SECTION], ensure_exists=True))
         self.__connectors.configure(configs.get_sections([ConnectorAccess.SECTION], ensure_exists=True))
         self.__data.configure(configs.get_section(DataAccess.SECTION, ensure_exists=True))
         super()._do_configure(configs, *args, **kwargs)
         self.__data.create()
+
+    @property
+    def converters(self):
+        return self.__converters
 
     @property
     def connectors(self):
