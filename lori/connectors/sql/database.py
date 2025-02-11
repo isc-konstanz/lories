@@ -9,8 +9,7 @@ lori.connectors.sql.database
 from __future__ import annotations
 
 import datetime as dt
-from collections.abc import Mapping
-from typing import Any, Dict, Iterator, Literal, Optional
+from typing import Any, Dict, Iterator, Mapping, Optional
 
 from sqlalchemy import Connection, Dialect, Engine, create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -21,6 +20,13 @@ from lori.connectors import ConnectionException, ConnectorException, Database, r
 from lori.connectors.sql import Schema, Table
 from lori.core import ConfigurationException, Configurations, Resources
 from lori.util import to_timezone
+
+# FIXME: Remove this once Python >= 3.9 is a requirement
+try:
+    from typing import Literal
+
+except ImportError:
+    from typing_extensions import Literal
 
 
 @register_connector_type("sql")
@@ -48,7 +54,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.__tables = dict[str, Table]()
+        self.__tables = {}
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.__tables)

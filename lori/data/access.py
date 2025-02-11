@@ -9,12 +9,19 @@ lori.data.access
 from __future__ import annotations
 
 import datetime as dt
-from typing import Any, Callable, Literal, Optional, Type
+from typing import Any, Callable, Optional, Type
 
 import pandas as pd
 from lori.core import Configurations, Configurator, Context, ResourceException
 from lori.data import Channel, Channels, DataContext
 from lori.util import get_context, update_recursive
+
+# FIXME: Remove this once Python >= 3.9 is a requirement
+try:
+    from typing import Literal
+
+except ImportError:
+    from typing_extensions import Literal
 
 
 # noinspection PyProtectedMember

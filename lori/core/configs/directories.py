@@ -155,7 +155,9 @@ class Directory(Path):
             base = Path.cwd()
         elif not isinstance(base, Path):
             base = Path(base)
-        if base.is_relative_to("~"):
+        # FIXME: Remove this once Python >= 3.9 is a requirement
+        # if dir.is_relative_to("~"):
+        if str(dir).startswith("~"):
             base = base.expanduser()
         if not base.is_absolute():
             base = base.absolute()
@@ -165,9 +167,12 @@ class Directory(Path):
     def __parse_dir(base: Path, *dirs: Optional[str], default: Optional[str] = None) -> Path:
         dir = Path(*dirs) if not any(d is None for d in dirs) else None
         if dir is not None:
-            if dir.is_relative_to(base):
+            # FIXME: Remove this once Python >= 3.9 is a requirement
+            # if dir.is_relative_to(base):
+            if str(dir).startswith(str(base)):
                 dir = dir.relative_to(base)
-            if dir.is_relative_to("~"):
+            # if dir.is_relative_to("~"):
+            if str(dir).startswith("~"):
                 dir = dir.expanduser()
         if str(dir) == default:
             dir = None

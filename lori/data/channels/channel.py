@@ -11,7 +11,7 @@ from __future__ import annotations
 import datetime as dt
 from collections import OrderedDict
 from collections.abc import Callable
-from typing import Any, Collection, Dict, List, Literal, Mapping, Optional, Type
+from typing import Any, Collection, Dict, List, Mapping, Optional, Type
 
 import pandas as pd
 import pytz as tz
@@ -19,6 +19,13 @@ from lori.core import Context, Resource, ResourceException
 from lori.core.configs import ConfigurationException, Configurations
 from lori.data.channels import ChannelConnector, ChannelConverter, ChannelState
 from lori.util import parse_freq, to_timedelta
+
+# FIXME: Remove this once Python >= 3.9 is a requirement
+try:
+    from typing import Literal
+
+except ImportError:
+    from typing_extensions import Literal
 
 
 class Channel(Resource):

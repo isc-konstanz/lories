@@ -10,12 +10,18 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Callable
-from typing import Any, Literal
 
 import pandas as pd
 import pytz as tz
 from lori.core import Resources
 from lori.data.channels import Channel, ChannelState
+
+# FIXME: Remove this once Python >= 3.9 is a requirement
+try:
+    from typing import Literal
+
+except ImportError:
+    from typing_extensions import Literal
 
 
 class Channels(Resources[Channel]):
@@ -33,7 +39,7 @@ class Channels(Resources[Channel]):
 
     def to_frame(self, unique: bool = False, states: bool = False) -> pd.DataFrame:
         columns = []
-        data = OrderedDict[pd.Timestamp, Any]()
+        data = OrderedDict()
 
         # noinspection PyTypeChecker
         def append(column: str, series: pd.Series) -> None:

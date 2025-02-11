@@ -12,13 +12,20 @@ import datetime as dt
 from abc import abstractmethod
 from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Callable, Collection, List, Literal, Optional, Tuple, Type
+from typing import Any, Callable, Collection, List, Optional, Tuple, Type
 
 import numpy as np
 import pandas as pd
 from lori.core import ConfigurationException, Configurations, Context, Directories, Identifier, ResourceException
 from lori.data.channels import Channel, Channels
 from lori.util import update_recursive, validate_key
+
+# FIXME: Remove this once Python >= 3.9 is a requirement
+try:
+    from typing import Literal
+
+except ImportError:
+    from typing_extensions import Literal
 
 
 class DataContext(Context[Channel]):

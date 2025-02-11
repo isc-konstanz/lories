@@ -9,10 +9,17 @@ lori.core.register.registry
 from __future__ import annotations
 
 import builtins
-from typing import Callable, Generic, List, Mapping, Optional, Type, TypeVar, get_args
+from typing import Callable, Generic, List, Mapping, Optional, Type, TypeVar
 
 from lori.core import Configurations, Context, ResourceException
 from lori.core.register import Registrator
+
+# FIXME: Remove this once Python >= 3.9 is a requirement
+try:
+    from typing import get_args
+
+except ImportError:
+    from typing_extensions import get_args
 
 R = TypeVar("R", bound=Registrator)
 

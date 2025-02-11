@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import re
 from collections import OrderedDict
-from collections.abc import Callable, Collection, MutableMapping
+from collections.abc import Callable
 from itertools import chain
-from typing import Any, Generic, Iterable, Iterator, Tuple, TypeVar
+from typing import Any, Collection, Generic, Iterable, Iterator, MutableMapping, Tuple, TypeVar
 
 import pandas as pd
 from lori.core import Identifier
@@ -25,7 +25,7 @@ class Context(Generic[ID], MutableMapping[str, ID]):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.__map = OrderedDict[str, ID]()
+        self.__map = OrderedDict()
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({', '.join(str(c.id) for c in self.__map.values())})"

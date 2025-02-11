@@ -16,8 +16,8 @@ from typing import List, Optional
 from lori import ConfigurationException, Configurations, Settings
 from lori.components import Component, WeatherProvider
 from lori.components.context import ComponentContext
-from lori.converters import ConverterAccess
 from lori.connectors import ConnectorAccess
+from lori.converters import ConverterAccess
 from lori.core import Activator, Context, Identifier, ResourceException
 from lori.data import DataAccess, DataContext
 from lori.location import Location, LocationUnavailableException

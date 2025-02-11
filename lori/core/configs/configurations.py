@@ -12,10 +12,9 @@ import datetime as dt
 import os
 import shutil
 from collections import OrderedDict
-from collections.abc import Mapping, MutableMapping
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Iterable, List, Optional
+from typing import Any, Iterable, List, Mapping, MutableMapping, Optional
 
 import pandas as pd
 from lori.core import ResourceException, ResourceUnavailableException

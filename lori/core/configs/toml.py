@@ -6,8 +6,7 @@ lori.core.configs.toml
 
 """
 
-from collections.abc import Mapping
-from typing import Any
+from typing import Any, Mapping
 
 try:
     import tomllib as toml

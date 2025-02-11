@@ -12,7 +12,7 @@ import datetime as dt
 import hashlib
 from abc import abstractmethod
 from functools import wraps
-from typing import Any, Literal, Optional, overload
+from typing import Any, Optional, overload
 
 import tzlocal
 
@@ -28,6 +28,13 @@ from lori.connectors import (
 )
 from lori.core import Configurations, Resources
 from lori.util import convert_timezone, to_date, to_timezone
+
+# FIXME: Remove this once Python >= 3.9 is a requirement
+try:
+    from typing import Literal
+
+except ImportError:
+    from typing_extensions import Literal
 
 
 class DatabaseMeta(ConnectorMeta):

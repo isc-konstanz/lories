@@ -15,7 +15,7 @@ import signal
 from concurrent import futures
 from concurrent.futures import Future, ThreadPoolExecutor
 from threading import Event, Thread
-from typing import Any, Callable, Dict, Literal, Mapping, Optional, Type
+from typing import Any, Callable, Dict, Mapping, Optional, Type
 
 import pandas as pd
 import pytz as tz
@@ -33,6 +33,13 @@ from lori.data.context import DataContext
 from lori.data.databases import Databases
 from lori.data.listeners import ListenerContext
 from lori.util import floor_date, get_variables, parse_type, to_timedelta, validate_key
+
+# FIXME: Remove this once Python >= 3.9 is a requirement
+try:
+    from typing import Literal
+
+except ImportError:
+    from typing_extensions import Literal
 
 
 # noinspection PyProtectedMember
@@ -272,7 +279,9 @@ class DataManager(DataContext, Activator, Identifier):
 
     def interrupt(self, *_) -> None:
         self.__interrupt.set()
-        self._executor.shutdown(wait=True, cancel_futures=True)
+
+        # FIXME: Add cancel_futures argument again, once Python >= 3.9 is a requirement
+        self._executor.shutdown(wait=True)  # , cancel_futures=True)
         if self.__runner.is_alive():
             self.__runner.join()
 

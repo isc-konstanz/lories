@@ -9,7 +9,7 @@ lori.connectors.sql.table
 from __future__ import annotations
 
 import datetime as dt
-from typing import Any, Dict, Iterator, List, Literal, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import sqlalchemy as sql
 from sqlalchemy import ClauseElement, Dialect, Result, UnaryExpression
@@ -22,6 +22,13 @@ import pytz as tz
 from lori.connectors.sql.columns import Column, DatetimeColumn, SurrogateKeyColumn
 from lori.connectors.sql.index import DatetimeIndexType
 from lori.core import Resource, ResourceException, Resources
+
+# FIXME: Remove this once Python >= 3.9 is a requirement
+try:
+    from typing import Literal
+
+except ImportError:
+    from typing_extensions import Literal
 
 
 class Table(sql.Table):

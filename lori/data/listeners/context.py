@@ -12,12 +12,19 @@ import logging
 from collections.abc import Callable
 from threading import Lock
 from time import sleep
-from typing import Collection, Literal
+from typing import Collection
 
 import pandas as pd
 from lori.core import Context, ResourceException
 from lori.data import Channel, Channels
 from lori.data.listeners import Listener
+
+# FIXME: Remove this once Python >= 3.9 is a requirement
+try:
+    from typing import Literal
+
+except ImportError:
+    from typing_extensions import Literal
 
 
 # noinspection PyShadowingBuiltins

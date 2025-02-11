@@ -13,11 +13,18 @@ import os
 import re
 from abc import abstractmethod
 from copy import deepcopy
-from typing import Any, Collection, Mapping, Optional, Sequence, TypeVar, get_args
+from typing import Any, Collection, Mapping, Optional, Sequence, TypeVar
 
 from lori.core import Configurations, Configurator, Context, Directories, ResourceException
 from lori.core.register import Registrator, Registry
 from lori.util import update_recursive, validate_key
+
+# FIXME: Remove this once Python >= 3.9 is a requirement
+try:
+    from typing import get_args
+
+except ImportError:
+    from typing_extensions import get_args
 
 R = TypeVar("R", bound=Registrator)
 

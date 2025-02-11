@@ -12,11 +12,17 @@ import logging
 from collections.abc import Callable
 from logging import Logger
 from threading import Lock
-from typing import Literal
 
 import pandas as pd
 from lori.core import Identifier, ResourceException
 from lori.data import Channel, Channels
+
+# FIXME: Remove this once Python >= 3.9 is a requirement
+try:
+    from typing import Literal
+
+except ImportError:
+    from typing_extensions import Literal
 
 
 # noinspection PyShadowingBuiltins

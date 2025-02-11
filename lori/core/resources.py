@@ -9,8 +9,7 @@ lori.core.resources
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
-from typing import Any, Callable, Generic, Iterable, Iterator, List, Tuple, TypeVar
+from typing import Any, Callable, Generic, Iterable, Iterator, List, Sequence, Tuple, TypeVar
 
 from lori.core import Resource
 
