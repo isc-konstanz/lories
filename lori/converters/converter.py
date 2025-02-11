@@ -40,13 +40,13 @@ class Converter(Registrator, Generic[T]):
     def convert(self, value: str | T | pd.Series) -> T | pd.Series: ...
 
     @overload
-    def revert(self, value: str | T) -> T: ...
+    def to_str(self, value: str | T) -> T: ...
 
     @overload
-    def revert(self, value: pd.Series) -> pd.Series: ...
+    def to_str(self, value: pd.Series) -> pd.Series: ...
 
     @abstractmethod
-    def revert(self, value: T | pd.Series) -> str | pd.Series: ...
+    def to_str(self, value: T | pd.Series) -> str | pd.Series: ...
 
 
 class ConversionException(ResourceException, TypeError):
@@ -75,7 +75,7 @@ class GenericConverter(Converter, Generic[T]):
     def _convert(self, value: str | T) -> T:
         pass
 
-    def revert(self, value: T | pd.Series) -> str | pd.Series:
+    def to_str(self, value: T | pd.Series) -> str | pd.Series:
         if issubclass(type(value), pd.Series):
             return value.apply(lambda v: str(v)).astype(str)
         return str(value)

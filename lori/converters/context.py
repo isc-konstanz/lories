@@ -35,16 +35,15 @@ registry.register(IntConverter, "int", "integer")
 registry.register(BoolConverter, "bool", "boolean")
 
 
-# noinspection PyShadowingBuiltins
 def register_converter_type(
-    type: str,
+    key: str,
     *alias: str,
     factory: Callable[[Registrator | Context, Optional[Configurations]], C] = None,
     replace: bool = False,
 ) -> Callable[[Type[C]], Type[C]]:
     # noinspection PyShadowingNames
     def _register(cls: Type[C]) -> Type[C]:
-        registry.register(cls, type, *alias, factory=factory, replace=replace)
+        registry.register(cls, key, *alias, factory=factory, replace=replace)
         return cls
 
     return _register
