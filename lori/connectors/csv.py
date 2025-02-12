@@ -170,12 +170,17 @@ class CsvDatabase(Database):
 
             results = []
             for resource in resources:
-                column = resource.id
-                if column not in data.columns:
-                    column = resource.get("column", default=resource.key)
-                result = data.loc[:, column].copy()
-                result.name = resource.id
-                results.append(result)
+                if resource.id in data.columns:
+                    results.append(data.loc[:, resource.id].copy())
+                    continue
+
+                resource_column = resource.get("column", default=resource.key)
+                if resource_column not in data.columns:
+                    results.append(pd.Series(name=resource.id))
+                    continue
+                resource_data = data.loc[:, resource_column].copy()
+                resource_data.name = resource.id
+                results.append(resource_data)
             return pd.concat(results, axis="columns")
 
         except IOError as e:
@@ -211,12 +216,17 @@ class CsvDatabase(Database):
                 return None
             results = []
             for resource in resources:
-                column = resource.id
-                if column not in data.columns:
-                    column = resource.get("column", default=resource.key)
-                result = data.loc[:, column].copy()
-                result.name = resource.id
-                results.append(result)
+                if resource.id in data.columns:
+                    results.append(data.loc[:, resource.id].copy())
+                    continue
+
+                resource_column = resource.get("column", default=resource.key)
+                if resource_column not in data.columns:
+                    results.append(pd.Series(name=resource.id))
+                    continue
+                resource_data = data.loc[:, resource_column].copy()
+                resource_data.name = resource.id
+                results.append(resource_data)
             return pd.concat(results, axis="columns").head(1)
 
         except IOError as e:
@@ -252,12 +262,17 @@ class CsvDatabase(Database):
                 return None
             results = []
             for resource in resources:
-                column = resource.id
-                if column not in data.columns:
-                    column = resource.get("column", default=resource.key)
-                result = data.loc[:, column].copy()
-                result.name = resource.id
-                results.append(result)
+                if resource.id in data.columns:
+                    results.append(data.loc[:, resource.id].copy())
+                    continue
+
+                resource_column = resource.get("column", default=resource.key)
+                if resource_column not in data.columns:
+                    results.append(pd.Series(name=resource.id))
+                    continue
+                resource_data = data.loc[:, resource_column].copy()
+                resource_data.name = resource.id
+                results.append(resource_data)
             return pd.concat(results, axis="columns").tail(1)
 
         except IOError as e:
