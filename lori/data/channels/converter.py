@@ -9,7 +9,7 @@ lori.data.channels.converter
 from __future__ import annotations
 
 from collections import OrderedDict
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 from lori.core import ResourceException
 
@@ -32,13 +32,18 @@ class ChannelConverter:
             raise ResourceException(f"Invalid converter: {None if converter is None else type(converter)}")
         return converter
 
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.key})"
-
-    def __str__(self) -> str:
-        return f"{type(self).__name__}:\n\tid={self.id}\n\t" + "\n\t".join(
-            f"{k}={v}" for k, v in self._get_vars().items()
+    def __eq__(self, other: Any) -> bool:
+        return (
+            isinstance(other, ChannelConverter)
+            and self._converter == other._converter
+            and self._get_vars() == other._get_vars()
         )
+
+    def __hash__(self) -> int:
+        return hash((self._converter, *self._get_vars()))
+
+    def __contains__(self, attr: str) -> bool:
+        return attr in self._get_attrs()
 
     def __getattr__(self, attr):
         # __getattr__ gets called when the item is not found via __getattribute__
@@ -47,6 +52,32 @@ class ChannelConverter:
         if attr in configs.keys():
             return configs[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
+
+    def __getitem__(self, attr: str) -> Any:
+        value = self.get(attr)
+        if value is not None:
+            return value
+        raise KeyError(attr)
+
+    def get(self, attr: str, default: Optional[Any] = None) -> Any:
+        return self._get_vars().get(attr, default)
+
+    def _get_attrs(self) -> List[str]:
+        return [*self._copy_configs().keys(), "enabled"]
+
+    # noinspection PyShadowingBuiltins
+    def _get_vars(self) -> Dict[str, Any]:
+        vars = self._copy_configs()
+        vars["enabled"] = self.enabled
+        return vars
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({self.key})"
+
+    def __str__(self) -> str:
+        return f"{type(self).__name__}:\n\tid={self.id}\n\t" + "\n\t".join(
+            f"{k}={v}" for k, v in self._get_vars().items()
+        )
 
     def __call__(self, value: Any) -> Any:
         return self._converter.convert(value)
@@ -67,9 +98,3 @@ class ChannelConverter:
     # noinspection PyShadowingBuiltins
     def _copy_configs(self) -> Dict[str, Any]:
         return OrderedDict(**self.__configs)
-
-    # noinspection PyShadowingBuiltins
-    def _get_vars(self) -> Dict[str, Any]:
-        vars = self._copy_configs()
-        vars["enabled"] = self.enabled
-        return vars

@@ -9,7 +9,7 @@ lori.data.channels.connector
 from __future__ import annotations
 
 from collections import OrderedDict
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from lori import ConfigurationException
@@ -43,26 +43,18 @@ class ChannelConnector:
             raise ResourceException(f"Invalid connector: {None if connector is None else type(connector)}")
         return connector
 
-    # noinspection PyShadowingBuiltins
-    def _get_vars(self) -> Dict[str, Any]:
-        vars = self._copy_configs()
-        vars["timestamp"] = self.timestamp
-        vars["enabled"] = self.enabled
-        return vars
-
     def __eq__(self, other: Any) -> bool:
-        return self is other
+        return (
+            isinstance(other, ChannelConnector)
+            and self._connector == other._connector
+            and self._get_vars() == other._get_vars()
+        )
 
     def __hash__(self) -> int:
-        return hash(id(self))
+        return hash((self._connector, *self._get_vars()))
 
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.id})"
-
-    def __str__(self) -> str:
-        return f"{type(self).__name__}:\n\tid={self.id}\n\t" + "\n\t".join(
-            f"{k}={v}" for k, v in self._get_vars().items()
-        )
+    def __contains__(self, attr: str) -> bool:
+        return attr in self._get_attrs()
 
     def __getattr__(self, attr):
         # __getattr__ gets called when the item is not found via __getattribute__
@@ -71,6 +63,33 @@ class ChannelConnector:
         if attr in configs.keys():
             return configs[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
+
+    def __getitem__(self, attr: str) -> Any:
+        value = self.get(attr)
+        if value is not None:
+            return value
+        raise KeyError(attr)
+
+    def get(self, attr: str, default: Optional[Any] = None) -> Any:
+        return self._get_vars().get(attr, default)
+
+    def _get_attrs(self) -> List[str]:
+        return [*self._copy_configs().keys(), "timestamp", "enabled"]
+
+    # noinspection PyShadowingBuiltins
+    def _get_vars(self) -> Dict[str, Any]:
+        vars = self._copy_configs()
+        vars["timestamp"] = self.timestamp
+        vars["enabled"] = self.enabled
+        return vars
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({self.id})"
+
+    def __str__(self) -> str:
+        return f"{type(self).__name__}:\n\tid={self.id}\n\t" + "\n\t".join(
+            f"{k}={v}" for k, v in self._get_vars().items()
+        )
 
     @property
     def id(self) -> Optional[str]:
