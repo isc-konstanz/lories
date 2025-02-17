@@ -8,10 +8,11 @@ lori.data.channels.channels.Channels
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from collections.abc import Callable
 
 import pandas as pd
-from lori.core import Resources, ResourceException
+from lori.core import Resources
 from lori.data.channels import Channel, ChannelState
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -36,18 +37,33 @@ class Channels(Resources[Channel]):
             channel.register(function, how=how, unique=unique)
 
     def to_frame(self, unique: bool = False, states: bool = False) -> pd.DataFrame:
-        data = []
+        data = OrderedDict()
         for channel in self:
             if pd.isna(channel.timestamp):
                 continue
             channel_uid = channel.key if not unique else channel.id
             channel_data = channel.to_series(state=states)
             channel_data.name = channel_uid
-            data.append(channel_data)
 
-        frame = pd.concat(data, axis="columns", verify_integrity=True, sort=True)
-        frame.index.name = Channel.TIMESTAMP
-        return frame
+            for timestamp, channel_values in channel_data.to_frame().to_dict(orient="index").items():
+                if timestamp not in data:
+                    timestamp_data = data[timestamp] = {}
+                else:
+                    timestamp_data = data[timestamp]
+
+                    if any(k in timestamp_data for k in channel_values.keys()):
+                        self._logger.warning(
+                            f"Overriding value for duplicate index while merging channel '{channel.id}' into "
+                            f"DataFrame for index: {channel_data.index}"
+                        )
+                timestamp_data.update(channel_values)
+
+        data = pd.DataFrame.from_records(
+            data=list(data.values()),
+            index=list(data.keys()),
+        )
+        data.index.name = Channel.TIMESTAMP
+        return data
 
     # noinspection PyProtectedMember
     def set_frame(self, data: pd.DataFrame) -> None:

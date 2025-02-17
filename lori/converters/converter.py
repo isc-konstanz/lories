@@ -11,7 +11,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 from abc import abstractmethod
-from typing import Any, Collection, Generic, List, Optional, Type, TypeVar, overload
+from typing import Any, Generic, List, Optional, Type, TypeVar, overload
 
 import pandas as pd
 import pytz as tz

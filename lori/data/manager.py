@@ -445,7 +445,9 @@ class DataManager(DataContext, Activator, Identifier):
             for replicator, replicator_channels in channels.groupby(lambda c: c.replicator._connector):
                 if len(replicator_channels) == 0:
                     continue
-                for configs, replication_channels in replicator_channels.groupby(lambda c: c.replicator._copy_configs()):
+                for configs, replication_channels in replicator_channels.groupby(
+                    lambda c: c.replicator._copy_configs()
+                ):
                     databases.replicate(replicator, replication_channels, **configs)
 
         finally:

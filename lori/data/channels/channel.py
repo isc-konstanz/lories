@@ -278,7 +278,9 @@ class Channel(Resource):
             {
                 k: v
                 for k, v in configs.items()
-                if not isinstance(v, Mapping) or k in [
+                if not isinstance(v, Mapping)
+                or k
+                in [
                     "logger",
                     "connector",
                     "converter",

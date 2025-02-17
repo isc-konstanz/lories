@@ -63,7 +63,7 @@ class Schema(Configurator, MetaData):
                 column_configs = [columns_configs[s] for s in columns_configs.sections]
 
                 def _filter_primary(primary: bool) -> Collection[Resource | Configurations]:
-                    _filter_columns = [*column_configs , *table_resources]
+                    _filter_columns = [*column_configs, *table_resources]
                     return [r for r in _filter_columns if r.get("primary", default=False) == primary]
 
                 columns = []
