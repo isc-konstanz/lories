@@ -8,12 +8,10 @@ lori.data.channels.channels.Channels
 
 from __future__ import annotations
 
-from collections import OrderedDict
 from collections.abc import Callable
 
 import pandas as pd
-import pytz as tz
-from lori.core import Resources
+from lori.core import Resources, ResourceException
 from lori.data.channels import Channel, ChannelState
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -38,61 +36,34 @@ class Channels(Resources[Channel]):
             channel.register(function, how=how, unique=unique)
 
     def to_frame(self, unique: bool = False, states: bool = False) -> pd.DataFrame:
-        columns = []
-        data = OrderedDict()
-
-        # noinspection PyTypeChecker
-        def append(column: str, series: pd.Series) -> None:
-            for index, value in series.items():
-                if index in data:
-                    row = data[index]
-                else:
-                    row = {}
-                    data[index] = row
-                if column in row:
-                    self._logger.warning(
-                        f"Overriding value for duplicate index while merging channel '{column}' into "
-                        f"DataFrame for index: {index}"
-                    )
-                row[column] = value
-            if column not in columns:
-                columns.append(column)
-
+        data = []
         for channel in self:
             if pd.isna(channel.timestamp):
                 continue
             channel_uid = channel.key if not unique else channel.id
             channel_data = channel.to_series(state=states)
             channel_data.name = channel_uid
+            data.append(channel_data)
 
-            if channel_data.index.tzinfo is None:
-                self._logger.warning(
-                    f"UTC will be presumed for channel '{channel.id}' timestamps, "
-                    f"as tz-naive with tz-aware DatetimeIndex cannot be joined: {channel_data}"
-                )
-                channel_data.index = channel_data.index.tz_localize(tz.UTC)
-            append(channel_uid, channel_data)
+        frame = pd.concat(data, axis="columns", verify_integrity=True, sort=True)
+        frame.index.name = Channel.TIMESTAMP
+        return frame
 
-        if len(data) > 0:
-            return pd.DataFrame.from_records(list(data.values()), index=list(data.keys()), columns=columns)
-        return pd.DataFrame(columns=columns)
-
+    # noinspection PyProtectedMember
     def set_frame(self, data: pd.DataFrame) -> None:
-        for channel in self:
-            if channel.id not in data.columns or all(pd.isna(data.loc[:, channel.id])):
-                channel.state = ChannelState.NOT_AVAILABLE
-                if channel.id in data.columns:
-                    self._logger.debug(f"Unable to update None value for channel: {channel.id}")
-                else:
-                    self._logger.warning(f"Unable to update unconfigured channel: {channel.id}")
-                continue
+        for converter, channels in self.groupby(lambda c: c.converter._converter):
+            converter_data = converter.convert(data, channels)
+            for channel in channels:
+                channel_data = converter_data.loc[:, channel.id].dropna()
+                if channel_data.empty:
+                    channel.state = ChannelState.NOT_AVAILABLE
+                    if channel.id in data.columns:
+                        self._logger.debug(f"Unable to update None value for channel: {channel.id}")
+                    else:
+                        self._logger.warning(f"Unable to update not configured channel: {channel.id}")
+                    continue
 
-            channel_data = data.loc[:, channel.id].dropna()
-            channel_data.name = channel.key
-            if len(channel_data.index) > 1:
                 timestamp = channel_data.index[0]
+                if len(channel_data.index) == 1:
+                    channel_data = channel_data.values[0]
                 channel.set(timestamp, channel_data)
-
-            elif len(channel_data.index) > 0:
-                timestamp = channel_data.index[-1]
-                channel.set(timestamp, channel_data[timestamp])

@@ -70,19 +70,6 @@ class ChannelConnector:
             return value
         raise KeyError(attr)
 
-    def get(self, attr: str, default: Optional[Any] = None) -> Any:
-        return self._get_vars().get(attr, default)
-
-    def _get_attrs(self) -> List[str]:
-        return [*self._copy_configs().keys(), "timestamp", "enabled"]
-
-    # noinspection PyShadowingBuiltins
-    def _get_vars(self) -> Dict[str, Any]:
-        vars = self._copy_configs()
-        vars["timestamp"] = self.timestamp
-        vars["enabled"] = self.enabled
-        return vars
-
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.id})"
 
@@ -105,6 +92,28 @@ class ChannelConnector:
     def is_connected(self) -> bool:
         return self._connector.is_connected() if self.enabled else False
 
+    def get(self, attr: str, default: Optional[Any] = None) -> Any:
+        return self._get_vars().get(attr, default)
+
+    # noinspection PyShadowingBuiltins
+    def _get_vars(self) -> Dict[str, Any]:
+        vars = self._copy_configs()
+        vars["timestamp"] = self.timestamp
+        vars["enabled"] = self.enabled
+        return vars
+
+    def _get_attrs(self) -> List[str]:
+        return [*self._copy_configs().keys(), "timestamp", "enabled"]
+
+    def _get_configs(self) -> Dict[str, Any]:
+        return self.__configs
+
+    def _copy_configs(self) -> Dict[str, Any]:
+        return OrderedDict(**self._get_configs())
+
+    def __update_configs(self, configs: Dict[str, Any]) -> None:
+        update_recursive(self.__configs, configs)
+
     # noinspection PyShadowingBuiltins
     def _update(
         self,
@@ -116,13 +125,6 @@ class ChannelConnector:
         if enabled is not None:
             self.enabled = to_bool(enabled)
         self.__update_configs(configs)
-
-    def __update_configs(self, configs: Dict[str, Any]) -> None:
-        update_recursive(self.__configs, configs)
-
-    # noinspection PyShadowingBuiltins
-    def _copy_configs(self) -> Dict[str, Any]:
-        return OrderedDict(**self.__configs)
 
     def copy(self) -> ChannelConnector:
         configs = self._copy_configs()

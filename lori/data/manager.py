@@ -447,10 +447,11 @@ class DataManager(DataContext, Activator, Identifier):
         for read_future in futures.as_completed(read_futures):
             try:
                 read_channels = read_future.result().channels
-                read_data.append(channels.to_frame(unique=True))
+                read_data.append(read_channels.to_frame(unique=True))
 
-                def update_connector(read_channel: Channel) -> None:
+                def update_connector(read_channel: Channel) -> Channel:
                     read_channel.connector.timestamp = time
+                    return read_channel
 
                 read_channels.apply(update_connector, inplace=True)
 

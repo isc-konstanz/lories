@@ -15,6 +15,7 @@ from typing import Any, AnyStr, Optional, Type, TypeVar
 import sqlalchemy as sql
 from sqlalchemy.types import BOOLEAN, DATETIME, FLOAT, INTEGER, TIMESTAMP, String, TypeEngine
 
+import numpy as np
 import pandas as pd
 from lori.core import ConfigurationException, ResourceException
 
@@ -50,15 +51,15 @@ class Column(sql.Column):
 # noinspection PyShadowingBuiltins
 def parse_type(type: Type | AnyStr, length: Optional[int] = None) -> Type[TypeEngine] | TypeEngine:
     if isinstance(type, builtins.type):
-        if issubclass(type, float):
-            type = "FLOAT"
-        elif issubclass(type, int):
-            type = "INTEGER"
-        elif issubclass(type, bool):
-            type = "BOOL"
-        elif issubclass(type, (pd.Timestamp, dt.datetime)):
+        if issubclass(type, (pd.Timestamp, dt.datetime, pd.arrays.DatetimeArray)):
             type = "TIMESTAMP"
-        elif issubclass(type, str):
+        elif issubclass(type, (float, np.floating, pd.arrays.FloatingArray)):
+            type = "FLOAT"
+        elif issubclass(type, (int, np.integer, pd.arrays.IntegerArray)):
+            type = "INT"
+        elif issubclass(type, (bool, pd.arrays.BooleanArray)):
+            type = "BOOL"
+        elif issubclass(type, (str, pd.arrays.StringArray)):
             type = "STRING"
 
     if isinstance(type, str):

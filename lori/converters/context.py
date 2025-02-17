@@ -16,7 +16,6 @@ from lori.converters.converter import (
     Converter,
     DatetimeConverter,
     FloatConverter,
-    GenericConverter,
     IntConverter,
     StringConverter,
     TimestampConverter,
@@ -25,6 +24,15 @@ from lori.core import Context, Registrator, RegistratorContext, Registry
 from lori.core.configs import Configurations, Configurator
 
 C = TypeVar("C", bound=Converter)
+
+BUILTIN_CONVERTERS = [
+    DatetimeConverter,
+    TimestampConverter,
+    StringConverter,
+    FloatConverter,
+    IntConverter,
+    BoolConverter,
+]
 
 registry = Registry[Converter]()
 registry.register(DatetimeConverter, "datetime")
@@ -61,13 +69,13 @@ class ConverterContext(RegistratorContext[Converter], Configurator):
         super().configure(configs)
         converter_dirs = configs.dirs.to_dict()
         converter_dirs["conf_dir"] = configs.dirs.conf.joinpath(f"{self.SECTION}.d")
-        converter_generics = [c.type for c in registry.types.values() if issubclass(c.type, GenericConverter)]
+        converter_generics = [c.type for c in registry.types.values() if c.type in BUILTIN_CONVERTERS]
         for converter in converter_generics:
             self._configure(converter, **converter_dirs)
         self._load(self, configs)
 
     # noinspection PyTypeChecker
-    def _configure(self, cls: Type[GenericConverter], **kwargs) -> None:
+    def _configure(self, cls: Type[Converter], **kwargs) -> None:
         key = cls.dtype.__name__.lower()
         configs = Configurations.load(f"{key}.conf", require=False, **kwargs)
         self._add(cls(context=self, configs=configs, key=key))

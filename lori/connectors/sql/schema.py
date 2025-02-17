@@ -63,7 +63,8 @@ class Schema(Configurator, MetaData):
                 column_configs = [columns_configs[s] for s in columns_configs.sections]
 
                 def _filter_primary(primary: bool) -> Collection[Resource | Configurations]:
-                    return [r for r in table_resources + column_configs if r.get("primary", default=False) == primary]
+                    _filter_columns = [*column_configs , *table_resources]
+                    return [r for r in _filter_columns if r.get("primary", default=False) == primary]
 
                 columns = []
                 columns.extend(Schema._create_primary_key(configs.get_section("index"), *_filter_primary(True)))

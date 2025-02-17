@@ -11,6 +11,8 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional
 
+import pandas as pd
+
 from lori.core import ResourceException
 
 
@@ -18,7 +20,7 @@ class ChannelConverter:
     __configs: OrderedDict[str, Any]
 
     # noinspection PyShadowingBuiltins
-    def __init__(self, converter, configs: Dict[str, Any] = ()) -> None:
+    def __init__(self, converter, **configs: Any) -> None:
         self.__configs = OrderedDict(configs)
         self._converter = self._assert_converter(converter)
 
@@ -59,18 +61,6 @@ class ChannelConverter:
             return value
         raise KeyError(attr)
 
-    def get(self, attr: str, default: Optional[Any] = None) -> Any:
-        return self._get_vars().get(attr, default)
-
-    def _get_attrs(self) -> List[str]:
-        return [*self._copy_configs().keys(), "enabled"]
-
-    # noinspection PyShadowingBuiltins
-    def _get_vars(self) -> Dict[str, Any]:
-        vars = self._copy_configs()
-        vars["enabled"] = self.enabled
-        return vars
-
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.key})"
 
@@ -80,7 +70,7 @@ class ChannelConverter:
         )
 
     def __call__(self, value: Any) -> Any:
-        return self._converter.convert(value)
+        return self._converter.to_dtype(value, **self._get_configs())
 
     @property
     def id(self) -> str:
@@ -90,11 +80,34 @@ class ChannelConverter:
     def key(self) -> str:
         return self._converter.key
 
+    def to_str(self, value: Any) -> str:
+        return self._converter.to_str(value)
+
+    def to_json(self, value: Any) -> str:
+        return self._converter.to_json(value)
+
+    def to_series(self, value: Any, timestamp: Optional[pd.Timestamp] = None, name: Optional[str] = None) -> pd.Series:
+        return self._converter.to_series(value, timestamp=timestamp, name=name)
+
+    def get(self, attr: str, default: Optional[Any] = None) -> Any:
+        return self._get_vars().get(attr, default)
+
+    # noinspection PyShadowingBuiltins
+    def _get_vars(self) -> Dict[str, Any]:
+        vars = self._copy_configs()
+        vars["enabled"] = self.enabled
+        return vars
+
+    def _get_attrs(self) -> List[str]:
+        return [*self._copy_configs().keys(), "enabled"]
+
+    def _get_configs(self) -> Dict[str, Any]:
+        return self.__configs
+
+    def _copy_configs(self) -> Dict[str, Any]:
+        return OrderedDict(**self._get_configs())
+
     def copy(self) -> ChannelConverter:
         configs = self._copy_configs()
         configs["enabled"] = self.enabled
-        return type(self)(self._converter, configs)
-
-    # noinspection PyShadowingBuiltins
-    def _copy_configs(self) -> Dict[str, Any]:
-        return OrderedDict(**self.__configs)
+        return type(self)(self._converter, **configs)

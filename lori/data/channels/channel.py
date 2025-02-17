@@ -29,6 +29,8 @@ except ImportError:
 
 
 class Channel(Resource):
+    TIMESTAMP: str = "timestamp"
+
     __context: Context
 
     _timestamp: pd.Timestamp = pd.NaT
@@ -141,13 +143,17 @@ class Channel(Resource):
         self._set(pd.Timestamp.now(tz.UTC).floor(freq="s"), None, state)
 
     def is_valid(self) -> bool:
-        return self.state == ChannelState.VALID and self._is_valid(self.value)
+        return self._is_valid(self.value, self.state)
 
     @staticmethod
-    def _is_valid(value: Any) -> bool:
+    def _is_valid(value: Any, state: ChannelState) -> bool:
+        return state == ChannelState.VALID and not Channel._is_empty(value)
+
+    @staticmethod
+    def _is_empty(value: Any) -> bool:
         if isinstance(value, Collection) and not isinstance(value, str):
-            return not any(pd.isna(value))
-        return not pd.isna(value)
+            return any(pd.isna(value))
+        return pd.isna(value)
 
     def set(
         self,
@@ -168,12 +174,8 @@ class Channel(Resource):
             raise ResourceException(f"Expected pandas Timestamp for '{self.id}', not: {type(value)}")
         self._timestamp = timestamp
 
-        valid = self._is_valid(value)
-        if valid:
-            value = self.converter(value)
-        elif state == ChannelState.VALID:
+        if self._is_empty(value) and state == ChannelState.VALID:
             raise ResourceException(f"Invalid value for valid state '{self.id}': {value}")
-
         self._value = value
         self._state = state
         if self.is_valid():
@@ -222,14 +224,10 @@ class Channel(Resource):
         return Channels([self])
 
     def to_series(self, state: bool = False) -> pd.Series:
-        if isinstance(self.value, pd.Series):
-            return self.value
-        else:
-            if state and pd.isna(self.value):
-                data = self.state
-            else:
-                data = self.value
-            return pd.Series(index=[self.timestamp], data=[data], name=self.key)
+        if not self.is_valid() and state:
+            return pd.Series(data=[self.state], index=[self.timestamp], name=self.key)
+
+        return self.converter.to_series(self.value, self.timestamp, name=self.key)
 
     # noinspection PyProtectedMember
     def from_logger(self) -> Channel:

@@ -287,8 +287,8 @@ def ceil_date(
 # noinspection PyShadowingBuiltins
 def to_date(
     date: Optional[str | int | dt.datetime | pd.Timestamp],
-    timezone: dt.tzinfo = None,
-    format: str = "%d.%m.%Y",
+    timezone: Optional[dt.tzinfo] = None,
+    format: Optional[str] = None,
 ) -> Optional[pd.Timestamp]:
     if date is None:
         return None
@@ -300,10 +300,12 @@ def to_date(
 
     if issubclass(type(date), dt.datetime):
         return _convert_timezone(date)
-    if isinstance(date, str):
-        return _convert_timezone(pd.Timestamp(dt.datetime.strptime(date, format)))
     if isinstance(date, int):
-        return _convert_timezone(pd.Timestamp(dt.datetime.fromtimestamp(date)))
+        return _convert_timezone(pd.Timestamp(date, unit="s"))
+    if isinstance(date, str):
+        if format is None:
+            return _convert_timezone(pd.Timestamp(date))
+        return _convert_timezone(pd.Timestamp(dt.datetime.strptime(date, format)))
 
     raise TypeError(f"Invalid date type: {type(date)}")
 
@@ -353,7 +355,7 @@ def to_timedelta(freq: str) -> relativedelta | pd.Timedelta:
 
 def is_float(value: str | float) -> bool:
     if (
-        isinstance(value, int)
+        issubclass(type(value), (np.integer, int))
         or (isinstance(value, str) and value.isnumeric())
         or issubclass(type(value), (np.floating, float))
     ):
@@ -373,7 +375,7 @@ def to_float(value: str | float) -> Optional[float]:
 
 def is_int(value: str | int) -> bool:
     if (
-        (isinstance(value, float) and int(value) == value)
+        (issubclass(type(value), (np.floating, float)) and int(value) == value)
         or (isinstance(value, str) and value.isnumeric())
         or issubclass(type(value), (np.integer, int))
     ):
@@ -392,7 +394,7 @@ def to_int(value: str | int) -> Optional[int]:
 
 
 def is_bool(value: str | bool) -> bool:
-    if issubclass(type(value), (np.bool, bool, int)) or (
+    if issubclass(type(value), (np.bool, bool, np.integer, int)) or (
         isinstance(value, str) and (value.lower() in ["true", "false" "yes", "no", "y", "n"])
     ):
         return True

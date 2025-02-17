@@ -238,6 +238,10 @@ class Table(sql.Table):
         for group, group_resources in self._groupby(resources):
             group_columns = self.__get_columns(group_resources)
             group_data = data[group_resources.ids].dropna(axis="index", how="all")
+
+            array_resources = group_resources.filter(lambda r: issubclass(r.type, pd.api.extensions.ExtensionArray))
+            if len(array_resources) > 0:
+                group_data = group_data.explode([r.id for r in array_resources])
             group_data.rename(columns={r.id: r.get("column", default=r.key) for r in group_resources}, inplace=True)
 
             for column in group_columns:
@@ -245,6 +249,8 @@ class Table(sql.Table):
                     column_data = group_data.index
                 elif column.name in group_data.columns:
                     column_data = group_data[column.name]
+                elif column.name in group:
+                    column_data = group[column.name]
                 else:
                     continue
                 group_data[column.name] = column.validate(column_data)
