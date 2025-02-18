@@ -32,6 +32,7 @@ from lori.data.channels import Channel, ChannelConnector, ChannelConverter, Chan
 from lori.data.context import DataContext
 from lori.data.databases import Databases
 from lori.data.listeners import ListenerContext
+from lori.data.replicator import Replicator
 from lori.util import floor_date, get_variables, parse_type, to_timedelta, validate_key
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -393,7 +394,7 @@ class DataManager(DataContext, Activator, Identifier):
 
     # noinspection PyShadowingBuiltins, PyTypeChecker
     def replicate(self, **kwargs) -> None:
-        configs = self.configs.get_section("replication", defaults={})
+        configs = self.configs.get_section(Replicator.SECTION, defaults={})
         configs._load(require=False)
         if not configs.enabled:
             self._logger.error("Unable to replicate for disabled configuration section 'replication'")
@@ -404,54 +405,8 @@ class DataManager(DataContext, Activator, Identifier):
         self._configure(databases)
         self._configure(*databases.values())
 
-        # noinspection PyShadowingNames
-        def build_replicator(channel: Channel) -> Channel:
-            replication_section = channel.get("replication", None)
-            if replication_section is None:
-                replication_section = {"database": None}
-            if isinstance(replication_section, str):
-                replication_section = {"database": replication_section}
-            elif not isinstance(replication_section, Mapping):
-                raise ConfigurationException("Invalid channel replication database: " + str(replication_section))
-            elif "database" not in replication_section:
-                replication_section["database"] = None
-
-            database = None
-            database_id = replication_section.pop("database")
-            if database_id is not None and "." not in database_id:
-                database_path = channel.id.split(".")
-                for i in reversed(range(1, len(database_path))):
-                    _database_id = ".".join([*database_path[:i], database_id])
-                    if _database_id in databases.keys():
-                        database = databases.get(_database_id, None)
-                        break
-                    elif _database_id in self.connectors.keys():
-                        database = self.connectors.get(_database_id, None)
-                        break
-            replication_args = {**kwargs}
-            replication_args.update(replication_section)
-
-            channel = channel.from_logger()
-            channel.replicator = ChannelConnector(connector=database, **replication_section)
-            return channel
-
-        def is_replicating(channel: Channel) -> bool:
-            return Databases.is_database(channel.replicator) and Databases.is_database(channel.logger)
-
-        channels = self.channels.apply(build_replicator).filter(is_replicating)
-        for database in databases.values():
-            self.connect(database, channels=channels.filter(lambda c: c.replicator.id == database.id))
-        try:
-            for replicator, replicator_channels in channels.groupby(lambda c: c.replicator._connector):
-                if len(replicator_channels) == 0:
-                    continue
-                for configs, replication_channels in replicator_channels.groupby(
-                    lambda c: c.replicator._copy_configs()
-                ):
-                    databases.replicate(replicator, replication_channels, **configs)
-
-        finally:
-            self.disconnect(*databases.values())
+        databases.extend(self.connectors.values())
+        databases.replicate(self.channels, **kwargs)
 
     # noinspection PyShadowingBuiltins, PyTypeChecker
     def read(

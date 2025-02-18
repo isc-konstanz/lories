@@ -75,8 +75,10 @@ class Application(DataManager):
         try:
             action = self.settings["action"]
             if action == "run":
-                self.run()
-
+                self.run(
+                    start=self.settings.get_date("start", default=None),
+                    end=self.settings.get_date("end", default=None),
+                )
             elif action == "start":
                 self.start()
 

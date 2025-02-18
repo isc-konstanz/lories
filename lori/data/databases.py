@@ -1,24 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-lori.data.backup
-~~~~~~~~~~~~~~~~~
+lori.data.databases
+~~~~~~~~~~~~~~~~~~~
 
 
 """
 
 from __future__ import annotations
 
-from typing import Optional
+import logging
+from typing import Collection
 
-import tzlocal
-
-import pandas as pd
-import pytz as tz
-from lori.connectors import Connector, ConnectorContext, Database, DatabaseException
-from lori.core import Configurations, Resources
-from lori.data.channels import ChannelConnector, Channels
+from lori.connectors import ConnectorContext, ConnectorException, Database
+from lori.core import Configurations
+from lori.data.channels import Channel, Channels, ChannelState
 from lori.data.context import DataContext
-from lori.util import floor_date, parse_freq, slice_range, to_timedelta, to_timezone
+from lori.data.replicator import Replicator
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
 try:
@@ -30,15 +27,6 @@ except ImportError:
 
 class Databases(ConnectorContext):
     SECTION: str = "databases"
-
-    # noinspection PyProtectedMember
-    @staticmethod
-    def is_database(connector: Connector | ChannelConnector) -> bool:
-        if isinstance(connector, ChannelConnector):
-            if not connector.enabled:
-                return False
-            connector = connector._connector
-        return connector.is_enabled() and isinstance(connector, Database)
 
     # noinspection PyUnresolvedReferences
     def __init__(self, context: DataContext, configs: Configurations) -> None:
@@ -53,133 +41,46 @@ class Databases(ConnectorContext):
     ) -> None:
         super()._load(context, configs, configs_file)
 
-    # noinspection PyProtectedMember
-    def replicate(
-        self,
-        database: Database,
-        resources: Resources,
-        method: Literal["push", "pull"] = "push",
-        **kwargs,
-    ) -> None:
-        if method not in ["push", "pull"]:
-            raise ValueError(f"Invalid replication method '{method}'")
+    def extend(self, databases: Collection[Database]) -> None:
+        for database in databases:
+            if database.is_enabled() and isinstance(database, Database):
+                self._add(database)
 
-        for logger, logger_resources in resources.groupby(lambda c: c.logger._connector):
-            for _, group_resources in logger_resources.groupby(lambda c: c.group):
-                if method == "push":
-                    self._replicate(logger, database, group_resources, **kwargs)
-                elif method == "pull":
-                    self._replicate(database, logger, group_resources, **kwargs)
+    def replicate(self, channels: Channels, **kwargs) -> None:
+        def build_replicator(channel: Channel) -> Channel:
+            channel = channel.from_logger()
+            channel.replicator = Replicator.build(self, channel, **kwargs)
+            return channel
 
-    # noinspection PyProtectedMember, PyUnresolvedReferences, PyTypeChecker, PyShadowingBuiltins
-    def _replicate(
-        self,
-        source: Database,
-        target: Database,
-        resources: Resources,
-        timezone: Optional[tz.BaseTzInfo] = None,
-        freq: str = "D",
-        full: bool = False,
-        slice: bool = True,
-    ) -> None:
-        if source is None or target is None or len(resources) == 0:
-            return
-        self._logger.info(f"Starting to replicate data of {len(resources)} resource{'s' if len(resources) > 0 else ''}")
-        target_empty = False
-
-        if timezone is None:
-            timezone = to_timezone(tzlocal.get_localzone_name())
-        freq = parse_freq(freq)
-        now = pd.Timestamp.now(tz=timezone)
-
-        end = source.read_last_index(resources)
-        if end is None:
-            end = now
-
-        start = target.read_last_index(resources) if not full else None
-        if start is None:
-            start = source.read_first_index(resources)
-            target_empty = True
-        else:
-            start += pd.Timedelta(seconds=1)
-
-        if (not any(t is None for t in [start, end]) and start >= end) or all(t is None for t in [start, end]):
-            self._logger.debug(
-                f"Skip copying values of channel{'s' if len(resources) > 1 else ''} "
-                + ", ".join([f"'{r.id}'" for r in resources])
-                + " without any new values found"
+        # noinspection PyProtectedMember
+        def is_replicating(channel: Channel) -> bool:
+            return (
+                channel.replicator.enabled
+                and channel.logger.enabled
+                and isinstance(channel.logger._connector, Database)
             )
-            return
 
-        if slice and end - start <= to_timedelta(freq):
-            slice = False
+        replication_channels = channels.apply(build_replicator).filter(is_replicating)
+        for database in self.values():
+            database_connected = database.is_connected()
+            try:
+                if not database_connected:
+                    self._logger.info(f"Connecting {type(database).__name__} '{database.name}': {database.id}")
+                    database.set_channels(ChannelState.CONNECTING)
+                    database.connect(replication_channels.filter(lambda c: c.replicator.database.id == database.id))
 
-        if not target_empty:
-            if start > now:
-                start = floor_date(now, freq=freq)
+                    database.set_channels(ChannelState.CONNECTED)
+                    self._logger.debug(f"Connected {type(database).__name__} '{database.name}': {database.id}")
 
-            prior = floor_date(start, timezone=timezone, freq=freq) - to_timedelta(freq)
-            self._replicate_range(source, target, resources, prior, start)
+                for replicator, replicator_channels in replication_channels.groupby(lambda c: c.replicator):
+                    replicator.replicate(replicator_channels)
 
-        if slice:
-            # Validate prior step, before continuing
-            for slice_start, slice_end in slice_range(start, end, timezone=timezone, freq=freq):
-                self._replicate_range(source, target, resources, slice_start, slice_end)
-        else:
-            self._replicate_range(source, target, resources, start, end)
-
-    def _replicate_range(
-        self,
-        source: Database,
-        target: Database,
-        resources: Resources,
-        start: pd.Timestamp,
-        end: pd.Timestamp,
-    ) -> None:
-        self._logger.debug(
-            f"Start copying data of channel{'s' if len(resources) > 1 else ''} "
-            + ", ".join([f"'{r.id}'" for r in resources])
-            + f" from {start.strftime('%d.%m.%Y (%H:%M:%S)')}"
-            + f" to {end.strftime('%d.%m.%Y (%H:%M:%S)')}"
-        )
-
-        source_checksum = source.hash(resources, start, end)
-        if source_checksum is None:
-            self._logger.debug(
-                f"Skipping time slice without database data for channel{'s' if len(resources) > 1 else ''} "
-                + ", ".join([f"'{r.id}'" for r in resources]),
-            )
-            return
-
-        target_checksum = target.hash(resources, start, end)
-        if target_checksum == source_checksum:
-            self._logger.debug(
-                f"Skipping time slice without changed data for channel{'s' if len(resources) > 1 else ''} "
-                + ", ".join([f"'{r.id}'" for r in resources])
-            )
-            return
-
-        data = source.read(resources, start=start, end=end)
-        if data is None or data.empty:  # not source.exists(resources, start=start, end=end):
-            self._logger.debug(
-                f"Skipping time slice without new data for channel{'s' if len(resources) > 1 else ''} ",
-                ", ".join([f"'{r.id}'" for r in resources]),
-            )
-            return
-
-        self._logger.info(
-            f"Copying {len(data)} values of channel{'s' if len(resources) > 1 else ''} "
-            + ", ".join([f"'{r.id}'" for r in resources])
-            + f" from {start.strftime('%d.%m.%Y (%H:%M:%S)')}"
-            + f" to {end.strftime('%d.%m.%Y (%H:%M:%S)')}"
-        )
-
-        target.write(data)
-        target_checksum = target.hash(resources, start, end)
-        if target_checksum != source_checksum:
-            self._logger.error(
-                f"Mismatching for {len(data)} values of channel{'s' if len(resources) > 1 else ''} "
-                + ",".join([f"'{r.id}'" for r in resources])
-                + f" with checksum '{source_checksum}' against target checksum '{target_checksum}'"
-            )
-            raise DatabaseException(target, "Checksum mismatch while synchronizing")
+            except ConnectorException as e:
+                self._logger.warning(f"Error opening connector '{e.connector.id}': {str(e)}")
+                if self._logger.isEnabledFor(logging.DEBUG):
+                    self._logger.exception(e)
+            finally:
+                if database.is_connected() and not database_connected:
+                    database.set_channels(ChannelState.DISCONNECTING)
+                    database.disconnect()
+                    database.set_channels(ChannelState.DISCONNECTED)
