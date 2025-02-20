@@ -37,7 +37,7 @@ class Application(DataManager):
             settings._add_section(Interface.SECTION, {"enabled": False})
         self._interface = Interface(self, settings.get_section(Interface.SECTION))
 
-    # noinspection PyProtectedMember
+    # noinspection PyProtectedMember, PyTypeChecker, PyMethodOverriding
     def configure(self, settings: Settings, factory: Type[System]) -> None:
         self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
 
@@ -81,6 +81,9 @@ class Application(DataManager):
                 )
             elif action == "start":
                 self.start()
+
+            elif action == "rotate":
+                self.rotate(full=self.settings["full"])
 
             elif action == "replicate":
                 self.replicate(full=self.settings["full"])

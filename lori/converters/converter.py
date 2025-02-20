@@ -74,8 +74,10 @@ class Converter(Registrator, Generic[T]):
         else:
             series = pd.Series(index=[timestamp], data=[value], name=name)
 
-        if not series.index.is_unique or not isinstance(series.index, pd.DatetimeIndex):
-            raise ResourceException(f"Invalid index for series, DatetimeIndex is expected: {series}")
+        if not isinstance(series.index, pd.DatetimeIndex):
+            raise ResourceException(f"Invalid series, without expected DatetimeIndex: {series}")
+        if not series.index.is_unique:
+            raise ResourceException(f"Invalid series with non unique index: {series[series.index.duplicated()]}")
 
         series.index.name = Channel.TIMESTAMP
         if series.index.tzinfo is None:

@@ -31,8 +31,9 @@ from lori.core.register import RegistratorContext
 from lori.data.channels import Channel, ChannelConnector, ChannelConverter, Channels, ChannelState
 from lori.data.context import DataContext
 from lori.data.databases import Databases
+from lori.data.replication import Replicator
+from lori.data.retention import Retention
 from lori.data.listeners import ListenerContext
-from lori.data.replicator import Replicator
 from lori.util import floor_date, get_variables, parse_type, to_timedelta, validate_key
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -392,21 +393,27 @@ class DataManager(DataContext, Activator, Identifier):
         self.listeners.wait()
         self.log()
 
-    # noinspection PyShadowingBuiltins, PyTypeChecker
-    def replicate(self, **kwargs) -> None:
-        configs = self.configs.get_section(Replicator.SECTION, defaults={})
+    def replicate(self, full: bool = False, **kwargs) -> None:
+        section = self.configs.get_section(Replicator.SECTION, defaults={})
+        configs = Configurations(f"{Replicator.SECTION}.conf", self.configs.dirs, defaults=section)
         configs._load(require=False)
         if not configs.enabled:
-            self._logger.error("Unable to replicate for disabled configuration section 'replication'")
+            self._logger.error(f"Unable to replicate for disabled configuration section '{Replicator.SECTION}'")
             return
+        kwargs["full"] = configs.pop("full", default=full)
         kwargs.update({k: v for k, v in configs.items() if k not in configs.sections})
 
         databases = Databases(self, configs)
-        self._configure(databases)
-        self._configure(*databases.values())
-
-        databases.extend(self.connectors.values())
         databases.replicate(self.channels, **kwargs)
+
+    def rotate(self, full: bool = False, **kwargs) -> None:
+        section = self.configs.get_section(Retention.SECTION, defaults={})
+        configs = Configurations(f"{Retention.SECTION}.conf", self.configs.dirs, defaults=section)
+        configs._load(require=False)
+        kwargs["full"] = configs.pop("full", default=full)
+
+        databases = Databases(self, configs)
+        databases.rotate(self.channels, **kwargs)
 
     # noinspection PyShadowingBuiltins, PyTypeChecker
     def read(

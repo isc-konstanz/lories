@@ -286,6 +286,8 @@ class Channel(Resource):
                     "converter",
                     "replicator",
                     "replication",
+                    "retention",
+                    "rotate",
                 ]
             }
         )

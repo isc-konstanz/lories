@@ -101,6 +101,17 @@ def _parse_kwargs(parser: ArgumentParser) -> Dict[str, Any]:
             action_parser.add_parser("run", help="run local resources, connectors and systems")
         if "start" not in action_parser.choices.keys():
             action_parser.add_parser("start", help="start the local resource system")
+        if "rotate" not in action_parser.choices.keys():
+            replicate_parser = action_parser.add_parser(
+                name="rotate",
+                help="rotate data of a local database",
+            )
+            replicate_parser.add_argument(
+                "--full",
+                dest="full",
+                action="store_true",
+                help="flags if the rotation should be executed for all data",
+            )
         if "replicate" not in action_parser.choices.keys():
             replicate_parser = action_parser.add_parser(
                 name="replicate",

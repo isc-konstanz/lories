@@ -15,8 +15,9 @@ import tzlocal
 
 import pandas as pd
 import pytz as tz
+
 from lori import ConfigurationException, Resource, ResourceException, Resources
-from lori.connectors import Database, DatabaseException
+from lori.connectors import Database
 from lori.util import floor_date, parse_freq, slice_range, to_bool, to_timedelta, to_timezone
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -34,27 +35,26 @@ class Replicator:
 
     database: Database
 
-    timezone: tz.BaseTzInfo
     how: Literal["push", "pull"]
     freq: str
-    full: bool
     slice: bool
+    timezone: tz.BaseTzInfo
 
     # noinspection PyShadowingNames
     @classmethod
-    def build(cls, databases, resource: Resource, **kwargs) -> Replicator:
-        section = resource.get(cls.SECTION, None)
-        if section is None:
-            section = {"database": None}
-        if isinstance(section, str):
-            section = {"database": section}
-        elif not isinstance(section, Mapping):
-            raise ConfigurationException("Invalid resource replication database: " + str(section))
-        elif "database" not in section:
-            section["database"] = None
+    def build(cls, databases, resource: Resource, **configs) -> Replicator:
+        resource_configs = resource.get(cls.SECTION, None)
+        if resource_configs is None:
+            resource_configs = {"database": None}
+        if isinstance(resource_configs, str):
+            resource_configs = {"database": resource_configs}
+        elif not isinstance(resource_configs, Mapping):
+            raise ConfigurationException("Invalid resource replication database: " + str(resource_configs))
+        elif "database" not in resource_configs:
+            resource_configs["database"] = None
 
         database = None
-        database_id = section.pop("database")
+        database_id = resource_configs.pop("database")
         if database_id is not None and "." not in database_id:
             database_path = resource.id.split(".")
             for i in reversed(range(1, len(database_path))):
@@ -63,8 +63,8 @@ class Replicator:
                     database = databases.get(_database_id, None)
                     break
 
-        kwargs.update(section)
-        return cls(database, **kwargs)
+        configs.update(resource_configs)
+        return cls(database, **configs)
 
     # noinspection PyShadowingBuiltins
     def __init__(
@@ -73,7 +73,6 @@ class Replicator:
         timezone: Optional[tz.BaseTzInfo] = None,
         how: Literal["push", "pull"] = "push",
         freq: str = "D",
-        full: bool = False,
         slice: bool = True,
         enabled: bool = True,
     ) -> None:
@@ -89,7 +88,6 @@ class Replicator:
             raise ConfigurationException(f"Invalid replication method '{how}'")
         self.how = how
         self.freq = parse_freq(freq)
-        self.full = to_bool(full)
         self.slice = to_bool(slice)
 
     @classmethod
@@ -123,7 +121,6 @@ class Replicator:
         return {
             "how": self.how,
             "freq": self.freq,
-            "full": self.full,
             "slice": self.slice,
             "timezone": self.timezone,
         }
@@ -133,8 +130,11 @@ class Replicator:
         return self._enabled and self.database is not None and self.database.is_enabled()
 
     # noinspection PyProtectedMember
-    def replicate(self, resources: Resources) -> None:
+    def replicate(self, resources: Resources, full: bool = False) -> None:
+        if not self.enabled:
+            raise ReplicationException(self.database, "Replication disabled")
         kwargs = self._get_args()
+        kwargs["full"] = full
         how = kwargs.pop("how")
 
         for logger, logger_resources in resources.groupby(lambda c: c.logger._connector):
@@ -145,7 +145,7 @@ class Replicator:
                     replicate(self.database, logger, group_resources, **kwargs)
 
 
-class ReplicationException(DatabaseException):
+class ReplicationException(ResourceException):
     """
     Raise if an error occurred while replicating.
 
@@ -166,7 +166,7 @@ def replicate(
         return
 
     logger = logging.getLogger(Replicator.__module__)
-    logger.info(f"Starting to replicate data of {len(resources)} resource{'s' if len(resources) > 0 else ''}")
+    logger.debug(f"Starting to replicate data of {len(resources)} resource{'s' if len(resources) > 0 else ''}")
     target_empty = False
 
     if timezone is None:
@@ -185,7 +185,7 @@ def replicate(
 
     if (not any(t is None for t in [start, end]) and start >= end) or all(t is None for t in [start, end]):
         logger.debug(
-            f"Skip copying values of channel{'s' if len(resources) > 1 else ''} "
+            f"Skip copying values of resource{'s' if len(resources) > 1 else ''} "
             + ", ".join([f"'{r.id}'" for r in resources])
             + " without any new values found"
         )
@@ -218,7 +218,7 @@ def replicate_range(
 ) -> None:
     logger = logging.getLogger(Replicator.__module__)
     logger.debug(
-        f"Start copying data of channel{'s' if len(resources) > 1 else ''} "
+        f"Start copying data of resource{'s' if len(resources) > 1 else ''} "
         + ", ".join([f"'{r.id}'" for r in resources])
         + f" from {start.strftime('%d.%m.%Y (%H:%M:%S)')}"
         + f" to {end.strftime('%d.%m.%Y (%H:%M:%S)')}"
@@ -227,7 +227,7 @@ def replicate_range(
     source_checksum = source.hash(resources, start, end)
     if source_checksum is None:
         logger.debug(
-            f"Skipping time slice without database data for channel{'s' if len(resources) > 1 else ''} "
+            f"Skipping time slice without database data for resource{'s' if len(resources) > 1 else ''} "
             + ", ".join([f"'{r.id}'" for r in resources]),
         )
         return
@@ -235,7 +235,7 @@ def replicate_range(
     target_checksum = target.hash(resources, start, end)
     if target_checksum == source_checksum:
         logger.debug(
-            f"Skipping time slice without changed data for channel{'s' if len(resources) > 1 else ''} "
+            f"Skipping time slice without changed data for resource{'s' if len(resources) > 1 else ''} "
             + ", ".join([f"'{r.id}'" for r in resources])
         )
         return
@@ -243,13 +243,13 @@ def replicate_range(
     data = source.read(resources, start=start, end=end)
     if data is None or data.empty:  # not source.exists(resources, start=start, end=end):
         logger.debug(
-            f"Skipping time slice without new data for channel{'s' if len(resources) > 1 else ''} ",
+            f"Skipping time slice without new data for resource{'s' if len(resources) > 1 else ''} ",
             ", ".join([f"'{r.id}'" for r in resources]),
         )
         return
 
     logger.info(
-        f"Copying {len(data)} values of channel{'s' if len(resources) > 1 else ''} "
+        f"Copying {len(data)} values of resource{'s' if len(resources) > 1 else ''} "
         + ", ".join([f"'{r.id}'" for r in resources])
         + f" from {start.strftime('%d.%m.%Y (%H:%M:%S)')}"
         + f" to {end.strftime('%d.%m.%Y (%H:%M:%S)')}"
@@ -259,8 +259,8 @@ def replicate_range(
     target_checksum = target.hash(resources, start, end)
     if target_checksum != source_checksum:
         logger.error(
-            f"Mismatching for {len(data)} values of channel{'s' if len(resources) > 1 else ''} "
+            f"Mismatching for {len(data)} values of resource{'s' if len(resources) > 1 else ''} "
             + ",".join([f"'{r.id}'" for r in resources])
             + f" with checksum '{source_checksum}' against target checksum '{target_checksum}'"
         )
-        raise ReplicationException(target, "Checksum mismatch while synchronizing")
+        raise ReplicationException("Checksum mismatch while synchronizing")
