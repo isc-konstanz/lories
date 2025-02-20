@@ -52,7 +52,7 @@ class Connector(Registrator, metaclass=ConnectorMeta):
 
     __resources: Resources
 
-    __lock: Lock
+    _lock: Lock
 
     def __init__(
         self,
@@ -62,7 +62,7 @@ class Connector(Registrator, metaclass=ConnectorMeta):
     ) -> None:
         super().__init__(context=context, configs=configs, **kwargs)
         self.__resources = Resources()
-        self.__lock = Lock()
+        self._lock = Lock()
 
     def __enter__(self) -> Connector:
         self.connect(self.__resources)
@@ -156,7 +156,7 @@ class Connector(Registrator, metaclass=ConnectorMeta):
     # noinspection PyUnresolvedReferences, PyTypeChecker
     @wraps(connect, updated=())
     def _do_connect(self, resources: Resources, *args, **kwargs) -> None:
-        with self.__lock:
+        with self._lock:
             if not self.is_enabled():
                 raise ConfigurationException(f"Trying to connect disabled {type(self).__name__}: {self.id}")
             if not self.is_configured():
@@ -181,7 +181,7 @@ class Connector(Registrator, metaclass=ConnectorMeta):
     # noinspection PyUnresolvedReferences, PyTypeChecker
     @wraps(disconnect, updated=())
     def _do_disconnect(self) -> None:
-        with self.__lock:
+        with self._lock:
             if self._is_connected():
                 return
 
@@ -201,9 +201,9 @@ class Connector(Registrator, metaclass=ConnectorMeta):
     # noinspection PyUnresolvedReferences, PyTypeChecker
     @wraps(read, updated=())
     def _do_read(self, resources: Resources, *args, **kwargs) -> pd.DataFrame:
-        with self.__lock:
+        with self._lock:
             if not self._is_connected():
-                raise ConnectorException(f"Trying to read from unconnected {type(self).__name__}: {self.id}")
+                raise ConnectorException(self, f"Trying to read from unconnected {type(self).__name__}: {self.id}")
 
             return self.__read(resources, *args, **kwargs)
 
@@ -214,13 +214,14 @@ class Connector(Registrator, metaclass=ConnectorMeta):
     # noinspection PyUnresolvedReferences, PyTypeChecker
     @wraps(write, updated=())
     def _do_write(self, data: pd.DataFrame, *args, **kwargs) -> None:
-        with self.__lock:
+        with self._lock:
             if not self._is_connected():
-                raise ConnectorException(f"Trying to write to unconnected {type(self).__name__}: {self.id}")
+                raise ConnectorException(self, f"Trying to write to unconnected {type(self).__name__}: {self.id}")
             unknown = [c for c in data.columns if c not in self.resources]
             if len(unknown) > 0:
                 raise ConnectorException(
-                    f"Trying to read unknown channel{'s' if len(unknown) > 0 else ''} '{', '.join(unknown)}' for "
+                    self,
+                    f"Trying to read unknown resource{'s' if len(unknown) > 0 else ''} '{', '.join(unknown)}' for "
                     f"{type(self).__name__}: {self.id}"
                 )
 

@@ -108,95 +108,6 @@ def update_recursive(configs: Dict[str, Any], update: Mapping[str, Any], replace
     return configs
 
 
-# noinspection PyUnresolvedReferences, PyShadowingBuiltins, PyShadowingNames
-def is_type(series: pd.Series, *type: str) -> bool:
-    # TODO: Introduce Unit or "Nature" constant, to differentiate better
-    series_name = series.name.split("_")
-    series_suffix_start = -1 if len(series_name) < 3 else -2
-    series_suffix = series_name[series_suffix_start:]
-    return any(t in series_suffix for t in type)
-
-
-def infer_resample_method(series: pd.Series) -> str:
-    if is_type(series, "state", "state", "mode", "code"):
-        return "max"
-    elif is_type(series, "timestamp", "time", "progress", "energy"):
-        return "last"
-    else:
-        return "mean"
-
-
-# noinspection PyUnresolvedReferences
-def resample(data: pd.DataFrame | pd.Series, resolution: int) -> pd.DataFrame:
-    resampled = []
-
-    for column, series in (data if isinstance(data, pd.DataFrame) else data.to_frame()).items():
-        series = series.dropna()
-        series = resample_series(series, resolution, infer_resample_method(series))
-
-        resampled.append(series)
-
-    resampled = pd.concat(resampled, axis="columns")
-    resampled.index.name = data.index.name
-    return resampled.dropna(how="all")
-
-
-# noinspection PyUnresolvedReferences
-def resample_series(
-    data: pd.Series,
-    resolution: int,
-    method: str,
-    offset: pd.Timedelta = None,
-) -> pd.Series:
-    kwargs = {}
-    if offset is not None:
-        kwargs["offset"] = offset
-    index = copy(data.index)
-    freq = index.freq
-    if freq is None and len(index) > 2:
-        freq = pd.tseries.frequencies.to_offset(pd.infer_freq(index))
-    if freq is None or freq.delta < pd.Timedelta(seconds=resolution):
-        # FIXME: AttributeError: 'NoneType' object has no attribute 'delta'
-        resampled = data.resample(f"{int(resolution)}s", closed="right", **kwargs)
-        if method == "mean":
-            data = resampled.mean()
-        elif method == "max":
-            # The max method is commonly used vor integer state/state/code values
-            data = resampled.max().astype(int)
-        elif method == "sum":
-            data = resampled.sum()
-        elif method == "last":
-            data = resampled.last()
-        else:
-            raise ValueError(f"Unknown resampling method: {method}")
-
-        data.index += to_offset(f"{int(resolution)}s")
-    return data[(data.index >= index[0]) & (data.index <= index[-1])]
-
-
-def derive_by_hours(data: pd.Series) -> pd.Series:
-    """
-    Derive a data series by hours.
-
-    Parameters
-    ----------
-    data : pd.Series
-        Series with the data to be derived
-
-    Returns
-    ----------
-    fixed: pd.Series
-        Series with the derived data
-
-    """
-    delta_value = data.iloc[:].astype("float64").diff()
-
-    delta_index = pd.Series(delta_value.index, index=delta_value.index)
-    delta_index = (delta_index - delta_index.shift(1)) / np.timedelta64(1, "h")
-
-    return pd.Series(delta_value / delta_index, index=data.index).dropna()
-
-
 def convert_timezone(
     date: dt.datetime | pd.Timestamp | str,
     timezone: dt.tzinfo = tz.UTC,
@@ -264,7 +175,7 @@ def floor_date(
         timezone = date.tzinfo
     date = convert_timezone(date, timezone)
     freq = parse_freq(freq)
-    if freq in ["Y", "M"]:
+    if any([freq.endswith(f) for f in ["Y", "M", "W"]]):
         return date.tz_localize(None).to_period(freq).to_timestamp().tz_localize(timezone, ambiguous=True)
     elif any([freq.endswith(f) for f in ["D", "h", "min", "s"]]):
         return date.tz_localize(None).floor(freq).tz_localize(timezone, ambiguous=True)
@@ -337,10 +248,12 @@ def to_timedelta(freq: str) -> relativedelta | pd.Timedelta:
     freq_val = "".join(s for s in freq if s.isnumeric())
     freq_val = int(freq_val) if len(freq_val) > 0 else 1
     freq = parse_freq(freq)
-    if freq == "Y":
+    if freq.endswith("Y"):
         return relativedelta(years=freq_val)
-    elif freq == "M":
+    elif freq.endswith("M"):
         return relativedelta(months=freq_val)
+    elif freq.endswith("W"):
+        return relativedelta(weeks=freq_val)
     elif freq.endswith("D"):
         return pd.Timedelta(days=freq_val)
     elif freq.endswith("h"):
@@ -418,20 +331,28 @@ def to_bool(value: str | bool) -> Optional[bool]:
 
 # noinspection SpellCheckingInspection
 def parse_freq(freq: str) -> Optional[str]:
+    if freq is None:
+        return None
     value = "".join(s for s in freq if s.isnumeric())
     value = int(value) if len(value) > 0 else 1
-    if freq.upper() == "Y":
-        return "Y"
-    elif freq.upper() == "M":
-        return "M"
+
+    def _parse_freq(suffix: str) -> str:
+        return str(value) + suffix if value > 0 else suffix
+
+    if freq.lower().endswith(("y", "year", "years")):
+        return _parse_freq("Y")
+    elif freq.lower().endswith(("m", "month", "months")):
+        return _parse_freq("M")
+    elif freq.lower().endswith(("w", "week", "weeks")):
+        return _parse_freq("W")
     elif freq.lower().endswith(("d", "day", "days")):
-        return f"{value}D"
+        return _parse_freq("D")
     elif freq.lower().endswith(("h", "hour", "hours")):
-        return f"{value}h"
+        return _parse_freq("h")
     elif freq.lower().endswith(("t", "min", "mins")):
-        return f"{value}min"
+        return _parse_freq("min")
     elif freq.lower().endswith(("s", "sec", "secs")):
-        return f"{value}s"
+        return _parse_freq("s")
     else:
         raise ValueError(f"Invalid frequency: {freq}")
 
