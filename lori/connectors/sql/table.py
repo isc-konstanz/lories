@@ -122,7 +122,9 @@ class Table(sql.Table):
 
             elif self.datetime_index_type == DatetimeIndexType.TIMESTAMP_UNIX:
                 index_column, *_ = self.primary_key.columns
-                group_data.loc[:, [index_column.name]] = pd.to_datetime(group_data[index_column.name], unit="s")
+                index_data = pd.to_datetime(group_data[index_column.name], unit="s")
+                group_data.drop(index_column.name, inplace=True, axis="columns")
+                group_data.loc[:, [index_column.name]] = index_data
                 group_data = group_data.set_index(index_column.name).tz_localize(tz.UTC)
 
             group_data = group_data.dropna(axis="index", how="all").rename(

@@ -39,7 +39,7 @@ class DatetimeIndexType(Enum):
         columns = []
         for column_type in self.value:
             column_name = name if name is not None else self.name.lower()
-            if column_type == DatetimeIndexType.TIMESTAMP_UNIX:
+            if column_type == INTEGER:
                 column = UnixTimestampColumn(column_name, column_type)
             else:
                 column = DatetimeColumn(column_name, column_type, timezone=tz.UTC, nullable=False, primary_key=True)
