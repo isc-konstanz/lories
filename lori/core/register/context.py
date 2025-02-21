@@ -84,8 +84,8 @@ class RegistratorContext(Context[R], Configurator):
         return values
 
     # noinspection PyProtectedMember, PyTypeChecker, PyUnresolvedReferences
-    @staticmethod
     def _load_from_file(
+        self,
         context: RegistratorContext,
         configs_dirs: Directories,
         configs_file: str,
@@ -95,7 +95,7 @@ class RegistratorContext(Context[R], Configurator):
         if configs_dirs.conf.joinpath(configs_file).is_file():
             configs = Configurations(configs_file, deepcopy(configs_dirs))
             configs._load()
-            values.extend(context._load_sections(context, configs, defaults))
+            values.extend(self._load_sections(context, configs, defaults))
         return values
 
     # noinspection PyTypeChecker, PyProtectedMember, PyUnresolvedReferences
