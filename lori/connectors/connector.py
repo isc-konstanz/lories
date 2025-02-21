@@ -46,6 +46,21 @@ class ConnectType(Enum):
     NONE = "NONE"
     AUTO = "AUTO"
 
+    @classmethod
+    def  get(cls, value: str | bool) -> ConnectType:
+        if isinstance(value, str):
+            value = value.lower()
+            if value.upper() in ["auto", "true"]:
+                return ConnectType.AUTO
+            if value.upper() == ["none", "false"]:
+                return ConnectType.NONE
+        if isinstance(value, bool):
+            if value:
+                return ConnectType.AUTO
+            else:
+                return ConnectType.NONE
+        raise ValueError("Unknown ConnectType: " + str(value))
+
     def __str__(self):
         return str(self.value)
 
@@ -140,10 +155,9 @@ class Connector(Registrator, metaclass=ConnectorMeta):
         for channel in self.channels.filter(lambda c: c.has_connector(self.id)):
             channel.state = state
 
-    # noinspection PyTypeChecker
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self._connect_type = ConnectType[configs.get("connect", default=ConnectType.AUTO.name).upper()]
+        self._connect_type = ConnectType.get(configs.get("connect", default=True))
 
     def _is_disconnected(self) -> bool:
         return not self._is_connected()
