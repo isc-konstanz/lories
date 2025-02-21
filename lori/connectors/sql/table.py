@@ -265,7 +265,7 @@ class Table(sql.Table):
 
     # noinspection SpellCheckingInspection
     def _groupby(self, resources: Resources) -> Iterator[Tuple[Dict[str, Any], Resources]]:
-        groups = list[Tuple[Dict[str, Any], Resources]]()
+        groups: List[Tuple[Dict[str, Any], Resources]] = []
 
         def _group(resource: Resource) -> Resource:
             attributes = {}
