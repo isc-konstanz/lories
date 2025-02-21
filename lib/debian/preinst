@@ -10,8 +10,10 @@ case "$1" in
             useradd --system --no-create-home --comment="Local Resource Integrator" "lori"
         fi
         # Initiate the virtual environment, if it does not exist
-        if [ ! -e /opt/lori/bin/python3 ]; then
+        python=/opt/lori/bin/python
+        if [ ! -e $python ]; then
             python3 -m venv /opt/lori
+            $python -m pip install --upgrade pip
         fi
         ;;
     *)
