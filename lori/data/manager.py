@@ -31,9 +31,9 @@ from lori.core.register import RegistratorContext
 from lori.data.channels import Channel, ChannelConnector, ChannelConverter, Channels, ChannelState
 from lori.data.context import DataContext
 from lori.data.databases import Databases
+from lori.data.listeners import ListenerContext
 from lori.data.replication import Replicator
 from lori.data.retention import Retention
-from lori.data.listeners import ListenerContext
 from lori.util import floor_date, get_variables, parse_type, to_timedelta, validate_key
 
 # FIXME: Remove this once Python >= 3.9 is a requirement

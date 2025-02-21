@@ -9,17 +9,17 @@ lori.data.databases
 from __future__ import annotations
 
 import logging
+
 import tzlocal
 
 import pandas as pd
-
 from lori.connectors import ConnectorContext, Database
 from lori.core import Configurations, ResourceException
 from lori.data.channels import Channel, Channels
 from lori.data.context import DataContext
 from lori.data.replication import Replicator
 from lori.data.retention import Retention, Retentions
-from lori.util import floor_date, to_bool, to_timedelta, to_timezone, parse_freq
+from lori.util import floor_date, parse_freq, to_bool, to_timedelta, to_timezone
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
 try:
@@ -102,7 +102,6 @@ class Databases(ConnectorContext):
 
             for database, database_resources in rotation_channels.groupby(lambda c: c.logger._connector):
                 for _, deletion_resources in database_resources.groupby(lambda c: c.group):
-
                     start = database.read_first_index(deletion_resources)
                     if start is None or start > rotate:
                         self._logger.debug(

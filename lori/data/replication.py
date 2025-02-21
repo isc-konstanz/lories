@@ -15,7 +15,6 @@ import tzlocal
 
 import pandas as pd
 import pytz as tz
-
 from lori import ConfigurationException, Resource, ResourceException, Resources
 from lori.connectors import Database
 from lori.util import floor_date, parse_freq, slice_range, to_bool, to_timedelta, to_timezone

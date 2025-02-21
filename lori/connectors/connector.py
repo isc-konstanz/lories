@@ -222,7 +222,7 @@ class Connector(Registrator, metaclass=ConnectorMeta):
                 raise ConnectorException(
                     self,
                     f"Trying to read unknown resource{'s' if len(unknown) > 0 else ''} '{', '.join(unknown)}' for "
-                    f"{type(self).__name__}: {self.id}"
+                    f"{type(self).__name__}: {self.id}",
                 )
 
             self.__write(data, *args, **kwargs)

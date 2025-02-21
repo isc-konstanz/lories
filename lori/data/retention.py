@@ -1,21 +1,22 @@
 # -*- coding: utf-8 -*-
 """
-    lori.data.retention
-    ~~~~~~~~~~~~~~~~~~
-    
-    
+lori.data.retention
+~~~~~~~~~~~~~~~~~~
+
+
 """
+
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, Iterable, Iterator, Mapping, MutableSequence, Optional
 
-import logging
 import tzlocal
 
 import pandas as pd
 import pytz as tz
-from lori import Configurations, ConfigurationException, Resource, ResourceException, Resources
-from lori.data.util import resample, hash_data
+from lori import ConfigurationException, Configurations, Resource, ResourceException, Resources
+from lori.data.util import hash_data, resample
 from lori.util import floor_date, parse_freq, slice_range, to_bool, to_timedelta, to_timezone
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -91,9 +92,7 @@ class Retention:
 
     def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, Retention)
-            and self._enabled == other._enabled
-            and self._get_args() == other._get_args()
+            isinstance(other, Retention) and self._enabled == other._enabled and self._get_args() == other._get_args()
         )
 
     def __hash__(self) -> int:
@@ -138,7 +137,6 @@ class Retention:
 
         for database, database_resources in resources.groupby(lambda c: c.logger._connector):
             for _, resample_resources in database_resources.groupby(lambda c: c.group):
-
                 start = database.read_first_index(resample_resources)
                 if start is not None and start == floor_date(start, freq=self.freq):
                     start += pd.Timedelta(seconds=1)
@@ -216,7 +214,7 @@ class Retention:
                         self._logger.debug(
                             f"Ending aggregation of resource{'s' if len(resample_resources) > 1 else ''} "
                             + ", ".join([f"'{r.id}'" for r in resample_resources])
-                            + f" as data is already resampled"
+                            + " as data is already resampled"
                             + f" from {resample_start.strftime('%d.%m.%Y (%H:%M:%S)')}"
                             + f" to {resample_end.strftime('%d.%m.%Y (%H:%M:%S)')}"
                         )
@@ -224,7 +222,6 @@ class Retention:
 
 
 class Retentions(MutableSequence[Retention]):
-
     def __init__(self, *retentions: Retention) -> None:
         self.__retentions = list(retentions)
 
@@ -268,20 +265,21 @@ class Retentions(MutableSequence[Retention]):
             freq_val = "".join(s for s in freq if s.isnumeric())
             freq_val = int(freq_val) if len(freq_val) > 0 else 1
             if freq.endswith("Y"):
-                return 31535965*freq_val
+                return 31535965 * freq_val
             elif freq.endswith("M"):
-                return 2628000*freq_val
+                return 2628000 * freq_val
             elif freq.endswith("W"):
-                return 604800*freq_val
+                return 604800 * freq_val
             elif freq.endswith("D"):
-                return 86400*freq_val
+                return 86400 * freq_val
             elif freq.endswith("h"):
-                return 3600*freq_val
+                return 3600 * freq_val
             elif freq.endswith("min"):
-                return 60*freq_val
+                return 60 * freq_val
             elif freq.endswith("s"):
-                return 1*freq_val
+                return 1 * freq_val
             return 0
+
         self.__retentions = sorted(self.__retentions, key=lambda r: order(r.keep))
 
 

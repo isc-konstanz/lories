@@ -8,9 +8,9 @@ lori.data.util
 
 from __future__ import annotations
 
+import hashlib
 from copy import copy, deepcopy
 
-import hashlib
 import numpy as np
 import pandas as pd
 import pytz as tz
@@ -31,10 +31,10 @@ def hash_data(
     encoding: str = "UTF-8",
 ) -> str:
     data = deepcopy(data)
-    data[data.index.name] = data.index.tz_convert(tz.UTC).astype(np.int64) // 10 ** 9
+    data[data.index.name] = data.index.tz_convert(tz.UTC).astype(np.int64) // 10**9
 
     for column in data.select_dtypes(include=["datetime64", "datetimetz"]).columns:
-        data[column] = data[column].dt.tz_convert(tz.UTC).astype(np.int64) // 10 ** 9
+        data[column] = data[column].dt.tz_convert(tz.UTC).astype(np.int64) // 10**9
 
     csv = data.to_csv(index=False, header=False, sep=",", decimal=".", float_format="%.10g")
     csv = ",".join(csv.replace(",,", ",").splitlines())
@@ -44,7 +44,7 @@ def hash_data(
 def hash_value(
     value: str,
     method: Literal["MD5", "SHA1", "SHA256", "SHA512"],
-    encoding: str = "UTF-8"
+    encoding: str = "UTF-8",
 ) -> str:
     method = method.lower()
     if method == "md5":
@@ -63,7 +63,7 @@ def resample(
     data: pd.DataFrame | pd.Series,
     freq: str,
     func: Literal["sum", "mean", "min", "max", "last"],
-    offset: Optional[pd.Timedelta] = None
+    offset: Optional[pd.Timedelta] = None,
 ) -> pd.DataFrame | pd.Series:
     if func not in ["sum", "mean", "min", "max", "last"]:
         raise ValueError(f"Invalid resampling function '{func}'")

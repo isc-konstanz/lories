@@ -11,7 +11,6 @@ from __future__ import annotations
 import datetime as dt
 import dateutil.parser
 import re
-from copy import copy
 from dateutil.relativedelta import relativedelta
 from pydoc import locate
 from typing import Any, Callable, Collection, Dict, List, Mapping, Optional, Tuple, Type, TypeVar
@@ -20,7 +19,6 @@ import numpy as np
 import pandas as pd
 import pytz as tz
 from lori.core import ResourceException
-from pandas.tseries.frequencies import to_offset
 
 # noinspection SpellCheckingInspection
 INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
