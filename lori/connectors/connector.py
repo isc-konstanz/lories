@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections import OrderedDict
+from enum import Enum
 from functools import wraps
 from threading import Lock
 from typing import Any, Dict, List, Optional
@@ -41,11 +42,20 @@ class ConnectorMeta(ConfiguratorMeta):
         return connector
 
 
+class ConnectType(Enum):
+    NONE = "NONE"
+    AUTO = "AUTO"
+
+    def __str__(self):
+        return str(self.value)
+
+
 class Connector(Registrator, metaclass=ConnectorMeta):
     SECTION: str = "connector"
     INCLUDES: List[str] = []
 
     _connected: bool = False
+    _connect_type: ConnectType = ConnectType.AUTO
     _connect_timestamp: pd.Timestamp = pd.NaT
     _disconnect_timestamp: pd.Timestamp = pd.NaT
     _reconnect_interval: pd.Timedelta = pd.Timedelta(minutes=1)
@@ -130,6 +140,11 @@ class Connector(Registrator, metaclass=ConnectorMeta):
         for channel in self.channels.filter(lambda c: c.has_connector(self.id)):
             channel.state = state
 
+    # noinspection PyTypeChecker
+    def configure(self, configs: Configurations) -> None:
+        super().configure(configs)
+        self._connect_type = ConnectType[configs.get("connect", default=ConnectType.AUTO.name).upper()]
+
     def _is_disconnected(self) -> bool:
         return not self._is_connected()
 
@@ -137,12 +152,15 @@ class Connector(Registrator, metaclass=ConnectorMeta):
         return (
             self.is_enabled()
             and self.is_configured()
-            and self._is_disconnected()
+            and self._is_connectable()
             and (
                 pd.isna(self._disconnect_timestamp)
                 or pd.Timestamp.now(tz.UTC) >= self._disconnect_timestamp + self._reconnect_interval
             )
         )
+
+    def _is_connectable(self) -> bool:
+        return self._is_disconnected() and self._connect_type == ConnectType.AUTO
 
     def _is_connected(self) -> bool:
         return self.is_connected() and self._connected

@@ -163,7 +163,7 @@ class DataManager(DataContext, Activator, Identifier):
 
     def activate(self) -> None:
         super().activate()
-        self.connect(*self._connectors.values())
+        self.connect(*self._connectors.filter(lambda c: c._is_connectable()))
         self._activate(*self._components.values())
 
     def _activate(self, *components: Component) -> None:
