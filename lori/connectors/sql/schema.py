@@ -49,7 +49,7 @@ class Schema(Configurator, MetaData):
         return tables
 
     def _create_tables(self, resources: Resources) -> Dict[str, Table]:
-        tables = dict[str, Table]()
+        tables = {}
 
         defaults = self.configs.get_sections(["index", "columns"], ensure_exists=True)
         for schema, schema_resources in resources.groupby("schema"):

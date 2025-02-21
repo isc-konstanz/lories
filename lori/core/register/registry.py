@@ -9,7 +9,7 @@ lori.core.register.registry
 from __future__ import annotations
 
 import builtins
-from typing import Callable, Generic, List, Mapping, Optional, Type, TypeVar
+from typing import Callable, Dict, Generic, List, Mapping, Optional, Type, TypeVar
 
 from lori.core import Configurations, Context, ResourceException
 from lori.core.register import Registrator
@@ -88,7 +88,7 @@ class Registry(Generic[R]):
     types: Mapping[Registration[R]]
 
     def __init__(self) -> None:
-        self.types: dict[str, Registration[R]] = {}
+        self.types: Dict[str, Registration[R]] = {}
 
     # noinspection PyTypeChecker, PyUnresolvedReferences
     def register(

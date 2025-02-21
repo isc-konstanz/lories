@@ -80,7 +80,7 @@ class View(PageGroup):
         self.header = header
         self.footer = footer
 
-        self.groups = dict[str, PageGroup]()
+        self.groups = {}
 
     @property
     def key(self) -> str:
