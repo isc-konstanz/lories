@@ -95,25 +95,6 @@ class Databases(ConnectorContext):
             return channel
 
         channels = channels.apply(build_rotation)
-        retentions.sort()
-        for retention in retentions:
-            if not retention.enabled:
-                self._logger.debug(f"Skipping disabled retention '{retention.keep}'")
-                continue
-            try:
-                # noinspection PyProtectedMember
-                def has_retention(channel: Channel) -> bool:
-                    return (
-                        channel.logger.enabled
-                        and isinstance(channel.logger._connector, Database)
-                        and retention in channel.retentions
-                    )
-
-                retention.aggregate(channels.filter(has_retention), full=to_bool(full))
-
-            except ResourceException as e:
-                self._logger.warning(f"Error aggregating '{retention.func}' retaining {retention.keep}: {str(e)}")
-
         for rotation, rotation_channels in channels.filter(lambda c: c.rotate is not None).groupby(lambda c: c.rotate):
             freq = self.configs.get("freq", default="D")
             timezone = to_timezone(self.configs.get("timezone", default=tzlocal.get_localzone_name()))
@@ -137,3 +118,22 @@ class Databases(ConnectorContext):
                         + f" up to {rotate.strftime('%d.%m.%Y (%H:%M:%S)')}"
                     )
                     database.delete(deletion_resources, end=rotate)
+
+        retentions.sort()
+        for retention in retentions:
+            if not retention.enabled:
+                self._logger.debug(f"Skipping disabled retention '{retention.keep}'")
+                continue
+            try:
+                # noinspection PyProtectedMember
+                def has_retention(channel: Channel) -> bool:
+                    return (
+                        channel.logger.enabled
+                        and isinstance(channel.logger._connector, Database)
+                        and retention in channel.retentions
+                    )
+
+                retention.aggregate(channels.filter(has_retention), full=to_bool(full))
+
+            except ResourceException as e:
+                self._logger.warning(f"Error aggregating '{retention.func}' retaining {retention.keep}: {str(e)}")
