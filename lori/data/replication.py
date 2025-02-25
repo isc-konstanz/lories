@@ -34,7 +34,8 @@ class Replicator:
 
     database: Database
 
-    how: Literal["push", "pull"]
+    method: Literal["push", "pull"]
+    floor: Optional[str]
     freq: str
     slice: bool
     timezone: tz.BaseTzInfo
@@ -70,11 +71,13 @@ class Replicator:
         self,
         database: Optional[Database],
         timezone: Optional[tz.BaseTzInfo] = None,
-        how: Literal["push", "pull"] = "push",
+        method: Literal["push", "pull"] = "push",
+        floor: Optional[str] = None,
         freq: str = "D",
         slice: bool = True,
         enabled: bool = True,
     ) -> None:
+        self._logger = logging.getLogger(self.__module__)
         self._enabled = to_bool(enabled)
 
         self.database = self._assert_database(database)
@@ -83,9 +86,10 @@ class Replicator:
             timezone = to_timezone(tzlocal.get_localzone_name())
         self.timezone = timezone
 
-        if how not in ["push", "pull"]:
-            raise ConfigurationException(f"Invalid replication method '{how}'")
-        self.how = how
+        if method not in ["push", "pull"]:
+            raise ConfigurationException(f"Invalid replication method '{method}'")
+        self.method = method
+        self.floor = parse_freq(floor)
         self.freq = parse_freq(freq)
         self.slice = to_bool(slice)
 
@@ -118,7 +122,8 @@ class Replicator:
     # noinspection PyShadowingBuiltins
     def _get_args(self) -> Dict[str, Any]:
         return {
-            "how": self.how,
+            "method": self.method,
+            "floor": self.floor,
             "freq": self.freq,
             "slice": self.slice,
             "timezone": self.timezone,
@@ -132,16 +137,22 @@ class Replicator:
     def replicate(self, resources: Resources, full: bool = False) -> None:
         if not self.enabled:
             raise ReplicationException(self.database, "Replication disabled")
+        if not self.database.is_connected():
+            raise ReplicationException(self.database, f"Replication database '{self.database.id}' not connected")
         kwargs = self._get_args()
         kwargs["full"] = full
-        how = kwargs.pop("how")
+        method = kwargs.pop("method")
 
         for logger, logger_resources in resources.groupby(lambda c: c.logger._connector):
             for _, group_resources in logger_resources.groupby(lambda c: c.group):
-                if how == "push":
-                    replicate(logger, self.database, group_resources, **kwargs)
-                elif how == "pull":
-                    replicate(self.database, logger, group_resources, **kwargs)
+                try:
+                    if method == "push":
+                        replicate(logger, self.database, group_resources, **kwargs)
+                    elif method == "pull":
+                        replicate(self.database, logger, group_resources, **kwargs)
+
+                except ReplicationException as e:
+                    self._logger.error(f"Replication failed because: {e}")
 
 
 class ReplicationException(ResourceException):
@@ -157,15 +168,19 @@ def replicate(
     target: Database,
     resources: Resources,
     timezone: Optional[tz.BaseTzInfo] = None,
+    floor: str = None,
     freq: str = "D",
     full: bool = True,
-    slice: bool = True,
+    slice: str = True,
 ) -> None:
     if source is None or target is None or len(resources) == 0:
         return
 
     logger = logging.getLogger(Replicator.__module__)
-    logger.debug(f"Starting to replicate data of {len(resources)} resource{'s' if len(resources) > 0 else ''}")
+    logger.debug(
+        f"Starting to replicate data of resource{'s' if len(resources) > 1 else ''} "
+        + ", ".join([f"'{r.id}'" for r in resources])
+    )
     target_empty = False
 
     if timezone is None:
@@ -174,13 +189,15 @@ def replicate(
     end = source.read_last_index(resources)
     if end is None:
         end = now
+    elif floor is not None:
+        end = floor_date(end, freq=floor)
 
     start = target.read_last_index(resources) if not full else None
     if start is None:
         start = source.read_first_index(resources)
         target_empty = True
     else:
-        start += pd.Timedelta(seconds=1)
+        start = floor_date(start, freq=freq) + pd.Timedelta(seconds=1)
 
     if (not any(t is None for t in [start, end]) and start >= end) or all(t is None for t in [start, end]):
         logger.debug(
@@ -247,7 +264,7 @@ def replicate_range(
         )
         return
 
-    logger.info(
+    logger.debug(
         f"Copying {len(data)} values of resource{'s' if len(resources) > 1 else ''} "
         + ", ".join([f"'{r.id}'" for r in resources])
         + f" from {start.strftime('%d.%m.%Y (%H:%M:%S)')}"
@@ -261,5 +278,7 @@ def replicate_range(
             f"Mismatching for {len(data)} values of resource{'s' if len(resources) > 1 else ''} "
             + ",".join([f"'{r.id}'" for r in resources])
             + f" with checksum '{source_checksum}' against target checksum '{target_checksum}'"
+            + f" from {start.strftime('%d.%m.%Y (%H:%M:%S)')}"
+            + f" to {end.strftime('%d.%m.%Y (%H:%M:%S)')}"
         )
         raise ReplicationException("Checksum mismatch while synchronizing")

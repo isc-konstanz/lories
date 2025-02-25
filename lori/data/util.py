@@ -31,10 +31,10 @@ def hash_data(
     encoding: str = "UTF-8",
 ) -> str:
     data = deepcopy(data)
-    data[data.index.name] = data.index.tz_convert(tz.UTC).astype(np.int64) // 10**9
+    data[data.index.name] = data.index.tz_convert(tz.UTC).view(np.int64) // 10**9
 
     for column in data.select_dtypes(include=["datetime64", "datetimetz"]).columns:
-        data[column] = data[column].dt.tz_convert(tz.UTC).astype(np.int64) // 10**9
+        data[column] = data[column].dt.tz_convert(tz.UTC).view(np.int64) // 10**9
 
     csv = data.to_csv(index=False, header=False, sep=",", decimal=".", float_format="%.10g")
     csv = ",".join(csv.replace(",,", ",").splitlines())

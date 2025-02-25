@@ -200,7 +200,7 @@ class Database(Connector, metaclass=DatabaseMeta):
         data = self._validate_timezone(resources, data)
         if data is None or data.empty:
             return None
-        return data.index[0]
+        return min(data.index)
 
     @wraps(read_first_index, updated=())
     def _do_read_first_index(self, resources: Resources, *args, **kwargs) -> Optional[Any]:
@@ -232,7 +232,7 @@ class Database(Connector, metaclass=DatabaseMeta):
         data = self._validate_timezone(resources, data)
         if data is None or data.empty:
             return None
-        return data.index[-1]
+        return max(data.index)
 
     @wraps(read_last_index, updated=())
     def _do_read_last_index(self, resources: Resources, *args, **kwargs) -> Optional[Any]:

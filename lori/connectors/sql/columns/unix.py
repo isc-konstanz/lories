@@ -27,12 +27,12 @@ class UnixTimestampColumn(Column):
         self,
         name: str,
         type: ColumnType = INTEGER,
-        default: Optional[Any] = "(UNIX_TIMESTAMP())",
+        default: Optional[Any] = None,
         nullable: bool = False,
         **kwargs,
     ) -> None:
-        if default is None and not nullable:
-            default = "(UNIX_TIMESTAMP())"
+        # if default is None and not nullable:
+        #     default = "(UNIX_TIMESTAMP())"
         super().__init__(
             name,
             type,
@@ -45,9 +45,9 @@ class UnixTimestampColumn(Column):
     # noinspection PyUnresolvedReferences
     def validate(self, data: Any) -> Any:
         if isinstance(data, pd.Series):
-            data = data.dt.tz_convert(tz.UTC).astype(np.int64) // 10**9
+            data = data.dt.tz_convert(tz.UTC).view(np.int64) // 10**9
         elif isinstance(data, pd.DatetimeIndex):
-            data = data.tz_convert(tz.UTC).astype(np.int64) // 10**9
+            data = data.tz_convert(tz.UTC).view(np.int64) // 10**9
         elif isinstance(data, pd.Timestamp):
             epoch = dt.datetime(1970, 1, 1, tzinfo=tz.UTC)
             data = data.tz_convert(tz.UTC)

@@ -67,12 +67,14 @@ class Databases(ConnectorContext):
         replication_channels = channels.apply(build_replicator).filter(is_replicating)
         for database in self.values():
             database_connected = database.is_connected()
+            database_channels = replication_channels.filter(lambda c: c.replicator.database.id == database.id)
+            if len(database_channels) == 0:
+                continue
             try:
                 if not database_connected:
-                    database_channels = replication_channels.filter(lambda c: c.replicator.database.id == database.id)
                     self.context.connect(database, channels=database_channels)
 
-                for replicator, replicator_channels in replication_channels.groupby(lambda c: c.replicator):
+                for replicator, replicator_channels in database_channels.groupby(lambda c: c.replicator):
                     replicator.replicate(replicator_channels, full=to_bool(full))
 
             except ResourceException as e:

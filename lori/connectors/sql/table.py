@@ -132,7 +132,7 @@ class Table(sql.Table):
             )
             results.append(group_data[group_resources.ids])
 
-        results = pd.concat(results, axis="index")
+        results = pd.concat(sorted(results, key=lambda d: min(d.index)), axis="index")
         for result_column in [c for c in result_columns if c not in results.columns]:
             results.loc[:, [result_column]] = np.nan
         return results

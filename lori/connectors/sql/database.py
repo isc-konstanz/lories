@@ -9,6 +9,7 @@ lori.connectors.sql.database
 from __future__ import annotations
 
 import datetime as dt
+from collections import OrderedDict
 from typing import Any, Dict, Iterator, Mapping, Optional
 
 from sqlalchemy import Connection, Dialect, Engine, create_engine, text
@@ -55,7 +56,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.__tables = {}
+        self.__tables = OrderedDict()
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.__tables)
@@ -267,6 +268,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
         except SQLAlchemyError as e:
             self._raise(e)
         if len(results) > 0:
+            results = sorted(results, key=lambda d: min(d.index))
             return pd.concat(results, axis="index")
         return pd.DataFrame(columns=[r.id for r in resources])
 
@@ -287,6 +289,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
         except SQLAlchemyError as e:
             self._raise(e)
         if len(results) > 0:
+            results = sorted(results, key=lambda d: min(d.index))
             return pd.concat(results, axis="index")
         return pd.DataFrame(columns=[r.id for r in resources])
 
@@ -307,6 +310,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
         except SQLAlchemyError as e:
             self._raise(e)
         if len(results) > 0:
+            results = sorted(results, key=lambda d: min(d.index))
             return pd.concat(results, axis="index")
         return pd.DataFrame(columns=[r.id for r in resources])
 
@@ -318,10 +322,11 @@ class SqlDatabase(Database, Mapping[str, Table]):
                     if table_name not in self.__tables:
                         raise DatabaseException(self, f"Table '{table_name}' not available")
                     table_data = data.loc[:, [r.id for r in table_resources if r.id in data.columns]]
+                    table_data = table_data.dropna(axis="index", how="all")
                     if table_data.empty:
                         continue
                     table = self.get(table_name)
-                    insert = table.write(table_resources, data)
+                    insert = table.write(table_resources, table_data)
                     self._logger.debug(insert)
                     self.connection.execute(insert)
 
