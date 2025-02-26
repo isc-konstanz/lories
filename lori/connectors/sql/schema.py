@@ -139,7 +139,7 @@ class Schema(Configurator, MetaData):
                     # TODO: Implement column validation
                 else:
                     if self.configs.get_bool("create", default=True):
-                        raise ResourceException(f"Now yet implemented to create missing column: {column.name}")
+                        raise ResourceException(f"Not yet implemented to create missing column: {column.name}")
                     else:
                         raise ResourceException(f"Unable to find configured column: {column.name}")
 

@@ -25,3 +25,6 @@ from .weather import (  # noqa: F401
     WeatherForecast,
     WeatherProvider,
 )
+
+from . import camera # noqa: F401
+from .camera import Camera # noqa: F401

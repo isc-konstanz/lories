@@ -42,3 +42,9 @@ try:
 
 except ModuleNotFoundError:
     pass
+
+try:
+    from .camera import Camera  # noqa: F401
+
+except ModuleNotFoundError:
+    pass
