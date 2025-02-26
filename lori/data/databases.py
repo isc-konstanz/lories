@@ -137,4 +137,4 @@ class Databases(ConnectorContext):
                 retention.aggregate(channels.filter(has_retention), full=to_bool(full))
 
             except ResourceException as e:
-                self._logger.warning(f"Error aggregating '{retention.func}' retaining {retention.keep}: {str(e)}")
+                self._logger.warning(f"Error aggregating '{retention.method}' retaining {retention.keep}: {str(e)}")

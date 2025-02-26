@@ -9,7 +9,7 @@ lori.data.retention
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Iterable, Iterator, Mapping, MutableSequence, Optional
+from typing import Any, Dict, Iterable, Iterator, MutableSequence, Optional
 
 import tzlocal
 
@@ -34,19 +34,19 @@ class Retention:
 
     keep: str
     freq: str
-    func: Optional[LiteralString]
+    method: Optional[LiteralString]
     resample: Optional[str]
     timezone: tz.BaseTzInfo
 
     # noinspection PyShadowingNames
     @classmethod
     def build(cls, configs: Configurations, resource: Resource) -> Retentions:
-        resource_configs = resource.get(cls.SECTION, default=None)
-        if resource_configs is None:
-            resource_configs = {"aggregate": resource.get("aggregate", default=None)}
+        resource_configs = resource.get(cls.SECTION, default={})
         if isinstance(resource_configs, str):
             resource_configs = {"aggregate": resource_configs}
-        elif not isinstance(resource_configs, Mapping):
+        elif isinstance(resource_configs, Dict):
+            resource_configs["aggregate"] = resource.get("aggregate", default=None)
+        else:
             raise ConfigurationException("Invalid retention method: " + str(resource_configs))
 
         configs = configs.copy()
@@ -88,7 +88,7 @@ class Retention:
             aggregate = aggregate.lower()
             if aggregate not in ["sum", "mean", "min", "max", "last"]:
                 raise ConfigurationException(f"Invalid retention aggregation '{aggregate}'")
-        self.func = aggregate
+        self.method = aggregate
 
     def __eq__(self, other: Any) -> bool:
         return (
@@ -99,7 +99,7 @@ class Retention:
         return hash((self._enabled, *self._get_args()))
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(keep={self.keep}, resample={self.resample}, aggregate={self.func})"
+        return f"{type(self).__name__}(keep={self.keep}, resample={self.resample}, aggregate={self.method})"
 
     def __str__(self) -> str:
         return (
@@ -113,7 +113,7 @@ class Retention:
         return {
             "keep": self.keep,
             "freq": self.freq,
-            "func": self.func,
+            "method": self.method,
             "resample": self.resample,
             "timezone": self.timezone,
         }
@@ -124,7 +124,7 @@ class Retention:
             self._enabled
             and self.keep is not None
             and self.freq is not None
-            and self.func is not None
+            and self.method is not None
             and self.resample is not None
         )
 
@@ -198,7 +198,7 @@ class Retention:
                     #     print(errors)
                     #     continue
 
-                    resampled_data = resample(data, self.resample, self.func)
+                    resampled_data = resample(data, self.resample, self.method)
                     if hash_data(resampled_data) != hash_data(data):
                         self._logger.info(
                             f"Aggregating {len(data)} to {len(resampled_data)} values "
