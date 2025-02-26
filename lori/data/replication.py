@@ -211,11 +211,9 @@ def replicate(
         slice = False
 
     if not target_empty:
-        if start > now:
-            start = floor_date(now, freq=freq)
-
-        prior = floor_date(start, timezone=timezone, freq=freq) - to_timedelta(freq)
-        replicate_range(source, target, resources, prior, start)
+        prior_end = floor_date(start if start <= now else now, freq=freq)
+        prior_start = floor_date(start, timezone=timezone, freq=freq) - to_timedelta(freq) + pd.Timedelta(seconds=1)
+        replicate_range(source, target, resources, prior_start, prior_end)
 
     if slice:
         # Validate prior step, before continuing
