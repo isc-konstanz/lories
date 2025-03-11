@@ -50,7 +50,7 @@ class Databases(ConnectorContext):
         super()._load(context, configs, configs_file)
 
     # noinspection PyUnresolvedReferences
-    def replicate(self, channels: Channels, full: bool = False, **kwargs) -> None:
+    def replicate(self, channels: Channels, full: bool = False, force: bool = False, **kwargs) -> None:
         def build_replicator(channel: Channel) -> Channel:
             channel = channel.from_logger()
             channel.replicator = Replicator.build(self, channel, **kwargs)
@@ -75,7 +75,7 @@ class Databases(ConnectorContext):
                     self.context.connect(database, channels=database_channels)
 
                 for replicator, replicator_channels in database_channels.groupby(lambda c: c.replicator):
-                    replicator.replicate(replicator_channels, full=to_bool(full))
+                    replicator.replicate(replicator_channels, full=to_bool(full), force=to_bool(force))
 
             except ResourceException as e:
                 self._logger.warning(f"Error replicating database '{database.id}': {str(e)}")
