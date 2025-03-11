@@ -171,6 +171,7 @@ def replicate(
     floor: str = None,
     freq: str = "D",
     full: bool = True,
+    force: bool = False,
     slice: str = True,
 ) -> None:
     if source is None or target is None or len(resources) == 0:
@@ -213,14 +214,14 @@ def replicate(
     if not target_empty:
         prior_end = floor_date(start if start <= now else now, freq=freq)
         prior_start = floor_date(start, timezone=timezone, freq=freq) - to_timedelta(freq) + pd.Timedelta(seconds=1)
-        replicate_range(source, target, resources, prior_start, prior_end)
+        replicate_range(source, target, resources, prior_start, prior_end, force=force)
 
     if slice:
         # Validate prior step, before continuing
         for slice_start, slice_end in slice_range(start, end, timezone=timezone, freq=freq):
-            replicate_range(source, target, resources, slice_start, slice_end)
+            replicate_range(source, target, resources, slice_start, slice_end, force=force)
     else:
-        replicate_range(source, target, resources, start, end)
+        replicate_range(source, target, resources, start, end, force=force)
 
 
 def replicate_range(
@@ -229,6 +230,7 @@ def replicate_range(
     resources: Resources,
     start: pd.Timestamp,
     end: pd.Timestamp,
+    force: bool = False,
 ) -> None:
     logger = logging.getLogger(Replicator.__module__)
     logger.debug(
@@ -272,6 +274,11 @@ def replicate_range(
     target.write(data)
     target_checksum = target.hash(resources, start, end)
     if target_checksum != source_checksum:
+        if force:
+            target.delete(resources, start, end)
+            target.write(data)
+            return
+
         logger.error(
             f"Mismatching for {len(data)} values of resource{'s' if len(resources) > 1 else ''} "
             + ",".join([f"'{r.id}'" for r in resources])

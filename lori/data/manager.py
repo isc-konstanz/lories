@@ -393,7 +393,7 @@ class DataManager(DataContext, Activator, Identifier):
         self.listeners.wait()
         self.log()
 
-    def replicate(self, full: bool = False, **kwargs) -> None:
+    def replicate(self, full: bool = False, force: bool = False, **kwargs) -> None:
         section = self.configs.get_section(Replicator.SECTION, defaults={})
         configs = Configurations(f"{Replicator.SECTION}.conf", self.configs.dirs, defaults=section)
         configs._load(require=False)
@@ -401,6 +401,7 @@ class DataManager(DataContext, Activator, Identifier):
             self._logger.error(f"Unable to replicate for disabled configuration section '{Replicator.SECTION}'")
             return
         kwargs["full"] = configs.pop("full", default=full)
+        kwargs["force"] = configs.pop("force", default=force)
         kwargs.update({k: v for k, v in configs.items() if k not in configs.sections})
 
         databases = Databases(self, configs)

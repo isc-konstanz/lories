@@ -83,10 +83,10 @@ class Application(DataManager):
                 self.start()
 
             elif action == "rotate":
-                self.rotate(full=self.settings["full"])
+                self.rotate(full=self.settings.get_bool("full"))
 
             elif action == "replicate":
-                self.replicate(full=self.settings["full"])
+                self.replicate(full=self.settings.get_bool("full"), force=self.settings.get_bool("force"))
 
         except Exception as e:
             self._logger.warning(repr(e))

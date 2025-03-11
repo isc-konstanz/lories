@@ -118,6 +118,12 @@ def _parse_kwargs(parser: ArgumentParser) -> Dict[str, Any]:
                 help="replicate data from a remote database",
             )
             replicate_parser.add_argument(
+                "--force",
+                dest="force",
+                action="store_true",
+                help="flags if the replication should force rewrite data for checksum mismatches",
+            )
+            replicate_parser.add_argument(
                 "--full",
                 dest="full",
                 action="store_true",
