@@ -134,13 +134,14 @@ class Replicator:
         return self._enabled and self.database is not None and self.database.is_enabled()
 
     # noinspection PyProtectedMember
-    def replicate(self, resources: Resources, full: bool = False) -> None:
+    def replicate(self, resources: Resources, full: bool = False, force: bool = False) -> None:
         if not self.enabled:
             raise ReplicationException(self.database, "Replication disabled")
         if not self.database.is_connected():
             raise ReplicationException(self.database, f"Replication database '{self.database.id}' not connected")
         kwargs = self._get_args()
         kwargs["full"] = full
+        kwargs["force"] = force
         method = kwargs.pop("method")
 
         for logger, logger_resources in resources.groupby(lambda c: c.logger._connector):
