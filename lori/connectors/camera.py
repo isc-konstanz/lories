@@ -55,10 +55,14 @@ class Camera(Connector):
                 # If the loop completes without a successful read
                 raise ConnectionException(
                     self,
-                    "Failed to capture a frame from the camera after multiple attempts.")
+                    "Failed to capture a frame from the camera after multiple attempts."
+                )
+
+            # Convert the frame from BGR to RGB
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
             # Encode the frame to JPEG format
-            ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
+            ret, buffer = cv2.imencode('.jpg', frame_rgb, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
             if not ret:
                 raise ConnectionException(self, "Failed to encode the frame to JPEG format.")
 
