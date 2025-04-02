@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-lori.conneccamera
+lori.components.camera
 ~~~~~~~~~~~~~~
 
 """

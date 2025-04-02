@@ -39,7 +39,12 @@ class Camera(Connector):
 
     def read(self, resources: Resources) -> pd.DataFrame:
         try:
+            # Use system webcam if RTSP URL is not available
             self.capture = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
+            if not self.capture.isOpened():
+                print("RTSP URL is not valid or not running. Falling back to system webcam.")
+                self.capture = cv2.VideoCapture(0)  # Default to system webcam
+
             if not self.capture.isOpened():
                 raise ConnectionException(self, "Unable to connect to the camera.")
 
@@ -58,11 +63,8 @@ class Camera(Connector):
                     "Failed to capture a frame from the camera after multiple attempts."
                 )
 
-            # Convert the frame from BGR to RGB
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
             # Encode the frame to JPEG format
-            ret, buffer = cv2.imencode('.jpg', frame_rgb, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
+            ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
             if not ret:
                 raise ConnectionException(self, "Failed to encode the frame to JPEG format.")
 
