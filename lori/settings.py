@@ -47,6 +47,10 @@ class Settings(Configurations):
             return configs[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
 
+    @property
+    def _sections_dir(self) -> Directory:
+        return self.dirs.conf
+
     def _load_logging(self) -> None:
         logging_file = os.path.join(self.dirs.conf, "logging.conf")
         if not os.path.isfile(logging_file) and not self.dirs.conf.is_default():

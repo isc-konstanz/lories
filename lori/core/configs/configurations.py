@@ -14,11 +14,11 @@ import shutil
 from collections import OrderedDict
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Iterable, List, Mapping, MutableMapping, Optional
+from typing import Any, Collection, Iterable, List, Mapping, MutableMapping, Optional
 
 import pandas as pd
 from lori.core import ResourceException, ResourceUnavailableException
-from lori.core.configs import Directories
+from lori.core.configs import Directories, Directory
 from lori.util import to_bool, to_date, to_float, to_int
 
 
@@ -34,7 +34,7 @@ class Configurations(MutableMapping[str, Any]):
         lib_dir: str = None,
         flat: bool = False,
         require: bool = True,
-        **kwargs,
+        **defaults,
     ) -> Configurations:
         if not conf_dir and flat:
             conf_dir = ""
@@ -50,13 +50,13 @@ class Configurations(MutableMapping[str, Any]):
         elif require:
             raise ConfigurationUnavailableException(f"Invalid configuration directory: {conf_dirs.conf}")
 
-        configs = cls(conf_file, conf_dirs, **kwargs)
+        configs = cls(conf_file, conf_dirs, defaults)
         configs._load(require)
         return configs
 
     # noinspection PyProtectedMember
     def _load(self, require: bool = True) -> None:
-        if self.__path.is_file():
+        if self.__path.exists() and self.__path.is_file():
             try:
                 # TODO: Implement other configuration parsers
                 self._load_toml(str(self.__path))
@@ -121,7 +121,12 @@ class Configurations(MutableMapping[str, Any]):
     def set(self, key: str, value: Any, replace: bool = True) -> None:
         if key in self.__configs and not replace:
             return
-        self.__configs[key] = value
+        if isinstance(value, Mapping):
+            if key not in self.keys():
+                self.__configs[key] = self._create_section(key, value)
+            self.__configs[key] = Configurations.update(self[key], value, replace)
+        else:
+            self.__configs[key] = value
 
     def __getitem__(self, key: str) -> Any:
         return self.__configs[key]
@@ -147,8 +152,8 @@ class Configurations(MutableMapping[str, Any]):
     def get_float(self, key: str, default: float = None) -> float:
         return to_float(self._get(key, default))
 
-    def get_date(self, key: str, default: dt.datetime | pd.Timestamp = None) -> pd.Timestamp:
-        return to_date(self._get(key, default))
+    def get_date(self, key: str, default: dt.datetime | pd.Timestamp = None, **kwargs) -> pd.Timestamp:
+        return to_date(self._get(key, default), **kwargs)
 
     def __iter__(self):
         return iter(self.__configs)
@@ -193,6 +198,10 @@ class Configurations(MutableMapping[str, Any]):
     def sections(self) -> List[str]:
         return [k for k, v in self.items() if isinstance(v, Configurations)]
 
+    @property
+    def _sections_dir(self) -> Directory:
+        return self.__dirs.conf.joinpath(self.__path.name.replace(".conf", ".d"))
+
     def has_section(self, section: str) -> bool:
         if section in self.sections:
             return True
@@ -200,7 +209,7 @@ class Configurations(MutableMapping[str, Any]):
 
     def get_sections(
         self,
-        sections: List[str],
+        sections: Collection[str],
         ensure_exists: bool = False,
     ) -> Configurations:
         sections = {
@@ -209,7 +218,7 @@ class Configurations(MutableMapping[str, Any]):
             if s in self.sections or ensure_exists
         }
         section_dirs = self.__dirs.copy()
-        section_dirs.conf = str(self.__path).replace(".conf", ".d")
+        section_dirs.conf = self._sections_dir
         return Configurations(self.name, section_dirs, sections)
 
     def get_section(
@@ -231,28 +240,28 @@ class Configurations(MutableMapping[str, Any]):
             return configs
 
         elif defaults is not None:
-            return self.__new_section(section, defaults)
+            return self._create_section(section, defaults)
         else:
             raise ConfigurationUnavailableException(f"Unknown configuration section: {section}")
 
     def _add_section(self, section, configs: Mapping[str, Any]) -> None:
         if self.has_section(section):
             raise ConfigurationUnavailableException(f"Unable to add existing configuration section: {section}")
-        self[section] = self.__new_section(section, configs)
+        self[section] = self._create_section(section, configs)
 
-    def __new_section(self, section, configs: Mapping[str, Any]) -> Configurations:
+    def _create_section(self, section, configs: Mapping[str, Any]) -> Configurations:
         if not isinstance(configs, Mapping):
             raise ConfigurationException(f"Invalid configuration '{section}': {type(configs)}")
         section_name = f"{section}.conf"
         section_dirs = self.__dirs.copy()
-        section_dirs.conf = str(self.__path).replace(".conf", ".d")
+        section_dirs.conf = self._sections_dir
         return Configurations(section_name, section_dirs, configs)
 
     def update(self, u: Mapping[str, Any], replace: bool = True) -> Configurations:
         for k, v in u.items():
             if isinstance(v, Mapping):
                 if k not in self.keys():
-                    self[k] = self.__new_section(k, v)
+                    self[k] = self._create_section(k, v)
                 self[k] = Configurations.update(self[k], v, replace)
             elif k not in self or replace:
                 self[k] = v

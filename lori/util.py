@@ -335,7 +335,7 @@ def parse_freq(freq: str) -> Optional[str]:
     value = int(value) if len(value) > 0 else 1
 
     def _parse_freq(suffix: str) -> str:
-        return str(value) + suffix if value > 0 else suffix
+        return str(value) + suffix if value > 1 else suffix
 
     if freq.lower().endswith(("y", "year", "years")):
         return _parse_freq("Y")

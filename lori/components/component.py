@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-lori.components.connector
+lori.components.component
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
@@ -9,61 +9,59 @@ lori.components.connector
 from __future__ import annotations
 
 import datetime as dt
-from functools import wraps
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import pandas as pd
+from lori.components import ComponentAccess
+from lori.components.core import _Component
 from lori.connectors import ConnectorAccess
 from lori.converters import ConverterAccess
-from lori.core import Activator, Context, Registrator, ResourceException, ResourceUnavailableException
-from lori.core.configs import ConfigurationException, Configurations
+from lori.core import Configurations, Context, Registrator
 from lori.data import DataAccess
 from lori.util import to_date
 
 
 # noinspection PyAbstractClass
-class Component(Registrator, Activator):
-    SECTION: str = "component"
-    INCLUDES: List[str] = [ConverterAccess.SECTION, ConnectorAccess.SECTION, DataAccess.SECTION]
-
+class Component(_Component):
     __converters: ConverterAccess
     __connectors: ConnectorAccess
+    __components: ComponentAccess
     __data: DataAccess
 
     def __init__(
         self,
-        context: Component | Context,
+        context: Context | Registrator,
         configs: Optional[Configurations] = None,
         **kwargs,
     ) -> None:
         super().__init__(context=context, configs=configs, **kwargs)
-        self.__converters = ConverterAccess(self)
-        self.__connectors = ConnectorAccess(self)
-        self.__data = DataAccess(self)
+        self.__converters = ConverterAccess(self, configs=configs.get_section("converters", ensure_exists=True))
+        self.__connectors = ConnectorAccess(self, configs=configs.get_section("connectors", ensure_exists=True))
+        self.__components = ComponentAccess(self, configs=configs.get_section("components", ensure_exists=True))
+        self.__data = DataAccess(self, configs=configs.get_section(DataAccess.SECTION, ensure_exists=True))
 
-    def configure(self, configs: Configurations) -> None:
-        super().configure(configs)
-
-    @wraps(configure, updated=())
-    def _do_configure(self, configs: Configurations, *args, **kwargs) -> None:
-        if configs is None:
-            raise ConfigurationException(f"Invalid NoneType configuration for {type(self).__name__}: {self.name}")
-        if not configs.enabled:
-            raise ConfigurationException(f"Trying to configure disabled {type(self).__name__}: {configs.name}")
-
-        self.__converters.configure(configs.get_sections([ConverterAccess.SECTION], ensure_exists=True))
-        self.__connectors.configure(configs.get_sections([ConnectorAccess.SECTION], ensure_exists=True))
+    def _at_configure(self, configs: Configurations) -> None:
+        self.__converters.configure(configs.get_section("converters", ensure_exists=True))
+        self.__connectors.configure(configs.get_section("connectors", ensure_exists=True))
+        self.__components.configure(configs.get_section("components", ensure_exists=True))
         self.__data.configure(configs.get_section(DataAccess.SECTION, ensure_exists=True))
-        super()._do_configure(configs, *args, **kwargs)
 
-        self.__data.create()
+    def _on_configure(self, configs: Configurations) -> None:
+        self.__converters.load()
+        self.__connectors.load()
+        self.__components.load()
+        self.__data.load()
 
     @property
-    def converters(self):
+    def components(self) -> ComponentAccess:
+        return self.__components
+
+    @property
+    def converters(self) -> ConverterAccess:
         return self.__converters
 
     @property
-    def connectors(self):
+    def connectors(self) -> ConnectorAccess:
         return self.__connectors
 
     @property
@@ -76,7 +74,12 @@ class Component(Registrator, Activator):
         end: Optional[pd.Timestamp, dt.datetime, str] = None,
         **kwargs,
     ) -> pd.DataFrame:
-        return self._get_range(self.__data.to_frame(), start, end, **kwargs)
+        data = self.__data.to_frame(unique=False)
+        if data.empty or start < data.index[0] or end > data.index[-1]:
+            logged = self.__data.from_logger(start=start, end=end, unique=False)
+            if not logged.empty:
+                data = logged if data.empty else data.combine_first(logged)
+        return self._get_range(data, start, end, **kwargs)
 
     @staticmethod
     def _get_range(
@@ -100,22 +103,3 @@ class Component(Registrator, Activator):
         vars = super()._get_vars()
         vars.pop("type", None)
         return vars
-
-
-class ComponentException(ResourceException):
-    """
-    Raise if an error occurred accessing the connector.
-
-    """
-
-    # noinspection PyArgumentList
-    def __init__(self, component: Component, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.component = component
-
-
-class ComponentUnavailableException(ResourceUnavailableException, ComponentException):
-    """
-    Raise if an accessed connector can not be found.
-
-    """

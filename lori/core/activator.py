@@ -11,19 +11,16 @@ from __future__ import annotations
 from functools import wraps
 from typing import Dict
 
-from lori.core import ConfigurationException, Configurator, ConfiguratorMeta
+from lori.core.configs import ConfigurationException
+from lori.core.configs.configurator import Configurator, ConfiguratorMeta
 
 
 class ActivatorMeta(ConfiguratorMeta):
     # noinspection PyProtectedMember
     def __call__(cls, *args, **kwargs):
         activator = super().__call__(*args, **kwargs)
-
-        activator._Activator__activate = activator.activate
-        activator.activate = activator._do_activate
-
-        activator._Activator__deactivate = activator.deactivate
-        activator.deactivate = activator._do_deactivate
+        cls._wrap_method(activator, "activate")
+        cls._wrap_method(activator, "deactivate")
 
         return activator
 
@@ -63,9 +60,13 @@ class Activator(Configurator, metaclass=ActivatorMeta):
             self._logger.warning(f"Trying to activate already active '{type(self).__name__}': {self.id}")
             return
 
-        self.__activate(*args, **kwargs)
+        self._at_activate()
+        self._run_activate(*args, **kwargs)
         self._on_activate()
         self._active = True
+
+    def _at_activate(self) -> None:
+        pass
 
     def _on_activate(self) -> None:
         pass
@@ -79,9 +80,13 @@ class Activator(Configurator, metaclass=ActivatorMeta):
         if not self.is_active():
             return
 
-        self.__deactivate()
+        self._at_deactivate()
+        self._run_deactivate()
         self._on_deactivate()
         self._active = False
+
+    def _at_deactivate(self) -> None:
+        pass
 
     def _on_deactivate(self) -> None:
         pass

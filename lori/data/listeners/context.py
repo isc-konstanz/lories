@@ -58,6 +58,36 @@ class ListenerContext(Context[Listener]):
     def context(self) -> Context:
         return self.__context
 
+    def _create(
+        self,
+        id: str,
+        key: str,
+        function: Callable[[pd.DataFrame], None],
+        channels: Channels,
+        how: Literal["any", "all"] = "any",
+        unique: bool = False,
+    ) -> Listener:
+        return Listener(id, key, function, channels, how, unique)
+
+    # noinspection PyShadowingBuiltins, PyProtectedMember
+    def _update(
+        self,
+        id: str,
+        channels: Channels,
+        how: Literal["any", "all"] = "any",
+        unique: bool = False,
+    ) -> None:
+        listener = self._get(id)
+        if listener._how != how:
+            raise ResourceException(
+                f"Trying to register '{how}' updated listener to existing '{listener._how}' instance"
+            )
+        if listener._unique != unique:
+            raise ResourceException(
+                f"Trying to register '{unique}' processed listener to existing '{listener._unique}' instance"
+            )
+        listener.channels.extend(channels)
+
     # noinspection PyUnresolvedReferences, PyProtectedMember
     def register(
         self,
@@ -72,19 +102,10 @@ class ListenerContext(Context[Listener]):
         except AttributeError:
             context = function.__module__
         id = f"{context}.{key}"
-        if id in self:
-            listener = self[id]
-            if listener._how != how:
-                raise ResourceException(
-                    f"Trying to register '{how}' updated listener to existing '{listener._how}' instance"
-                )
-            if listener._unique != unique:
-                raise ResourceException(
-                    f"Trying to register '{unique}' processed listener to existing '{listener._unique}' instance"
-                )
-            listener.channels.extend(channels)
+        if self._contains(id):
+            self._update(id, channels, how, unique)
         else:
-            self._add(Listener(id, key, function, channels, how=how, unique=unique))
+            self._add(self._create(id, key, function, channels, how=how, unique=unique))
 
     def notify(self, *channels: Channel) -> Collection[Listener]:
         listeners = []

@@ -13,18 +13,19 @@ from collections import OrderedDict
 from logging import Logger
 from typing import Any, Dict, List, Optional, Type
 
-from lori.core import ConfigurationException, Identifier
-from lori.util import parse_type, update_recursive
+from lori.core import ConfigurationException, Entity, ResourceException
+from lori.util import parse_type, update_recursive, validate_key
 
 
-class Resource(Identifier):
+class Resource(Entity):
     __configs: OrderedDict[str, Any]
 
     _key: str
     _name: str
     _group: str
 
-    _type: Type
+    _unit: Optional[str]
+    _type: Type[Any]
 
     _logger: Logger
 
@@ -35,6 +36,7 @@ class Resource(Identifier):
         key: str = None,
         name: Optional[str] = None,
         group: Optional[str] = None,
+        unit: Optional[str] = None,
         type: Type | str = None,
         **configs: Any,
     ) -> None:
@@ -42,11 +44,33 @@ class Resource(Identifier):
         self._logger = logging.getLogger(self.__module__)
 
         if group is None:
-            group = ".".join(self._id.split(".")[:-1])
-        self._group = group
-
-        self._type = parse_type(type)
+            group = "_".join(self._id.split(".")[:-1])
+        self._group = self._assert_group(group)
+        self._unit = self._assert_unit(unit)
+        self._type = self._assert_type(parse_type(type))
         self.__configs = OrderedDict(configs)
+
+    @classmethod
+    def _assert_group(cls, __group: str) -> str:
+        if __group is None:
+            raise ResourceException(f"Invalid {cls.__name__}, missing specified 'group'")
+        _group = validate_key(__group)
+        if _group != __group:
+            raise ResourceException(f"Invalid characters in '{cls.__name__}' group: " + __group)
+        return _group
+
+    @classmethod
+    def _assert_unit(cls, __unit: str) -> str:
+        # TODO: Assert unit to be somewhat alphanumeric with certain symbols allowed
+        return __unit
+
+    # noinspection PyShadowingBuiltins
+    @classmethod
+    def _assert_type(cls, __type: Type[Any]) -> Type[Any]:
+        # TODO: Validate type to be valid pandas dtypes
+        if not isinstance(__type, type):
+            raise ResourceException(f"Invalid {cls.__name__}, with type '{__type}' being not allowed.")
+        return __type
 
     def __contains__(self, attr: str) -> bool:
         return attr in self._get_attrs()
@@ -69,10 +93,18 @@ class Resource(Identifier):
         return self._get_vars().get(attr, default)
 
     def _get_attrs(self) -> List[str]:
-        return ["id", "key", "name", "group", "type", *self._copy_configs().keys()]
+        return ["id", "key", "name", "group", "type", "unit", *self._copy_configs().keys()]
 
     def _get_vars(self) -> Dict[str, Any]:
-        return OrderedDict(id=self.id, key=self.key, name=self.name, type=self.type, **self._copy_configs())
+        return OrderedDict(
+            id=self.id,
+            key=self.key,
+            name=self.name,
+            group=self.group,
+            type=self.type,
+            unit=self.unit,
+            **self._copy_configs(),
+        )
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.id})"
@@ -88,9 +120,19 @@ class Resource(Identifier):
     def name(self) -> str:
         return self._name
 
+    def full_name(self, unit: bool = False) -> str:
+        name = self.name
+        if unit and self.unit is not None and len(self.unit) > 0:
+            name += f" [{self.unit}]"
+        return name
+
     @property
     def group(self) -> str:
         return self._group
+
+    @property
+    def unit(self) -> Optional[str]:
+        return self._unit
 
     @property
     def type(self) -> Type:
@@ -102,6 +144,7 @@ class Resource(Identifier):
         id: Optional[str] = None,
         key: Optional[str] = None,
         name: Optional[str] = None,
+        unit: Optional[str] = None,
         type: Optional[str | Type] = None,
         **configs: Any,
     ) -> None:
@@ -113,6 +156,7 @@ class Resource(Identifier):
             self._name = name
         if type is not None:
             self._type = parse_type(type)
+        self._unit = unit
         self.__update_configs(configs)
 
     def __update_configs(self, configs: Dict[str, Any]) -> None:
@@ -127,6 +171,7 @@ class Resource(Identifier):
             key=self.key,
             name=self.name,
             group=self.group,
+            unit=self.unit,
             type=self.type,
             **self._copy_configs(),
         )

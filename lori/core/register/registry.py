@@ -9,7 +9,7 @@ lori.core.register.registry
 from __future__ import annotations
 
 import builtins
-from typing import Callable, Dict, Generic, List, Mapping, Optional, Type, TypeVar
+from typing import Callable, Collection, Dict, Generic, List, Mapping, Optional, Type, TypeVar
 
 from lori.core import Configurations, Context, ResourceException
 from lori.core.register import Registrator
@@ -27,8 +27,7 @@ R = TypeVar("R", bound=Registrator)
 # noinspection PyShadowingBuiltins
 class Registration(Generic[R]):
     __class: key
-    __context: Context
-    __factory: Callable[[Registrator | Context, Optional[Configurations]], R]
+    __factory: Callable[[Context | Registrator, Optional[Configurations]], R]
 
     _key: str
     alias: List[str]
@@ -39,7 +38,7 @@ class Registration(Generic[R]):
         cls: Type[R],
         type: str,
         *alias: str,
-        factory: Callable[[Registrator | Context, Optional[Configurations]], R] = None,
+        factory: Callable[[Context | Registrator, Optional[Configurations]], R] = None,
     ):
         if not isinstance(type, str):
             raise ResourceException(f"Invalid '{builtins.type(type)}' registration type: {type}")
@@ -83,12 +82,19 @@ class Registration(Generic[R]):
         return self.__factory(*args, **kwargs)
 
 
+class RegistrationException(ResourceException):
+    """
+    Raise if an error with the registration occurred.
+
+    """
+
+
 # noinspection PyShadowingBuiltins
 class Registry(Generic[R]):
-    types: Mapping[Registration[R]]
+    __types: Mapping[Registration[R]]
 
     def __init__(self) -> None:
-        self.types: Dict[str, Registration[R]] = {}
+        self.__types: Dict[str, Registration[R]] = {}
 
     # noinspection PyTypeChecker, PyUnresolvedReferences
     def register(
@@ -100,18 +106,31 @@ class Registry(Generic[R]):
         replace: bool = False,
     ) -> None:
         if not isinstance(key, str):
-            raise ResourceException(f"Invalid '{builtins.type(key)}' registration type: {key}")
+            raise RegistrationException(f"Invalid '{builtins.type(key)}' registration type: {key}")
         key = key.lower()
         type = get_args(self.__orig_class__)[0]
         if not issubclass(cls, type):
             raise ValueError(f"Can only register {type} types")
         if self.has_type(key) and not replace:
-            raise ResourceException(
+            raise RegistrationException(
                 f"Registration '{key}' does already exist: "
-                f"{next(t for t in self.types.values() if key == t.key).name}"
+                f"{next(t for t in self.__types.values() if key == t.key).name}"
             )
-        registration = Registration(cls, key, *alias, factory=factory)
-        self.types[key] = registration
+        registration = Registration[R](cls, key, *alias, factory=factory)
+        self.__types[key] = registration
+
+    # noinspection PyShadowingBuiltins
+    def filter(self, filter: Callable[[Registration[R]], bool]) -> Collection[Registration[R]]:
+        return [c for c in self.__types.values() if filter(c)]
+
+    def get_types(self) -> Collection[str]:
+        return self.__types.keys()
 
     def has_type(self, type: str) -> bool:
-        return any(t.is_type(type) for t in self.types.values())
+        return any(t.is_type(type) for t in self.__types.values())
+
+    def from_type(self, type: str) -> Registration[R]:
+        for registration in self.__types.values():
+            if registration.is_type(type):
+                return registration
+        raise RegistrationException(f"Registration '{type}' does not exist")

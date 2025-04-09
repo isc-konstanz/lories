@@ -186,7 +186,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
         hashes = []
         try:
             for table_schema, schema_resources in resources.groupby("schema"):
-                for table_name, table_resources in schema_resources.groupby("table"):
+                for table_name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
                     if table_name not in self.__tables:
                         raise DatabaseException(self, f"Table '{table_name}' not available")
 
@@ -223,7 +223,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
     ) -> bool:
         try:
             for table_schema, schema_resources in resources.groupby("schema"):
-                for table_name, table_resources in schema_resources.groupby("table"):
+                for table_name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
                     if table_name not in self.__tables:
                         raise DatabaseException(self, f"Table '{table_name}' not available")
 
@@ -233,13 +233,13 @@ class SqlDatabase(Database, Mapping[str, Table]):
 
                     # noinspection PyTypeChecker
                     if result.rowcount < 1:
-                        return False
+                        continue
                     count = result.scalar()
-                    if count is None or int(count) < 1:
-                        return False
+                    if count is None or int(count) > 1:
+                        return True
         except SQLAlchemyError as e:
             self._raise(e)
-        return True
+        return False
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
     def read(
@@ -251,7 +251,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
         results = []
         try:
             for table_schema, schema_resources in resources.groupby("schema"):
-                for table_name, table_resources in schema_resources.groupby("table"):
+                for table_name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
                     table_key = table_name if table_schema is None else f"{table_schema}.{table_name}"
                     if table_key not in self.__tables:
                         raise DatabaseException(self, f"Table '{table_key}' not available")
@@ -277,7 +277,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
         results = []
         try:
             for table_schema, schema_resources in resources.groupby("schema"):
-                for table_name, table_resources in schema_resources.groupby("table"):
+                for table_name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
                     if table_name not in self.__tables:
                         raise DatabaseException(self, f"Table '{table_name}' not available")
 
@@ -298,7 +298,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
         results = []
         try:
             for table_schema, schema_resources in resources.groupby("schema"):
-                for table_name, table_resources in schema_resources.groupby("table"):
+                for table_name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
                     if table_name not in self.__tables:
                         raise DatabaseException(self, f"Table '{table_name}' not available")
 
@@ -318,7 +318,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
     def write(self, data: pd.DataFrame) -> None:
         try:
             for table_schema, schema_resources in self.resources.groupby("schema"):
-                for table_name, table_resources in schema_resources.groupby("table"):
+                for table_name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
                     if table_name not in self.__tables:
                         raise DatabaseException(self, f"Table '{table_name}' not available")
                     table_data = data.loc[:, [r.id for r in table_resources if r.id in data.columns]]
@@ -343,7 +343,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
     ) -> None:
         try:
             for table_schema, schema_resources in resources.groupby("schema"):
-                for table_name, table_resources in schema_resources.groupby("table"):
+                for table_name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
                     if table_name not in self.__tables:
                         raise DatabaseException(self, f"Table '{table_name}' not available")
                     table = self.get(table_name)

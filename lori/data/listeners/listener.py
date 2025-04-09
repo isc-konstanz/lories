@@ -14,7 +14,7 @@ from logging import Logger
 from threading import Lock
 
 import pandas as pd
-from lori.core import Identifier, ResourceException
+from lori.core import Entity, ResourceException
 from lori.data import Channel, Channels
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -26,7 +26,7 @@ except ImportError:
 
 
 # noinspection PyShadowingBuiltins
-class Listener(Identifier):
+class Listener(Entity):
     __lock: Lock
     _logger: Logger
 

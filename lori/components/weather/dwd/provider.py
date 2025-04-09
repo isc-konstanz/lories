@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-lori.connector.weather.dwd.component
+lori.components.weather.dwd.provider
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
@@ -11,13 +11,11 @@ from __future__ import annotations
 from typing import Any, Collection, Dict
 
 import pandas as pd
-from lori import Configurations, Weather
-from lori.components import register_component_type
-from lori.components.weather import WeatherForecast, WeatherProvider
-from lori.components.weather.constants import WEATHER as CHANNEL_NAMES
+from lori import Configurations, Constant
+from lori.components.weather import Weather, WeatherForecast, WeatherProvider, register_weather_type
 from lori.components.weather.dwd import Brightsky
 
-CHANNEL_IDS = [
+CHANNELS = [
     Weather.GHI,
     Weather.TEMP_AIR,
     Weather.TEMP_DEW_POINT,
@@ -30,8 +28,8 @@ CHANNEL_IDS = [
     Weather.VISIBILITY,
     Weather.PRECIPITATION,
     Weather.PRECIPITATION_PROB,
-    "condition",
-    "icon",
+    Constant(str, "condition", "Condition"),
+    Constant(str, "icon", "Icon"),
 ]
 
 CHANNEL_ADDRESS_ALIAS = {
@@ -42,24 +40,24 @@ CHANNEL_ADDRESS_ALIAS = {
     Weather.WIND_DIRECTION_GUST: "wind_gust_direction",
 }
 
-CHANNEL_TYPE_DEFAULT = float
-CHANNEL_TYPES = {
-    Weather.SUNSHINE: int,
-    Weather.VISIBILITY: int,
-    Weather.PRECIPITATION_PROB: int,
-    "condition": str,
-    "icon": str,
+CHANNEL_AGGREGATE_ALIAS = {
+    Weather.SUNSHINE: "sum",
+    Weather.PRECIPITATION: "sum",
+    Weather.WIND_SPEED_GUST: "max",
+    "condition": None,
+    "icon": None,
 }
 
 
 # noinspection SpellCheckingInspection
-@register_component_type("dwd", "brightsky")
+@register_weather_type("dwd", "brightsky")
 class DeutscherWetterDienst(WeatherProvider):
     # noinspection PyUnresolvedReferences
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        connector = Brightsky(self, key="brightsky")
+        connector = Brightsky(self, self.location, key="brightsky")
+        connector.configure(configs.get_section("brightsky", defaults={}))
         self.connectors.add(connector)
 
         if self.forecast.is_enabled() and isinstance(self.forecast, WeatherForecast):
@@ -70,6 +68,7 @@ class DeutscherWetterDienst(WeatherProvider):
                 address="source_first_record",
                 source="forecast",
                 type=pd.Timestamp,
+                aggregate="last",
                 logger={
                     "primary": True,
                     "nullable": False,
@@ -83,30 +82,20 @@ class DeutscherWetterDienst(WeatherProvider):
                 self.data.add(**channel)
 
 
-def _parse_name(key: str) -> str:
-    return key.replace("_", " ").title() if key not in CHANNEL_NAMES else CHANNEL_NAMES[key]
-
-
-def _parse_address(key: str) -> str:
-    return key if key not in CHANNEL_ADDRESS_ALIAS else CHANNEL_ADDRESS_ALIAS[key]
-
-
-def _parse_type(key: str) -> type:
-    return CHANNEL_TYPE_DEFAULT if key not in CHANNEL_TYPES else CHANNEL_TYPES[key]
-
-
-def _build_channel(key: str, **channel: Any) -> Dict[str, Any]:
-    channel["key"] = key
-    channel["name"] = _parse_name(key)
-    channel["address"] = _parse_address(key)
-    channel["type"] = _parse_type(key)
-    if channel["type"] == str:  # noqa: E721
-        channel["length"] = 32
-    return channel
-
-
-def build_channels(**channel: Any) -> Collection[Dict[str, Any]]:
+def build_channels(**custom: Any) -> Collection[Dict[str, Any]]:
     channels = []
-    for channel_key in CHANNEL_IDS:
-        channels.append(_build_channel(channel_key, **channel))
+    for channel in CHANNELS:
+        configs = channel.to_dict()
+        if channel.key in CHANNEL_ADDRESS_ALIAS:
+            configs["address"] = CHANNEL_ADDRESS_ALIAS[channel.key]
+        else:
+            configs["address"] = channel.key
+        if configs["type"] == str:  # noqa: E721
+            configs["length"] = 32
+        if channel.key in CHANNEL_AGGREGATE_ALIAS:
+            configs["aggregate"] = CHANNEL_AGGREGATE_ALIAS[channel.key]
+        else:
+            configs["aggregate"] = "mean"
+        configs.update(custom)
+        channels.append(configs)
     return channels

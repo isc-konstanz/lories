@@ -9,77 +9,85 @@ lori.core.register.registrator
 from __future__ import annotations
 
 import inspect
+import os
 import sys
 from collections import OrderedDict
 from collections.abc import Callable
-from typing import Any, Dict, Optional
+from typing import Any, Collection, Dict, List, Mapping, Optional
 
-from lori.core import Configurations, Configurator, Context, Identifier, ResourceException
-from lori.util import get_context, validate_key
+from lori.core import Configurations, Configurator, Context, Entity, ResourceException
+from lori.util import validate_key
 
 
-class Registrator(Configurator, Identifier):
+class Registrator(Configurator, Entity):
     SECTION: str = "registration"
+    INCLUDES: List[str] = []
 
     __context: Context
 
-    # noinspection PyProtectedMember, PyShadowingBuiltins, PyUnusedLocal
+    # noinspection PyShadowingBuiltins, PyProtectedMember, PyUnresolvedReferences, PyUnusedLocal
     def __init__(
         self,
-        context: Registrator | Context = None,
+        context: Context | Registrator,
         configs: Optional[Configurations] = None,
         id: Optional[str] = None,
         key: Optional[str] = None,
         name: Optional[str] = None,
         **kwargs,
     ) -> None:
+        context = self._assert_context(context)
+
+        name = self._build_name(name, configs=configs)
         key = self._build_key(key, configs=configs)
         id = self._build_id(id, key, configs=configs, context=context)
 
-        context = self._assert_context(context)
         if configs is None:
             configs = Configurations(f"{key}.conf", context.configs.dirs)
         super().__init__(
             configs=configs,
-            name=self._build_name(name, configs=configs),
             id=id,
             key=key,
+            name=name,
             **kwargs,
         )
         self.__context = context
 
     @classmethod
-    def _assert_context(cls, context: Registrator | Context) -> Context:
+    def _assert_context(cls, context: Context | Registrator) -> Context | Registrator:
         from lori.core.register import RegistratorContext
 
-        if context is None or not isinstance(context, (Registrator, RegistratorContext)):
+        if context is None or not isinstance(context, (RegistratorContext, Registrator)):
             raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
-        return get_context(context, RegistratorContext)
-
-    # noinspection PyShadowingBuiltins
-    @classmethod
-    def _assert_id(cls, id: Optional[str], key: Optional[str]) -> str:
-        id = super()._assert_id(id, key)
-        if len(id.split(".")) <= 1:
-            raise ResourceException(f"Missing context in '{cls.__name__}' id: {id}")
-        return id
+        return context
 
     # noinspection PyShadowingBuiltins
     @classmethod
     def _build_id(
         cls,
-        id: Optional[str],
-        key: Optional[str],
-        configs: Optional[Configurations],
-        context: Context,
+        id: Optional[str] = None,
+        key: Optional[str] = None,
+        context: Optional[Context | Registrator] = None,
+        configs: Optional[Configurations] = None,
     ) -> str:
         if configs is not None:
-            if configs.has_section(cls.SECTION) and "id" in configs[cls.SECTION]:
-                id = configs[cls.SECTION]["id"]
-            elif "id" in configs:
-                id = configs["id"]
-        if id is None:
-            id = f"{get_context(context, Identifier).id}.{key}"
+            if id is None:
+                if configs.has_section(cls.SECTION) and "id" in configs[cls.SECTION]:
+                    id = configs[cls.SECTION]["id"]
+                elif "id" in configs:
+                    id = configs["id"]
+            if key is None:
+                if configs.has_section(cls.SECTION) and "key" in configs[cls.SECTION]:
+                    key = configs[cls.SECTION]["key"]
+                elif "key" in configs:
+                    key = configs["key"]
+                else:
+                    key = validate_key("_".join(os.path.splitext(configs.name)[:-1]))
+        if key is None:
+            raise ResourceException(f"Unable to build '{cls.__name__}' ID")
+        if id is None and context is not None and isinstance(context, Registrator):
+            id = f"{context.id}.{key}"
+        else:
+            id = key
         return id
 
     @classmethod
@@ -94,6 +102,10 @@ class Registrator(Configurator, Identifier):
                     key = validate_key(configs[cls.SECTION]["name"])
                 elif "name" in configs:
                     key = validate_key(configs["name"])
+                else:
+                    key = validate_key("_".join(os.path.splitext(configs.name)[:-1]))
+        if key is None:
+            raise ResourceException(f"Unable to build '{cls.__name__}' Key")
         return key
 
     @classmethod
@@ -104,6 +116,10 @@ class Registrator(Configurator, Identifier):
             elif "name" in configs:
                 name = configs["name"]
         return name
+
+    @classmethod
+    def _build_defaults(cls, configs: Configurations, includes: Optional[Collection[str]] = ()) -> Dict[str, Any]:
+        return {k: v for k, v in configs.items() if not isinstance(v, Mapping) or k in cls.INCLUDES or k in includes}
 
     # noinspection PyShadowingBuiltins
     def _convert_vars(self, convert: Callable[[Any], str] = str) -> Dict[str, str]:
@@ -123,7 +139,7 @@ class Registrator(Configurator, Identifier):
         def is_from_framework(value: Any) -> bool:
             from lori.core import Configurator, Context, Resource, Resources
 
-            if isinstance(value, (Context, Resource, Resources, Configurator, Identifier)):
+            if isinstance(value, (Context, Resource, Resources, Configurator, Entity)):
                 return True
             module = inspect.getmodule(value)
             if module is None:

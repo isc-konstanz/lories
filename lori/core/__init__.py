@@ -11,8 +11,7 @@ from .exceptions import (  # noqa: F401
     ResourceUnavailableException,
 )
 
-from .identifier import Identifier  # noqa: F401
-
+from .entity import Entity  # noqa: F401
 from .context import Context  # noqa: F401
 
 from .configs import (  # noqa: F401
@@ -21,9 +20,11 @@ from .configs import (  # noqa: F401
     Configurations,
     ConfigurationException,
     ConfigurationUnavailableException,
-    ConfiguratorMeta,
     Configurator,
 )
+
+from .constant import Constant  # noqa: F401
+from .constants import CONSTANTS  # noqa: F401
 
 from .resource import Resource  # noqa: F401
 
@@ -33,9 +34,7 @@ from .register import (  # noqa: F401
     Registry,
     Registrator,
     RegistratorContext,
+    RegistratorAccess,
 )
 
-from .activator import (  # noqa: F401
-    ActivatorMeta,
-    Activator,
-)
+from .activator import Activator  # noqa: F401)

@@ -18,15 +18,12 @@ from lori.connectors import Connector, register_connector_type
 from lori.core import Resources
 from lori.data import Channel
 
-_core: RevPiModIO = RevPiModIO(autorefresh=True)
-
-# Handle SIGINT / SIGTERM to exit program cleanly
-_core.handlesignalend(_core.cleanup)
-
 
 # noinspection PyShadowingBuiltins, SpellCheckingInspection
 @register_connector_type("revpi", "revpi_io", "revpi_aio", "revpi_ro", "revolutionpi")
 class RevPiConnector(Connector):
+    _core: RevPiModIO
+
     _listeners: Dict[str, RevPiListener]
 
     def __init__(self, *args, **kwargs):
@@ -35,6 +32,11 @@ class RevPiConnector(Connector):
 
     def connect(self, resources: Resources) -> None:
         super().connect(resources)
+        self._core = RevPiModIO(autorefresh=True)
+
+        # Handle SIGINT / SIGTERM to exit program cleanly
+        # self._core.handlesignalend(self._core.cleanup)
+
         # TODO: register listeners
         # self._core.io[""].reg_event(None, as_thread=True, prefire=True)
 
@@ -47,13 +49,13 @@ class RevPiConnector(Connector):
 
         # TODO: set all IO output values to optional default attribute value
 
-        # self._core.cleanup()
+        self._core.cleanup()
 
     def read(self, resources: Resources) -> pd.DataFrame:
         now = pd.Timestamp.now(tz=tz.UTC)
         data = pd.DataFrame(columns=[r.id for r in resources])
         for resource in resources:
-            resource_io = _core.io[resource.address]
+            resource_io = self._core.io[resource.address]
             data.loc[now, resource.id] = resource_io.value
         print(data)
         return data
@@ -66,7 +68,7 @@ class RevPiConnector(Connector):
             if channel_data.empty:
                 continue
 
-            channel_io = _core.io[channel.address]
+            channel_io = self._core.io[channel.address]
             channel_io.value = channel_data.iloc[-1]
 
 

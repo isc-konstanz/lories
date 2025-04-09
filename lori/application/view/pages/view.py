@@ -143,21 +143,21 @@ class View(PageGroup):
         systems = [s for s in components.filter(lambda c: isinstance(c, System))]
         for system in systems:
             system_page = self._new_page(self, system)
-            for component in system.values():
+            for component in system.components.values():
                 self._new_page(system_page, component)
 
-        for component in components.filter(lambda c: all(c != s and c not in s for s in systems)):
+        for component in components.filter(lambda c: all(c != s and c not in s.components for s in systems)):
             self._new_page(self, component)
 
     # noinspection PyUnresolvedReferences
     def _new_page(self, view: PageGroup, component: Any) -> Optional[Page]:
         if isinstance(component, Configurator) and not component.is_enabled():
             self._logger.debug(f"Skipping page creation for disabled {type(component).__name__} '{component.id}'")
-            return
+            return None
 
         _type = type(component)
         if not registry.has_page(_type):
-            return
+            return None
 
         registration = registry.get_page(_type)
         page = registration.initialize(
@@ -175,7 +175,7 @@ class View(PageGroup):
     def _new_group(self, component: Any) -> Optional[PageGroup]:
         _type = type(component)
         if not registry.has_group(_type):
-            return
+            return None
 
         registration = registry.get_group(_type)
         group = registration.initialize(
@@ -190,7 +190,7 @@ class View(PageGroup):
     def _get_group(self, component: Any) -> Optional[PageGroup]:
         _type = type(component)
         if not registry.has_group(_type):
-            return
+            return None
         group = self.groups.get(registry.get_group(_type).key, None)
         if group is None:
             group = self._new_group(component)

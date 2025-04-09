@@ -40,6 +40,7 @@ class CsvDatabase(Database):
     separator: str = ","
 
     columns: Mapping[str, str] = {}
+    pretty: bool = False
 
     # noinspection PyTypeChecker
     def configure(self, configs: Configurations) -> None:
@@ -98,17 +99,24 @@ class CsvDatabase(Database):
         self.decimal = configs.get("decimal", CsvDatabase.decimal)
         self.separator = configs.get("separator", CsvDatabase.separator)
 
-        # TODO: Implement flag if pretty printing should be used or not
+        self.pretty = configs.get_bool("pretty", default=False)
         self.columns = configs.get("columns", default=CsvDatabase.columns)
+
+    def _build_columns(self, resources: Optional[Resources] = None) -> Mapping[str, str]:
+        columns = {r.id: self.columns[r.key] for r in resources if r.key in self.columns}
+        if self.pretty:
+            columns.update({r.id: r.full_name(unit=True) for r in self.resources if "name" in r})
+            if resources is not None:
+                columns.update({r.id: r.full_name(unit=True) for r in resources if "name" in r})
+        else:
+            columns.update({r.id: r.get("column", default=r.key) for r in self.resources})
+            if resources is not None:
+                columns.update({r.id: r.get("column", default=r.key) for r in resources})
+        return columns
 
     def connect(self, resources: Resources) -> None:
         if not os.path.isdir(self._data_dir):
             os.makedirs(self._data_dir, exist_ok=True)
-
-        columns = {r.name: r.id for r in self.resources if "name" in r}
-        columns.update({r.name: r.id for r in resources if "name" in r})
-        columns.update({column: key for key, column in self.columns.items()})
-
         try:
             if self._data_path is not None:
                 self._data = csv.read_file(
@@ -118,7 +126,7 @@ class CsvDatabase(Database):
                     timezone=self.timezone,
                     separator=self.separator,
                     decimal=self.decimal,
-                    rename=columns,
+                    rename=self._build_columns(resources),
                 )
         except IOError as e:
             raise ConnectionException(self, str(e))
@@ -135,10 +143,6 @@ class CsvDatabase(Database):
         start: Optional[pd.Timestamp | dt.datetime] = None,
         end: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> pd.DataFrame:
-        columns = {r.name: r.id for r in self.resources if "name" in r}
-        columns.update({r.name: r.id for r in resources if "name" in r})
-        columns.update({column: key for key, column in self.columns.items()})
-
         def _infer_dates(s=start, e=end) -> Tuple[pd.Timestamp, pd.Timestamp]:
             if all(pd.isna(d) for d in [s, e]):
                 n = pd.Timestamp.now(tz=self.timezone)
@@ -160,7 +164,6 @@ class CsvDatabase(Database):
                     timezone=self.timezone,
                     separator=self.separator,
                     decimal=self.decimal,
-                    rename=columns,
                 )
 
             if self.index_type in ["timestamp", "unix"] and all(pd.isna(d) for d in [start, end]):
@@ -168,13 +171,10 @@ class CsvDatabase(Database):
                 index = data.index.tz_convert(self.timezone).get_indexer([now], method="nearest")
                 data = data.iloc[[index[-1]], :]
 
+            columns = self._build_columns(resources)
             results = []
             for resource in resources:
-                if resource.id in data.columns:
-                    results.append(data.loc[:, resource.id].copy())
-                    continue
-
-                resource_column = resource.get("column", default=resource.key)
+                resource_column = columns[resource.id]
                 if resource_column not in data.columns:
                     results.append(pd.Series(name=resource.id))
                     continue
@@ -188,9 +188,6 @@ class CsvDatabase(Database):
 
     # noinspection PyTypeChecker
     def read_first(self, resources: Resources) -> Optional[pd.DataFrame]:
-        columns = {r.name: r.id for r in self.resources if "name" in r}
-        columns.update({r.name: r.id for r in resources if "name" in r})
-        columns.update({column: key for key, column in self.columns.items()})
         try:
             if self._data is not None:
                 data = self._data
@@ -210,17 +207,15 @@ class CsvDatabase(Database):
                     timezone=self.timezone,
                     separator=self.separator,
                     decimal=self.decimal,
-                    rename=columns,
+                    rename=self._build_columns(resources),
                 )
             if data is None or data.empty:
                 return None
+
+            columns = self._build_columns(resources)
             results = []
             for resource in resources:
-                if resource.id in data.columns:
-                    results.append(data.loc[:, resource.id].copy())
-                    continue
-
-                resource_column = resource.get("column", default=resource.key)
+                resource_column = columns[resource.id]
                 if resource_column not in data.columns:
                     results.append(pd.Series(name=resource.id))
                     continue
@@ -234,9 +229,6 @@ class CsvDatabase(Database):
 
     # noinspection PyTypeChecker
     def read_last(self, resources: Resources) -> Optional[pd.DataFrame]:
-        columns = {r.name: r.id for r in self.resources if "name" in r}
-        columns.update({r.name: r.id for r in resources if "name" in r})
-        columns.update({column: key for key, column in self.columns.items()})
         try:
             if self._data is not None:
                 data = self._data
@@ -256,17 +248,15 @@ class CsvDatabase(Database):
                     timezone=self.timezone,
                     separator=self.separator,
                     decimal=self.decimal,
-                    rename=columns,
+                    rename=self._build_columns(resources),
                 )
             if data is None or data.empty:
                 return None
+
+            columns = self._build_columns(resources)
             results = []
             for resource in resources:
-                if resource.id in data.columns:
-                    results.append(data.loc[:, resource.id].copy())
-                    continue
-
-                resource_column = resource.get("column", default=resource.key)
+                resource_column = columns[resource.id]
                 if resource_column not in data.columns:
                     results.append(pd.Series(name=resource.id))
                     continue
@@ -279,8 +269,7 @@ class CsvDatabase(Database):
             raise ConnectionException(self, str(e))
 
     def write(self, data: pd.DataFrame) -> None:
-        columns = {r.id: r.name for r in self.resources if "name" in r}
-        columns.update(self.columns)
+        columns = self._build_columns(self.resources)
         kwargs = {
             "timezone": self.timezone,
             "separator": self.separator,

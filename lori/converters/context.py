@@ -8,7 +8,7 @@ lori.converters.context
 
 from __future__ import annotations
 
-from typing import Callable, List, Optional, Type, TypeVar
+from typing import Any, Callable, Collection, List, Optional, Type, TypeVar
 
 from lori import ResourceException
 from lori.converters.converter import (
@@ -21,11 +21,11 @@ from lori.converters.converter import (
     TimestampConverter,
 )
 from lori.core import Context, Registrator, RegistratorContext, Registry
-from lori.core.configs import Configurations, Configurator
+from lori.core.configs import Configurations
 
 C = TypeVar("C", bound=Converter)
 
-BUILTIN_CONVERTERS = [
+CONVERTERS_BUILTINS = [
     DatetimeConverter,
     TimestampConverter,
     StringConverter,
@@ -46,7 +46,7 @@ registry.register(BoolConverter, "bool", "boolean")
 def register_converter_type(
     key: str,
     *alias: str,
-    factory: Callable[[Registrator | Context, Optional[Configurations]], C] = None,
+    factory: Callable[[Context | Registrator, Optional[Configurations]], C] = None,
     replace: bool = False,
 ) -> Callable[[Type[C]], Type[C]]:
     # noinspection PyShadowingNames
@@ -57,45 +57,33 @@ def register_converter_type(
     return _register
 
 
-class ConverterContext(RegistratorContext[Converter], Configurator):
-    SECTION: str = "converters"
-
+class ConverterContext(RegistratorContext[Converter]):
     @property
     def _registry(self) -> Registry[Converter]:
         return registry
 
-    # noinspection PyTypeChecker
-    def configure(self, configs: Configurations) -> None:
-        super().configure(configs)
+    # noinspection PyProtectedMember
+    def load(self, configs: Configurations, **kwargs: Any) -> Collection[Converter]:
+        defaults = Converter._build_defaults(configs)
+
+        converters = []
         converter_dirs = configs.dirs.to_dict()
-        converter_dirs["conf_dir"] = configs.dirs.conf.joinpath(f"{self.SECTION}.d")
-        converter_generics = [c.type for c in registry.types.values() if c.type in BUILTIN_CONVERTERS]
-        for converter in converter_generics:
-            self._configure(converter, **converter_dirs)
-        self._load(self, configs)
+        converter_dirs["conf_dir"] = str(configs.dirs.conf.joinpath("converters.d"))
+        converter_generics = [c.type for c in registry.filter(lambda r: r.type in CONVERTERS_BUILTINS)]
+        for converter_cls in converter_generics:
+            converter_key = converter_cls.dtype.__name__.lower()
+            converter_configs = Configurations.load(
+                f"{converter_key}.conf",
+                require=False,
+                **converter_dirs,
+                **defaults,
+            )
+            converter = converter_cls(context=self, configs=converter_configs, key=converter_key)
+            converters.append(converter)
+            self._add(converter)
 
-    # noinspection PyTypeChecker
-    def _configure(self, cls: Type[Converter], **kwargs) -> None:
-        key = cls.dtype.__name__.lower()
-        configs = Configurations.load(f"{key}.conf", require=False, **kwargs)
-        self._add(cls(context=self, configs=configs, key=key))
-
-    def _load(
-        self,
-        context: Registrator | RegistratorContext,
-        configs: Configurations,
-        configs_file: str = "converters.conf",
-    ) -> None:
-        defaults = {}
-        configs = configs.copy()
-        if configs.has_section(self.SECTION):
-            connectors = configs.get_section(self.SECTION)
-            for section in Converter.INCLUDES:
-                if section in connectors:
-                    defaults.update(connectors.pop(section))
-
-            self._load_sections(context, connectors, defaults, Converter.INCLUDES)
-        self._load_from_file(context, configs.dirs, configs_file, defaults)
+        converters.extend(self._load(self, configs, includes=Converter.INCLUDES, **kwargs))
+        return converters
 
     def has_dtype(self, *dtypes: Type) -> bool:
         return len(self._get_by_dtypes(*dtypes)) > 0

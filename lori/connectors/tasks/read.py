@@ -17,6 +17,8 @@ from lori.connectors.tasks.task import ConnectorTask
 
 
 class ReadTask(ConnectorTask):
+    results: pd.DataFrame
+
     def run(
         self,
         start: Optional[pd.Timestamp | dt.datetime] = None,
@@ -26,10 +28,8 @@ class ReadTask(ConnectorTask):
             f"Reading {len(self.channels)} channels of '{type(self.connector).__name__}': {self.connector.id}"
         )
         if isinstance(self.connector, Database):
-            data = self.connector.read(self.channels, start=start, end=end)
+            self.results = self.connector.read(self.channels, start=start, end=end)
         else:
             if start is not None or end is not None:
                 self._logger.warning(f"Trying to read slice of Connector '{self.connector.id}' from {start} to {end}")
-            data = self.connector.read(self.channels)
-
-        self.channels.set_frame(data)
+            self.results = self.connector.read(self.channels)

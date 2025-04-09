@@ -15,20 +15,23 @@ from functools import wraps
 from logging import Logger
 from typing import Any, Dict, Optional
 
-from lori.core import Context, Identifier
+from lori.core import Context, Entity
 from lori.core.configs import ConfigurationException, Configurations
 from lori.util import get_members
 
 
 class ConfiguratorMeta(ABCMeta):
-    # noinspection PyProtectedMember
     def __call__(cls, *args, **kwargs):
         configurator = super().__call__(*args, **kwargs)
-
-        configurator._Configurator__configure = configurator.configure
-        configurator.configure = configurator._do_configure
+        cls._wrap_method(configurator, "configure")
 
         return configurator
+
+    # noinspection PyShadowingBuiltins
+    @staticmethod
+    def _wrap_method(object: Any, method: str) -> None:
+        setattr(object, f"_run_{method}", getattr(object, method))
+        setattr(object, method, getattr(object, f"_do_{method}"))
 
 
 class Configurator(ABC, object, metaclass=ConfiguratorMeta):
@@ -71,7 +74,7 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
     # noinspection PyShadowingBuiltins
     def _convert_vars(self, convert: callable = str) -> Dict[str, str]:
         def _convert(var: Any) -> str:
-            return str(var) if not isinstance(var, (Context, Configurator, Identifier)) else convert(var)
+            return str(var) if not isinstance(var, (Context, Configurator, Entity)) else convert(var)
 
         vars = self._get_vars()
         values = OrderedDict([(k, _convert(v)) for k, v in vars.items()])
@@ -117,11 +120,15 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
             return
 
         self._assert_configs(configs)
-        self.__configure(configs, *args, **kwargs)
+        self._at_configure(configs)
+        self._run_configure(configs, *args, **kwargs)
         self._on_configure(configs)
         if self.__configs != configs:
             self.__configs = configs
         self._configured = True
+
+    def _at_configure(self, configs: Configurations) -> None:
+        pass
 
     def _on_configure(self, configs: Configurations) -> None:
         pass

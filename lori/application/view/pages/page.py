@@ -12,7 +12,7 @@ import logging
 import re
 from abc import ABC, ABCMeta, abstractmethod
 from functools import wraps
-from typing import Optional, TypeVar
+from typing import Any, Optional, TypeVar
 
 import dash
 from dash.development.base_component import Component
@@ -28,14 +28,16 @@ class PageMeta(ABCMeta):
     # noinspection PyProtectedMember
     def __call__(cls, *args, **kwargs):
         page = super().__call__(*args, **kwargs)
-
-        page._Page__create_layout = page.create_layout
-        page.create_layout = page._do_create_layout
-
-        page._Page__register = page.register
-        page.register = page._do_register
+        cls._wrap_method(page, "create_layout")
+        cls._wrap_method(page, "register")
 
         return page
+
+    # noinspection PyShadowingBuiltins
+    @staticmethod
+    def _wrap_method(object: Any, method: str) -> None:
+        setattr(object, f"_run_{method}", getattr(object, method))
+        setattr(object, method, getattr(object, f"_do_{method}"))
 
 
 # noinspection PyShadowingBuiltins
@@ -104,9 +106,13 @@ class Page(ABC, metaclass=PageMeta):
             self._logger.warning(f"{type(self).__name__} '{self.id}' layout already created")
         else:
             self.layout = PageLayout(id=f"{self.id}-container")
-            self.__create_layout(self.layout, *args, **kwargs)
+            self._at_create_layout(self.layout)
+            self._run_create_layout(self.layout, *args, **kwargs)
             self._on_create_layout(self.layout)
             self._created = True
+
+    def _at_create_layout(self, layout: PageLayout) -> None:
+        pass
 
     def _on_create_layout(self, layout: PageLayout) -> None:
         pass
@@ -138,7 +144,7 @@ class Page(ABC, metaclass=PageMeta):
 
         self._logger.debug(f"Registering {type(self).__name__} '{self.id}': {self.name}")
 
-        self.__register()
+        self._run_register()
         self._on_register()
         self._registered = True
 

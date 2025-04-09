@@ -191,7 +191,7 @@ def replicate(
     end = source.read_last_index(resources)
     if end is None:
         end = now
-    elif floor is not None:
+    if floor is not None:
         end = floor_date(end, freq=floor)
 
     start = target.read_last_index(resources) if not full else None
@@ -209,7 +209,7 @@ def replicate(
         )
         return
 
-    if slice and end - start <= to_timedelta(freq):
+    if slice and start + to_timedelta(freq) >= end:
         slice = False
 
     if not target_empty:

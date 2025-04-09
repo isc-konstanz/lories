@@ -17,6 +17,7 @@ import pandas as pd
 import pytz as tz
 from lori.core import Registrator, ResourceException
 from lori.data.channels import Channel, Channels
+from lori.data.validation import validate_index
 from lori.util import is_bool, is_float, is_int, to_bool, to_date, to_float, to_int
 
 T = TypeVar("T", bound=Any)
@@ -74,11 +75,7 @@ class Converter(Registrator, Generic[T]):
         else:
             series = pd.Series(index=[timestamp], data=[value], name=name)
 
-        if not isinstance(series.index, pd.DatetimeIndex):
-            raise ResourceException(f"Invalid series, without expected DatetimeIndex: {series}")
-        if not series.index.is_unique:
-            raise ResourceException(f"Invalid series with non unique index: {series[series.index.duplicated()]}")
-
+        series = validate_index(series)
         series.index.name = Channel.TIMESTAMP
         if series.index.tzinfo is None:
             self._logger.warning(

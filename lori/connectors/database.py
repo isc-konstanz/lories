@@ -17,15 +17,11 @@ import tzlocal
 
 import pandas as pd
 import pytz as tz
-from lori.connectors import (
-    ConnectionException,
-    Connector,
-    ConnectorException,
-    ConnectorMeta,
-    ConnectorUnavailableException,
-)
+from lori.connectors import ConnectionException, ConnectorException, ConnectorUnavailableException
+from lori.connectors.connector import Connector, ConnectorMeta
 from lori.core import Configurations, Resources
 from lori.data.util import hash_data
+from lori.data.validation import validate_index, validate_timezone
 from lori.util import convert_timezone, to_date, to_timezone
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -40,30 +36,13 @@ class DatabaseMeta(ConnectorMeta):
     # noinspection PyProtectedMember
     def __call__(cls, *args, **kwargs):
         database = super().__call__(*args, **kwargs)
-
-        database._Database__hash = database.hash
-        database.hash = database._do_hash
-
-        database._Database__exists = database.exists
-        database.exists = database._do_exists
-
-        database._Database__read = database._Connector__read
-        del database._Connector__read
-
-        database._Database__read_first = database.read_first
-        database.read_first = database._do_read_first
-
-        database._Database__read_first_index = database.read_first_index
-        database.read_first_index = database._do_read_first_index
-
-        database._Database__read_last = database.read_last
-        database.read_last = database._do_read_last
-
-        database._Database__read_last_index = database.read_last_index
-        database.read_last_index = database._do_read_last_index
-
-        database._Database__delete = database.delete
-        database.delete = database._do_delete
+        cls._wrap_method(database, "hash")
+        cls._wrap_method(database, "exists")
+        cls._wrap_method(database, "read_first")
+        cls._wrap_method(database, "read_first_index")
+        cls._wrap_method(database, "read_last")
+        cls._wrap_method(database, "read_last_index")
+        cls._wrap_method(database, "delete")
 
         return database
 
@@ -89,15 +68,13 @@ class Database(Connector, metaclass=DatabaseMeta):
         method: Literal["MD5", "SHA1", "SHA256", "SHA512"] = "MD5",
         encoding: str = "UTF-8",
     ) -> Optional[str]:
-        data = self.__read(resources, start, end)
-        data = self._validate_timezone(resources, data)
+        data = self._run_read(resources, start, end)
+        data = self._validate(resources, data)
         data = self._get_range(data, start, end)
         if data is None or data.empty:
             return None
-        columns = [
-            data.index.name,
-            *[r.id for r in resources if r.id in data.columns],
-        ]
+
+        columns = [r.id for r in resources if r.id in data.columns]
         return hash_data(data.loc[:, columns], method, encoding)
 
     @wraps(hash, updated=())
@@ -115,7 +92,7 @@ class Database(Connector, metaclass=DatabaseMeta):
             if not self._is_connected():
                 raise ConnectionException(self, f"Database '{self.id}' not connected")
 
-            return self.__hash(resources, start=start, end=end, method=method, encoding=encoding, *args, **kwargs)
+            return self._run_hash(resources, start=start, end=end, method=method, encoding=encoding, *args, **kwargs)
 
     def exists(
         self,
@@ -124,8 +101,8 @@ class Database(Connector, metaclass=DatabaseMeta):
         end: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> bool:
         # TODO: Replace this placeholder more resource efficient
-        data = self.__read(resources, start, end)
-        data = self._validate_timezone(resources, data)
+        data = self._run_read(resources, start, end)
+        data = self._validate(resources, data)
         data = self._get_range(data, start, end)
         return not data.empty
 
@@ -142,7 +119,7 @@ class Database(Connector, metaclass=DatabaseMeta):
             if not self._is_connected():
                 raise ConnectionException(self, f"Database '{self.id}' not connected")
 
-            return self.__exists(resources, start=start, end=end, *args, **kwargs)
+            return self._run_exists(resources, start=start, end=end, *args, **kwargs)
 
     @overload
     def read(self, resources: Resources) -> pd.DataFrame: ...
@@ -177,8 +154,8 @@ class Database(Connector, metaclass=DatabaseMeta):
             if not self._is_connected():
                 raise ConnectionException(self, f"Database '{self.id}' not connected")
 
-            data = self.__read(resources, start=start, end=end, *args, **kwargs)
-            data = self._validate_timezone(resources, data)
+            data = self._run_read(resources, start=start, end=end, *args, **kwargs)
+            data = self._validate(resources, data)
             return self._get_range(data, start, end)
 
     @abstractmethod
@@ -191,13 +168,13 @@ class Database(Connector, metaclass=DatabaseMeta):
             if not self._is_connected():
                 raise ConnectionException(self, f"Database '{self.id}' not connected")
 
-            data = self.__read_first(resources, *args, **kwargs)
-            data = self._validate_timezone(resources, data)
+            data = self._run_read_first(resources, *args, **kwargs)
+            data = self._validate(resources, data)
             return data
 
     def read_first_index(self, resources: Resources) -> Optional[Any]:
-        data = self.__read_first(resources)
-        data = self._validate_timezone(resources, data)
+        data = self._run_read_first(resources)
+        data = self._validate(resources, data)
         if data is None or data.empty:
             return None
         return min(data.index)
@@ -208,7 +185,7 @@ class Database(Connector, metaclass=DatabaseMeta):
             if not self._is_connected():
                 raise ConnectionException(self, f"Database '{self.id}' not connected")
 
-            index = self.__read_first_index(resources, *args, **kwargs)
+            index = self._run_read_first_index(resources, *args, **kwargs)
             if isinstance(index, dt.datetime):
                 index = convert_timezone(index, timezone=self.timezone)
             return index
@@ -223,13 +200,13 @@ class Database(Connector, metaclass=DatabaseMeta):
             if not self._is_connected():
                 raise ConnectionException(self, f"Database '{self.id}' not connected")
 
-            data = self.__read_last(resources, *args, **kwargs)
-            data = self._validate_timezone(resources, data)
+            data = self._run_read_last(resources, *args, **kwargs)
+            data = self._validate(resources, data)
             return data
 
     def read_last_index(self, resources: Resources) -> Optional[pd.Index]:
-        data = self.__read_last(resources)
-        data = self._validate_timezone(resources, data)
+        data = self._run_read_last(resources)
+        data = self._validate(resources, data)
         if data is None or data.empty:
             return None
         return max(data.index)
@@ -240,24 +217,15 @@ class Database(Connector, metaclass=DatabaseMeta):
             if not self._is_connected():
                 raise ConnectionException(self, f"Database '{self.id}' not connected")
 
-            index = self.__read_last_index(resources, *args, **kwargs)
+            index = self._run_read_last_index(resources, *args, **kwargs)
             if isinstance(index, dt.datetime):
                 index = convert_timezone(index, timezone=self.timezone)
             return index
 
-    def _validate_timezone(self, resources: Resources, data: pd.DataFrame) -> pd.DataFrame:
-        # noinspection PyShadowingNames
-        def _validate_series(series: pd.Series) -> pd.Series:
-            if isinstance(series, pd.DatetimeIndex):
-                series = series.tz_convert(self.timezone)
-            elif pd.api.types.is_datetime64_dtype(series.values):
-                series = series.dt.tz_convert(self.timezone)
-            elif series.map(lambda i: isinstance(i, (pd.Timestamp, dt.datetime))).all():
-                series = series.map(lambda i: i.astimezone(self.timezone))
-            return series
-
+    def _validate(self, resources: Resources, data: pd.DataFrame) -> pd.DataFrame:
         if not data.empty:
-            data.index = _validate_series(data.index)
+            data = validate_index(data)
+            data.index = validate_timezone(data.index, self.timezone)
             for resource in resources:
                 if resource.id not in data:
                     continue
@@ -265,7 +233,7 @@ class Database(Connector, metaclass=DatabaseMeta):
                     resource_data = data[resource.id]
                     if pd.api.types.is_string_dtype(resource_data.values):
                         resource_data = pd.to_datetime(resource_data)
-                    data[resource.id] = _validate_series(resource_data)
+                    data[resource.id] = validate_timezone(resource_data, self.timezone)
         return data
 
     @staticmethod
@@ -317,7 +285,7 @@ class Database(Connector, metaclass=DatabaseMeta):
             if not self._is_connected():
                 raise ConnectionException(self, f"Database '{self.id}' not connected")
 
-            self.__delete(resources, start=start, end=end, *args, **kwargs)
+            self._run_delete(resources, start=start, end=end, *args, **kwargs)
 
 
 class DatabaseException(ConnectorException):

@@ -8,67 +8,36 @@ lori.connectors.connector
 
 from __future__ import annotations
 
+import datetime as dt
 from abc import abstractmethod
 from collections import OrderedDict
-from enum import Enum
 from functools import wraps
 from threading import Lock
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import pandas as pd
 import pytz as tz
 from lori import Channel, Channels, ChannelState
-from lori.core import Context, Registrator, Resource, ResourceException, Resources, ResourceUnavailableException
-from lori.core.configs import ConfigurationException, Configurations, Configurator, ConfiguratorMeta
+from lori.connectors.core import ConnectorException, ConnectType, _Connector
+from lori.core import Context, Registrator, Resource, ResourceException, Resources
+from lori.core.configs import ConfigurationException, Configurations
+from lori.core.configs.configurator import Configurator, ConfiguratorMeta
+from lori.data.validation import validate_index
 
 
 class ConnectorMeta(ConfiguratorMeta):
     # noinspection PyProtectedMember
     def __call__(cls, *args, **kwargs):
         connector = super().__call__(*args, **kwargs)
-
-        connector._Connector__connect = connector.connect
-        connector.connect = connector._do_connect
-
-        connector._Connector__disconnect = connector.disconnect
-        connector.disconnect = connector._do_disconnect
-
-        connector._Connector__read = connector.read
-        connector.read = connector._do_read
-
-        connector._Connector__write = connector.write
-        connector.write = connector._do_write
+        cls._wrap_method(connector, "connect")
+        cls._wrap_method(connector, "disconnect")
+        cls._wrap_method(connector, "read")
+        cls._wrap_method(connector, "write")
 
         return connector
 
 
-class ConnectType(Enum):
-    NONE = "NONE"
-    AUTO = "AUTO"
-
-    @classmethod
-    def  get(cls, value: str | bool) -> ConnectType:
-        if isinstance(value, str):
-            value = value.lower()
-            if value.upper() in ["auto", "true"]:
-                return ConnectType.AUTO
-            if value.upper() == ["none", "false"]:
-                return ConnectType.NONE
-        if isinstance(value, bool):
-            if value:
-                return ConnectType.AUTO
-            else:
-                return ConnectType.NONE
-        raise ValueError("Unknown ConnectType: " + str(value))
-
-    def __str__(self):
-        return str(self.value)
-
-
-class Connector(Registrator, metaclass=ConnectorMeta):
-    SECTION: str = "connector"
-    INCLUDES: List[str] = []
-
+class Connector(_Connector, metaclass=ConnectorMeta):
     _connected: bool = False
     _connect_type: ConnectType = ConnectType.AUTO
     _connect_timestamp: pd.Timestamp = pd.NaT
@@ -81,7 +50,7 @@ class Connector(Registrator, metaclass=ConnectorMeta):
 
     def __init__(
         self,
-        context: Registrator | Context,
+        context: Context | Registrator,
         configs: Optional[Configurations] = None,
         **kwargs,
     ) -> None:
@@ -98,7 +67,7 @@ class Connector(Registrator, metaclass=ConnectorMeta):
         self.disconnect()
 
     @classmethod
-    def _assert_context(cls, context: Registrator | Context) -> Context:
+    def _assert_context(cls, context: Context | Registrator) -> Context:
         if context is None:
             raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
         return super()._assert_context(context)
@@ -162,6 +131,7 @@ class Connector(Registrator, metaclass=ConnectorMeta):
     def _is_disconnected(self) -> bool:
         return not self._is_connected()
 
+    # noinspection SpellCheckingInspection
     def _is_reconnectable(self) -> bool:
         return (
             self.is_enabled()
@@ -197,12 +167,16 @@ class Connector(Registrator, metaclass=ConnectorMeta):
                 self._logger.warning(f"{type(self).__name__} '{self.id}' already connected")
                 return
 
-            self.__connect(resources, *args, **kwargs)
+            self._at_connect(resources)
+            self._run_connect(resources, *args, **kwargs)
             self._on_connect(resources)
             self._disconnect_timestamp = pd.NaT
             self._connect_timestamp = pd.Timestamp.now(tz.UTC)
             self._connected = True
             self.__resources = resources
+
+    def _at_connect(self, resources: Resources) -> None:
+        pass
 
     def _on_connect(self, resources: Resources) -> None:
         pass
@@ -214,14 +188,18 @@ class Connector(Registrator, metaclass=ConnectorMeta):
     @wraps(disconnect, updated=())
     def _do_disconnect(self) -> None:
         with self._lock:
-            if self._is_connected():
+            if not self._is_connected():
                 return
 
-            self.__disconnect()
+            self._at_disconnect()
+            self._run_disconnect()
             self._on_disconnect()
             self._disconnect_timestamp = pd.Timestamp.now(tz.UTC)
             self._connect_timestamp = pd.NaT
             self._connected = False
+
+    def _at_disconnect(self) -> None:
+        pass
 
     def _on_disconnect(self) -> None:
         pass
@@ -237,7 +215,22 @@ class Connector(Registrator, metaclass=ConnectorMeta):
             if not self._is_connected():
                 raise ConnectorException(self, f"Trying to read from unconnected {type(self).__name__}: {self.id}")
 
-            return self.__read(resources, *args, **kwargs)
+            data = self._run_read(resources, *args, **kwargs)
+            data = self._validate(resources, data)
+            return data
+
+    # noinspection PyMethodMayBeStatic
+    def _validate(self, resources: Resources, data: pd.DataFrame) -> pd.DataFrame:
+        if not data.empty:
+            data = validate_index(data)
+            for resource in resources:
+                if resource.id not in data:
+                    continue
+                if resource.type in [pd.Timestamp, dt.datetime]:
+                    resource_data = data[resource.id]
+                    if pd.api.types.is_string_dtype(resource_data.values):
+                        data[resource.id] = pd.to_datetime(resource_data)
+        return data
 
     @abstractmethod
     def write(self, data: pd.DataFrame) -> None:
@@ -253,34 +246,8 @@ class Connector(Registrator, metaclass=ConnectorMeta):
             if len(unknown) > 0:
                 raise ConnectorException(
                     self,
-                    f"Trying to read unknown resource{'s' if len(unknown) > 0 else ''} '{', '.join(unknown)}' for "
+                    f"Trying to write unknown resource{'s' if len(unknown) > 0 else ''} '{', '.join(unknown)}' for "
                     f"{type(self).__name__}: {self.id}",
                 )
 
-            self.__write(data, *args, **kwargs)
-
-
-class ConnectorException(ResourceException):
-    """
-    Raise if an error occurred accessing the connector.
-
-    """
-
-    # noinspection PyArgumentList
-    def __init__(self, connector: Connector, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.connector = connector
-
-
-class ConnectorUnavailableException(ResourceUnavailableException, ConnectorException):
-    """
-    Raise if an accessed connector can not be found.
-
-    """
-
-
-class ConnectionException(ConnectorException):
-    """
-    Raise if an error occurred with the connection.
-
-    """
+            self._run_write(data, *args, **kwargs)

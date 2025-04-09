@@ -15,7 +15,7 @@ from typing import Any, Collection, Dict, List, Mapping, Optional, Type
 
 import pandas as pd
 import pytz as tz
-from lori.core import Context, Resource, ResourceException
+from lori.core import Context, Entity, Resource, ResourceException
 from lori.core.configs import ConfigurationException, Configurations
 from lori.data.channels import ChannelConnector, ChannelConverter, ChannelState
 from lori.util import parse_freq, to_timedelta
@@ -29,6 +29,15 @@ except ImportError:
 
 
 class Channel(Resource):
+    INCLUDES: Collection[str] = [
+        "logger",
+        "connector",
+        "converter",
+        "replicator",
+        "replication",
+        "retention",
+        "rotate",
+    ]
     TIMESTAMP: str = "timestamp"
 
     __context: Context
@@ -241,6 +250,7 @@ class Channel(Resource):
             key=self.key,
             name=self.name,
             group=self.group,
+            unit=self.unit,
             type=self.type,
             context=self.__context,
             converter=self.converter.copy(),
@@ -272,24 +282,27 @@ class Channel(Resource):
             self.logger._update(**logger)
         super()._update(**configs)
 
+    # noinspection PyShadowingBuiltins
+    @classmethod
+    def _build_id(
+        cls,
+        id: Optional[str] = None,
+        key: Optional[str] = None,
+        context: Optional[Context | Entity] = None,
+    ) -> str:
+        if id is None:
+            if key is None:
+                raise ResourceException(f"Unable to build '{cls.__name__}' ID")
+            if id is None and context is not None and isinstance(context, Entity):
+                id = f"{context.id}.{key}"
+            else:
+                id = key
+        return id
+
     @staticmethod
     def _build_defaults(configs: Configurations) -> Dict[str, Any]:
         return Channel._build_configs(
-            {
-                k: v
-                for k, v in configs.items()
-                if not isinstance(v, Mapping)
-                or k
-                in [
-                    "logger",
-                    "connector",
-                    "converter",
-                    "replicator",
-                    "replication",
-                    "retention",
-                    "rotate",
-                ]
-            }
+            {k: v for k, v in configs.items() if not isinstance(v, Mapping) or k in Channel.INCLUDES}
         )
 
     @staticmethod
