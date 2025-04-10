@@ -133,6 +133,23 @@ def _parse_kwargs(parser: ArgumentParser) -> Dict[str, Any]:
                 action="store_true",
                 help="flags if the replication should be executed for all data",
             )
+        if "simulate" not in action_parser.choices.keys():
+            simulate_parser = action_parser.add_parser(
+                name="simulate",
+                help="simulate local resources and systems for a specified time range",
+            )
+            simulate_parser.add_argument(
+                "--start",
+                dest="start",
+                metavar="datetime",
+                help="the start datetime for the simulation to start",
+            )
+            simulate_parser.add_argument(
+                "--end",
+                dest="end",
+                metavar="datetime",
+                help="the end datetime for the simulation to end",
+            )
 
         parser.add_argument(
             "-c",

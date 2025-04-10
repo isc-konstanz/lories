@@ -16,6 +16,7 @@ import pandas as pd
 from lori import ConfigurationException, Configurations, Settings
 from lori.components import Component, ComponentContext, Weather, WeatherUnavailableException
 from lori.location import Location, LocationUnavailableException
+from lori.simulation import Results
 from lori.typing import TimestampType
 from lori.util import validate_key
 
@@ -139,3 +140,15 @@ class System(Component):
         if weather is None:
             raise WeatherUnavailableException(f"System '{self.name}' has no weather configured")
         return weather
+
+    def simulate(
+        self,
+        start: TimestampType,
+        end: TimestampType,
+        prior: Optional[pd.DataFrame] = None,
+        **kwargs: Any,
+    ) -> pd.DataFrame:
+        raise NotImplementedError()
+
+    def evaluate(self, results: Results) -> pd.DataFrame:
+        raise NotImplementedError()

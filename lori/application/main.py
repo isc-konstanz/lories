@@ -20,6 +20,7 @@ from lori import Settings, System
 from lori.application import Interface
 from lori.connectors import Database, DatabaseException
 from lori.data.manager import DataManager
+from lori.simulation import Results
 from lori.typing import TimestampType
 from lori.util import slice_range, to_timedelta
 
@@ -94,6 +95,11 @@ class Application(DataManager):
             elif action == "replicate":
                 self.replicate(full=self.settings.get_bool("full"), force=self.settings.get_bool("force"))
 
+            elif action == "simulate":
+                self.simulate(
+                    start=self.settings.get_date("start", default=None),
+                    end=self.settings.get_date("end", default=None),
+                )
         except Exception as e:
             self._logger.warning(repr(e))
             if self._logger.isEnabledFor(logging.DEBUG):
@@ -108,3 +114,107 @@ class Application(DataManager):
 
         if has_interface:
             self._interface.start()
+
+    # noinspection PyUnresolvedReferences, PyProtectedMember, PyShadowingBuiltins
+    def simulate(
+        self,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
+        **kwargs,
+    ) -> None:
+        simulation = self.settings.get_section("simulation", defaults={"data": {"include": True}})
+
+        timezone = simulation.get("timezone", None)
+        if timezone is None:
+            timezone = tzlocal.get_localzone_name()
+        if start is None:
+            start = simulation.get_date("start", default=None, timezone=timezone)
+        if end is None:
+            end = simulation.get_date("end", default=None, timezone=timezone)
+
+        if start is None or end is None or end < start:
+            self._logger.error("Invalid settings missing specified simulation period")
+            sys.exit(1)
+
+        slice = simulation.get_bool("slice", default=True)
+        freq = simulation.get("freq", default=None)
+
+        database_id = simulation.get("database", default="results")
+        database_section = simulation.get_section("databases", defaults={})
+        if database_id == "results" and "results" not in database_section:
+            database_section["results"] = {
+                "type": "tables",
+                "file": ".results.h5",
+                "compression_level": 9,
+                "compression_lib": "zlib",
+            }
+        self.connectors.load(database_section)
+
+        database = self.connectors.get(database_id)
+        if not isinstance(database, Database):
+            raise DatabaseException(database, f"Invalid results cache type '{type(database)}'")
+
+        error = False
+        summary = []
+        systems = self.components.get_all(System)
+        for system in systems:
+            self._logger.info(f"Starting simulation of system '{system.name}': {system.id}")
+            if slice and freq is not None and start + to_timedelta(freq) < end:
+                slices = slice_range(start, end, timezone=system.location.timezone, freq=freq)
+            else:
+                slices = [(start, end)]
+
+            with Results(system, database, simulation.get_section("data"), total=len(slices)) as results:
+                results.durations.start("Simulation")
+                try:
+                    for slice_start, slice_end in slices:
+                        slice_prior = results.data.tail(1) if not results.data.empty else None
+                        results.submit(
+                            system.simulate,
+                            slice_start,
+                            slice_end,
+                            slice_prior,
+                            **kwargs,
+                        )
+                        results.progress.update()
+
+                    results.durations.stop("Simulation")
+                    self._logger.debug(
+                        f"Finished simulation of system '{system.name}' in {results.durations['Simulation']} minutes"
+                    )
+
+                    self._logger.debug(f"Starting evaluation of system '{system.name}': {system.id}")
+                    results.durations.start("Evaluation")
+                    results_data = system.evaluate(results)
+                    results.report()
+
+                    # TODO: Call evaluations from configs
+
+                    results.durations.stop("Evaluation")
+                    self._logger.debug(
+                        f"Finished evaluation of system '{system.name}' in {results.durations['Evaluation']} minutes"
+                    )
+
+                    summary.append(results.to_frame())
+
+                except Exception as e:
+                    error = True
+                    self._logger.error(f"Error simulating system {system.name}: {str(e)}")
+                    self._logger.debug("%s: %s", type(e).__name__, traceback.format_exc())
+                    results.durations.complete()
+                    results.progress.complete(
+                        status="error",
+                        message=str(e),
+                        error=type(e).__name__,
+                        trace=traceback.format_exc(),
+                    )
+
+        if not error and len(summary) > 1:
+            try:
+                from lori.io import excel
+
+                excel_file = str(self.configs.dirs.data.joinpath("summary.xlsx"))
+                excel.write(excel_file, "Summary", pd.concat(summary, axis="index"))
+
+            except ImportError:
+                pass
