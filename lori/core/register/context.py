@@ -96,7 +96,8 @@ class _RegistratorContext(Context[R], Generic[R]):
                 continue
             section_file = f"{section_name}.conf"
             section_default = deepcopy(defaults)
-            section_default.update(configs.get(section_name))
+            update_recursive(section_default, configs.get(section_name))
+
             section = Configurations.load(
                 section_file,
                 **configs.dirs.to_dict(),

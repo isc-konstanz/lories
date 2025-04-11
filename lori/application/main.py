@@ -59,8 +59,8 @@ class Application(DataManager):
         else:
             systems.append(factory.load(self._components, **system_dirs, flat=systems_flat))
 
-        self._components.sort()
         self._components._configure(systems)
+        self._components.sort()
 
         if not self._components.has_type(System) and settings.dirs.data.is_default():
             self._components.load(settings, configs_dir=settings.dirs.conf)

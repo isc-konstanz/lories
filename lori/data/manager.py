@@ -109,14 +109,15 @@ class DataManager(DataContext, Activator, Entity):
                 return {registrator_type: None}
 
             registrator_id = registrator_section.pop(registrator_type)
-            if "." not in registrator_id:
+            if registrator_id is not None and "." not in registrator_id:
                 registrator_path = id.split(".")
                 for i in reversed(range(1, len(registrator_path))):
                     _registrator_id = ".".join([*registrator_path[:i], registrator_id])
                     if _registrator_id in registrator_context.keys():
                         registrator_id = _registrator_id
                         break
-            return {registrator_type: registrator_context.get(registrator_id, None), **registrator_section}
+            registrator = registrator_context.get(registrator_id, None) if registrator_id else None
+            return {registrator_type: registrator, **registrator_section}
 
         if "converter" not in configs:
             converter = ChannelConverter(self._converters.get_by_dtype(parse_type(type)))
