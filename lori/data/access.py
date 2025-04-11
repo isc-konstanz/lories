@@ -63,6 +63,14 @@ class DataAccess(Configurator, DataContext):
     def __str__(self) -> str:
         return f"{type(self).__name__}:\n\t" + "\n\t".join(f"{v.key} = {repr(v)}" for v in self.values())
 
+    # noinspection PyArgumentList
+    def __getattr__(self, attr):
+        channels = Context.__getattribute__(self, f"_{Context.__name__}__map")
+        channels_by_key = {c.key: c for c in channels.values()}
+        if attr in channels_by_key:
+            return channels_by_key[attr]
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{attr}'")
+
     def __validate_id(self, id: str) -> str:
         if not len(id.split(".")) > 1:
             id = f"{self.__registrar.id}.{id}"
