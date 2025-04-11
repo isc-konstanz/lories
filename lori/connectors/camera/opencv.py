@@ -49,7 +49,7 @@ class OpenCV(CameraConnector):
             self._capture = cv2.VideoCapture(self._url, cv2.CAP_FFMPEG)
             if not self._capture.isOpened():
                 self._logger.warning("RTSP URL is not valid or not running.")
-                raise ConnectionException(self, "Unable to connect to camera 'rtsp://#:#@{self._host}:{self._port}'")
+                raise ConnectionException(self, f"Unable to connect to camera 'rtsp://#:#@{self._host}:{self._port}'")
 
             # TODO: Make Fallback configurable
             # if not self._capture.isOpened():
