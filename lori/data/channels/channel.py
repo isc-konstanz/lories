@@ -308,11 +308,11 @@ class Channel(Resource):
     @staticmethod
     # noinspection PyShadowingNames
     def _build_configs(configs: Dict[str, Any]) -> Dict[str, Any]:
-        def _build_registrator(section: str, key: Optional[str] = None) -> None:
+        def _build_registrator(key: str, section: Optional[str] = None) -> None:
+            if section is None:
+                section = key
             if section not in configs:
                 return
-            if key is None:
-                key = section
             configs[section] = Channel._build_section(configs[section], key)
 
         _build_registrator("converter")
@@ -323,9 +323,7 @@ class Channel(Resource):
     @staticmethod
     # noinspection PyShadowingNames
     def _build_section(section: Optional[Dict[str, Any] | str], key: str) -> Optional[Dict[str, Any]]:
-        if section is None:
-            return None
-        if isinstance(section, str):
+        if isinstance(section, str) or section is None:
             return {key: section}
         elif not isinstance(section, Mapping):
             raise ConfigurationException(f"Invalid channel {key} type: " + str(section))
