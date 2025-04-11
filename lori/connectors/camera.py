@@ -5,10 +5,12 @@ lori.connectors.camera
 
 """
 
-import cv2
-import pandas as pd
 from typing import Optional
-from lori.connectors import Connector, ConnectionException, register_connector_type
+
+import cv2
+
+import pandas as pd
+from lori.connectors import ConnectionException, Connector, register_connector_type
 from lori.core import Configurations, Resources
 
 
@@ -58,13 +60,10 @@ class Camera(Connector):
                     print(f"Attempt {attempt + 1}/{max_attempts}: Failed to capture frame.")
             else:
                 # If the loop completes without a successful read
-                raise ConnectionException(
-                    self,
-                    "Failed to capture a frame from the camera after multiple attempts."
-                )
+                raise ConnectionException(self, "Failed to capture a frame from the camera after multiple attempts.")
 
             # Encode the frame to JPEG format
-            ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
+            ret, buffer = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
             if not ret:
                 raise ConnectionException(self, "Failed to encode the frame to JPEG format.")
 

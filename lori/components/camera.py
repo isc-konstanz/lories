@@ -8,7 +8,6 @@ lori.components.camera
 from __future__ import annotations
 
 import pandas as pd
-
 from lori import Configurations
 from lori.components import Component, register_component_type
 

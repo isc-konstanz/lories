@@ -13,7 +13,7 @@ import datetime as dt
 from typing import Any, AnyStr, Optional, Type, TypeVar
 
 import sqlalchemy as sql
-from sqlalchemy.types import BOOLEAN, DATETIME, FLOAT, INTEGER, TIMESTAMP, String, TypeEngine, LargeBinary
+from sqlalchemy.types import BOOLEAN, DATETIME, FLOAT, INTEGER, TIMESTAMP, LargeBinary, String, TypeEngine
 
 import numpy as np
 import pandas as pd
@@ -46,6 +46,7 @@ class Column(sql.Column):
         if data is None and not self.nullable:
             raise ResourceException(f"None value for '{self.name}' NOT NULL")
         return data
+
 
 # noinspection PyShadowingBuiltins
 def parse_type(type: Type | AnyStr, length: Optional[int] = None) -> Type[TypeEngine] | TypeEngine:
