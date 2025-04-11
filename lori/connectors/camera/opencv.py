@@ -18,22 +18,25 @@ from lori.core import Configurations, Resources
 @register_connector_type("opencv")
 class OpenCV(CameraConnector):
     _capture: Optional[cv2.VideoCapture] = None
+    _host: str
+    _port: int
     _url: str
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        host = configs.get("host")
-        port = configs.get_int("port", default=554)
+        self._host = configs.get("host")
+        self._port = configs.get_int("port", default=554)
 
         username = configs.get("username")
         password = configs.get("password")
 
         # Validate configuration parameters
-        if not all([host, username, password, port]):
-            raise ValueError("Camera configuration requires 'host', 'username', 'password', and 'port'")
+        if not all([self._host, self._port, username, password]):
+            raise ValueError("Camera configuration requires 'host', 'port', 'username' and 'password'")
 
-        self._url = f"rtsp://{username}:{password}@{host}:{port}"
+        self._url = f"rtsp://{username}:{password}@{self._host}:{self._port}"
+        self._logger.info(f"Setup OpenCV connection to RTSP URL 'rtsp://#:#@{self._host}:{self._port}'")
 
     def stream(self):
         # TODO: Implement stream for visualization
@@ -45,11 +48,12 @@ class OpenCV(CameraConnector):
             # Use system webcam if RTSP URL is not available
             self._capture = cv2.VideoCapture(self._url, cv2.CAP_FFMPEG)
             if not self._capture.isOpened():
-                self._logger.warning("RTSP URL is not valid or not running. Falling back to system webcam.")
-                self._capture = cv2.VideoCapture(0)  # Default to system webcam
+                self._logger.warning("RTSP URL is not valid or not running.")
+                raise ConnectionException(self, "Unable to connect to camera 'rtsp://#:#@{self._host}:{self._port}'")
 
-            if not self._capture.isOpened():
-                raise ConnectionException(self, "Unable to connect to the camera.")
+            # TODO: Make Fallback configurable
+            # if not self._capture.isOpened():
+            #     self._capture = cv2.VideoCapture(0)  # Default to system webcam
 
             max_attempts = 5
             for attempt in range(max_attempts):
@@ -76,6 +80,8 @@ class OpenCV(CameraConnector):
             self._capture = None
             return pd.DataFrame(data=[data], index=[timestamp], columns=columns)
 
+        except ConnectionException as e:
+            raise e
         except cv2.error as e:
             raise ConnectionException(self, f"OpenCV error during reading: {e}")
         except Exception as e:
