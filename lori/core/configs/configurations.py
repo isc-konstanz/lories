@@ -124,7 +124,10 @@ class Configurations(MutableMapping[str, Any]):
         if isinstance(value, Mapping):
             if key not in self.keys():
                 self.__configs[key] = self._create_section(key, value)
-            self.__configs[key] = Configurations.update(self[key], value, replace)
+            if isinstance(self[key], Mapping):
+                self.__configs[key] = Configurations.update(self.__configs[key], value, replace)
+            elif replace:
+                self.__configs[key] = value
         else:
             self.__configs[key] = value
 
@@ -262,7 +265,10 @@ class Configurations(MutableMapping[str, Any]):
             if isinstance(v, Mapping):
                 if k not in self.keys():
                     self[k] = self._create_section(k, v)
-                self[k] = Configurations.update(self[k], v, replace)
+                if isinstance(self[k], Mapping):
+                    self[k] = Configurations.update(self[k], v, replace)
+                elif replace:
+                    self[k] = v
             elif k not in self or replace:
                 self[k] = v
         return self

@@ -58,6 +58,7 @@ class ComponentAccess(RegistratorAccess[C]):
     def load_from_type(
         self,
         type: Type[C],
+        configs: Configurations,
         section: str,
         key: str,
         name: Optional[str] = None,
@@ -68,20 +69,20 @@ class ComponentAccess(RegistratorAccess[C]):
         kwargs["factory"] = type
         components = []
 
-        if any(i in self.configs.sections for i in includes):
-            configs = self.configs.get_sections(includes)
+        if any(i in configs.sections for i in includes):
+            configs = configs.get_sections(includes)
             configs["key"] = key
             configs["name"] = name
             components.append(self._load_from_configs(self._registrar, configs, **kwargs))
 
-        configs = self.configs.get_section(section, defaults={})
+        configs = configs.get_section(section, defaults={})
         defaults = Registrator._build_defaults(configs, _Component.INCLUDES + list(includes))
 
-        configs_dirs = self.configs.dirs.copy()
+        configs_dirs = configs.dirs.copy()
         configs_file = configs.name
         configs_sections = configs.get_sections([s for s in configs.sections if s not in defaults])
 
-        components.extend(self._load_from_sections(self._registrar, configs_sections, defaults, **kwargs))
+        components.extend(self._load_from_sections(self._registrar, configs_sections, defaults=defaults, **kwargs))
         components.extend(self._load_from_file(self._registrar, configs_file, configs_dirs, defaults, **kwargs))
 
         if "alias" in configs:
