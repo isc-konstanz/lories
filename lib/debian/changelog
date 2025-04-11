@@ -1,5 +1,21 @@
 lori (<version>) stable; urgency=medium
 
+  * Implement force replication
+
+ -- Adrian Minde <adrian.minde@isc-konstanz.de>  Tue, 11 Mar 2025 10:30:00 +0100
+
+lori (0.12.4) stable; urgency=medium
+
+  * Fix several replication related bugs
+  * Change debian /opt/lori dir to stay root
+  * Enable backwards compatibility to Python 3.7
+  * Implement replicator class structure
+  * Implement data rotation with retention and aggregation
+
+ -- Adrian Minde <adrian.minde@isc-konstanz.de>  Wed, 05 Mar 2025 14:00:00 +0100
+
+lori (0.12.3) stable; urgency=medium
+
   * Initial release
 
  -- Adrian Minde <adrian.minde@isc-konstanz.de>  Tue, 28 Jan 2025 12:00:00 +0100

@@ -20,7 +20,7 @@ from PIL import Image
 class PageHeader:
     _brand: Component
 
-    menu: List[Component] = list[Component]()
+    menu: List[Component]
 
     def __init__(self, name: str, logo: Optional[str | PathLike] = None) -> None:
         super().__init__()
@@ -35,6 +35,8 @@ class PageHeader:
             )
         else:
             self._brand = NavbarBrand(name, className="ms-2")
+
+        self.menu = []
 
     @property
     def searchbar(self) -> Row:

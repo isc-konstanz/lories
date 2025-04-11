@@ -65,7 +65,9 @@ class Directories:
 
     # noinspection PyShadowingBuiltins
     @lib.setter
-    def lib(self, dir: str) -> None:
+    def lib(self, dir: str | Directory) -> None:
+        if isinstance(dir, Directory):
+            dir = str(dir)
         self._lib = Directory(dir, default="lib")
 
     @property
@@ -74,7 +76,9 @@ class Directories:
 
     # noinspection PyShadowingBuiltins
     @log.setter
-    def log(self, dir: str) -> None:
+    def log(self, dir: str | Directory) -> None:
+        if isinstance(dir, Directory):
+            dir = str(dir)
         self._log = Directory(dir, default="log")
 
     @property
@@ -83,7 +87,9 @@ class Directories:
 
     # noinspection PyShadowingBuiltins
     @tmp.setter
-    def tmp(self, dir: str) -> None:
+    def tmp(self, dir: str | Directory) -> None:
+        if isinstance(dir, Directory):
+            dir = str(dir)
         self._tmp = Directory(dir, default="tmp")
 
     @property
@@ -92,7 +98,9 @@ class Directories:
 
     # noinspection PyShadowingBuiltins
     @data.setter
-    def data(self, dir: str) -> None:
+    def data(self, dir: str | Directory) -> None:
+        if isinstance(dir, Directory):
+            dir = str(dir)
         self._data = Directory(dir, default="data")
 
     @property
@@ -101,7 +109,9 @@ class Directories:
 
     # noinspection PyShadowingBuiltins
     @conf.setter
-    def conf(self, dir: str) -> None:
+    def conf(self, dir: str | Directory) -> None:
+        if isinstance(dir, Directory):
+            dir = str(dir)
         self._conf = Directory(dir, default="conf", base=self.data)
 
     # noinspection PyProtectedMember
@@ -131,13 +141,13 @@ class Directory(Path):
     default: str
 
     # noinspection PyShadowingBuiltins, PyTypeChecker
-    def __new__(cls, *dirs: Optional[str], base: Optional[str | Directory] = None, default: Optional[str] = None):
+    def __new__(cls, *dirs: str, base: Optional[str | Directory] = None, default: Optional[str] = None):
         cls = WindowsDirectory if os.name == "nt" else PosixDirectory
         base = Directory.__parse_base(base)
         dir = Directory.__parse_dir(base, *dirs, default=default)
         return super().__new__(cls, Directory.__parse(base, dir, default), base=base, default=default)
 
-    def __init__(self, *dirs: Optional[str], base: Optional[str | Directory] = None, default: Optional[str] = None):
+    def __init__(self, *dirs: str, base: Optional[str | Directory] = None, default: Optional[str] = None):
         self.default = default
         self._base = Directory.__parse_base(base)
         self._dir = Directory.__parse_dir(self._base, *dirs, default=default)
@@ -163,6 +173,7 @@ class Directory(Path):
             base = base.absolute()
         return base
 
+    # noinspection PyShadowingBuiltins
     @staticmethod
     def __parse_dir(base: Path, *dirs: Optional[str], default: Optional[str] = None) -> Path:
         dir = Path(*dirs) if not any(d is None for d in dirs) else None

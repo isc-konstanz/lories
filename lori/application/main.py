@@ -9,18 +9,22 @@ lori.application.main
 from __future__ import annotations
 
 import logging
-from typing import Collection, Optional, Type
+import sys
+import traceback
+from typing import Optional, Type
 
+import tzlocal
+
+import pandas as pd
 from lori import Settings, System
 from lori.application import Interface
-from lori.components import ComponentContext
-from lori.connectors import ConnectorContext
+from lori.connectors import Database, DatabaseException
 from lori.data.manager import DataManager
+from lori.typing import TimestampType
+from lori.util import slice_range, to_timedelta
 
 
 class Application(DataManager):
-    INCLUDES: Collection[str] = [ComponentContext.SECTION, ConnectorContext.SECTION]
-
     _interface: Optional[Interface] = None
 
     @classmethod
@@ -37,28 +41,30 @@ class Application(DataManager):
             settings._add_section(Interface.SECTION, {"enabled": False})
         self._interface = Interface(self, settings.get_section(Interface.SECTION))
 
-    # noinspection PyProtectedMember
+    # noinspection PyProtectedMember, PyTypeChecker, PyMethodOverriding
     def configure(self, settings: Settings, factory: Type[System]) -> None:
+        super().configure(settings)
         self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
 
         systems = []
-        systems_flat = self.settings["systems"]["flat"]
-        system_dirs = self.settings.dirs.to_dict()
+        system_dirs = settings.dirs.to_dict()
         system_dirs["conf_dir"] = None
-        if self.settings["systems"]["scan"]:
-            if self.settings["systems"]["copy"]:
+        systems_section = settings.get_section("systems")
+        systems_flat = systems_section.get_bool("flat")
+        if systems_section.get_bool("scan"):
+            if systems_section.get_bool("copy"):
                 factory.copy(self.settings)
-            system_dirs["scan_dir"] = str(self.settings.dirs.data)
-            systems.extend(factory.scan(self, **system_dirs, flat=systems_flat))
+            system_dirs["scan_dir"] = str(settings.dirs.data)
+            systems.extend(factory.scan(self._components, **system_dirs, flat=systems_flat))
         else:
-            systems.append(factory.load(self, **system_dirs, flat=systems_flat))
-        for system in systems:
-            if system.key in self._components:
-                self._components.get(system.key).configs.update(system.configs)
-            else:
-                self._components._add(system)
+            systems.append(factory.load(self._components, **system_dirs, flat=systems_flat))
 
-        super().configure(settings)
+        self._components.sort()
+        self._components._configure(systems)
+
+        if not self._components.has_type(System) and settings.dirs.data.is_default():
+            self._components.load(settings, configs_dir=settings.dirs.conf)
+
         if self._interface.is_enabled():
             self._interface.configure(settings.get_section(Interface.SECTION))
 
@@ -82,8 +88,11 @@ class Application(DataManager):
             elif action == "start":
                 self.start()
 
+            elif action == "rotate":
+                self.rotate(full=self.settings.get_bool("full"))
+
             elif action == "replicate":
-                self.replicate(full=self.settings["full"])
+                self.replicate(full=self.settings.get_bool("full"), force=self.settings.get_bool("force"))
 
         except Exception as e:
             self._logger.warning(repr(e))

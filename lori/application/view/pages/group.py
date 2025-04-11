@@ -34,7 +34,7 @@ class PageGroup(Page, MutableSequence[P], Generic[P]):
         if key is None:
             key = self._encode_id(self.name)
         self._key = key
-        self._pages = list[P]()
+        self._pages = []
 
     def __len__(self) -> int:
         return len(self._pages)

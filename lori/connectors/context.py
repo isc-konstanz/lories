@@ -8,21 +8,21 @@ lori.connectors.context
 
 from __future__ import annotations
 
-from typing import Callable, Optional, Type, TypeVar
+from typing import Any, Callable, Collection, Optional, Type, TypeVar
 
-from lori.connectors import Connector
+from lori.connectors.core import _Connector
 from lori.core import Configurations, Context, Registrator, RegistratorContext, Registry
 
-C = TypeVar("C", bound=Connector)
+C = TypeVar("C", bound=_Connector)
 
-registry = Registry[Connector]()
+registry = Registry[_Connector]()
 
 
 # noinspection PyShadowingBuiltins
 def register_connector_type(
     type: str,
     *alias: str,
-    factory: Callable[[Registrator | Context, Optional[Configurations]], C] = None,
+    factory: Callable[[Context | Registrator, Optional[Configurations]], C] = None,
     replace: bool = False,
 ) -> Callable[[Type[C]], Type[C]]:
     # noinspection PyShadowingNames
@@ -33,30 +33,10 @@ def register_connector_type(
     return _register
 
 
-class ConnectorContext(RegistratorContext[Connector]):
-    SECTION: str = "connectors"
-
+class ConnectorContext(RegistratorContext[C]):
     @property
-    def _registry(self) -> Registry[Connector]:
+    def _registry(self) -> Registry[C]:
         return registry
 
-    def configure(self, configs: Configurations) -> None:
-        super().configure(configs)
-        self._load(self, configs)
-
-    def _load(
-        self,
-        context: Registrator | RegistratorContext,
-        configs: Configurations,
-        configs_file: str = "connectors.conf",
-    ) -> None:
-        defaults = {}
-        configs = configs.copy()
-        if configs.has_section(self.SECTION):
-            connectors = configs.get_section(self.SECTION)
-            for section in Connector.INCLUDES:
-                if section in connectors:
-                    defaults.update(connectors.pop(section))
-
-            self._load_sections(context, connectors, defaults, Connector.INCLUDES)
-        self._load_from_file(context, configs.dirs, configs_file, defaults)
+    def load(self, configs: Configurations, **kwargs: Any) -> Collection[C]:
+        return self._load(self, configs, includes=_Connector.INCLUDES, **kwargs)

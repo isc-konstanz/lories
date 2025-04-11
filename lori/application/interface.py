@@ -11,7 +11,8 @@ from __future__ import annotations
 from typing import Optional, Type
 
 from lori.core import Context, ResourceException
-from lori.core.configs import ConfigurationException, Configurations, Configurator, ConfiguratorMeta
+from lori.core.configs import ConfigurationException, Configurations
+from lori.core.configs.configurator import Configurator, ConfiguratorMeta
 
 
 class InterfaceMeta(ConfiguratorMeta):

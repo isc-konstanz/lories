@@ -112,8 +112,8 @@ class PageRegistry:
     groups: Collection[GroupRegistration]
 
     def __init__(self) -> None:
-        self.pages: list[PageRegistration] = []
-        self.groups: list[GroupRegistration] = []
+        self.pages: List[PageRegistration] = []
+        self.groups: List[GroupRegistration] = []
 
     # noinspection PyTypeChecker, PyProtectedMember
     def register_page(

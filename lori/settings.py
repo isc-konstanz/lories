@@ -47,6 +47,10 @@ class Settings(Configurations):
             return configs[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
 
+    @property
+    def _sections_dir(self) -> Directory:
+        return self.dirs.conf
+
     def _load_logging(self) -> None:
         logging_file = os.path.join(self.dirs.conf, "logging.conf")
         if not os.path.isfile(logging_file) and not self.dirs.conf.is_default():
@@ -101,10 +105,27 @@ def _parse_kwargs(parser: ArgumentParser) -> Dict[str, Any]:
             action_parser.add_parser("run", help="run local resources, connectors and systems")
         if "start" not in action_parser.choices.keys():
             action_parser.add_parser("start", help="start the local resource system")
+        if "rotate" not in action_parser.choices.keys():
+            replicate_parser = action_parser.add_parser(
+                name="rotate",
+                help="rotate data of a local database",
+            )
+            replicate_parser.add_argument(
+                "--full",
+                dest="full",
+                action="store_true",
+                help="flags if the rotation should be executed for all data",
+            )
         if "replicate" not in action_parser.choices.keys():
             replicate_parser = action_parser.add_parser(
                 name="replicate",
                 help="replicate data from a remote database",
+            )
+            replicate_parser.add_argument(
+                "--force",
+                dest="force",
+                action="store_true",
+                help="flags if the replication should force rewrite data for checksum mismatches",
             )
             replicate_parser.add_argument(
                 "--full",

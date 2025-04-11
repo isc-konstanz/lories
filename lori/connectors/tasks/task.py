@@ -45,5 +45,5 @@ class ConnectorTask(ABC, Thread):
         return self
 
     @abstractmethod
-    def run(self, **kwargs):
+    def run(self, **kwargs) -> None:
         pass

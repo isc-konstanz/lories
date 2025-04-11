@@ -13,7 +13,7 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import sqlalchemy as sql
 from sqlalchemy import ClauseElement, Dialect, Result, UnaryExpression
-from sqlalchemy.sql import Insert, Select, and_, asc, between, desc, func, literal, not_, text
+from sqlalchemy.sql import Delete, Insert, Select, and_, asc, between, desc, func, literal, not_, text
 from sqlalchemy.types import DATETIME, TIMESTAMP
 
 import numpy as np
@@ -82,9 +82,9 @@ class Table(sql.Table):
         if self.__is_datetime_index(primary_index):
             if start is not None and end is not None:
                 clauses.append(between(primary_index, primary_index.validate(start), primary_index.validate(end)))
-            if start is not None:
+            elif start is not None:
                 clauses.append(primary_index >= primary_index.validate(start))
-            if end is not None:
+            elif end is not None:
                 clauses.append(primary_index <= primary_index.validate(end))
         return clauses
 
@@ -122,7 +122,9 @@ class Table(sql.Table):
 
             elif self.datetime_index_type == DatetimeIndexType.TIMESTAMP_UNIX:
                 index_column, *_ = self.primary_key.columns
-                group_data.loc[:, [index_column.name]] = pd.to_datetime(group_data[index_column.name], unit="s")
+                index_data = pd.to_datetime(group_data[index_column.name], unit="s")
+                group_data.drop(index_column.name, inplace=True, axis="columns")
+                group_data.loc[:, [index_column.name]] = index_data
                 group_data = group_data.set_index(index_column.name).tz_localize(tz.UTC)
 
             group_data = group_data.dropna(axis="index", how="all").rename(
@@ -130,7 +132,7 @@ class Table(sql.Table):
             )
             results.append(group_data[group_resources.ids])
 
-        results = pd.concat(results, axis="index")
+        results = pd.concat(sorted(results, key=lambda d: min(d.index)), axis="index")
         for result_column in [c for c in result_columns if c not in results.columns]:
             results.loc[:, [result_column]] = np.nan
         return results
@@ -163,7 +165,7 @@ class Table(sql.Table):
             if column.type == DATETIME or isinstance(column.type, DATETIME):
                 # TODO: Verify if there is a more generic way to implement time
                 raise ValueError(
-                    f"Unable to generate consistent hashes for column '{self.name}' "
+                    f"Unable to generate consistent hashes for table '{self.name}' "
                     f"with DATETIME column: {column.name}",
                 )
             if column.type == TIMESTAMP or isinstance(column.type, TIMESTAMP):
@@ -190,7 +192,7 @@ class Table(sql.Table):
         resources: Resources,
         start: Optional[pd.Timestamp | dt.datetime] = None,
         end: Optional[pd.Timestamp | dt.datetime] = None,
-        order_by: Literal["asc", "desc"] = "desc",
+        order_by: Literal["asc", "desc"] = "asc",
     ) -> Select:
         columns = self.__get_columns(resources)
         query = sql.select(*columns)
@@ -221,16 +223,19 @@ class Table(sql.Table):
         else:
             return sql.insert(self).values(params)
 
-    #  def delete(
-    #      self,
-    #      resources: Resources,
-    #      start: Optional[pd.Timestamp | dt.datetime] = None,
-    #      end: Optional[pd.Timestamp | dt.datetime] = None,
-    # ) -> Delete:
-    #      columns = self.__get_columns(resources)
-    #      query = sql.delete(*columns)
-    #      query = query.where(and_(*self._primary_clauses(start, end)))
-    #      return query
+    # noinspection PyMethodOverriding
+    def delete(
+        self,
+        resources: Resources,
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
+    ) -> Delete:
+        columns = self.__get_columns(resources)
+        if self.columns != columns:
+            raise ResourceException(f"Unable to delete rows of table '{self.name}' with only subset of columns")
+        query = super().delete()
+        query = query.where(and_(*self._primary_clauses(start, end)))
+        return query
 
     def _validate(self, resources: Resources, data: pd.DataFrame) -> List[Dict[str, Any]]:
         values = []
@@ -260,7 +265,7 @@ class Table(sql.Table):
 
     # noinspection SpellCheckingInspection
     def _groupby(self, resources: Resources) -> Iterator[Tuple[Dict[str, Any], Resources]]:
-        groups = list[Tuple[Dict[str, Any], Resources]]()
+        groups: List[Tuple[Dict[str, Any], Resources]] = []
 
         def _group(resource: Resource) -> Resource:
             attributes = {}

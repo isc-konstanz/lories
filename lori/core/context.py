@@ -9,19 +9,21 @@ lori.core.context
 from __future__ import annotations
 
 import re
+from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Callable
 from itertools import chain
 from typing import Any, Collection, Generic, Iterable, Iterator, MutableMapping, Tuple, TypeVar
 
 import pandas as pd
-from lori.core import Identifier
+from lori.core import Entity, ResourceException
 
-ID = TypeVar("ID", bound=Identifier)
+E = TypeVar("E", bound=Entity)
 
 
-class Context(Generic[ID], MutableMapping[str, ID]):
-    __map: OrderedDict[str, ID]
+# noinspection PyAbstractClass
+class Context(ABC, MutableMapping[str, E], Generic[E]):
+    __map: OrderedDict[str, E]
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -34,44 +36,61 @@ class Context(Generic[ID], MutableMapping[str, ID]):
         return f"{type(self).__name__}:\n\t" + "\n\t".join(f"{i} = {repr(c)}" for i, c in self.__map.items())
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self.__map)
+        return iter(self.__map.keys())
 
     def __len__(self) -> int:
         return len(self.__map)
 
-    def __contains__(self, __object: str | ID) -> bool:
-        if isinstance(__object, str):
-            return __object in self.__map.keys()
-        if isinstance(__object, Identifier):
-            return __object in self.__map.values()
-        return False
+    def __contains__(self, __object: str | E) -> bool:
+        return self._contains(__object)
 
-    def __getitem__(self, __uid: Iterable[str] | str) -> ID | Collection[ID]:
+    def __getitem__(self, __uid: Iterable[str] | str) -> E | Collection[E]:
         if isinstance(__uid, str):
             return self._get(__uid)
         if isinstance(__uid, Iterable):
             return [self._get(i) for i in __uid]
         raise KeyError(__uid)
 
-    def __setitem__(self, __uid: str, __object: ID) -> None:
+    def __setitem__(self, __uid: str, __object: E) -> None:
         self._set(__uid, __object)
 
     def __delitem__(self, __uid: str) -> None:
-        del self.__map[__uid]
+        self._remove(__uid)
 
-    def _get(self, __uid: str) -> ID:
+    def _contains(self, __object: str | E) -> bool:
+        if isinstance(__object, str):
+            return __object in self.__map.keys()
+        if isinstance(__object, Entity):
+            return __object in self.__map.values()
+        return False
+
+    def _get(self, __uid: str) -> E:
         return self.__map[__uid]
 
-    def _set(self, __uid: str, __object: ID) -> None:
+    def _set(self, __uid: str, __object: E) -> None:
+        if id in self.keys():
+            raise ResourceException(f'Entity with ID "{__uid}" already exists')
+
         self.__map[__uid] = __object
 
-    def _add(self, *__objects: ID) -> None:
+    def _add(self, *__objects: E) -> None:
         for __object in __objects:
             self._set(__object.id, __object)
 
-    # noinspection PyShadowingBuiltins
-    def filter(self, filter: Callable[[ID], bool]) -> Collection[ID]:
-        return [c for c in self.__map.values() if filter(c)]
+    @abstractmethod
+    def _create(self, *args, **kwargs) -> E:
+        pass
+
+    @abstractmethod
+    def _update(self, *args, **kwargs) -> None:
+        pass
+
+    def _remove(self, *__objects: str | E) -> None:
+        for __object in __objects:
+            if isinstance(__object, str):
+                del self.__map[__object]
+            if isinstance(__object, Entity):
+                del self.__map[__object.id]
 
     def sort(self):
         def order(text: str) -> Tuple[Any, ...]:
@@ -81,3 +100,7 @@ class Context(Generic[ID], MutableMapping[str, ID]):
             return tuple(elements)
 
         self.__map = OrderedDict(sorted(self.__map.items(), key=lambda e: order(e[0])))
+
+    # noinspection PyShadowingBuiltins
+    def filter(self, filter: Callable[[E], bool]) -> Collection[E]:
+        return [c for c in self.__map.values() if filter(c)]

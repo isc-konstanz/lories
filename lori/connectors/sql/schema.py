@@ -49,11 +49,11 @@ class Schema(Configurator, MetaData):
         return tables
 
     def _create_tables(self, resources: Resources) -> Dict[str, Table]:
-        tables = dict[str, Table]()
+        tables = {}
 
         defaults = self.configs.get_sections(["index", "columns"], ensure_exists=True)
         for schema, schema_resources in resources.groupby("schema"):
-            for name, table_resources in schema_resources.groupby("table"):
+            for name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
                 if name is None:
                     raise ConfigurationException(
                         "Missing 'table' configuration for resources: " + ", ".join([r.id for r in table_resources])

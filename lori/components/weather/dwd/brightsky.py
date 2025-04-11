@@ -16,13 +16,20 @@ import requests
 
 import numpy as np
 import pandas as pd
-from lori import ConfigurationException, Configurations, Resources, Weather
-from lori.components.weather import WeatherConnector
+from lori import ConfigurationException, Configurations, Resources
+from lori.components.weather import Weather
+from lori.connectors import Connector
+from lori.location import Location
 
 
-class Brightsky(WeatherConnector):
+class Brightsky(Connector):
+    location: Location
     address: str = "https://api.brightsky.dev/"
     horizon: int = 10
+
+    def __init__(self, context: Weather, location: Location, **kwargs) -> None:
+        super().__init__(context, **kwargs)
+        self.location = location
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
@@ -104,8 +111,8 @@ class Brightsky(WeatherConnector):
 
         sources = pd.DataFrame(response_json["sources"])
         sources = sources.set_index("id")
-        sources["first_record"] = pd.DatetimeIndex(sources["first_record"])
-        sources["last_record"] = pd.DatetimeIndex(sources["last_record"])
+        sources["first_record"] = pd.to_datetime(sources["first_record"])
+        sources["last_record"] = pd.to_datetime(sources["last_record"])
 
         data = pd.DataFrame(response_json["weather"])
         data["timestamp"] = pd.to_datetime(data["timestamp"], utc=True)

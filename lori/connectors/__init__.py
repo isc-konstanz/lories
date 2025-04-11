@@ -6,13 +6,15 @@ lori.connectors
 
 """
 
-from .connector import (  # noqa: F401
-    ConnectorMeta,
-    Connector,
+from .core import (  # noqa: F401
+    _Connector,
     ConnectorException,
     ConnectorUnavailableException,
     ConnectionException,
 )
+
+from . import access  # noqa: F401
+from .access import ConnectorAccess  # noqa: F401
 
 from . import context  # noqa: F401
 from .context import (  # noqa: F401
@@ -21,7 +23,8 @@ from .context import (  # noqa: F401
     registry,
 )
 
-from .access import ConnectorAccess  # noqa: F401
+from . import connector  # noqa: F401
+from .connector import Connector  # noqa: F401
 
 from .database import (  # noqa: F401
     Database,
@@ -29,22 +32,14 @@ from .database import (  # noqa: F401
     DatabaseUnavailableException,
 )
 
-from .dummy import DummyConnector  # noqa: F401
-from .csv import CsvDatabase  # noqa: F401
+import importlib
 
-try:
-    from .sql import SqlDatabase  # noqa: F401
+for import_connector in ["dummy", "csv", "sql", "tables", "camera", "revpi"]:
+    try:
+        importlib.import_module(f".{import_connector}", "lori.connectors")
 
-except ModuleNotFoundError:
-    pass
-try:
-    from .revpi import RevPiConnector  # noqa: F401
+    except ModuleNotFoundError:
+        # TODO: Implement meaningful logging here
+        pass
 
-except ModuleNotFoundError:
-    pass
-
-try:
-    from .camera import Camera  # noqa: F401
-
-except ModuleNotFoundError:
-    pass
+del importlib

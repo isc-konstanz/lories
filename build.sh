@@ -33,10 +33,6 @@ chmod 755 "$build_dir/debian/pre*" 2>/dev/null
 chmod 755 "$build_dir/debian/post*" 2>/dev/null
 chmod 755 "$build_dir/debian/rules"
 
-echo "$build_dir/debian/version"
-if [ -f "$build_dir/debian/version" ]; then
-    echo "Yep"
-fi
 version=$(cat "$build_dir/debian/version" | tr -d "\n")
 rm "$build_dir/debian/version"
 

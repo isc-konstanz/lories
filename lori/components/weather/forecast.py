@@ -14,21 +14,18 @@ from typing import Optional
 import pandas as pd
 import pytz as tz
 from lori.components import Component
+from lori.components.weather import Weather
 from lori.core import Configurations, ResourceException
+from lori.location import Location
 from lori.util import floor_date, to_date, to_timezone
-from lori.weather import Weather
 
 
-class WeatherForecast(Component, Weather):
+class WeatherForecast(Weather):
     TYPE: str = "weather_forecast"
     SECTION: str = "forecast"
 
     interval: int = 60
     offset: int = 0
-
-    def __init__(self, component: Component, configs: Configurations) -> None:
-        super().__init__(component, configs)
-        self.__component = component
 
     @classmethod
     def _assert_context(cls, context: Component):
@@ -43,6 +40,15 @@ class WeatherForecast(Component, Weather):
 
         self.interval = configs.get_int("interval", default=WeatherForecast.interval)
         self.offset = configs.get_int("offset", default=WeatherForecast.offset)
+
+    def localize(self, configs: Configurations) -> None:
+        # Do nothing, as context was already validated as WeatherProvider, that does have a location
+        pass
+
+    # noinspection PyUnresolvedReferences
+    @property
+    def location(self) -> Location:
+        return self.context.location
 
     def get(
         self,
@@ -76,7 +82,7 @@ class WeatherForecast(Component, Weather):
         :rtype:
             :class:`pandas.DataFrame`
         """
-        forecast = super().get(start, end, **kwargs)
+        forecast = self.data.to_frame(unique=False)
 
         # Calculate the available forecast start and end times
         if timezone is None:
@@ -88,19 +94,14 @@ class WeatherForecast(Component, Weather):
         if start is None:
             start = pd.Timestamp.now(tz=timezone)
 
-        if forecast.empty or forecast.index[0] > start:
-            forecast_channels = self.data.filter(lambda c: c.has_logger())
-            if len(forecast_channels) > 0:
-                start_schedule = floor_date(start, self.location.timezone, freq=f"{self.interval}T")
-                start_schedule += pd.Timedelta(minutes=self.offset)
-                if start_schedule > start:
-                    start_schedule -= pd.Timedelta(minutes=self.interval)
+        if forecast.empty or start < forecast.index[0] or end > forecast.index[-1]:
+            start_schedule = floor_date(start, self.location.timezone, freq=f"{self.interval}T")
+            start_schedule += pd.Timedelta(minutes=self.offset)
+            if start_schedule > start:
+                start_schedule -= pd.Timedelta(minutes=self.interval)
 
-                # TODO: Implement reading of logged forecasts
-                # if self.database.exists(start_schedule):
-                #     forecast = self.database.read_file(start_schedule).tz_convert(timezone)
-                #
-                # elif start < pd.Timestamp.now(timezone):
-                #     raise WeatherException("Unable to read persisted historic forecast")
-                forecast = self._get_range(forecast, start_schedule, end, **kwargs)
-        return forecast
+            logged = self.data.from_logger(start=start, end=end, unique=False)
+            if not logged.empty:
+                forecast = logged if forecast.empty else forecast.combine_first(logged)
+
+        return self._get_range(forecast, start, end, **kwargs)

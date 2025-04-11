@@ -14,6 +14,7 @@ from collections.abc import Callable
 import pandas as pd
 from lori.core import Resources
 from lori.data.channels import Channel, ChannelState
+from lori.data.validation import validate_index
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
 try:
@@ -44,7 +45,8 @@ class Channels(Resources[Channel]):
             channel_uid = channel.key if not unique else channel.id
             channel_data = channel.to_series(state=states)
             channel_data.name = channel_uid
-
+            if channel_data.empty:
+                continue
             for timestamp, channel_values in channel_data.to_frame().to_dict(orient="index").items():
                 if timestamp not in data:
                     timestamp_data = data[timestamp] = {}
@@ -58,10 +60,15 @@ class Channels(Resources[Channel]):
                         )
                 timestamp_data.update(channel_values)
 
+        if len(data) == 0:
+            return pd.DataFrame()
         data = pd.DataFrame.from_records(
             data=list(data.values()),
             index=list(data.keys()),
         )
+        data.dropna(axis="index", how="all", inplace=True)
+        data.dropna(axis="columns", how="all", inplace=True)
+        data = validate_index(data)
         data.index.name = Channel.TIMESTAMP
         return data
 

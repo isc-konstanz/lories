@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.core.identifier
-~~~~~~~~~~~~~~~~~~~~
+lori.core.entity
+~~~~~~~~~~~~~~~~
 
 
 """
@@ -12,8 +12,7 @@ from lori.core import ResourceException
 from lori.util import parse_name, validate_key
 
 
-# noinspection SpellCheckingInspection
-class Identifier:
+class Entity:
     _id: str
     _key: str
     _name: str
@@ -43,32 +42,32 @@ class Identifier:
 
     # noinspection PyShadowingBuiltins
     @classmethod
-    def _assert_id(cls, id: Optional[str], key: Optional[str]) -> str:
-        if id is None and key is None:
+    def _assert_id(cls, __id: Optional[str], __key: Optional[str]) -> str:
+        if __id is None and __key is None:
             raise ResourceException(f"Invalid {cls.__name__}, missing specified 'id'")
-        if id is None:
-            id = key
-        _id = ".".join(validate_key(i) for i in id.split("."))
-        if _id != id:
-            raise ResourceException(f"Invalid characters in '{cls.__name__}' id: " + key)
+        if __id is None:
+            __id = __key
+        _id = ".".join(validate_key(i) for i in __id.split("."))
+        if _id != __id:
+            raise ResourceException(f"Invalid characters in '{cls.__name__}' id: " + __id)
         return _id
 
     @classmethod
-    def _assert_key(cls, key: str) -> str:
-        if key is None:
+    def _assert_key(cls, __key: str) -> str:
+        if __key is None:
             raise ResourceException(f"Invalid {cls.__name__}, missing specified 'key'")
-        _key = validate_key(key)
-        if _key != key:
-            raise ResourceException(f"Invalid characters in '{cls.__name__}' key: " + key)
+        _key = validate_key(__key)
+        if _key != __key:
+            raise ResourceException(f"Invalid characters in '{cls.__name__}' key: " + __key)
         return _key
 
     @classmethod
-    def _assert_name(cls, name: Optional[str], key: Optional[str]) -> str:
-        if name is None and key is None:
+    def _assert_name(cls, __name: Optional[str], __key: Optional[str]) -> str:
+        if __name is None and __key is None:
             raise ResourceException(f"Invalid {cls.__name__}, missing specified 'name'")
-        if name is None:
-            name = parse_name(key)
-        return name
+        if __name is None:
+            __name = parse_name(__key)
+        return __name
 
     @property
     def id(self) -> str:

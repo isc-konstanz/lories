@@ -6,11 +6,13 @@ lori.components
 
 """
 
-from .component import (  # noqa: F401
-    Component,
+from .core import (  # noqa: F401
     ComponentException,
     ComponentUnavailableException,
 )
+
+from . import access  # noqa: F401
+from .access import ComponentAccess  # noqa: F401
 
 from . import context  # noqa: F401
 from .context import (  # noqa: F401
@@ -19,11 +21,15 @@ from .context import (  # noqa: F401
     registry,
 )
 
+from . import component  # noqa: F401
+from .component import Component  # noqa: F401
+
 from . import weather  # noqa: F401
 from .weather import (  # noqa: F401
-    WeatherConnector,
+    Weather,
     WeatherForecast,
-    WeatherProvider,
+    WeatherException,
+    WeatherUnavailableException,
 )
 
 from . import camera # noqa: F401

@@ -92,6 +92,11 @@ class ChannelConnector:
     def is_connected(self) -> bool:
         return self._connector.is_connected() if self.enabled else False
 
+    def is_database(self) -> bool:
+        from lori.connectors import Database
+
+        return isinstance(self._connector, Database) if self.enabled else False
+
     def get(self, attr: str, default: Optional[Any] = None) -> Any:
         return self._get_vars().get(attr, default)
 
