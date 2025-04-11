@@ -7,7 +7,8 @@ lori.components.camera
 
 from __future__ import annotations
 
-import pandas as pd
+from typing import Optional
+
 from lori import Configurations
 from lori.components import Component, register_component_type
 
@@ -22,16 +23,17 @@ class Camera(Component):
             key="frame",
             name="Frame",
             type=bytes,
+            aggregation="last",
         )
 
-    def activate(self) -> None:
-        super().activate()
-        self.data.register(
-            self._on_frame,
-            self.data.frame,
-            how="all",
-            unique=False,
-        )
-
-    def _on_frame(self, data: pd.DataFrame) -> None:
-        pass
+    # def activate(self) -> None:
+    #     super().activate()
+    #     self.data.register(
+    #         self._on_frame,
+    #         self.data.frame,
+    #         how="all",
+    #         unique=False,
+    #     )
+    #
+    # def _on_frame(self, data: pd.DataFrame) -> None:
+    #     pass
