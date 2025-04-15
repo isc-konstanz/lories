@@ -20,6 +20,7 @@ from dash.development.base_component import Component
 import pandas as pd
 from lori.application import InterfaceException
 from lori.application.view.pages.layout import PageLayout
+from lori.util import validate_key
 
 C = TypeVar("C", bound=Component)
 
@@ -43,6 +44,7 @@ class PageMeta(ABCMeta):
 # noinspection PyShadowingBuiltins
 class Page(ABC, metaclass=PageMeta):
     id: str
+    key: str
     name: str
     title: str
     description: Optional[str]
@@ -51,14 +53,14 @@ class Page(ABC, metaclass=PageMeta):
 
     group: Optional[Page]
 
-    layout: PageLayout
-
+    _layout: PageLayout
     _created: bool = False
     _registered: bool = False
 
     def __init__(
         self,
         id: str,
+        key: str,
         name: str,
         title: Optional[str] = None,
         description: Optional[str] = None,
@@ -71,24 +73,23 @@ class Page(ABC, metaclass=PageMeta):
         self._logger = logging.getLogger(self.__module__)
 
         self.id = self._encode_id(id)
+        self.key = validate_key(key)
         self.name = name
         self.title = title if title is not None else name
         self.description = description
 
-        if not pd.isna(order):
-            self.order = order
-
+        self.order = Page.order if pd.isna(order) else order
         self.group = group
-
-    @property
-    @abstractmethod
-    def key(self) -> str:
-        pass
+        self._layout = PageLayout(id=f"{self.id}-container")
 
     @property
     def path(self) -> str:
         _path = f"/{self._encode_id(self.key)}"
         return _path if self.group is None else self.group.path + _path
+
+    @property
+    def layout(self) -> PageLayout:
+        return self._layout
 
     def is_created(self) -> bool:
         return self._created
@@ -99,16 +100,15 @@ class Page(ABC, metaclass=PageMeta):
 
     # noinspection PyUnresolvedReferences
     @wraps(create_layout, updated=())
-    def _do_create_layout(self, *args, **kwargs) -> None:
+    def _do_create_layout(self, layout: PageLayout, *args, **kwargs) -> None:
         if self.is_registered():
             raise PageException(f"Trying to create layout of already registered {type(self).__name__}: {self.name}")
         if self.is_created():
             self._logger.warning(f"{type(self).__name__} '{self.id}' layout already created")
         else:
-            self.layout = PageLayout(id=f"{self.id}-container")
-            self._at_create_layout(self.layout)
-            self._run_create_layout(self.layout, *args, **kwargs)
-            self._on_create_layout(self.layout)
+            self._at_create_layout(layout)
+            self._run_create_layout(layout, *args, **kwargs)
+            self._on_create_layout(layout)
             self._created = True
 
     def _at_create_layout(self, layout: PageLayout) -> None:
@@ -135,7 +135,7 @@ class Page(ABC, metaclass=PageMeta):
 
     # noinspection PyUnresolvedReferences
     @wraps(register, updated=())
-    def _do_register(self) -> None:
+    def _do_register(self, **kwargs) -> None:
         if not self.is_created():
             raise PageException(f"Trying to register {type(self).__name__} without layout: {self.name}")
         if self.is_registered():
@@ -144,11 +144,15 @@ class Page(ABC, metaclass=PageMeta):
 
         self._logger.debug(f"Registering {type(self).__name__} '{self.id}': {self.name}")
 
-        self._run_register()
-        self._on_register()
+        self._at_register(**kwargs)
+        self._run_register(**kwargs)
+        self._on_register(**kwargs)
         self._registered = True
 
-    def _on_register(self) -> None:
+    def _at_register(self, **kwargs) -> None:
+        pass
+
+    def _on_register(self, **kwargs) -> None:
         pass
 
     @staticmethod

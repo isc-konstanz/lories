@@ -21,23 +21,15 @@ from dash_bootstrap_components import themes
 
 from lori import Configurations
 from lori.application import Application
-from lori.application.interface import Interface, InterfaceMeta
+from lori.application.interface import Interface, register_interface_type
 from lori.application.view.pages import PageFooter, PageHeader, View
 
 logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
 
-class ViewInterfaceMeta(InterfaceMeta):
-    # noinspection PyProtectedMember
-    def __call__(cls, context: Application, configs: Configurations) -> Interface:
-        global _instance
-        if _instance is None:
-            _instance = super().__call__(context, configs)
-        return _instance
-
-
 # noinspection PyProtectedMember
-class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
+@register_interface_type("dash")
+class ViewInterface(Interface, Dash):
     _host: str
     _port: int
 
@@ -102,14 +94,22 @@ class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
 
         self.view = View(context.id, header, footer)
 
+    # noinspection PyUnresolvedReferences
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self._do_create_view()
         self._host = configs.get("host", default="127.0.0.1")
         self._port = configs.get_int("port", default=8050)
 
+        self.view.create_pages(self.context.components)
+        self.view.create_layout(self.view.layout)
+        self.layout = self.create_layout
+
+    def start(self) -> None:
+        self.view.register()
+        self.run(host=self._host, port=self._port, debug=self._logger.level == logging.DEBUG)
+
     # noinspection PyUnresolvedReferences
-    def create_view_layout(self) -> html.Div:
+    def create_layout(self) -> html.Div:
         return html.Div(
             id=f"{self.context.id}",
             children=[
@@ -121,16 +121,3 @@ class ViewInterface(Interface, Dash, metaclass=ViewInterfaceMeta):
                 ),
             ],
         )
-
-    # noinspection PyUnresolvedReferences, PyArgumentList
-    def _do_create_view(self) -> None:
-        self.view._do_create_pages(self.context.components)
-        self.view._do_create_layout()
-        self.layout = self.create_view_layout
-
-    def start(self) -> None:
-        self.view._do_register()
-        self.run(host=self._host, port=self._port)  # debug=self._logger.isEnabledFor(logging.DEBUG))
-
-
-_instance: Optional[ViewInterface] = None

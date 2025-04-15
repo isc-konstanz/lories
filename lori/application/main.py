@@ -9,19 +9,11 @@ lori.application.main
 from __future__ import annotations
 
 import logging
-import sys
-import traceback
 from typing import Optional, Type
 
-import tzlocal
-
-import pandas as pd
 from lori import Settings, System
 from lori.application import Interface
-from lori.connectors import Database, DatabaseException
 from lori.data.manager import DataManager
-from lori.typing import TimestampType
-from lori.util import slice_range, to_timedelta
 
 
 class Application(DataManager):
@@ -96,15 +88,21 @@ class Application(DataManager):
 
         except Exception as e:
             self._logger.warning(repr(e))
-            if self._logger.isEnabledFor(logging.DEBUG):
+            if self._logger.level == logging.DEBUG:
                 self._logger.exception(e)
             exit(1)
 
-    def start(self, wait: bool = True) -> None:
-        has_interface = self._interface.is_enabled()
-        if has_interface:
-            wait = False
-        super().start(wait)
+    def activate(self) -> None:
+        super().activate()
+        if self._interface.is_configured():
+            self._interface.activate()
 
-        if has_interface:
-            self._interface.start()
+    def deactivate(self, *_) -> None:
+        super().deactivate()
+        if self._interface.is_active():
+            self._interface.deactivate()
+
+    def start(self) -> None:
+        if self._interface.is_active():
+            self._executor.submit(self._interface.start)
+        super().start()
