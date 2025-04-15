@@ -111,8 +111,8 @@ class Brightsky(Connector):
 
         sources = pd.DataFrame(response_json["sources"])
         sources = sources.set_index("id")
-        sources["first_record"] = pd.to_datetime(sources["first_record"])
-        sources["last_record"] = pd.to_datetime(sources["last_record"])
+        sources["first_record"] = pd.to_datetime(sources["first_record"], utc=True)
+        sources["last_record"] = pd.to_datetime(sources["last_record"], utc=True)
 
         data = pd.DataFrame(response_json["weather"])
         data["timestamp"] = pd.to_datetime(data["timestamp"], utc=True)

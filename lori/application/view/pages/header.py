@@ -59,4 +59,6 @@ class PageHeader:
             brand=self._brand,
             brand_href="/",
             links_left=True,
+            color="light",
+            dark=False,
         )

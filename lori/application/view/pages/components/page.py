@@ -17,6 +17,7 @@ from dash import Input, Output, callback, html
 import pandas as pd
 from lori import Channel, Component, Configurations
 from lori.application.view.pages import Page, PageLayout
+from lori.components import ComponentAccess
 from lori.connectors import ConnectorAccess
 from lori.data import DataAccess
 
@@ -29,15 +30,12 @@ class ComponentPage(Page, Generic[C]):
     def __init__(self, component: C, *args, **kwargs) -> None:
         super().__init__(
             id=component.id,
+            key=component.key,
             name=component.name,
             *args,
             **kwargs,
         )
         self._component = component
-
-    @property
-    def key(self) -> str:
-        return self._component.key
 
     @property
     def configs(self) -> Configurations:
@@ -46,6 +44,10 @@ class ComponentPage(Page, Generic[C]):
     @property
     def connectors(self) -> ConnectorAccess:
         return self._component.connectors
+
+    @property
+    def components(self) -> ComponentAccess:
+        return self._component.components
 
     @property
     def data(self) -> DataAccess:

@@ -9,45 +9,45 @@ lori.data.databases
 from __future__ import annotations
 
 import logging
+from typing import Any, Collection
 
 import tzlocal
 
 import pandas as pd
 from lori.connectors import ConnectorContext, Database
-from lori.core import Configurations, ResourceException
+from lori.core import Configurations, Configurator, ResourceException
 from lori.data.channels import Channel, Channels
 from lori.data.context import DataContext
 from lori.data.replication import Replicator
 from lori.data.retention import Retention, Retentions
 from lori.util import floor_date, parse_freq, to_bool, to_timedelta, to_timezone
 
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
 
-except ImportError:
-    from typing_extensions import Literal
-
-
-class Databases(ConnectorContext):
+class Databases(ConnectorContext, Configurator):
     SECTION: str = "databases"
 
     # noinspection PyProtectedMember, PyUnresolvedReferences
     def __init__(self, context: DataContext, configs: Configurations) -> None:
-        super().__init__(context, configs)
-        context._configure(self)
-        context._configure(*self.values())
+        super().__init__(context, configs=configs.get_section(Databases.SECTION, defaults={}))
         for database in context.connectors.filter(lambda c: c.is_enabled() and isinstance(c, Database)):
             self._add(database)
+        self.load()
 
-    # noinspection PyProtectedMember
-    def _load(
-        self,
-        context: ConnectorContext,
-        configs: Configurations,
-        configs_file: str = "databases.conf",
-    ) -> None:
-        super()._load(context, configs, configs_file)
+    @classmethod
+    def _assert_configs(cls, configs: Configurations) -> Configurations:
+        if configs is None:
+            raise ResourceException(f"Invalid '{cls.__name__}' NoneType configurations")
+        return super()._assert_configs(configs)
+
+    def load(self, **kwargs: Any) -> Collection[Database]:
+        return self._load(
+            self,
+            self.configs,
+            configs_file=self.configs.name,
+            configs_dir=self.configs.dirs.conf.joinpath(self.configs.name.replace(".conf", ".d")),
+            includes=Database.INCLUDES,
+            **kwargs,
+        )
 
     # noinspection PyUnresolvedReferences
     def replicate(self, channels: Channels, full: bool = False, force: bool = False, **kwargs) -> None:
