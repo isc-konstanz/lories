@@ -190,7 +190,7 @@ class DataManager(DataContext, Activator, Entity):
 
         except ConnectorException as e:
             self._logger.warning(f"Error opening connector '{e.connector.id}': {str(e)}")
-            if self._logger.isEnabledFor(logging.DEBUG):
+            if self._logger.level == logging.DEBUG:
                 self._logger.exception(e)
 
     def reconnect(self, *connectors: Connector) -> None:
@@ -230,16 +230,16 @@ class DataManager(DataContext, Activator, Entity):
 
         except Exception as e:
             self._logger.warning(f"Error closing connector '{connector.id}': {str(e)}")
-            if self._logger.isEnabledFor(logging.DEBUG):
+            if self._logger.level == logging.DEBUG:
                 self._logger.exception(e)
         finally:
             connector.set_channels(ChannelState.DISCONNECTED)
 
     def deactivate(self, *_) -> None:
+        self.interrupt()
         super().deactivate()
         self._deactivate(*self._components.values())
         self.disconnect(*self._connectors.values())
-        self.interrupt()
 
     def _deactivate(self, *components: Component) -> None:
         for component in reversed(list(components)):
@@ -253,7 +253,7 @@ class DataManager(DataContext, Activator, Entity):
 
             except Exception as e:
                 self._logger.warning(f"Error deactivating component '{component.id}': {str(e)}")
-                if self._logger.isEnabledFor(logging.DEBUG):
+                if self._logger.level == logging.DEBUG:
                     self._logger.exception(e)
 
     def interrupt(self, *_) -> None:
@@ -302,7 +302,7 @@ class DataManager(DataContext, Activator, Entity):
         if exception is not None:
             listener = exception.listener
             self._logger.warning(f"Error notifying listener '{listener.id}': {str(exception)}")
-            if self._logger.isEnabledFor(logging.DEBUG):
+            if self._logger.level == logging.DEBUG:
                 self._logger.exception(exception)
 
     def start(self, wait: bool = True) -> None:
@@ -432,7 +432,7 @@ class DataManager(DataContext, Activator, Entity):
 
             except ConnectorException as e:
                 self._logger.warning(f"Error reading connector '{e.connector.id}': {str(e)}")
-                if self._logger.isEnabledFor(logging.DEBUG):
+                if self._logger.level == logging.DEBUG:
                     self._logger.exception(e)
 
         if len(check_results) == 0:
@@ -488,7 +488,7 @@ class DataManager(DataContext, Activator, Entity):
 
             except ConnectorException as e:
                 self._logger.warning(f"Error reading connector '{e.connector.id}': {str(e)}")
-                if self._logger.isEnabledFor(logging.DEBUG):
+                if self._logger.level == logging.DEBUG:
                     self._logger.exception(e)
 
         if len(read_data) == 0:
@@ -531,7 +531,7 @@ class DataManager(DataContext, Activator, Entity):
 
             except ConnectorException as e:
                 self._logger.warning(f"Error reading connector '{e.connector.id}': {str(e)}")
-                if self._logger.isEnabledFor(logging.DEBUG):
+                if self._logger.level == logging.DEBUG:
                     self._logger.exception(e)
 
                 def update_state(channel: Channel) -> Channel:
@@ -579,7 +579,7 @@ class DataManager(DataContext, Activator, Entity):
 
             except ConnectorException as e:
                 self._logger.warning(f"Error writing connector '{e.connector.id}': {str(e)}")
-                if self._logger.isEnabledFor(logging.DEBUG):
+                if self._logger.level == logging.DEBUG:
                     self._logger.exception(e)
 
                 # noinspection PyShadowingNames
@@ -634,7 +634,7 @@ class DataManager(DataContext, Activator, Entity):
 
             except ConnectorException as e:
                 self._logger.warning(f"Error logging connector '{e.connector.id}': {str(e)}")
-                if self._logger.isEnabledFor(logging.DEBUG):
+                if self._logger.level == logging.DEBUG:
                     self._logger.exception(e)
 
 

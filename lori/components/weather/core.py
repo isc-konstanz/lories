@@ -34,7 +34,7 @@ def register_weather_type(
 
 
 class WeatherMeta(ActivatorMeta):
-    def __call__(cls, context: Context | Component, configs: Configurations, **kwargs) -> Weather:
+    def __call__(cls, context: Context | Component, configs: Configurations, **kwargs) -> WeatherType:
         _type = configs.get("type", default="default").lower()
         _cls = cls._get_class(_type)
         if cls != _cls:
