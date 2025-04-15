@@ -305,12 +305,11 @@ class DataManager(DataContext, Activator, Entity):
             if self._logger.level == logging.DEBUG:
                 self._logger.exception(exception)
 
-    def start(self, wait: bool = True) -> None:
+    def start(self) -> None:
         self._logger.info(f"Starting {type(self).__name__}: {self.name}")
         self.__interrupt.clear()
         self.__runner.start()
-        if wait:
-            self.__runner.join()
+        self.__runner.join()
 
     # noinspection PyShadowingBuiltins, PyProtectedMember
     def run(self, **kwargs) -> None:

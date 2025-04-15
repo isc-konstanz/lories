@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from collections.abc import MutableSequence, Sequence
 from itertools import chain
-from typing import Any, Generic, Iterator, List, Optional, Tuple, TypeVar
+from typing import Any, Generic, Iterator, List, Tuple, TypeVar
 
 import dash_bootstrap_components as dbc
 from dash import html
@@ -24,16 +24,12 @@ P = TypeVar("P", bound=Page)
 
 class PageGroup(Page, MutableSequence[P], Generic[P]):
     _pages: List[P]
-    _key: str
 
     order: int = 1000
 
     # noinspection PyShadowingBuiltins
-    def __init__(self, key: Optional[str] = None, *args, **kwargs) -> None:
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        if key is None:
-            key = self._encode_id(self.name)
-        self._key = key
         self._pages = []
 
     def __len__(self) -> int:
@@ -56,10 +52,6 @@ class PageGroup(Page, MutableSequence[P], Generic[P]):
 
     def insert(self, index: int, page: P) -> None:
         self._pages.insert(index, page)
-
-    @property
-    def key(self) -> str:
-        return self._key
 
     def sort(self) -> Sequence[Page]:
         def order(page: Page) -> Tuple[Any, ...]:

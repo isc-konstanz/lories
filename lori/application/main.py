@@ -92,11 +92,17 @@ class Application(DataManager):
                 self._logger.exception(e)
             exit(1)
 
-    def start(self, wait: bool = True) -> None:
-        has_interface = self._interface.is_enabled()
-        if has_interface:
-            wait = False
-        super().start(wait)
+    def activate(self) -> None:
+        super().activate()
+        if self._interface.is_configured():
+            self._interface.activate()
 
-        if has_interface:
-            self._interface.start()
+    def deactivate(self, *_) -> None:
+        super().deactivate()
+        if self._interface.is_active():
+            self._interface.deactivate()
+
+    def start(self) -> None:
+        if self._interface.is_active():
+            self._executor.submit(self._interface.start)
+        super().start()

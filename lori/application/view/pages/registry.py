@@ -121,7 +121,6 @@ class PageRegistry:
         cls: Type[GroupType],
         type: Type,
         factory: Optional[Callable] = None,
-        children: Optional[ChildrenType] = None,
         replace: bool = False,
     ) -> None:
         if not issubclass(cls, Page):
@@ -135,7 +134,7 @@ class PageRegistry:
                 raise ResourceException(
                     f"Registration for '{type}' does already exist: " ", ".join(p._class.__name__ for p in existing)
                 )
-        self.pages.append(PageRegistration(cls, type, children=children, factory=factory))
+        self.pages.append(PageRegistration(cls, type, factory=factory))
 
     # noinspection PyTypeChecker, PyProtectedMember, PyUnresolvedReferences
     def register_group(
