@@ -22,7 +22,7 @@ from dash_bootstrap_components import themes
 from lori import Configurations
 from lori.application import Application
 from lori.application.interface import Interface, register_interface_type
-from lori.application.view.pages import PageFooter, PageHeader, View
+from lori.application.view import PageFooter, PageHeader, View
 
 logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
@@ -30,6 +30,9 @@ logging.getLogger("werkzeug").setLevel(logging.WARNING)
 # noinspection PyProtectedMember
 @register_interface_type("dash")
 class ViewInterface(Interface, Dash):
+    # _auth: Authentication
+
+    _proxy: Optional[str] = None
     _host: str
     _port: int
 
@@ -82,6 +85,7 @@ class ViewInterface(Interface, Dash):
             use_pages=True,
             server=True,  # TODO: Replace this with local Flask server, to create custom REST API ?
         )
+        # self._auth = Authentication(self, configs)
 
         theme_defaults = {
             "name": context.name,
@@ -97,16 +101,17 @@ class ViewInterface(Interface, Dash):
     # noinspection PyUnresolvedReferences
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
+        self._proxy = configs.get("proxy", default=None)
         self._host = configs.get("host", default="127.0.0.1")
         self._port = configs.get_int("port", default=8050)
 
         self.view.create_pages(self.context.components)
         self.view.create_layout(self.view.layout)
+        self.view.register()
         self.layout = self.create_layout
 
     def start(self) -> None:
-        self.view.register()
-        self.run(host=self._host, port=self._port, debug=self._logger.level == logging.DEBUG)
+        self.run(host=self._host, port=self._port, proxy=self._proxy, debug=self._logger.level == logging.DEBUG)
 
     # noinspection PyUnresolvedReferences
     def create_layout(self) -> html.Div:

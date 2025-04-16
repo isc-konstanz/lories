@@ -8,7 +8,7 @@ lori.application.view.pages.view
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Optional, Type, TypeVar
+from typing import Any, Callable, Dict, Optional, Sequence, Type, TypeVar
 
 import dash_bootstrap_components as dbc
 from dash import html
@@ -192,8 +192,14 @@ class View(PageGroup):
     def _at_register(self) -> None:
         super()._at_register()
         groups = self.groups.values()
-        for page in [p for p in self if p not in groups]:
-            if page.is_active():
-                page.register()
+
+        def _register(pages: Sequence[Page]) -> None:
+            for page in pages:
+                if page.is_created() and page not in groups:
+                    page.register()
+                if isinstance(page, PageGroup):
+                    _register(page)
+
+        _register(self)
         for group in groups:
             group.register()
