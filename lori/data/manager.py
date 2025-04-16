@@ -373,7 +373,8 @@ class DataManager(DataContext, Activator, Entity):
         kwargs.update({k: v for k, v in configs.items() if k not in configs.sections})
 
         databases = Databases(self, configs)
-        databases.replicate(self.channels, **kwargs)
+        future: Future = self._executor.submit(databases.replicate, self.channels, **kwargs)
+        future.result()
 
     def rotate(self, full: bool = False, **kwargs) -> None:
         section = self.configs.get_section(Retention.SECTION, defaults={})
@@ -382,7 +383,8 @@ class DataManager(DataContext, Activator, Entity):
         kwargs["full"] = configs.pop("full", default=full)
 
         databases = Databases(self, configs)
-        databases.rotate(self.channels, **kwargs)
+        future: Future = self._executor.submit(databases.rotate, self.channels, **kwargs)
+        future.result()
 
     @overload
     def has_logged(
