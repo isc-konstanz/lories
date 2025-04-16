@@ -35,21 +35,22 @@ class Component(_Component):
         **kwargs,
     ) -> None:
         super().__init__(context=context, configs=configs, **kwargs)
-        self.__converters = ConverterAccess(self, configs=configs.get_section("converters", ensure_exists=True))
-        self.__connectors = ConnectorAccess(self, configs=configs.get_section("connectors", ensure_exists=True))
-        self.__components = ComponentAccess(self, configs=configs.get_section("components", ensure_exists=True))
-        self.__data = DataAccess(self, configs=configs.get_section(DataAccess.SECTION, ensure_exists=True))
-
-    def _at_configure(self, configs: Configurations) -> None:
-        self.__converters.configure(configs.get_section("converters", ensure_exists=True))
-        self.__connectors.configure(configs.get_section("connectors", ensure_exists=True))
-        self.__components.configure(configs.get_section("components", ensure_exists=True))
-        self.__data.configure(configs.get_section(DataAccess.SECTION, ensure_exists=True))
+        self.__converters = ConverterAccess(self)
+        self.__connectors = ConnectorAccess(self)
+        self.__components = ComponentAccess(self)
+        self.__data = DataAccess(self)
 
     def _on_configure(self, configs: Configurations) -> None:
+        super()._on_configure(configs)
         self.__converters.load()
+        self.__converters.configure()
+
         self.__connectors.load()
+        self.__connectors.configure()
+
         self.__components.load()
+        self.__components.configure()
+
         self.__data.load()
 
     @property

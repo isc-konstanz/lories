@@ -106,7 +106,7 @@ class System(Component):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
         self.localize(configs.get_section(Location.SECTION, defaults={}))
-        self.components.load(configs_dir=configs.dirs.conf)
+        self.components.load(configs_dir=self.configs.dirs.conf)
 
     def localize(self, configs: Configurations) -> None:
         if configs.enabled and all(k in configs for k in ["latitude", "longitude"]):

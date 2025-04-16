@@ -34,7 +34,7 @@ from .database import (  # noqa: F401
 
 import importlib
 
-for import_connector in ["dummy", "csv", "sql", "tables", "revpi"]:
+for import_connector in ["dummy", "csv", "sql", "tables", "modbus", "revpi"]:
     try:
         importlib.import_module(f".{import_connector}", "lori.connectors")
 

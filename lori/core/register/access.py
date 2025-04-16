@@ -8,10 +8,9 @@ lori.core.register.access
 
 from __future__ import annotations
 
-from abc import abstractmethod
-from typing import Any, Collection, Generic, TypeVar, overload
+from typing import Any, Generic, TypeVar, overload
 
-from lori.core import Configurations, Configurator, Context, ResourceException
+from lori.core import Configurations, Context, ResourceException
 from lori.core.register import Registrator
 from lori.core.register.context import RegistratorContext, _RegistratorContext
 from lori.util import update_recursive
@@ -20,7 +19,7 @@ R = TypeVar("R", bound=Registrator)
 
 
 # noinspection SpellCheckingInspection, PyAbstractClass, PyShadowingBuiltins
-class RegistratorAccess(Configurator, _RegistratorContext[R], Generic[R]):
+class RegistratorAccess(_RegistratorContext[R], Generic[R]):
     _registrar: Registrator
     __context: Context
 
@@ -28,9 +27,10 @@ class RegistratorAccess(Configurator, _RegistratorContext[R], Generic[R]):
         self,
         context: RegistratorContext,
         registrar: Registrator,
+        section: str,
         **kwargs,
     ) -> None:
-        super().__init__(**kwargs)
+        super().__init__(section, **kwargs)
         self.__context = self._assert_context(context)
         self._registrar = self._assert_registrar(registrar)
 
@@ -45,12 +45,6 @@ class RegistratorAccess(Configurator, _RegistratorContext[R], Generic[R]):
         if context is None or not isinstance(context, RegistratorContext):
             raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
         return context
-
-    @classmethod
-    def _assert_configs(cls, configs: Configurations) -> Configurations:
-        if configs is None:
-            raise ResourceException(f"Invalid '{cls.__name__}' NoneType configurations")
-        return super()._assert_configs(configs)
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({', '.join(str(c.key) for c in self.values())})"
@@ -69,6 +63,9 @@ class RegistratorAccess(Configurator, _RegistratorContext[R], Generic[R]):
     @property
     def context(self) -> Context:
         return self.__context
+
+    def _get_registrator_section(self) -> Configurations:
+        return self._registrar.configs.get_section(self._section, ensure_exists=True)
 
     def __validate_id(self, id: str) -> str:
         if not len(id.split(".")) > 1:
@@ -121,28 +118,25 @@ class RegistratorAccess(Configurator, _RegistratorContext[R], Generic[R]):
             self._add(__registrator)
             return
 
-        if not self.configs.has_section(__registrator):
-            self.configs._add_section(__registrator, configs)
+        registrators = self._get_registrator_section()
+        if not registrators.has_section(__registrator):
+            registrators._add_section(__registrator, configs)
         else:
-            registrator_configs = self.configs[__registrator]
+            registrator_configs = registrators[__registrator]
             registrator_configs = update_recursive(registrator_configs, configs, replace=False)
-            self.configs[__registrator] = registrator_configs
+            registrators[__registrator] = registrator_configs
 
         if self._registrar.is_configured():
             registrator_configs = Configurations.load(
                 f"{__registrator}.conf",
-                **self.configs.dirs.to_dict(),
-                **self._build_defaults(self.configs),
+                **registrators.dirs.to_dict(),
+                **self._build_defaults(registrators),
             )
             # Be wary of the order. First, update the registrator core with the default core
             # of the configuration file, then update the function arguments. Last, override
             # everything with the registrator specific configurations of the file.
             registrator_configs = update_recursive(registrator_configs, configs)
-            registrator_configs = update_recursive(registrator_configs, self.configs[__registrator])
+            registrator_configs = update_recursive(registrator_configs, registrators[__registrator])
             registrator = self._load_from_configs(self._registrar, registrator_configs)
             if registrator.is_enabled():
                 registrator.configure(registrator_configs)
-
-    @abstractmethod
-    def load(self, **kwargs: Any) -> Collection[R]:
-        pass

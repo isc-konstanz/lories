@@ -122,7 +122,7 @@ class Page(ABC, metaclass=PageMeta):
 
     # noinspection PyMethodMayBeStatic
     def register(self, **kwargs) -> None:
-        self._logger.info(f"Registering '{type(self).__name__}' page: {self.id} at {self.path}")
+        self._logger.debug(f"Registering '{type(self).__name__}' page: {self.id} at {self.path}")
         dash.register_page(
             self.id,
             path=self.path,

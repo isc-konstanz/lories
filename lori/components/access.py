@@ -24,9 +24,9 @@ C = TypeVar("C", bound=_Component)
 
 class ComponentAccess(RegistratorAccess[C]):
     # noinspection PyUnresolvedReferences
-    def __init__(self, registrar: Registrator, configs: Configurations, **kwargs) -> None:
+    def __init__(self, registrar: Registrator, **kwargs) -> None:
         context = get_context(registrar, RegistratorContext).context.components
-        super().__init__(context, registrar, configs=configs, **kwargs)
+        super().__init__(context, registrar, "components", **kwargs)
 
     # noinspection PyShadowingBuiltins
     def _set(self, id: str, component: C) -> None:
@@ -41,13 +41,14 @@ class ComponentAccess(RegistratorAccess[C]):
         configs_dir: Optional[str | Directory] = None,
         **kwargs: Any,
     ) -> Collection[C]:
+        configs = self._get_registrator_section()
         if configs_file is None:
-            configs_file = self.configs.name
+            configs_file = configs.name
         if configs_dir is None:
-            configs_dir = self.configs.dirs.conf.joinpath(self.configs.name.replace(".conf", ".d"))
+            configs_dir = configs.dirs.conf.joinpath(configs.name.replace(".conf", ".d"))
         return self._load(
             self._registrar,
-            self.configs,
+            configs=configs,
             configs_file=configs_file,
             configs_dir=configs_dir,
             includes=_Component.INCLUDES,
@@ -100,8 +101,6 @@ class ComponentAccess(RegistratorAccess[C]):
 
         if sort:
             self.sort()
-        self._configure(components)
-
         return components
 
     def _create(
