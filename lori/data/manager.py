@@ -134,9 +134,14 @@ class DataManager(DataContext, Activator, Entity):
         super().configure(configs)
         self._interval = configs.get_int("interval", default=1)
         self._load(self, configs)
-        self._converters.load(configs.get_section("converters", defaults={}))
-        self._connectors.load(configs.get_section("connectors", defaults={}))
-        self._components.load(configs.get_section("components", defaults={}))
+        self._converters.load()
+        self._converters.configure()
+
+        self._connectors.load()
+        self._connectors.configure()
+
+        self._components.load()
+        self._components.configure()
 
     def activate(self) -> None:
         super().activate()

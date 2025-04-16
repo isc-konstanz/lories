@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any, Callable, Collection, Optional, Type, overload
 
 import pandas as pd
-from lori.core import Configurations, Configurator, Constant, Context, Registrator, ResourceException
+from lori.core import Configurations, Constant, Context, Registrator, ResourceException
 from lori.data import Channel, DataContext
 from lori.typing import ChannelsType, TimestampType
 from lori.util import get_context, update_recursive
@@ -25,7 +25,7 @@ except ImportError:
 
 
 # noinspection PyProtectedMember, PyShadowingBuiltins
-class DataAccess(Configurator, DataContext):
+class DataAccess(DataContext):
     __registrar: Registrator
     __context: Context
 
@@ -47,15 +47,6 @@ class DataAccess(Configurator, DataContext):
         if context is None or not isinstance(context, DataManager):
             raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
         return context
-
-    @classmethod
-    def _assert_configs(cls, configs: Configurations) -> Configurations:
-        if configs is None:
-            raise ResourceException(f"Invalid '{cls.__name__}' NoneType configurations")
-        configs = super()._assert_configs(configs)
-        if not configs.has_section("channels"):
-            configs._add_section("channels", {})
-        return configs
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({', '.join(str(c.key) for c in self.values())})"
@@ -115,19 +106,18 @@ class DataAccess(Configurator, DataContext):
     def context(self) -> DataContext:
         return self.__context
 
-    def configure(self, configs: Configurations) -> None:
-        super().configure(configs)
-        if not configs.has_section("channels"):
-            configs._add_section("channels", {})
+    def _get_data_section(self) -> Configurations:
+        return self.__registrar.configs.get_section(self.SECTION, ensure_exists=True)
 
     def load(self) -> Collection[Channel]:
         channels = []
         defaults = {}
-        if self.configs.has_section("channels"):
-            section = self.configs.get_section("channels")
+        data = self._get_data_section()
+        if data.has_section("channels"):
+            section = data.get_section("channels")
             defaults = Channel._build_defaults(section)
             channels.extend(self._load_from_sections(self.__registrar, section))
-        channels.extend(self._load_from_file(self.__registrar, self.configs.dirs, "channels.conf", defaults=defaults))
+        channels.extend(self._load_from_file(self.__registrar, data.dirs, "channels.conf", defaults=defaults))
         return channels
 
     # noinspection PyUnresolvedReferences
@@ -139,21 +129,22 @@ class DataAccess(Configurator, DataContext):
             }
             key = configs.pop("key")
         configs = Channel._build_configs(configs)
-        if not self.configs["channels"].has_section(key):
-            self.configs["channels"]._add_section(key, configs)
+        channels = self._get_data_section().get_section("channels", ensure_exists=True)
+        if not channels.has_section(key):
+            channels._add_section(key, configs)
         else:
-            channel_configs = Channel._build_configs(self.configs["channels"][key])
+            channel_configs = Channel._build_configs(channels[key])
             channel_configs = update_recursive(channel_configs, configs, replace=False)
-            self.configs["channels"][key] = channel_configs
+            channels[key] = channel_configs
 
         if self.__registrar.is_configured():
-            channel_defaults = Channel._build_defaults(self.configs["channels"])
+            channel_defaults = Channel._build_defaults(channels)
             channel_configs = Channel._build_configs(channel_defaults)
             # Be wary of the order. First, update the channel core with the default core
             # of the configuration file, then update the function arguments. Last, override
             # everything with the channel specific configurations of the file.
             channel_configs = update_recursive(channel_configs, configs)
-            channel_configs = update_recursive(channel_configs, self.configs["channels"][key])
+            channel_configs = update_recursive(channel_configs, channels[key])
             channel_id = f"{self.__registrar.id}.{key}"
             if self._contains(channel_id):
                 self._update(id=channel_id, key=key, **channel_configs)

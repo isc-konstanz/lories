@@ -8,6 +8,7 @@ lori.core.register.context
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from abc import abstractmethod
@@ -30,6 +31,13 @@ R = TypeVar("R", bound=Registrator)
 
 # noinspection SpellCheckingInspection, PyAbstractClass, PyProtectedMember
 class _RegistratorContext(Context[R], Generic[R]):
+    _section: str
+
+    def __init__(self, section: str, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._logger = logging.getLogger(self.__module__)
+        self._section = section
+
     def _load(
         self,
         context: Context | Registrator,
@@ -59,8 +67,6 @@ class _RegistratorContext(Context[R], Generic[R]):
 
         if sort:
             self.sort()
-        self._configure(registrators)
-
         return registrators
 
     def _load_from_configs(
@@ -161,16 +167,20 @@ class _RegistratorContext(Context[R], Generic[R]):
                         pass
         return registrators
 
-    def _configure(self, configurators: Optional[Collection[Configurator]] = None) -> None:
+    def configure(self, configurators: Optional[Collection[Configurator]] = None) -> None:
         if configurators is None:
             configurators = self.values()
         for configurator in configurators:
             configurations = configurator.configs
             if configurations is None or not configurations.enabled:
-                # Skipping configuring disabled configuration
+                self._logger.debug(f"Skipping configuring disabled {type(configurator).__name__}")
                 continue
 
+            self._logger.debug(f"Configuring {type(self).__name__}: {configurations.path}")
             configurator.configure(configurations)
+
+            if self._logger.level == logging.DEBUG:
+                self._logger.debug(f"Configured {configurator}")
 
     # noinspection PyShadowingBuiltins, PyArgumentList
     def _update(self, id: str, configs: Configurations) -> None:
@@ -197,17 +207,21 @@ class _RegistratorContext(Context[R], Generic[R]):
             raise ValueError("At least one type to look up required")
         return len(self.get_all(*types)) > 0
 
+    @abstractmethod
+    def _get_registrator_section(self) -> Configurations:
+        pass
+
+    @abstractmethod
+    def load(self, **kwargs: Any) -> Collection[R]:
+        pass
+
 
 # noinspection SpellCheckingInspection, PyProtectedMember
 class RegistratorContext(_RegistratorContext[R], Generic[R]):
     __context: Context
 
-    def __init__(
-        self,
-        context: Context,
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, context: Context, section: str, **kwargs) -> None:
+        super().__init__(section, **kwargs)
         self.__context = self._assert_context(context)
 
     @classmethod
@@ -247,6 +261,10 @@ class RegistratorContext(_RegistratorContext[R], Generic[R]):
         if len(types) == 0:
             return self.values()
         return self.filter(_is_type)
+
+    # noinspection PyUnresolvedReferences
+    def _get_registrator_section(self) -> Configurations:
+        return self.__context.configs.get_section(self._section, ensure_exists=True)
 
     def _create(
         self,
