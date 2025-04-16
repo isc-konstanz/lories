@@ -123,8 +123,7 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
         self._at_configure(configs)
         self._run_configure(configs, *args, **kwargs)
         self._on_configure(configs)
-        if self.__configs != configs:
-            self.__configs = configs
+        self.__configs = configs
         self._configured = True
 
     def _at_configure(self, configs: Configurations) -> None:

@@ -37,8 +37,8 @@ class Application(DataManager):
     def configure(self, settings: Settings, factory: Type[System]) -> None:
         super().configure(settings)
         self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
+        components = []
 
-        systems = []
         system_dirs = settings.dirs.to_dict()
         system_dirs["conf_dir"] = None
         systems_section = settings.get_section("systems")
@@ -47,15 +47,14 @@ class Application(DataManager):
             if systems_section.get_bool("copy"):
                 factory.copy(self.settings)
             system_dirs["scan_dir"] = str(settings.dirs.data)
-            systems.extend(factory.scan(self._components, **system_dirs, flat=systems_flat))
+            components.extend(factory.scan(self._components, **system_dirs, flat=systems_flat))
         else:
-            systems.append(factory.load(self._components, **system_dirs, flat=systems_flat))
-
-        self._components._configure(systems)
-        self._components.sort()
+            components.append(factory.load(self._components, **system_dirs, flat=systems_flat))
 
         if not self._components.has_type(System) and settings.dirs.data.is_default():
-            self._components.load(settings, configs_dir=settings.dirs.conf)
+            components += self._components.load(configs_dir=settings.dirs.conf)
+        self._components.sort()
+        self._components.configure(components)
 
         if self._interface.is_enabled():
             self._interface.configure(settings.get_section(Interface.SECTION))
@@ -92,17 +91,12 @@ class Application(DataManager):
                 self._logger.exception(e)
             exit(1)
 
-    def activate(self) -> None:
-        super().activate()
-        if self._interface.is_configured():
+    def start(self) -> None:
+        if self._interface.is_enabled():
             self._interface.activate()
+        super().start()
 
     def deactivate(self, *_) -> None:
         super().deactivate()
         if self._interface.is_active():
             self._interface.deactivate()
-
-    def start(self) -> None:
-        if self._interface.is_active():
-            self._executor.submit(self._interface.start)
-        super().start()

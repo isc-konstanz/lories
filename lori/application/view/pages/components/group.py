@@ -38,8 +38,3 @@ class ComponentGroup(PageGroup[ComponentPage], ComponentPage[ComponentType], Gen
                 data.append(html.H5(f"{title}:"))
             data.append(self._build_data())
             layout.append(dbc.Row(dbc.Col(dbc.Card(dbc.CardBody(data)))))
-
-    def _on_register(self) -> None:
-        super()._on_register()
-        for page in self:
-            page.register()

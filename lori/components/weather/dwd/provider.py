@@ -57,7 +57,6 @@ class DeutscherWetterDienst(WeatherProvider):
         super().configure(configs)
 
         connector = Brightsky(self, self.location, key="brightsky")
-        connector.configure(configs.get_section("brightsky", defaults={}))
         self.connectors.add(connector)
 
         if self.forecast.is_enabled() and isinstance(self.forecast, WeatherForecast):

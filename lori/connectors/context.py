@@ -34,9 +34,12 @@ def register_connector_type(
 
 
 class ConnectorContext(RegistratorContext[C]):
+    def __init__(self, context: Context, **kwargs) -> None:
+        super().__init__(context, "connectors", **kwargs)
+
     @property
     def _registry(self) -> Registry[C]:
         return registry
 
-    def load(self, configs: Configurations, **kwargs: Any) -> Collection[C]:
-        return self._load(self, configs, includes=_Connector.INCLUDES, **kwargs)
+    def load(self, **kwargs: Any) -> Collection[C]:
+        return self._load(self, self._get_registrator_section(), includes=_Connector.INCLUDES, **kwargs)

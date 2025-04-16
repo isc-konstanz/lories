@@ -61,12 +61,16 @@ def register_converter_type(
 
 
 class ConverterContext(RegistratorContext[Converter]):
+    def __init__(self, context: Context, **kwargs) -> None:
+        super().__init__(context, "converters", **kwargs)
+
     @property
     def _registry(self) -> Registry[Converter]:
         return registry
 
     # noinspection PyProtectedMember
-    def load(self, configs: Configurations, **kwargs: Any) -> Collection[Converter]:
+    def load(self, **kwargs: Any) -> Collection[Converter]:
+        configs = self._get_registrator_section()
         defaults = Converter._build_defaults(configs)
 
         converters = []
