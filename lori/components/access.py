@@ -43,7 +43,7 @@ class ComponentAccess(RegistratorAccess[C]):
         configs_dir: Optional[str | Directory] = None,
         **kwargs: Any,
     ) -> Collection[C]:
-        defaults = self._registrar.configs.get_sections(_Component.INCLUDES)
+        defaults = self._registrar.configs.get_sections(_Component.INCLUDES, ensure_exists=True)
         defaults[DataAccess.SECTION][Channels.SECTION] = Channel._build_defaults(
             defaults[DataAccess.SECTION].get_section(Channels.SECTION, defaults={})
         )
@@ -76,7 +76,7 @@ class ComponentAccess(RegistratorAccess[C]):
     ) -> Collection[C]:
         kwargs["factory"] = type
         components = []
-        defaults = self._registrar.configs.get_sections(_Component.INCLUDES)
+        defaults = self._registrar.configs.get_sections(_Component.INCLUDES, ensure_exists=True)
         defaults[DataAccess.SECTION][Channels.SECTION] = Channel._build_defaults(
             defaults[DataAccess.SECTION].get_section(Channels.SECTION, defaults={})
         )
