@@ -124,7 +124,7 @@ class ListenerContext(Context[Listener]):
         def has_locked() -> bool:
             locked = [listener.locked() for listener in self.values()]
 
-            if self._logger.isEnabledFor(logging.DEBUG):
+            if self._logger.level <= logging.DEBUG:
                 self._logger.debug(f"Waiting for {len(locked)} listener{'s' if len(locked) > 0 else ''} to finish")
             return any(locked)
 

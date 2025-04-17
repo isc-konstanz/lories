@@ -8,15 +8,12 @@ lori.application.interface
 
 from __future__ import annotations
 
-import signal
-from abc import abstractmethod
 from collections.abc import Callable
-from threading import Thread
 from typing import Optional, Type, TypeVar
 
 from lori.core import Context, Registry, ResourceException
-from lori.core.activator import Activator, ActivatorMeta
 from lori.core.configs import ConfigurationException, Configurations
+from lori.core.configs.configurator import Configurator, ConfiguratorMeta
 
 
 # noinspection PyShadowingBuiltins
@@ -34,7 +31,7 @@ def register_interface_type(
     return _register
 
 
-class InterfaceMeta(ActivatorMeta):
+class InterfaceMeta(ConfiguratorMeta):
     def __call__(cls, context: Context, configs: Configurations, **kwargs) -> InterfaceType:
         global _instance
 
@@ -57,19 +54,15 @@ class InterfaceMeta(ActivatorMeta):
         raise InterfaceException(f"Unknown interface type '{type}'")
 
 
-class Interface(Activator, metaclass=InterfaceMeta):
+class Interface(Configurator, metaclass=InterfaceMeta):
     SECTION: str = "interface"
 
     __context: Context
-    __runner: Thread
 
     # noinspection PyUnresolvedReferences
     def __init__(self, context: Context, configs: Configurations, **kwargs) -> None:
         super().__init__(configs, **kwargs)
         self.__context = self._assert_context(context)
-        self.__runner = Thread(name=f"{context.name} {type(self).__name__}", target=self.start)
-
-        signal.signal(signal.SIGTERM, self.deactivate)
 
     @classmethod
     def _assert_context(cls, context: Context) -> Context:
@@ -89,18 +82,6 @@ class Interface(Activator, metaclass=InterfaceMeta):
     def context(self) -> Context:
         return self.__context
 
-    def activate(self) -> None:
-        super().activate()
-        self.__runner.start()
-
-    def deactivate(self, *_) -> None:
-        super().deactivate()
-        signal.pthread_kill(self.__runner.ident, signal.SIGTERM)
-
-        if self.__runner.is_alive():
-            self.__runner.join()
-
-    @abstractmethod
     def start(self, *args, **kwargs) -> None:
         pass
 

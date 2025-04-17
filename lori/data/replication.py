@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.data.replicator
-~~~~~~~~~~~~~~~~~~~~
+lori.data.replication
+~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -9,6 +9,7 @@ lori.data.replicator
 from __future__ import annotations
 
 import logging
+from copy import deepcopy
 from typing import Any, Dict, Mapping, Optional
 
 import tzlocal
@@ -43,7 +44,7 @@ class Replicator:
     # noinspection PyShadowingNames
     @classmethod
     def build(cls, databases, resource: Resource, **configs) -> Replicator:
-        resource_configs = resource.get(cls.SECTION, None)
+        resource_configs = deepcopy(resource.get(cls.SECTION, None))
         if resource_configs is None:
             resource_configs = {"database": None}
         if isinstance(resource_configs, str):
@@ -55,9 +56,9 @@ class Replicator:
 
         database = None
         database_id = resource_configs.pop("database")
-        if database_id is not None and "." not in database_id:
+        if database_id is not None:
             database_path = resource.id.split(".")
-            for i in reversed(range(1, len(database_path))):
+            for i in reversed(range(len(database_path))):
                 _database_id = ".".join([*database_path[:i], database_id])
                 if _database_id in databases.keys():
                     database = databases.get(_database_id, None)
@@ -110,14 +111,22 @@ class Replicator:
         return hash((self.database, self._enabled, *self._get_args()))
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.database.id})"
+        return f"{type(self).__name__}({self.id})"
 
     def __str__(self) -> str:
         return (
-            f"{type(self).__name__}:\n\tid={self.database.id}\n\t"
+            f"{type(self).__name__}:\n\tid={self.id}\n\t"
             + "\n\t".join(f"{k}={v}" for k, v in self._get_args().items())
             + f"\n\tenabled={self.enabled}"
         )
+
+    @property
+    def id(self) -> Optional[str]:
+        return self.database.id if self.database is not None else None
+
+    @property
+    def key(self) -> str:
+        return self.database.key if self.database is not None else None
 
     # noinspection PyShadowingBuiltins
     def _get_args(self) -> Dict[str, Any]:

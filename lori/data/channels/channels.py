@@ -25,6 +25,8 @@ except ImportError:
 
 
 class Channels(Resources[Channel]):
+    SECTION: str = "channels"
+
     def __str__(self) -> str:
         return str(self.to_frame(unique=True, states=True))
 

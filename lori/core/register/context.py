@@ -182,7 +182,7 @@ class _RegistratorContext(Context[R], Generic[R]):
             self._logger.debug(f"Configuring {type(self).__name__}: {configurations.path}")
             configurator.configure(configurations)
 
-            if self._logger.level == logging.DEBUG:
+            if self._logger.level <= logging.DEBUG:
                 self._logger.debug(f"Configured {configurator}")
 
     # noinspection PyShadowingBuiltins, PyArgumentList

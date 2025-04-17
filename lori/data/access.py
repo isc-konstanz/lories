@@ -12,7 +12,7 @@ from typing import Any, Callable, Collection, Optional, Type, overload
 
 import pandas as pd
 from lori.core import Configurations, Constant, Context, Registrator, ResourceException
-from lori.data import Channel, DataContext
+from lori.data import Channel, Channels, DataContext
 from lori.typing import ChannelsType, TimestampType
 from lori.util import get_context, update_recursive
 
@@ -109,15 +109,20 @@ class DataAccess(DataContext):
     def _get_data_section(self) -> Configurations:
         return self.__registrar.configs.get_section(self.SECTION, ensure_exists=True)
 
-    def load(self) -> Collection[Channel]:
+    def load(self, sort: bool = True) -> Collection[Channel]:
         channels = []
         defaults = {}
         data = self._get_data_section()
-        if data.has_section("channels"):
-            section = data.get_section("channels")
+        if data.has_section(Channels.SECTION):
+            section = data.get_section(Channels.SECTION)
             defaults = Channel._build_defaults(section)
             channels.extend(self._load_from_sections(self.__registrar, section))
-        channels.extend(self._load_from_file(self.__registrar, data.dirs, "channels.conf", defaults=defaults))
+        channels.extend(
+            self._load_from_file(self.__registrar, data.dirs, f"{Channels.SECTION}.conf", defaults=defaults)
+        )
+
+        if sort:
+            self.sort()
         return channels
 
     # noinspection PyUnresolvedReferences
@@ -129,7 +134,7 @@ class DataAccess(DataContext):
             }
             key = configs.pop("key")
         configs = Channel._build_configs(configs)
-        channels = self._get_data_section().get_section("channels", ensure_exists=True)
+        channels = self._get_data_section().get_section(Channels.SECTION, ensure_exists=True)
         if not channels.has_section(key):
             channels._add_section(key, configs)
         else:

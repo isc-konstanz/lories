@@ -36,15 +36,22 @@ class DataContext(Context[Channel]):
         self,
         context: Context | Registrator,
         configs: Configurations,
-    ) -> None:
+        sort: bool = True,
+    ) -> Collection[Channel]:
+        channels = []
+
         defaults = {}
         configs = configs.copy()
         if configs.has_section(self.SECTION):
             data = configs.get_section(self.SECTION)
             update_recursive(defaults, Channel._build_defaults(configs))
-            if data.has_section("channels"):
-                self._load_from_sections(context, data.get_section("channels"), defaults)
-        self._load_from_file(context, configs.dirs, "channels.conf", defaults=defaults)
+            if data.has_section(Channels.SECTION):
+                channels.extend(self._load_from_sections(context, data.get_section(Channels.SECTION), defaults))
+        channels.extend(self._load_from_file(context, configs.dirs, f"{Channels.SECTION}.conf", defaults=defaults))
+
+        if sort:
+            self.sort()
+        return channels
 
     # noinspection PyProtectedMember, PyShadowingBuiltins
     def _load_from_configs(

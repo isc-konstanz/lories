@@ -29,9 +29,11 @@ class Databases(ConnectorContext, Configurator):
     # noinspection PyProtectedMember, PyUnresolvedReferences
     def __init__(self, context: DataContext, configs: Configurations) -> None:
         super().__init__(context, configs=configs.get_section(Databases.SECTION, defaults={}))
+        self.load()
+        self.configure()
+
         for database in context.connectors.filter(lambda c: c.is_enabled() and isinstance(c, Database)):
             self._add(database)
-        self.load()
 
     @classmethod
     def _assert_configs(cls, configs: Configurations) -> Configurations:
@@ -79,7 +81,7 @@ class Databases(ConnectorContext, Configurator):
 
             except ResourceException as e:
                 self._logger.warning(f"Error replicating database '{database.id}': {str(e)}")
-                if self._logger.isEnabledFor(logging.DEBUG):
+                if self._logger.level <= logging.DEBUG:
                     self._logger.exception(e)
             finally:
                 if database.is_connected() and not database_connected:
