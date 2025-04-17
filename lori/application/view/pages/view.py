@@ -73,7 +73,7 @@ class View(PageGroup):
 
     # noinspection PyShadowingBuiltins
     def __init__(self, id: str, header: PageHeader, footer: PageFooter, *args, **kwargs) -> None:
-        super().__init__(id=f"{id}-view", key="view", name="View", path="/", *args, **kwargs)
+        super().__init__(id=f"{id}-view", key="view", name="View", *args, **kwargs)
         self.header = header
         self.footer = footer
 
