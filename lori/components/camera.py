@@ -7,8 +7,6 @@ lori.components.camera
 
 from __future__ import annotations
 
-from typing import Optional
-
 from lori import Configurations
 from lori.components import Component, register_component_type
 

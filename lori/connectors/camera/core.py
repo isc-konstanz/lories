@@ -12,7 +12,6 @@ from lori.connectors import Connector
 
 
 class CameraConnector(Connector):
-
     @abstractmethod
     def stream(self):
         pass
