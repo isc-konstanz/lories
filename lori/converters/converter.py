@@ -89,8 +89,12 @@ class Converter(Registrator, Generic[T]):
         converted_data = []
         for channel in channels:
             channel_data = data.loc[:, channel.id].dropna() if channel.id in data.columns else None
-            if channel_data is None or channel_data.empty or not all(channel_data.apply(self.is_dtype)):
+            if channel_data is None or channel_data.empty:
                 converted_data.append(pd.Series(name=channel.id))
+                continue
+            elif not all(channel_data.apply(self.is_dtype)):
+                converted_data.append(pd.Series(name=channel.id))
+                self._logger.warning(f"Unable to convert values for channel '{channel.id}': {channel_data.values}")
                 continue
             try:
                 converter_args = channel.converter._get_configs()
