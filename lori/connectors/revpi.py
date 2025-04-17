@@ -64,7 +64,7 @@ class RevPiConnector(Connector):
         data = pd.DataFrame(columns=[r.id for r in resources])
         for resource in resources:
             resource_io = self._core.io[resource.address]
-            data.loc[now, resource.id] = resource_io.value
+            data.at[now, resource.id] = resource_io.value
         return data
 
     def write(self, data: pd.DataFrame) -> None:
