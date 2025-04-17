@@ -160,7 +160,7 @@ class Channel(Resource):
 
     @staticmethod
     def _is_empty(value: Any) -> bool:
-        if isinstance(value, Collection) and not isinstance(value, str):
+        if isinstance(value, Collection) and not isinstance(value, str) and not isinstance(value, bytes):
             return any(pd.isna(value))
         return pd.isna(value)
 

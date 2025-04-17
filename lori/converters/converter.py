@@ -179,3 +179,18 @@ class BoolConverter(Converter[bool]):
 
     def to_dtype(self, value: str | bool, **_) -> Optional[bool]:
         return to_bool(value)
+
+
+# noinspection PyMethodMayBeStatic
+class BytesConverter(Converter[bytes]):
+    dtype: Type[bytes] = bytes
+
+    def is_dtype(self, value: str | bytes) -> bool:
+        return isinstance(value, bytes)
+
+    def to_dtype(self, value: str | bytes, **_) -> Optional[bytes]:
+        if isinstance(value, bytes):
+            return value
+        elif isinstance(value, str):
+            return value.encode()
+        return None

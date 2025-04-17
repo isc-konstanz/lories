@@ -13,6 +13,7 @@ from typing import Any, Callable, Collection, List, Optional, Type, TypeVar
 from lori import ResourceException
 from lori.converters.converter import (
     BoolConverter,
+    BytesConverter,
     Converter,
     DatetimeConverter,
     FloatConverter,
@@ -32,6 +33,7 @@ CONVERTERS_BUILTINS = [
     FloatConverter,
     IntConverter,
     BoolConverter,
+    BytesConverter,
 ]
 
 registry = Registry[Converter]()
@@ -41,6 +43,7 @@ registry.register(StringConverter, "str", "string")
 registry.register(FloatConverter, "float")
 registry.register(IntConverter, "int", "integer")
 registry.register(BoolConverter, "bool", "boolean")
+registry.register(BytesConverter, "byte", "bytes")
 
 
 def register_converter_type(
