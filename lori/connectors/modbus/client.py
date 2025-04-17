@@ -38,7 +38,7 @@ class ModbusClient(Connector):
     # noinspection SpellCheckingInspection
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        _endian = configs.get("word_order", default="big").lower()
+        _endian = configs.get("endian", default="big").lower()
         if _endian not in ["big", "little"]:
             raise ConnectorException(self, f"Invalid modbus word order '{_endian}'")
         self._endian = _endian
@@ -104,7 +104,7 @@ class ModbusClient(Connector):
     # noinspection PyTypeChecker, PyShadowingBuiltins
     def read(self, resources: Resources) -> pd.DataFrame:
         timestamp = pd.Timestamp.now(tz.UTC).floor(freq="s")
-        data = pd.DataFrame(index=[timestamp], columns=[resources.ids])
+        data = pd.DataFrame(index=[timestamp], columns=resources.ids)
         try:
             for device, device_resources in resources.groupby("device"):
                 if device is None:

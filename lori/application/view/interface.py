@@ -30,8 +30,6 @@ logging.getLogger("werkzeug").setLevel(logging.WARNING)
 # noinspection PyProtectedMember
 @register_interface_type("dash")
 class ViewInterface(Interface, Dash):
-    # _auth: Authentication
-
     _proxy: Optional[str] = None
     _host: str
     _port: int
@@ -85,7 +83,6 @@ class ViewInterface(Interface, Dash):
             use_pages=True,
             server=True,  # TODO: Replace this with local Flask server, to create custom REST API ?
         )
-        # self._auth = Authentication(self, configs)
 
         theme_defaults = {
             "name": context.name,
