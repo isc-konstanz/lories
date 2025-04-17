@@ -96,13 +96,16 @@ def get_members(
 
 
 def update_recursive(configs: Dict[str, Any], update: Mapping[str, Any], replace: bool = True) -> Dict[str, Any]:
-    for k, v in update.items():
-        if isinstance(v, Mapping):
-            if k not in configs.keys():
-                configs[k] = {}
-            configs[k] = update_recursive(configs[k], v, replace)
-        elif k not in configs or replace:
-            configs[k] = v
+    for key, value in update.items():
+        if isinstance(value, Mapping):
+            if key not in configs.keys():
+                configs[key] = {}
+            if isinstance(configs[key], Mapping):
+                configs[key] = update_recursive(configs[key], value, replace)
+            elif replace:
+                configs[key] = value
+        elif key not in configs or replace:
+            configs[key] = value
     return configs
 
 

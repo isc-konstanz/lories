@@ -45,11 +45,14 @@ class _RegistratorContext(Context[R], Generic[R]):
         configs_file: Optional[str] = None,
         configs_dir: Optional[str | Directory] = None,
         includes: Optional[Collection[str]] = (),
+        defaults: Optional[Mapping[str, Any]] = None,
         sort: bool = True,
         **kwargs: Any,
     ) -> Collection[R]:
         registrators = []
-        defaults = Registrator._build_defaults(configs, includes)
+        if defaults is None:
+            defaults = {}
+        update_recursive(defaults, Registrator._build_defaults(configs, includes))
 
         configs_dirs = configs.dirs.copy()
         if configs_dir is None:
