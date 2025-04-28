@@ -38,12 +38,15 @@ class ComponentAccess(RegistratorAccess[C]):
     # noinspection PyProtectedMember
     def load(
         self,
+        configs: Optional[Configurations] = None,
         configs_file: Optional[str] = None,
         configs_dir: Optional[str | Directory] = None,
+        configure: bool = False,
         **kwargs: Any,
     ) -> Collection[C]:
         defaults = _Component._build_defaults(self._registrar.configs, strict=True)
-        configs = self._get_registrator_section()
+        if configs is None:
+            configs = self._get_registrator_section()
         if configs_file is None:
             configs_file = configs.name
         if configs_dir is None:
@@ -53,6 +56,7 @@ class ComponentAccess(RegistratorAccess[C]):
             configs=configs,
             configs_file=configs_file,
             configs_dir=configs_dir,
+            configure=configure,
             includes=_Component.INCLUDES,
             defaults=defaults,
             **kwargs,
@@ -67,6 +71,7 @@ class ComponentAccess(RegistratorAccess[C]):
         key: str,
         name: Optional[str] = None,
         includes: Optional[Collection[str]] = (),
+        configure: bool = False,
         sort: bool = True,
         **kwargs,
     ) -> Collection[C]:
@@ -104,6 +109,8 @@ class ComponentAccess(RegistratorAccess[C]):
 
         if sort:
             self.sort()
+        if configure:
+            self.configure(components)
         return components
 
     def _create(

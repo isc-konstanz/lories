@@ -46,13 +46,16 @@ class Component(_Component):
 
     def _on_configure(self, configs: Configurations) -> None:
         super()._on_configure(configs)
-        self.__converters.load()
+        self.__converters.load(configure=False, sort=False)
+        self.__converters.sort()
         self.__converters.configure()
 
-        self.__connectors.load()
+        self.__connectors.load(configure=False, sort=False)
+        self.__connectors.sort()
         self.__connectors.configure()
 
-        self.__components.load()
+        self.__components.load(configure=False, sort=False)
+        self.__components.sort()
         self.__components.configure()
 
         self.__data.load()

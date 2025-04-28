@@ -41,5 +41,7 @@ class ComponentContext(RegistratorContext[C]):
     def _registry(self) -> Registry[C]:
         return registry
 
-    def load(self, **kwargs: Any) -> Collection[C]:
-        return self._load(self, self._get_registrator_section(), includes=_Component.INCLUDES, **kwargs)
+    def load(self, configs: Optional[Configurations] = None, **kwargs: Any) -> Collection[C]:
+        if configs is None:
+            configs = self._get_registrator_section()
+        return self._load(self, configs, includes=_Component.INCLUDES, **kwargs)

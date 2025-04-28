@@ -27,7 +27,7 @@ class _Component(Registrator, Activator):
         cls,
         configs: Configurations,
         includes: Optional[Collection[str]] = (),
-        strict: bool = False
+        strict: bool = False,
     ) -> Dict[str, Any]:
         defaults = super()._build_defaults(configs, includes)
         if strict and DataAccess.SECTION in defaults:

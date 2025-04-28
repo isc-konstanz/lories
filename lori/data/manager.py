@@ -137,13 +137,14 @@ class DataManager(DataContext, Activator, Entity):
     def _at_configure(self, configs: Configurations) -> None:
         super()._at_configure(configs)
         self._load(self, configs, sort=False)
-        self._converters.load(sort=False)
+
+        self._converters.load(configure=False, sort=False)
         self._converters.configure()
 
-        self._connectors.load(sort=False)
+        self._connectors.load(configure=False, sort=False)
         self._connectors.configure()
 
-        self._components.load(sort=False)
+        self._components.load(configure=False, sort=False)
         self._components.configure()
 
     def _on_configure(self, configs: Configurations) -> None:
