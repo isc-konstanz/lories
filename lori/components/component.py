@@ -40,6 +40,10 @@ class Component(_Component):
         self.__components = ComponentAccess(self)
         self.__data = DataAccess(self)
 
+    def _at_configure(self, configs: Configurations) -> None:
+        super()._at_configure(configs)
+        self.__data.configure(configs.get_section(DataAccess.SECTION, ensure_exists=True))
+
     def _on_configure(self, configs: Configurations) -> None:
         super()._on_configure(configs)
         self.__converters.load()

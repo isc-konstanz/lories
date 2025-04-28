@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any, Callable, Collection, Optional, Type, overload
 
 import pandas as pd
-from lori.core import Configurations, Constant, Context, Registrator, ResourceException
+from lori.core import Configurator, Constant, Context, Registrator, ResourceException
 from lori.data import Channel, Channels, DataContext
 from lori.typing import ChannelsType, TimestampType
 from lori.util import get_context, update_recursive
@@ -25,7 +25,7 @@ except ImportError:
 
 
 # noinspection PyProtectedMember, PyShadowingBuiltins
-class DataAccess(DataContext):
+class DataAccess(DataContext, Configurator):
     __registrar: Registrator
     __context: Context
 
@@ -106,19 +106,15 @@ class DataAccess(DataContext):
     def context(self) -> DataContext:
         return self.__context
 
-    def _get_data_section(self) -> Configurations:
-        return self.__registrar.configs.get_section(self.SECTION, ensure_exists=True)
-
     def load(self, sort: bool = True) -> Collection[Channel]:
         channels = []
         defaults = {}
-        data = self._get_data_section()
-        if data.has_section(Channels.SECTION):
-            section = data.get_section(Channels.SECTION)
+        if self.configs.has_section(Channels.SECTION):
+            section = self.configs.get_section(Channels.SECTION)
             defaults = Channel._build_defaults(section)
             channels.extend(self._load_from_sections(self.__registrar, section))
         channels.extend(
-            self._load_from_file(self.__registrar, data.dirs, f"{Channels.SECTION}.conf", defaults=defaults)
+            self._load_from_file(self.__registrar, self.configs.dirs, f"{Channels.SECTION}.conf", defaults=defaults)
         )
 
         if sort:
@@ -134,7 +130,7 @@ class DataAccess(DataContext):
             }
             key = configs.pop("key")
         configs = Channel._build_configs(configs)
-        channels = self._get_data_section().get_section(Channels.SECTION, ensure_exists=True)
+        channels = self.configs.get_section(Channels.SECTION, ensure_exists=True)
         if not channels.has_section(key):
             channels._add_section(key, configs)
         else:

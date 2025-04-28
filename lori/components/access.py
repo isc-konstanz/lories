@@ -17,7 +17,6 @@ from lori import Context
 from lori.components.core import _Component
 from lori.core import Configurations, Directory, ResourceException
 from lori.core.register import Registrator, RegistratorAccess, RegistratorContext
-from lori.data import Channel, Channels, DataAccess
 from lori.util import get_context
 
 C = TypeVar("C", bound=_Component)
@@ -43,10 +42,7 @@ class ComponentAccess(RegistratorAccess[C]):
         configs_dir: Optional[str | Directory] = None,
         **kwargs: Any,
     ) -> Collection[C]:
-        defaults = self._registrar.configs.get_sections(_Component.INCLUDES, ensure_exists=True)
-        defaults[DataAccess.SECTION][Channels.SECTION] = Channel._build_defaults(
-            defaults[DataAccess.SECTION].get_section(Channels.SECTION, defaults={})
-        )
+        defaults = _Component._build_defaults(self._registrar.configs, strict=True)
         configs = self._get_registrator_section()
         if configs_file is None:
             configs_file = configs.name
@@ -76,10 +72,7 @@ class ComponentAccess(RegistratorAccess[C]):
     ) -> Collection[C]:
         kwargs["factory"] = type
         components = []
-        defaults = self._registrar.configs.get_sections(_Component.INCLUDES, ensure_exists=True)
-        defaults[DataAccess.SECTION][Channels.SECTION] = Channel._build_defaults(
-            defaults[DataAccess.SECTION].get_section(Channels.SECTION, defaults={})
-        )
+        defaults = _Component._build_defaults(self._registrar.configs, strict=True)
         if any(i in configs.sections for i in includes):
             configs = configs.get_sections(includes)
             configs["key"] = key
