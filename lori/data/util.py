@@ -42,7 +42,9 @@ def hash_data(
     data = data[[index_column, *data_columns]]
 
     csv = data.to_csv(index=False, header=False, sep=",", decimal=".", float_format="%.10g")
-    csv = ",".join(csv.replace(",,", ",").splitlines())
+    while ",," in csv:
+        csv = csv.replace(",,", ",")
+    csv = ",".join(csv.splitlines())
     return hash_value(csv, method, encoding)
 
 

@@ -59,12 +59,13 @@ class RevPiConnector(Connector):
 
         self._core.cleanup()
 
+    # noinspection PyTypeChecker
     def read(self, resources: Resources) -> pd.DataFrame:
         now = pd.Timestamp.now(tz=tz.UTC)
-        data = pd.DataFrame(columns=[r.id for r in resources])
+        data = pd.DataFrame(index=[now], columns=resources.ids)
         for resource in resources:
             resource_io = self._core.io[resource.address]
-            data.loc[now, resource.id] = resource_io.value
+            data.at[now, resource.id] = resource_io.value
         return data
 
     def write(self, data: pd.DataFrame) -> None:

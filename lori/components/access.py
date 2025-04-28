@@ -17,6 +17,7 @@ from lori import Context
 from lori.components.core import _Component
 from lori.core import Configurations, Directory, ResourceException
 from lori.core.register import Registrator, RegistratorAccess, RegistratorContext
+from lori.data import Channel, Channels, DataAccess
 from lori.util import get_context
 
 C = TypeVar("C", bound=_Component)
@@ -35,12 +36,17 @@ class ComponentAccess(RegistratorAccess[C]):
 
         super()._set(id, component)
 
+    # noinspection PyProtectedMember
     def load(
         self,
         configs_file: Optional[str] = None,
         configs_dir: Optional[str | Directory] = None,
         **kwargs: Any,
     ) -> Collection[C]:
+        defaults = self._registrar.configs.get_sections(_Component.INCLUDES, ensure_exists=True)
+        defaults[DataAccess.SECTION][Channels.SECTION] = Channel._build_defaults(
+            defaults[DataAccess.SECTION].get_section(Channels.SECTION, defaults={})
+        )
         configs = self._get_registrator_section()
         if configs_file is None:
             configs_file = configs.name
@@ -52,6 +58,7 @@ class ComponentAccess(RegistratorAccess[C]):
             configs_file=configs_file,
             configs_dir=configs_dir,
             includes=_Component.INCLUDES,
+            defaults=defaults,
             **kwargs,
         )
 
@@ -69,15 +76,18 @@ class ComponentAccess(RegistratorAccess[C]):
     ) -> Collection[C]:
         kwargs["factory"] = type
         components = []
-
+        defaults = self._registrar.configs.get_sections(_Component.INCLUDES, ensure_exists=True)
+        defaults[DataAccess.SECTION][Channels.SECTION] = Channel._build_defaults(
+            defaults[DataAccess.SECTION].get_section(Channels.SECTION, defaults={})
+        )
         if any(i in configs.sections for i in includes):
             configs = configs.get_sections(includes)
             configs["key"] = key
             configs["name"] = name
-            components.append(self._load_from_configs(self._registrar, configs, **kwargs))
+            components.append(self._load_from_configs(self._registrar, configs, **defaults, **kwargs))
 
         configs = configs.get_section(section, defaults={})
-        defaults = Registrator._build_defaults(configs, _Component.INCLUDES + list(includes))
+        defaults.update(Registrator._build_defaults(configs, _Component.INCLUDES + list(includes)))
 
         configs_dirs = configs.dirs.copy()
         configs_file = configs.name

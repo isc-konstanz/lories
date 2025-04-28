@@ -25,6 +25,8 @@ except ImportError:
 
 
 class Channels(Resources[Channel]):
+    SECTION: str = "channels"
+
     def __str__(self) -> str:
         return str(self.to_frame(unique=True, states=True))
 
@@ -75,9 +77,9 @@ class Channels(Resources[Channel]):
     # noinspection PyProtectedMember
     def set_frame(self, data: pd.DataFrame) -> None:
         for converter, channels in self.groupby(lambda c: c.converter._converter):
-            converter_data = converter.convert(data, channels)
+            converted_data = converter.from_frame(data, channels)
             for channel in channels:
-                channel_data = converter_data.loc[:, channel.id].dropna()
+                channel_data = converted_data.loc[:, channel.id].dropna()
                 if channel_data.empty:
                     channel.state = ChannelState.NOT_AVAILABLE
                     if channel.id in data.columns:

@@ -31,3 +31,6 @@ from .weather import (  # noqa: F401
     WeatherException,
     WeatherUnavailableException,
 )
+
+from . import camera  # noqa: F401
+from .camera import Camera  # noqa: F401

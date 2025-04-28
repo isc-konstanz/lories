@@ -30,10 +30,9 @@ class Authentication(Configurator, Auth):
         self,
         app: Dash,
         configs: Configurations,
-        public_routes: Optional[list] = None,
         secret_key: str = None,
     ):
-        super().__init__(app=app, public_routes=public_routes)
+        super().__init__(app=app, public_routes=["/login"])
         self.configure(configs)
         if secret_key is not None:
             app.server.secret_key = secret_key
@@ -61,8 +60,4 @@ class Authentication(Configurator, Auth):
         return authorized
 
     def login_request(self):
-        return flask.Response(
-            'Login Required',
-            headers={'WWW-Authenticate': 'Basic realm="User Visible Realm"'},
-            status=401,
-        )
+        return flask.redirect("/login", code=302)

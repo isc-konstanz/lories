@@ -85,21 +85,37 @@ class Converter(Registrator, Generic[T]):
         return series
 
     # noinspection PyProtectedMember
-    def convert(self, data: pd.DataFrame, channels: Channels) -> pd.DataFrame:
+    def from_frame(self, data: pd.DataFrame, channels: Channels) -> pd.DataFrame:
         converted_data = []
         for channel in channels:
-            channel_data = data.loc[:, channel.id].dropna() if channel.id in data.columns else None
-            if channel_data is None or channel_data.empty or not all(channel_data.apply(self.is_dtype)):
+            channel_data = data[channel.id].dropna() if channel.id in data.columns else None
+            if channel_data is None or channel_data.empty:
                 converted_data.append(pd.Series(name=channel.id))
                 continue
+            elif not channel_data.apply(self.is_dtype).all():
+                converted_data.append(pd.Series(name=channel.id))
+                self._logger.warning(f"Unable to convert values for channel '{channel.id}': {channel_data.values}")
+                continue
             try:
-                converter_args = channel.converter._get_configs()
-                converted_data.append(channel_data.apply(self.to_dtype, **converter_args))
+                converted_data.append(self.from_series(channel_data, channel))
             except TypeError:
                 raise ConversionException(f"Expected str or {self.dtype}, not: {type(data)}")
         if len(converted_data) == 0:
             return pd.DataFrame(columns=[c.id for c in channels])
         return pd.concat(converted_data, axis="columns")
+
+    # noinspection PyProtectedMember
+    def from_series(self, data: pd.Series, channel: Channel) -> pd.Series:
+        try:
+            converter_args = channel.converter._get_configs()
+            converted_data = data.apply(self.convert, **converter_args)
+            return converted_data.apply(self.to_dtype, **converter_args)
+        except TypeError:
+            raise ConversionException(f"Expected str or {self.dtype}, not: {type(data)}")
+
+    # noinspection PyMethodMayBeStatic, PyUnusedLocal
+    def convert(self, value: Any, **kwargs) -> Optional[T]:
+        return value
 
 
 class ConversionException(ResourceException, TypeError):
@@ -175,3 +191,18 @@ class BoolConverter(Converter[bool]):
 
     def to_dtype(self, value: str | bool, **_) -> Optional[bool]:
         return to_bool(value)
+
+
+# noinspection PyMethodMayBeStatic
+class BytesConverter(Converter[bytes]):
+    dtype: Type[bytes] = bytes
+
+    def is_dtype(self, value: str | bytes) -> bool:
+        return isinstance(value, bytes)
+
+    def to_dtype(self, value: str | bytes, **_) -> Optional[bytes]:
+        if isinstance(value, bytes):
+            return value
+        elif isinstance(value, str):
+            return value.encode()
+        return None

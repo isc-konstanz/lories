@@ -133,15 +133,25 @@ class DataManager(DataContext, Activator, Entity):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
         self._interval = configs.get_int("interval", default=1)
-        self._load(self, configs)
-        self._converters.load()
+
+    def _at_configure(self, configs: Configurations) -> None:
+        super()._at_configure(configs)
+        self._load(self, configs, sort=False)
+        self._converters.load(sort=False)
         self._converters.configure()
 
-        self._connectors.load()
+        self._connectors.load(sort=False)
         self._connectors.configure()
 
-        self._components.load()
+        self._components.load(sort=False)
         self._components.configure()
+
+    def _on_configure(self, configs: Configurations) -> None:
+        super()._on_configure(configs)
+        self._converters.sort()
+        self._connectors.sort()
+        self._components.sort()
+        self.sort()
 
     def activate(self) -> None:
         super().activate()
@@ -195,7 +205,7 @@ class DataManager(DataContext, Activator, Entity):
 
         except ConnectorException as e:
             self._logger.warning(f"Error opening connector '{e.connector.id}': {str(e)}")
-            if self._logger.level == logging.DEBUG:
+            if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(e)
 
     def reconnect(self, *connectors: Connector) -> None:
@@ -235,7 +245,7 @@ class DataManager(DataContext, Activator, Entity):
 
         except Exception as e:
             self._logger.warning(f"Error closing connector '{connector.id}': {str(e)}")
-            if self._logger.level == logging.DEBUG:
+            if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(e)
         finally:
             connector.set_channels(ChannelState.DISCONNECTED)
@@ -258,7 +268,7 @@ class DataManager(DataContext, Activator, Entity):
 
             except Exception as e:
                 self._logger.warning(f"Error deactivating component '{component.id}': {str(e)}")
-                if self._logger.level == logging.DEBUG:
+                if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
 
     def interrupt(self, *_) -> None:
@@ -307,14 +317,15 @@ class DataManager(DataContext, Activator, Entity):
         if exception is not None:
             listener = exception.listener
             self._logger.warning(f"Error notifying listener '{listener.id}': {str(exception)}")
-            if self._logger.level == logging.DEBUG:
+            if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(exception)
 
-    def start(self) -> None:
+    def start(self, wait: bool = True) -> None:
         self._logger.info(f"Starting {type(self).__name__}: {self.name}")
         self.__interrupt.clear()
         self.__runner.start()
-        self.__runner.join()
+        if wait:
+            self.__runner.join()
 
     # noinspection PyShadowingBuiltins, PyProtectedMember
     def run(self, **kwargs) -> None:
@@ -438,7 +449,7 @@ class DataManager(DataContext, Activator, Entity):
 
             except ConnectorException as e:
                 self._logger.warning(f"Error reading connector '{e.connector.id}': {str(e)}")
-                if self._logger.level == logging.DEBUG:
+                if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
 
         if len(check_results) == 0:
@@ -494,7 +505,7 @@ class DataManager(DataContext, Activator, Entity):
 
             except ConnectorException as e:
                 self._logger.warning(f"Error reading connector '{e.connector.id}': {str(e)}")
-                if self._logger.level == logging.DEBUG:
+                if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
 
         if len(read_data) == 0:
@@ -537,8 +548,8 @@ class DataManager(DataContext, Activator, Entity):
 
             except ConnectorException as e:
                 self._logger.warning(f"Error reading connector '{e.connector.id}': {str(e)}")
-                if self._logger.level == logging.DEBUG:
-                    self._logger.exception(e)
+                # if self._logger.getEffectiveLevel() <= logging.DEBUG:
+                self._logger.exception(e)
 
                 def update_state(channel: Channel) -> Channel:
                     channel.state = ChannelState.UNKNOWN_ERROR
@@ -585,7 +596,7 @@ class DataManager(DataContext, Activator, Entity):
 
             except ConnectorException as e:
                 self._logger.warning(f"Error writing connector '{e.connector.id}': {str(e)}")
-                if self._logger.level == logging.DEBUG:
+                if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
 
                 # noinspection PyShadowingNames
@@ -640,7 +651,7 @@ class DataManager(DataContext, Activator, Entity):
 
             except ConnectorException as e:
                 self._logger.warning(f"Error logging connector '{e.connector.id}': {str(e)}")
-                if self._logger.level == logging.DEBUG:
+                if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
 
 

@@ -19,7 +19,7 @@ from typing import Any, Collection, Iterable, List, Mapping, MutableMapping, Opt
 import pandas as pd
 from lori.core import ResourceException, ResourceUnavailableException
 from lori.core.configs import Directories, Directory
-from lori.util import to_bool, to_date, to_float, to_int
+from lori.util import to_bool, to_date, to_float, to_int, update_recursive
 
 
 class Configurations(MutableMapping[str, Any]):
@@ -124,9 +124,9 @@ class Configurations(MutableMapping[str, Any]):
         if isinstance(value, Mapping):
             if key not in self.keys():
                 self.__configs[key] = self._create_section(key, value)
-            if isinstance(self[key], Mapping):
-                self.__configs[key] = Configurations.update(self.__configs[key], value, replace)
-            elif replace:
+            elif isinstance(self.__configs[key], Mapping) and not replace:
+                update_recursive(self.__configs[key], value, replace=replace)
+            else:
                 self.__configs[key] = value
         else:
             self.__configs[key] = value
@@ -260,18 +260,9 @@ class Configurations(MutableMapping[str, Any]):
         section_dirs.conf = self._sections_dir
         return Configurations(section_name, section_dirs, configs)
 
-    def update(self, u: Mapping[str, Any], replace: bool = True) -> Configurations:
-        for k, v in u.items():
-            if isinstance(v, Mapping):
-                if k not in self.keys():
-                    self[k] = self._create_section(k, v)
-                if isinstance(self[k], Mapping):
-                    self[k] = Configurations.update(self[k], v, replace)
-                elif replace:
-                    self[k] = v
-            elif k not in self or replace:
-                self[k] = v
-        return self
+    # noinspection PyTypeChecker
+    def update(self, update: Mapping[str, Any], replace: bool = True) -> Configurations:
+        return update_recursive(self, update, replace=replace)
 
 
 class ConfigurationException(ResourceException):

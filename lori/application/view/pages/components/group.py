@@ -13,7 +13,7 @@ from typing import Dict, Generic, Optional, Type, TypeVar
 import dash_bootstrap_components as dbc
 from dash import html
 
-from lori import Component
+from lori import Channels, Component
 from lori.application.view.pages import PageGroup, PageLayout
 from lori.application.view.pages.components import ComponentPage
 
@@ -31,10 +31,10 @@ class ComponentGroup(PageGroup[ComponentPage], ComponentPage[ComponentType], Gen
         for page in self:
             page.create_layout(page.layout)
 
-    def _create_data_layout(self, layout: PageLayout, title: Optional[str] = "Data") -> None:
-        if len(self.data.channels) > 0:
+    def _create_data_layout(self, layout: PageLayout, channels: Channels, title: Optional[str] = "Data") -> None:
+        if len(channels) > 0:
             data = []
             if title is not None:
                 data.append(html.H5(f"{title}:"))
-            data.append(self._build_data())
+            data.append(self._build_data(channels))
             layout.append(dbc.Row(dbc.Col(dbc.Card(dbc.CardBody(data)))))

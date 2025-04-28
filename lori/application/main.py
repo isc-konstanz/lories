@@ -61,8 +61,8 @@ class Application(DataManager):
             components.append(factory.load(self._components, **system_dirs, flat=systems_flat))
 
         if not self._components.has_type(System) and settings.dirs.data.is_default():
-            components += self._components.load(configs_dir=settings.dirs.conf)
-        self._components.sort()
+            components += self._components.load(configs_dir=settings.dirs.conf, sort=False)
+
         self._components.configure(components)
 
         if self._interface.is_enabled():
@@ -101,19 +101,18 @@ class Application(DataManager):
                 )
         except Exception as e:
             self._logger.warning(repr(e))
-            if self._logger.level == logging.DEBUG:
+            if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(e)
             exit(1)
 
-    def deactivate(self, *_) -> None:
-        super().deactivate()
-        if self._interface.is_active():
-            self._interface.deactivate()
+    def start(self, wait: bool = True) -> None:
+        has_interface = self._interface.is_enabled()
+        if has_interface:
+            wait = False
+        super().start(wait)
 
-    def start(self) -> None:
-        if self._interface.is_enabled():
-            self._interface.activate()
-        super().start()
+        if has_interface:
+            self._interface.start()
 
     # noinspection PyUnresolvedReferences, PyProtectedMember, PyShadowingBuiltins
     def simulate(

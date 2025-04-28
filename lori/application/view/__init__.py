@@ -15,9 +15,10 @@ from .pages import (  # noqa: F401
     PageGroup,
     PageHeader,
     PageFooter,
-    View,
+    LoginPage,
     ComponentPage,
     ComponentGroup,
+    View,
 )
 
 from .interface import ViewInterface  # noqa: F401

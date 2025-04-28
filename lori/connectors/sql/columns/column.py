@@ -13,7 +13,7 @@ import datetime as dt
 from typing import Any, AnyStr, Optional, Type, TypeVar
 
 import sqlalchemy as sql
-from sqlalchemy.types import BOOLEAN, DATETIME, FLOAT, INTEGER, TIMESTAMP, String, TypeEngine
+from sqlalchemy.types import BOOLEAN, DATETIME, FLOAT, INTEGER, TIMESTAMP, LargeBinary, String, TypeEngine
 
 import numpy as np
 import pandas as pd
@@ -61,6 +61,8 @@ def parse_type(type: Type | AnyStr, length: Optional[int] = None) -> Type[TypeEn
             type = "BOOL"
         elif issubclass(type, (str, pd.arrays.StringArray)):
             type = "STRING"
+        elif issubclass(type, (bytes, bytearray)):
+            type = "BYTE"
 
     if isinstance(type, str):
         type = type.upper()
@@ -78,6 +80,8 @@ def to_type_engine(type: Type | AnyStr, length: Optional[int] = None) -> Type[Ty
         return INTEGER
     if type in ["BOOL", "BOOLEAN"]:
         return BOOLEAN
+    if type in ["BYTE", "BYTES"]:
+        return LargeBinary(length=4294967295)
     if type == "DATETIME":
         return DATETIME
     if type == "TIMESTAMP":

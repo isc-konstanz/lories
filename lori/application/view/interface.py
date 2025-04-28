@@ -30,8 +30,6 @@ logging.getLogger("werkzeug").setLevel(logging.WARNING)
 # noinspection PyProtectedMember
 @register_interface_type("dash")
 class ViewInterface(Interface, Dash):
-    # _auth: Authentication
-
     _proxy: Optional[str] = None
     _host: str
     _port: int
@@ -85,7 +83,6 @@ class ViewInterface(Interface, Dash):
             use_pages=True,
             server=True,  # TODO: Replace this with local Flask server, to create custom REST API ?
         )
-        # self._auth = Authentication(self, configs)
 
         theme_defaults = {
             "name": context.name,
@@ -111,7 +108,12 @@ class ViewInterface(Interface, Dash):
         self.layout = self.create_layout
 
     def start(self) -> None:
-        self.run(host=self._host, port=self._port, proxy=self._proxy, debug=self._logger.level == logging.DEBUG)
+        self.run(
+            host=self._host,
+            port=self._port,
+            proxy=self._proxy,
+            debug=self._logger.getEffectiveLevel() <= logging.DEBUG
+        )
 
     # noinspection PyUnresolvedReferences
     def create_layout(self) -> html.Div:

@@ -38,7 +38,7 @@ class ModbusClient(Connector):
     # noinspection SpellCheckingInspection
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        _endian = configs.get("word_order", default="big").lower()
+        _endian = configs.get("endian", default="big").lower()
         if _endian not in ["big", "little"]:
             raise ConnectorException(self, f"Invalid modbus word order '{_endian}'")
         self._endian = _endian
@@ -91,8 +91,6 @@ class ModbusClient(Connector):
             self.__client.connect()
             self.__registers = {r.id: ModbusRegister.from_resource(r) for r in resources}
 
-            self._logger.info([f"{r}: {reg.address}" for r, reg in self.__registers.items()])
-
         except ModbusException as e:
             self._logger.warning(f"Error connecting to '{self.__client}': {e}")
             raise ConnectionException(self, e)
@@ -106,7 +104,7 @@ class ModbusClient(Connector):
     # noinspection PyTypeChecker, PyShadowingBuiltins
     def read(self, resources: Resources) -> pd.DataFrame:
         timestamp = pd.Timestamp.now(tz.UTC).floor(freq="s")
-        data = pd.DataFrame(index=[timestamp], columns=[resources.ids])
+        data = pd.DataFrame(index=[timestamp], columns=resources.ids)
         try:
             for device, device_resources in resources.groupby("device"):
                 if device is None:
@@ -114,40 +112,35 @@ class ModbusClient(Connector):
 
                 # TODO: Implement reading adjacent blocks of registers of same device ID
                 for resource in device_resources:
-                    register = self.__registers[resource.id]
                     try:
-                        function = getattr(self.__client, f"read_{register.function}")
-
-                        self._logger.info(f"{function}({register.address}, count={register.length}, slave={device})")
-
+                        register = self.__registers[resource.id]
+                        function = getattr(self.__client, f"read_{register.function}s")
                         result = function(register.address, count=register.length, slave=device)
                         if result.isError():
-                            data.at[timestamp, resource.id] = ChannelState("REGISTER_READ_ERROR")
+                            data.at[timestamp, resource.id] = ChannelState.UNKNOWN_ERROR
                             self._logger.warning(f"Error reading register '{resource.id}'")
                             continue
 
-                        self._logger.info(f"convert_from_registers({result.registers}, {register.type}, word_order={self._endian})")
-
                         value = self.__client.convert_from_registers(
-                            result.registers,
-                            register.type,
-                            word_order=self._endian
+                            result.registers, register.type, word_order=self._endian
                         )
                         data.at[timestamp, resource.id] = value
+
+                        self._logger.debug(f"Read {register.type} value of register {register.address}: {value}")
 
                     except ConfigurationException as e:
                         data.at[timestamp, resource.id] = ChannelState.ARGUMENT_SYNTAX_ERROR
                         self._logger.warning(f"Invalid register configuration for resource '{resource.id}': {e}")
                         continue
+                    except KeyError:
+                        data.at[timestamp, resource.id] = ChannelState.NOT_AVAILABLE
+                        continue
+            return data
 
         except ModbusException as e:
             raise ConnectionException(self, e)
         except IOError as e:
             raise ConnectorException(self, e)
-
-        if len(data) == 0:
-            return pd.DataFrame()
-        return pd.concat(data, axis="columns")
 
     def write(self, data: pd.DataFrame) -> None:
         try:
@@ -164,9 +157,7 @@ class ModbusClient(Connector):
                     register = self.__registers[channel.id]
                     try:
                         values = self.__client.convert_to_registers(
-                            channel_data.iloc[-1],
-                            register.type,
-                            word_order=self._endian
+                            channel_data.iloc[-1], register.type, word_order=self._endian
                         )
                         self.__client.write_registers(register.address, values, slave=device)
 
