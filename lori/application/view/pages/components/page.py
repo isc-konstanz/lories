@@ -15,11 +15,11 @@ import dash_bootstrap_components as dbc
 from dash import Input, Output, callback, html
 
 import pandas as pd
-from lori import Channel, Component, Configurations
+from lori import Component, Configurations
 from lori.application.view.pages import Page, PageLayout
 from lori.components import ComponentAccess
 from lori.connectors import ConnectorAccess
-from lori.data import DataAccess
+from lori.data import Channel, Channels, DataAccess
 
 C = TypeVar("C", bound=Component)
 
@@ -63,28 +63,28 @@ class ComponentPage(Page, Generic[C]):
 
     def _on_create_layout(self, layout: PageLayout) -> None:
         super()._on_create_layout(layout)
-        self._create_data_layout(layout)
+        self._create_data_layout(layout, self.data.channels)
 
-    def _create_data_layout(self, layout: PageLayout, title: Optional[str] = "Data") -> None:
+    def _create_data_layout(self, layout: PageLayout, channels: Channels, title: Optional[str] = "Data") -> None:
         if len(self.data.channels) > 0:
             layout.append(html.Hr())
 
             data = []
             if title is not None:
                 data.append(html.H5(f"{title}:"))
-            data.append(self._build_data())
+            data.append(self._build_data(channels))
 
             layout.append(dbc.Row(data))
 
         # TODO: append data-update separately to view
 
-    def _build_data(self) -> html.Div:
+    def _build_data(self, channels: Channels) -> html.Div:
         @callback(
             Output(f"{self.id}-data", "children"),
             Input("view-update", "n_intervals"),
         )
         def _update_data(*_) -> Sequence[dbc.AccordionItem]:
-            return [self._build_channel(channel) for channel in self.data.channels]
+            return [self._build_channel(channel) for channel in channels]
 
         return html.Div(
             [
