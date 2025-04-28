@@ -69,8 +69,9 @@ class ConverterContext(RegistratorContext[Converter]):
         return registry
 
     # noinspection PyProtectedMember
-    def load(self, **kwargs: Any) -> Collection[Converter]:
-        configs = self._get_registrator_section()
+    def load(self, configs: Optional[Configurations] = None, configure: bool = True, **kwargs: Any) -> Collection[C]:
+        if configs is None:
+            configs = self._get_registrator_section()
         defaults = Converter._build_defaults(configs)
 
         converters = []
@@ -89,7 +90,9 @@ class ConverterContext(RegistratorContext[Converter]):
             converters.append(converter)
             self._add(converter)
 
-        converters.extend(self._load(self, configs, includes=Converter.INCLUDES, **kwargs))
+        converters.extend(self._load(self, configs, includes=Converter.INCLUDES, configure=False, **kwargs))
+        if configure:
+            self.configure(converters)
         return converters
 
     def has_dtype(self, *dtypes: Type) -> bool:

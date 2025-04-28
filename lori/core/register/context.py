@@ -46,6 +46,7 @@ class _RegistratorContext(Context[R], Generic[R]):
         configs_dir: Optional[str | Directory] = None,
         includes: Optional[Collection[str]] = (),
         defaults: Optional[Mapping[str, Any]] = None,
+        configure: bool = True,
         sort: bool = True,
         **kwargs: Any,
     ) -> Collection[R]:
@@ -70,6 +71,8 @@ class _RegistratorContext(Context[R], Generic[R]):
 
         if sort:
             self.sort()
+        if configure:
+            self.configure(registrators)
         return registrators
 
     def _load_from_configs(

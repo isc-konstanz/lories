@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any, Collection, Optional, TypeVar
 
 from lori.connectors.core import _Connector
-from lori.core import Directory, Registrator, RegistratorAccess, RegistratorContext, ResourceException
+from lori.core import Configurations, Directory, Registrator, RegistratorAccess, RegistratorContext, ResourceException
 from lori.util import get_context
 
 C = TypeVar("C", bound=_Connector)
@@ -32,11 +32,14 @@ class ConnectorAccess(RegistratorAccess[C]):
 
     def load(
         self,
+        configs: Optional[Configurations] = None,
         configs_file: Optional[str] = None,
         configs_dir: Optional[str | Directory] = None,
+        configure: bool = False,
         **kwargs: Any,
     ) -> Collection[C]:
-        configs = self._get_registrator_section()
+        if configs is None:
+            configs = self._get_registrator_section()
         if configs_file is None:
             configs_file = configs.name
         if configs_dir is None:
@@ -46,6 +49,7 @@ class ConnectorAccess(RegistratorAccess[C]):
             configs=configs,
             configs_file=configs_file,
             configs_dir=configs_dir,
+            configure=configure,
             includes=_Connector.INCLUDES,
             **kwargs,
         )

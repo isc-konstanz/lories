@@ -17,7 +17,6 @@ from lori import Context
 from lori.components.core import _Component
 from lori.core import Configurations, Directory, ResourceException
 from lori.core.register import Registrator, RegistratorAccess, RegistratorContext
-from lori.data import Channel, Channels, DataAccess
 from lori.util import get_context
 
 C = TypeVar("C", bound=_Component)
@@ -39,15 +38,15 @@ class ComponentAccess(RegistratorAccess[C]):
     # noinspection PyProtectedMember
     def load(
         self,
+        configs: Optional[Configurations] = None,
         configs_file: Optional[str] = None,
         configs_dir: Optional[str | Directory] = None,
+        configure: bool = False,
         **kwargs: Any,
     ) -> Collection[C]:
-        defaults = self._registrar.configs.get_sections(_Component.INCLUDES, ensure_exists=True)
-        defaults[DataAccess.SECTION][Channels.SECTION] = Channel._build_defaults(
-            defaults[DataAccess.SECTION].get_section(Channels.SECTION, defaults={})
-        )
-        configs = self._get_registrator_section()
+        defaults = _Component._build_defaults(self._registrar.configs, strict=True)
+        if configs is None:
+            configs = self._get_registrator_section()
         if configs_file is None:
             configs_file = configs.name
         if configs_dir is None:
@@ -57,6 +56,7 @@ class ComponentAccess(RegistratorAccess[C]):
             configs=configs,
             configs_file=configs_file,
             configs_dir=configs_dir,
+            configure=configure,
             includes=_Component.INCLUDES,
             defaults=defaults,
             **kwargs,
@@ -71,15 +71,13 @@ class ComponentAccess(RegistratorAccess[C]):
         key: str,
         name: Optional[str] = None,
         includes: Optional[Collection[str]] = (),
+        configure: bool = False,
         sort: bool = True,
         **kwargs,
     ) -> Collection[C]:
         kwargs["factory"] = type
         components = []
-        defaults = self._registrar.configs.get_sections(_Component.INCLUDES, ensure_exists=True)
-        defaults[DataAccess.SECTION][Channels.SECTION] = Channel._build_defaults(
-            defaults[DataAccess.SECTION].get_section(Channels.SECTION, defaults={})
-        )
+        defaults = _Component._build_defaults(self._registrar.configs, strict=True)
         if any(i in configs.sections for i in includes):
             configs = configs.get_sections(includes)
             configs["key"] = key
@@ -111,6 +109,8 @@ class ComponentAccess(RegistratorAccess[C]):
 
         if sort:
             self.sort()
+        if configure:
+            self.configure(components)
         return components
 
     def _create(

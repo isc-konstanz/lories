@@ -270,6 +270,7 @@ def to_timedelta(freq: str) -> relativedelta | pd.Timedelta:
 def is_float(value: str | float) -> bool:
     def _is_numeric(s: str) -> bool:
         return s.replace(".", "").replace(",", "").replace("e+", "").replace("e-", "").replace("e", "").isnumeric()
+
     if (
         issubclass(type(value), (np.integer, int))
         or issubclass(type(value), (np.floating, float))

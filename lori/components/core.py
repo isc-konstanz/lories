@@ -10,16 +10,31 @@ from __future__ import annotations
 
 import datetime as dt
 from abc import abstractmethod
-from typing import List, Optional
+from typing import Any, Collection, Dict, List, Optional
 
 import pandas as pd
-from lori.core import Activator, Registrator, ResourceException, ResourceUnavailableException
-from lori.data import DataAccess
+from lori.core import Activator, Configurations, Registrator, ResourceException, ResourceUnavailableException
+from lori.data import Channel, Channels, DataAccess
 
 
 class _Component(Registrator, Activator):
     SECTION: str = "component"
     INCLUDES: List[str] = [DataAccess.SECTION]
+
+    # noinspection PyProtectedMember
+    @classmethod
+    def _build_defaults(
+        cls,
+        configs: Configurations,
+        includes: Optional[Collection[str]] = (),
+        strict: bool = False,
+    ) -> Dict[str, Any]:
+        defaults = super()._build_defaults(configs, includes)
+        if strict and DataAccess.SECTION in defaults:
+            defaults[DataAccess.SECTION][Channels.SECTION] = Channel._build_defaults(
+                defaults[DataAccess.SECTION].get_section(Channels.SECTION, defaults={})
+            )
+        return defaults
 
     @property
     @abstractmethod

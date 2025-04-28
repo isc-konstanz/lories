@@ -13,7 +13,8 @@ import os
 import sys
 from collections import OrderedDict
 from collections.abc import Callable
-from typing import Any, Collection, Dict, List, Mapping, Optional
+from copy import deepcopy
+from typing import Any, Collection, Dict, List, Optional
 
 from lori.core import Configurations, Configurator, Context, Entity, ResourceException
 from lori.util import validate_key
@@ -119,7 +120,7 @@ class Registrator(Configurator, Entity):
 
     @classmethod
     def _build_defaults(cls, configs: Configurations, includes: Optional[Collection[str]] = ()) -> Dict[str, Any]:
-        return {k: v for k, v in configs.items() if not isinstance(v, Mapping) or k in cls.INCLUDES or k in includes}
+        return {k: deepcopy(v) for k, v in configs.items() if k in cls.INCLUDES or k in includes}
 
     # noinspection PyShadowingBuiltins
     def _convert_vars(self, convert: Callable[[Any], str] = str) -> Dict[str, str]:
