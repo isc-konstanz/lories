@@ -81,7 +81,7 @@ class Databases(ConnectorContext, Configurator):
 
             except ResourceException as e:
                 self._logger.warning(f"Error replicating database '{database.id}': {str(e)}")
-                if self._logger.level <= logging.DEBUG:
+                if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
             finally:
                 if database.is_connected() and not database_connected:

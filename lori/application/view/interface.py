@@ -108,7 +108,12 @@ class ViewInterface(Interface, Dash):
         self.layout = self.create_layout
 
     def start(self) -> None:
-        self.run(host=self._host, port=self._port, proxy=self._proxy, debug=self._logger.level <= logging.DEBUG)
+        self.run(
+            host=self._host,
+            port=self._port,
+            proxy=self._proxy,
+            debug=self._logger.getEffectiveLevel() <= logging.DEBUG
+        )
 
     # noinspection PyUnresolvedReferences
     def create_layout(self) -> html.Div:

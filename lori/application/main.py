@@ -87,7 +87,7 @@ class Application(DataManager):
 
         except Exception as e:
             self._logger.warning(repr(e))
-            if self._logger.level <= logging.DEBUG:
+            if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(e)
             exit(1)
 
