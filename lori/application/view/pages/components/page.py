@@ -9,7 +9,7 @@ lori.application.view.pages.components.page
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Generic, Optional, TypeVar
+from typing import Collection, Generic, Optional, TypeVar
 
 import dash_bootstrap_components as dbc
 from dash import Input, Output, callback, html
@@ -103,7 +103,7 @@ class ComponentPage(Page, Generic[C]):
             title=dbc.Row(
                 [
                     dbc.Col(self._build_channel_title(channel), width="auto"),
-                    dbc.Col(self._build_channel_state(channel), width="auto"),
+                    dbc.Col(self._build_channel_header(channel), width="auto"),
                 ],
                 justify="between",
                 className="w-100",
@@ -111,15 +111,15 @@ class ComponentPage(Page, Generic[C]):
             children=[
                 dbc.Row(
                     [
-                        dbc.Col(html.Span("Value:", className="text-muted"), width=1),
-                        dbc.Col(self._build_channel_value(channel), width="auto"),
+                        dbc.Col(html.Span("Updated:", className="text-muted"), width=1),
+                        dbc.Col(self._build_channel_timestamp(channel), width="auto"),
                     ],
                     justify="start",
                 ),
                 dbc.Row(
                     [
                         dbc.Col(None, width=1),
-                        dbc.Col(self._build_channel_timestamp(channel), width="auto"),
+                        dbc.Col(self._build_channel_body(channel), width="auto"),
                     ],
                     justify="start",
                 ),
@@ -133,13 +133,21 @@ class ComponentPage(Page, Generic[C]):
         return html.Span(channel.name, className="mb-1")
 
     # noinspection PyMethodMayBeStatic
-    def _build_channel_value(self, channel: Channel) -> html.Span:
-        # TODO: Implement further type validation, e.g. implementing a Graph for pandas Series types
-        value = channel.value
-        if not pd.isna(value):
-            if channel.type == float:
-                value = round(channel.value, 2)
-        return html.Span(html.B(value), className="mb-1")
+    def _build_channel_header(self, channel: Channel) -> Collection[html.Span]:
+        channel_header = []
+        if channel.is_valid():
+            channel_header.append(self._build_channel_value(channel))
+            channel_header.append(self._build_channel_unit(channel))
+        channel_header.append(self._build_channel_state(channel))
+        return channel_header
+
+    # noinspection PyMethodMayBeStatic
+    def _build_channel_body(self, channel: Channel) -> Optional[html.Div]:
+        if not channel.is_valid() or not (channel.has_logger() or channel.type == pd.Series):
+            return None
+
+        # TODO: Implement a Graph for logged values or pandas.Series types
+        return html.Div(html.I("Placeholder", className="text-muted"))
 
     # noinspection PyMethodMayBeStatic
     def _build_channel_timestamp(self, channel: Channel) -> html.Small:
@@ -147,6 +155,19 @@ class ComponentPage(Page, Generic[C]):
         if not pd.isna(timestamp):
             timestamp = timestamp.isoformat(sep=" ", timespec="seconds")
         return html.Small(timestamp, className="text-muted")
+
+    # noinspection PyMethodMayBeStatic
+    def _build_channel_value(self, channel: Channel) -> html.Span:
+        # TODO: Implement further type validation
+        value = channel.value
+        if not pd.isna(value):
+            if channel.type == float:
+                value = round(channel.value, 2)
+        return html.Span(value, className="mb-1", style={"margin-right": "0.2rem"})
+
+    # noinspection PyMethodMayBeStatic
+    def _build_channel_unit(self, channel: Channel) -> html.Span:
+        return html.Span(channel.unit, className="text-muted", style={"margin-right": "2rem"})
 
     # noinspection PyMethodMayBeStatic
     def _build_channel_state(self, channel: Channel) -> html.Small:
