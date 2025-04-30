@@ -61,10 +61,12 @@ class RevPiConnector(Connector):
 
     # noinspection PyTypeChecker
     def read(self, resources: Resources) -> pd.DataFrame:
-        now = pd.Timestamp.now(tz=tz.UTC)
+        now = pd.Timestamp.now(tz=tz.UTC).floor(freq="s")
         data = pd.DataFrame(index=[now], columns=resources.ids)
         for resource in resources:
             resource_io = self._core.io[resource.address]
+            self._logger.debug(f"Read RevPi IO '{resource_io}': {resource_io.value}")
+
             data.at[now, resource.id] = resource_io.value
         return data
 
