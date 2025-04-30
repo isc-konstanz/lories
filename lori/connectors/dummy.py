@@ -25,8 +25,11 @@ class DummyConnector(Connector):
 
     def connect(self, resources: Resources) -> None:
         super().connect(resources)
-        self._data = pd.Series(index=[r.id for r in resources])
+        index = []
+        data = []
         for resource in resources:
+            index.append(resource.id)
+
             generator = resource.get("generator", default=None)
             if generator == "random":
                 for attr in ["min", "max"]:
@@ -34,8 +37,13 @@ class DummyConnector(Connector):
                         raise ConfigurationException(
                             f"Invalid dummy channel '{resource.id}', missing attribute: {attr}"
                         )
+                data.append(float(random.randrange(int(resource.min * 100), int(resource.max * 100))) / 100.0)
+
             elif generator is not None:
                 raise ConfigurationException(f"Invalid dummy channel '{resource.id}' generator: {generator}")
+            else:
+                data.append(resource.get("default", default=None))
+        self._data = pd.Series(index=index, data=data)
 
     def read(
         self,
@@ -44,37 +52,43 @@ class DummyConnector(Connector):
         end: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> pd.DataFrame:
         for resource in resources:
-            generator = resource.get("generator", default=None)
+            generator = resource.get("generator", default="virtual")
             if generator == "random":
                 self._read_random(resource)
-            else:
+            elif generator != "virtual":
                 raise ConnectorException(
                     self, f"Trying to read dummy channel '{resource.id}' with generator: {generator}"
                 )
         return self._data.to_frame(pd.Timestamp.now(tz.UTC).floor(freq="s")).T
 
     def _read_random(self, resource: Resource) -> None:
-        if pd.isna(self._data[resource.id]):
-            value = float(random.randrange(int(resource.min * 100), int(resource.max * 100))) / 100.0
-        else:
-            range = int(abs(resource.max - resource.min))
-            value = float(random.randrange(-range * 100, range * 100)) / 1000.0 + self._data[resource.id]
-            if value < resource.min:
-                value = resource.min
-            if value > resource.max:
-                value = resource.max
+        range = int(abs(resource.max - resource.min))
+        value = float(random.randrange(-range * 100, range * 100)) / 1000.0 + self._data[resource.id]
+        if value < resource.min:
+            value = resource.min
+        if value > resource.max:
+            value = resource.max
         self._data[resource.id] = value
 
     def write(self, data: pd.DataFrame) -> None:
         for id in data.columns:
             if id in self.channels:
                 channel = self.channels[id]
-                generator = channel.get("generator", default=None)
+                generator = channel.get("generator", default="virtual")
                 if generator == "random":
                     self._write_random(data, channel)
+                elif generator == "virtual":
+                    self._write_virtual(data, channel)
+                else:
+                    raise ConnectorException(
+                        self, f"Trying to write to dummy channel '{channel.id}' with generator: {generator}"
+                    )
+
+    def _write_virtual(self, data: pd.DataFrame, channel: Channel) -> None:
+        self._data[channel.id] = data.at[data.index[-1], channel.id]
 
     def _write_random(self, data: pd.DataFrame, channel: Channel) -> None:
-        value = data.loc[data.index[-1], channel.id]
+        value = data.at[data.index[-1], channel.id]
         if value < channel.min:
             value = channel.min
         if value > channel.max:
