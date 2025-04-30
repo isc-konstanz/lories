@@ -11,10 +11,12 @@ from __future__ import annotations
 import logging
 import os
 import signal
+import time
+from collections.abc import Callable
 from concurrent import futures
 from concurrent.futures import Future, ThreadPoolExecutor
 from threading import Event, Thread
-from typing import Any, Callable, Dict, Mapping, Optional, Type, overload
+from typing import Any, Dict, Mapping, Optional, Type, overload
 
 import pandas as pd
 import pytz as tz
@@ -343,7 +345,7 @@ class DataManager(DataContext, Activator, Entity):
                 return False
             if pd.isna(channel.connector.timestamp):
                 return True
-            next_reading = _next(channel.connector.timestamp, freq)
+            next_reading = _next(freq, channel.connector.timestamp)
             return timestamp >= next_reading
 
         channels = self.channels.filter(lambda c: is_reading(c, now))
@@ -351,17 +353,10 @@ class DataManager(DataContext, Activator, Entity):
             self.read(channels, **kwargs)
 
         interval = f"{self._interval}s"
+        _sleep(interval)
+
         while not self.__interrupt.is_set():
             try:
-                now = pd.Timestamp.now(tz.UTC)
-                next = _next(now, interval)
-                sleep = (next - now).total_seconds()
-                self._logger.debug(f"Sleeping until next execution in {sleep} seconds: {next}")
-                self.__interrupt.wait(sleep)
-
-                for connector in self.connectors.filter(lambda c: c._is_reconnectable()):
-                    self.reconnect(connector)
-
                 now = pd.Timestamp.now(tz.UTC)
 
                 channels = self.channels.filter(lambda c: is_reading(c, now))
@@ -369,13 +364,20 @@ class DataManager(DataContext, Activator, Entity):
                     self._logger.debug(f"Reading {len(channels)} channels of application: {self.name}")
                     self.read(channels)
 
+                self.__interrupt.wait(0.05)
+                self._listeners.wait(0.05, self.__interrupt.wait)
                 self.log()
+
+                for connector in self.connectors.filter(lambda c: c._is_reconnectable()):
+                    self.reconnect(connector)
+
+                _sleep(interval, self.__interrupt.wait)
 
             except KeyboardInterrupt:
                 self.interrupt()
                 break
 
-        self.listeners.wait()
+        self._listeners.wait()
         self.log()
 
     def replicate(self, full: bool = False, force: bool = False, **kwargs) -> None:
@@ -513,7 +515,7 @@ class DataManager(DataContext, Activator, Entity):
             return pd.DataFrame()
         return pd.concat(read_data, axis="columns")
 
-    # noinspection PyShadowingBuiltins, PyUnresolvedReferences, PyTypeChecker
+    # noinspection PyShadowingBuiltins, PyShadowingNames, PyUnresolvedReferences, PyTypeChecker
     def read(self, channels: Optional[Channels] = None, **kwargs) -> pd.DataFrame:
         time = pd.Timestamp.now(tz=tz.UTC)
         if channels is None:
@@ -655,10 +657,19 @@ class DataManager(DataContext, Activator, Entity):
                 if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
 
-
 # noinspection PyShadowingBuiltins
-def _next(time: pd.Timestamp, freq: str) -> pd.Timestamp:
-    next = floor_date(time, freq=freq)
-    while next <= time:
+def _sleep(freq: str, sleep: Callable = time.sleep) -> None:
+    now = pd.Timestamp.now(tz.UTC)
+    next = _next(freq, now)
+    seconds = (next - now).total_seconds()
+    sleep(seconds)
+
+
+# noinspection PyShadowingBuiltins, PyShadowingNames
+def _next(freq: str, now: Optional[pd.Timestamp] = None) -> pd.Timestamp:
+    if now is None:
+        now = pd.Timestamp.now(tz.UTC)
+    next = floor_date(now, freq=freq)
+    while next <= now:
         next += to_timedelta(freq)
     return next

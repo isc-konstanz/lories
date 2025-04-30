@@ -9,10 +9,10 @@ lori.data.listeners.context
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable
 from threading import Lock
-from time import sleep
-from typing import Collection
+from typing import Collection, Optional
 
 import pandas as pd
 from lori.core import Context, ResourceException
@@ -119,7 +119,14 @@ class ListenerContext(Context[Listener]):
                 listeners.append(listener)
         return listeners
 
-    def wait(self) -> None:
+    def wait(self, timeout: Optional[float] = None, sleep: Callable = time.sleep) -> None:
+        start = time.time()
+
+        def is_timeout() -> bool:
+            if timeout is None:
+                return False
+            return time.time() - start >= timeout
+
         # noinspection PyShadowingNames
         def has_locked() -> bool:
             locked = [listener.locked() for listener in self.values()]
@@ -128,5 +135,5 @@ class ListenerContext(Context[Listener]):
                 self._logger.debug(f"Waiting for {len(locked)} listener{'s' if len(locked) > 0 else ''} to finish")
             return any(locked)
 
-        while has_locked():
-            sleep(0.1)
+        while has_locked() and not is_timeout():
+            sleep(0.01)
