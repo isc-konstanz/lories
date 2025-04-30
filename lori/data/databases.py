@@ -29,11 +29,12 @@ class Databases(ConnectorContext, Configurator):
     # noinspection PyProtectedMember, PyUnresolvedReferences
     def __init__(self, context: DataContext, configs: Configurations) -> None:
         super().__init__(context, configs=configs.get_section(Databases.SECTION, defaults={}))
-        self.load()
+        self.load(configure=False, sort=False)
         self.configure()
 
         for database in context.connectors.filter(lambda c: c.is_enabled() and isinstance(c, Database)):
             self._add(database)
+        self.sort()
 
     @classmethod
     def _assert_configs(cls, configs: Configurations) -> Configurations:
