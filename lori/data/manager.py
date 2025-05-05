@@ -169,10 +169,10 @@ class DataManager(DataContext, Activator, Entity):
                 )
                 continue
 
-            self._logger.info(f"Activating {type(component).__name__} '{component.name}': {component.id}")
+            self._logger.debug(f"Activating {type(component).__name__} '{component.name}': {component.id}")
             component.activate()
 
-            self._logger.debug(f"Activated {type(component).__name__} '{component.name}': {component.id}")
+            self._logger.info(f"Activated {type(component).__name__} '{component.name}': {component.id}")
 
     def connect(self, *connectors: Connector, channels: Optional[Channels] = None) -> None:
         connect_futures = []
@@ -194,7 +194,7 @@ class DataManager(DataContext, Activator, Entity):
         #     connect_future.add_done_callback(self._connect_callback)
 
     def _connect(self, connector: Connector, channels: Optional[Channels] = None) -> Future:
-        self._logger.info(f"Connecting {type(connector).__name__} '{connector.name}': {connector.id}")
+        self._logger.debug(f"Connecting {type(connector).__name__} '{connector.name}': {connector.id}")
         if channels is None:
             channels = self.channels.filter(lambda c: c.has_connector(connector.id))
             channels.update(self.channels.filter(lambda c: c.has_logger(connector.id)).apply(lambda c: c.from_logger()))
@@ -204,10 +204,10 @@ class DataManager(DataContext, Activator, Entity):
     def _connect_callback(self, future: Future) -> None:
         try:
             connector = future.result().connector
-            self._logger.debug(f"Connected {type(connector).__name__} '{connector.name}': {connector.id}")
+            self._logger.info(f"Connected {type(connector).__name__} '{connector.name}': {connector.id}")
 
         except ConnectorException as e:
-            self._logger.warning(f"Error opening connector '{e.connector.id}': {str(e)}")
+            self._logger.warning(f"Failed opening connector '{e.connector.id}': {str(e)}")
             if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(e)
 
@@ -240,14 +240,14 @@ class DataManager(DataContext, Activator, Entity):
 
     def _disconnect(self, connector: Connector) -> None:
         try:
-            self._logger.info(f"Disconnecting {type(connector).__name__} '{connector.name}': {connector.id}")
+            self._logger.debug(f"Disconnecting {type(connector).__name__} '{connector.name}': {connector.id}")
             connector.set_channels(ChannelState.DISCONNECTING)
             connector.disconnect()
 
-            self._logger.debug(f"Disconnected {type(connector).__name__} '{connector.name}': {connector.id}")
+            self._logger.info(f"Disconnected {type(connector).__name__} '{connector.name}': {connector.id}")
 
         except Exception as e:
-            self._logger.warning(f"Error closing connector '{connector.id}': {str(e)}")
+            self._logger.warning(f"Failed closing connector '{connector.id}': {str(e)}")
             if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(e)
         finally:
@@ -264,13 +264,13 @@ class DataManager(DataContext, Activator, Entity):
             if not component.is_active():
                 continue
             try:
-                self._logger.info(f"Deactivating {type(component).__name__} '{component.name}': {component.id}")
+                self._logger.debug(f"Deactivating {type(component).__name__} '{component.name}': {component.id}")
                 component.deactivate()
 
-                self._logger.debug(f"Deactivated {type(component).__name__} '{component.name}': {component.id}")
+                self._logger.info(f"Deactivated {type(component).__name__} '{component.name}': {component.id}")
 
             except Exception as e:
-                self._logger.warning(f"Error deactivating component '{component.id}': {str(e)}")
+                self._logger.warning(f"Failed deactivating component '{component.id}': {str(e)}")
                 if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
 
@@ -319,7 +319,7 @@ class DataManager(DataContext, Activator, Entity):
         exception = future.exception()
         if exception is not None:
             listener = exception.listener
-            self._logger.warning(f"Error notifying listener '{listener.id}': {str(exception)}")
+            self._logger.warning(f"Failed notifying listener '{listener.id}': {str(exception)}")
             if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(exception)
 
@@ -451,7 +451,7 @@ class DataManager(DataContext, Activator, Entity):
                 check_results.append(check_task.exists)
 
             except ConnectorException as e:
-                self._logger.warning(f"Error reading connector '{e.connector.id}': {str(e)}")
+                self._logger.warning(f"Failed reading connector '{e.connector.id}': {str(e)}")
                 if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
 
@@ -507,7 +507,7 @@ class DataManager(DataContext, Activator, Entity):
                     read_data.append(read_results)
 
             except ConnectorException as e:
-                self._logger.warning(f"Error reading connector '{e.connector.id}': {str(e)}")
+                self._logger.warning(f"Failed reading connector '{e.connector.id}': {str(e)}")
                 if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
 
@@ -550,7 +550,7 @@ class DataManager(DataContext, Activator, Entity):
                 read_channels.apply(update_connector, inplace=True)
 
             except ConnectorException as e:
-                self._logger.warning(f"Error reading connector '{e.connector.id}': {str(e)}")
+                self._logger.warning(f"Failed reading connector '{e.connector.id}': {str(e)}")
                 # if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(e)
 
@@ -598,7 +598,7 @@ class DataManager(DataContext, Activator, Entity):
                 write_channels.apply(update_connector, inplace=True)
 
             except ConnectorException as e:
-                self._logger.warning(f"Error writing connector '{e.connector.id}': {str(e)}")
+                self._logger.warning(f"Failed writing connector '{e.connector.id}': {str(e)}")
                 if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
 
@@ -653,7 +653,7 @@ class DataManager(DataContext, Activator, Entity):
                 log_channels.apply(update_logger, inplace=True)
 
             except ConnectorException as e:
-                self._logger.warning(f"Error logging connector '{e.connector.id}': {str(e)}")
+                self._logger.warning(f"Failed logging connector '{e.connector.id}': {str(e)}")
                 if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
 
