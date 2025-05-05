@@ -134,8 +134,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
             self.__tables = self._schema.connect(self.engine, resources)
 
         except SQLAlchemyError as e:
-            self._logger.warning(f"Connection failed: {str(e)}")
-            raise ConnectionException(self, str(e))
+            self._raise(e)
 
     def disconnect(self) -> None:
         if self._connection is not None:

@@ -29,8 +29,11 @@ from lori.util import to_bool, to_timezone
 class Schema(Configurator, MetaData):
     dialect: Dialect
 
+    _created: bool = False
+
     def __init__(self, dialect: Dialect, **kwargs) -> None:
         super().__init__(**kwargs)
+        self._created = False
         self.dialect = dialect
 
     def __repr__(self) -> str:
@@ -42,13 +45,14 @@ class Schema(Configurator, MetaData):
         return super(MetaData, self).__str__()
 
     def connect(self, bind: Engine | Connection, resources: Resources) -> Dict[str, Table]:
-        tables = self._create_tables(resources)
-
-        self.create_all(bind=bind, checkfirst=True)
+        tables = self._connect_tables(resources)
+        if not self._created:
+            self.create_all(bind=bind, checkfirst=True)
+            self._created = True
         self._validate(bind=bind, tables=tables.values())
         return tables
 
-    def _create_tables(self, resources: Resources) -> Dict[str, Table]:
+    def _connect_tables(self, resources: Resources) -> Dict[str, Table]:
         tables = {}
 
         defaults = self.configs.get_sections(["index", "columns"], ensure_exists=True)
@@ -58,6 +62,11 @@ class Schema(Configurator, MetaData):
                     raise ConfigurationException(
                         "Missing 'table' configuration for resources: " + ", ".join([r.id for r in table_resources])
                     )
+                if name in self.tables:
+                    table = self.tables[name]
+                    tables[table.key] = table
+                    continue
+
                 configs = self.configs.get_section(name, defaults=defaults)
                 columns_configs = configs.get_section("columns")
                 column_configs = [columns_configs[s] for s in columns_configs.sections]
