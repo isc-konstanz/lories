@@ -124,6 +124,27 @@ class ConversionException(ResourceException, TypeError):
     """
 
 
+# noinspection PyAbstractClass, PyMethodMayBeStatic
+class _NumberConverter(Converter[T]):
+    def scale(self, value: T, factor: Optional[T], invert: bool = False, **kwargs) -> T:
+        if value is not None and factor is not None:
+            if invert:
+                value /= factor
+            else:
+                value *= factor
+        return self.to_dtype(value, **kwargs)
+
+    # noinspection PyProtectedMember
+    def from_series(self, data: pd.Series, channel: Channel) -> pd.Series:
+        try:
+            converter_args = channel.converter._get_configs()
+            converter_args["factor"] = to_float(channel.get("scale", default=None))
+            converted_data = data.apply(self.convert, **converter_args)
+            return converted_data.apply(self.scale, **converter_args)
+        except TypeError:
+            raise ConversionException(f"Expected str or {self.dtype}, not: {type(data)}")
+
+
 # noinspection PyMethodMayBeStatic
 class DatetimeConverter(Converter[dt.datetime]):
     dtype: Type[dt.datetime] = dt.datetime
@@ -158,7 +179,7 @@ class StringConverter(Converter[str]):
 
 
 # noinspection PyMethodMayBeStatic
-class FloatConverter(Converter[float]):
+class FloatConverter(_NumberConverter[float]):
     dtype: Type[float] = float
 
     def is_dtype(self, value: str | float) -> bool:
@@ -172,7 +193,7 @@ class FloatConverter(Converter[float]):
 
 
 # noinspection PyMethodMayBeStatic
-class IntConverter(Converter[int]):
+class IntConverter(_NumberConverter[int]):
     dtype: Type[int] = int
 
     def is_dtype(self, value: str | int) -> bool:
