@@ -43,6 +43,7 @@ sed -i "s/<version>/$version/g" "$build_dir/debian/postinst"
 cp "$lori_dir/lib/systemd/lori.service" "$build_dir/debian/"
 
 cp -r "$lori_dir/lib/tmpfiles.d" "$build_dir/"
+cp -r "$lori_dir/lib/logrotate.d" "$build_dir/"
 
 mkdir -p "$build_dir/etc"
 cp -r "$lori_dir/conf/logging.default.conf" "$build_dir/etc/logging.conf"

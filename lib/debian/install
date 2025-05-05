@@ -3,3 +3,4 @@ etc/logging.conf   /etc/lori/
 etc/settings.conf   /etc/lori/
 
 tmpfiles.d/lori.conf /usr/lib/tmpfiles.d/
+logrotate.d/lori /etc/logrotate.d/
