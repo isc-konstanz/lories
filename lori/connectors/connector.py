@@ -133,15 +133,11 @@ class Connector(_Connector, metaclass=ConnectorMeta):
 
     # noinspection SpellCheckingInspection
     def _is_reconnectable(self) -> bool:
-        return (
-            self.is_enabled()
-            and self.is_configured()
-            and self._is_connectable()
-            and (
-                pd.isna(self._disconnect_timestamp)
-                or pd.Timestamp.now(tz.UTC) >= self._disconnect_timestamp + self._reconnect_interval
-            )
-        )
+        if not self.is_enabled() or not self.is_configured() or not self._is_connectable():
+            return False
+        if pd.isna(self._disconnect_timestamp):
+            return True
+        return self._disconnect_timestamp + self._reconnect_interval <= pd.Timestamp.now(tz.UTC)
 
     def _is_connectable(self) -> bool:
         return self._is_disconnected() and self._connect_type == ConnectType.AUTO
@@ -163,13 +159,13 @@ class Connector(_Connector, metaclass=ConnectorMeta):
                 raise ConfigurationException(f"Trying to connect disabled {type(self).__name__}: {self.id}")
             if not self.is_configured():
                 raise ConfigurationException(f"Trying to connect unconfigured {type(self).__name__}: {self.id}")
-            if self._is_connected():
+            if not self._is_connected():
+                self._at_connect(resources)
+                self._run_connect(resources, *args, **kwargs)
+                self._on_connect(resources)
+            else:
                 self._logger.warning(f"{type(self).__name__} '{self.id}' already connected")
-                return
 
-            self._at_connect(resources)
-            self._run_connect(resources, *args, **kwargs)
-            self._on_connect(resources)
             self._disconnect_timestamp = pd.NaT
             self._connect_timestamp = pd.Timestamp.now(tz.UTC)
             self._connected = True
@@ -188,12 +184,11 @@ class Connector(_Connector, metaclass=ConnectorMeta):
     @wraps(disconnect, updated=())
     def _do_disconnect(self) -> None:
         with self._lock:
-            if not self._is_connected():
-                return
+            if self._is_connected():
+                self._at_disconnect()
+                self._run_disconnect()
+                self._on_disconnect()
 
-            self._at_disconnect()
-            self._run_disconnect()
-            self._on_disconnect()
             self._disconnect_timestamp = pd.Timestamp.now(tz.UTC)
             self._connect_timestamp = pd.NaT
             self._connected = False

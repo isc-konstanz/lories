@@ -53,12 +53,12 @@ def parse_type(type: Type | AnyStr, length: Optional[int] = None) -> Type[TypeEn
     if isinstance(type, builtins.type):
         if issubclass(type, (pd.Timestamp, dt.datetime, pd.arrays.DatetimeArray)):
             type = "TIMESTAMP"
-        elif issubclass(type, (float, np.floating, pd.arrays.FloatingArray)):
-            type = "FLOAT"
-        elif issubclass(type, (int, np.integer, pd.arrays.IntegerArray)):
-            type = "INT"
         elif issubclass(type, (bool, pd.arrays.BooleanArray)):
             type = "BOOL"
+        elif issubclass(type, (int, np.integer, pd.arrays.IntegerArray)):
+            type = "INT"
+        elif issubclass(type, (float, np.floating, pd.arrays.FloatingArray)):
+            type = "FLOAT"
         elif issubclass(type, (str, pd.arrays.StringArray)):
             type = "STRING"
         elif issubclass(type, (bytes, bytearray)):

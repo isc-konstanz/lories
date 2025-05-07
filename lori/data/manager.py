@@ -11,10 +11,12 @@ from __future__ import annotations
 import logging
 import os
 import signal
+import time
+from collections.abc import Callable
 from concurrent import futures
 from concurrent.futures import Future, ThreadPoolExecutor
 from threading import Event, Thread
-from typing import Any, Callable, Dict, Mapping, Optional, Type, overload
+from typing import Any, Dict, Mapping, Optional, Type, overload
 
 import pandas as pd
 import pytz as tz
@@ -167,10 +169,10 @@ class DataManager(DataContext, Activator, Entity):
                 )
                 continue
 
-            self._logger.info(f"Activating {type(component).__name__} '{component.name}': {component.id}")
+            self._logger.debug(f"Activating {type(component).__name__} '{component.name}': {component.id}")
             component.activate()
 
-            self._logger.debug(f"Activated {type(component).__name__} '{component.name}': {component.id}")
+            self._logger.info(f"Activated {type(component).__name__} '{component.name}': {component.id}")
 
     def connect(self, *connectors: Connector, channels: Optional[Channels] = None) -> None:
         connect_futures = []
@@ -192,7 +194,7 @@ class DataManager(DataContext, Activator, Entity):
         #     connect_future.add_done_callback(self._connect_callback)
 
     def _connect(self, connector: Connector, channels: Optional[Channels] = None) -> Future:
-        self._logger.info(f"Connecting {type(connector).__name__} '{connector.name}': {connector.id}")
+        self._logger.debug(f"Connecting {type(connector).__name__} '{connector.name}': {connector.id}")
         if channels is None:
             channels = self.channels.filter(lambda c: c.has_connector(connector.id))
             channels.update(self.channels.filter(lambda c: c.has_logger(connector.id)).apply(lambda c: c.from_logger()))
@@ -202,10 +204,10 @@ class DataManager(DataContext, Activator, Entity):
     def _connect_callback(self, future: Future) -> None:
         try:
             connector = future.result().connector
-            self._logger.debug(f"Connected {type(connector).__name__} '{connector.name}': {connector.id}")
+            self._logger.info(f"Connected {type(connector).__name__} '{connector.name}': {connector.id}")
 
         except ConnectorException as e:
-            self._logger.warning(f"Error opening connector '{e.connector.id}': {str(e)}")
+            self._logger.warning(f"Failed opening connector '{e.connector.id}': {str(e)}")
             if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(e)
 
@@ -238,14 +240,14 @@ class DataManager(DataContext, Activator, Entity):
 
     def _disconnect(self, connector: Connector) -> None:
         try:
-            self._logger.info(f"Disconnecting {type(connector).__name__} '{connector.name}': {connector.id}")
+            self._logger.debug(f"Disconnecting {type(connector).__name__} '{connector.name}': {connector.id}")
             connector.set_channels(ChannelState.DISCONNECTING)
             connector.disconnect()
 
-            self._logger.debug(f"Disconnected {type(connector).__name__} '{connector.name}': {connector.id}")
+            self._logger.info(f"Disconnected {type(connector).__name__} '{connector.name}': {connector.id}")
 
         except Exception as e:
-            self._logger.warning(f"Error closing connector '{connector.id}': {str(e)}")
+            self._logger.warning(f"Failed closing connector '{connector.id}': {str(e)}")
             if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(e)
         finally:
@@ -262,13 +264,13 @@ class DataManager(DataContext, Activator, Entity):
             if not component.is_active():
                 continue
             try:
-                self._logger.info(f"Deactivating {type(component).__name__} '{component.name}': {component.id}")
+                self._logger.debug(f"Deactivating {type(component).__name__} '{component.name}': {component.id}")
                 component.deactivate()
 
-                self._logger.debug(f"Deactivated {type(component).__name__} '{component.name}': {component.id}")
+                self._logger.info(f"Deactivated {type(component).__name__} '{component.name}': {component.id}")
 
             except Exception as e:
-                self._logger.warning(f"Error deactivating component '{component.id}': {str(e)}")
+                self._logger.warning(f"Failed deactivating component '{component.id}': {str(e)}")
                 if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
 
@@ -317,7 +319,7 @@ class DataManager(DataContext, Activator, Entity):
         exception = future.exception()
         if exception is not None:
             listener = exception.listener
-            self._logger.warning(f"Error notifying listener '{listener.id}': {str(exception)}")
+            self._logger.warning(f"Failed notifying listener '{listener.id}': {str(exception)}")
             if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(exception)
 
@@ -343,7 +345,7 @@ class DataManager(DataContext, Activator, Entity):
                 return False
             if pd.isna(channel.connector.timestamp):
                 return True
-            next_reading = _next(channel.connector.timestamp, freq)
+            next_reading = _next(freq, channel.connector.timestamp)
             return timestamp >= next_reading
 
         channels = self.channels.filter(lambda c: is_reading(c, now))
@@ -351,17 +353,10 @@ class DataManager(DataContext, Activator, Entity):
             self.read(channels, **kwargs)
 
         interval = f"{self._interval}s"
+        _sleep(interval)
+
         while not self.__interrupt.is_set():
             try:
-                now = pd.Timestamp.now(tz.UTC)
-                next = _next(now, interval)
-                sleep = (next - now).total_seconds()
-                self._logger.debug(f"Sleeping until next execution in {sleep} seconds: {next}")
-                self.__interrupt.wait(sleep)
-
-                for connector in self.connectors.filter(lambda c: c._is_reconnectable()):
-                    self.reconnect(connector)
-
                 now = pd.Timestamp.now(tz.UTC)
 
                 channels = self.channels.filter(lambda c: is_reading(c, now))
@@ -369,13 +364,20 @@ class DataManager(DataContext, Activator, Entity):
                     self._logger.debug(f"Reading {len(channels)} channels of application: {self.name}")
                     self.read(channels)
 
+                self.__interrupt.wait(0.05)
+                self._listeners.wait(0.05, self.__interrupt.wait)
                 self.log()
+
+                for connector in self.connectors.filter(lambda c: c._is_reconnectable()):
+                    self.reconnect(connector)
+
+                _sleep(interval, self.__interrupt.wait)
 
             except KeyboardInterrupt:
                 self.interrupt()
                 break
 
-        self.listeners.wait()
+        self._listeners.wait()
         self.log()
 
     def replicate(self, full: bool = False, force: bool = False, **kwargs) -> None:
@@ -449,7 +451,7 @@ class DataManager(DataContext, Activator, Entity):
                 check_results.append(check_task.exists)
 
             except ConnectorException as e:
-                self._logger.warning(f"Error reading connector '{e.connector.id}': {str(e)}")
+                self._logger.warning(f"Failed reading connector '{e.connector.id}': {str(e)}")
                 if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
 
@@ -505,7 +507,7 @@ class DataManager(DataContext, Activator, Entity):
                     read_data.append(read_results)
 
             except ConnectorException as e:
-                self._logger.warning(f"Error reading connector '{e.connector.id}': {str(e)}")
+                self._logger.warning(f"Failed reading connector '{e.connector.id}': {str(e)}")
                 if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
 
@@ -513,7 +515,7 @@ class DataManager(DataContext, Activator, Entity):
             return pd.DataFrame()
         return pd.concat(read_data, axis="columns")
 
-    # noinspection PyShadowingBuiltins, PyUnresolvedReferences, PyTypeChecker
+    # noinspection PyShadowingBuiltins, PyShadowingNames, PyUnresolvedReferences, PyTypeChecker
     def read(self, channels: Optional[Channels] = None, **kwargs) -> pd.DataFrame:
         time = pd.Timestamp.now(tz=tz.UTC)
         if channels is None:
@@ -548,7 +550,7 @@ class DataManager(DataContext, Activator, Entity):
                 read_channels.apply(update_connector, inplace=True)
 
             except ConnectorException as e:
-                self._logger.warning(f"Error reading connector '{e.connector.id}': {str(e)}")
+                self._logger.warning(f"Failed reading connector '{e.connector.id}': {str(e)}")
                 # if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(e)
 
@@ -596,7 +598,7 @@ class DataManager(DataContext, Activator, Entity):
                 write_channels.apply(update_connector, inplace=True)
 
             except ConnectorException as e:
-                self._logger.warning(f"Error writing connector '{e.connector.id}': {str(e)}")
+                self._logger.warning(f"Failed writing connector '{e.connector.id}': {str(e)}")
                 if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
 
@@ -651,14 +653,23 @@ class DataManager(DataContext, Activator, Entity):
                 log_channels.apply(update_logger, inplace=True)
 
             except ConnectorException as e:
-                self._logger.warning(f"Error logging connector '{e.connector.id}': {str(e)}")
+                self._logger.warning(f"Failed logging connector '{e.connector.id}': {str(e)}")
                 if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
 
-
 # noinspection PyShadowingBuiltins
-def _next(time: pd.Timestamp, freq: str) -> pd.Timestamp:
-    next = floor_date(time, freq=freq)
-    while next <= time:
+def _sleep(freq: str, sleep: Callable = time.sleep) -> None:
+    now = pd.Timestamp.now(tz.UTC)
+    next = _next(freq, now)
+    seconds = (next - now).total_seconds()
+    sleep(seconds)
+
+
+# noinspection PyShadowingBuiltins, PyShadowingNames
+def _next(freq: str, now: Optional[pd.Timestamp] = None) -> pd.Timestamp:
+    if now is None:
+        now = pd.Timestamp.now(tz.UTC)
+    next = floor_date(now, freq=freq)
+    while next <= now:
         next += to_timedelta(freq)
     return next

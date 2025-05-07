@@ -64,6 +64,11 @@ modbus = [
 revpi = [
     "revpimodio2",
 ]
+dash = [
+    "dash",
+    "dash-auth",
+    "dash-bootstrap-component",
+]
 doc = [
     "graphviz",
     "sphinx",

@@ -15,6 +15,8 @@ from typing import Any, Callable, Collection, Iterable, List, Optional, Tuple, T
 
 import numpy as np
 import pandas as pd
+
+from lori import ConfigurationException
 from lori.core import Configurations, Context, Directories, Registrator, ResourceException
 from lori.data.channels import Channel, Channels
 from lori.typing import ChannelsType
@@ -61,6 +63,9 @@ class DataContext(Context[Channel]):
         **configs: Any,
     ) -> Channel:
         id = Channel._build_id(key=key, context=context)
+        if "type" not in configs:
+            raise ConfigurationException("Missing 'type' for channel: " + id)
+
         if self._contains(id):
             self._update(id=id, key=key, **configs)
             return self._get(id)
@@ -109,9 +114,9 @@ class DataContext(Context[Channel]):
         super()._set(id, channel)
 
     # noinspection PyShadowingBuiltins, PyProtectedMember, PyArgumentList
-    def _update(self, id: str, key: str, type: Type, **configs: Any) -> None:
+    def _update(self, id: str, key: str, **configs: Any) -> None:
         channel = self._get(id)
-        channel._update(type=type, **configs)
+        channel._update(**configs)
 
     @property
     def channels(self) -> Channels:

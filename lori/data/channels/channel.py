@@ -221,11 +221,11 @@ class Channel(Resource):
 
     # noinspection PyShadowingBuiltins
     def has_logger(self, *ids: Optional[str]) -> bool:
-        return self.logger.enabled and any(self.logger.id == id for id in ids) if len(ids) > 0 else True
+        return self.logger.enabled and (any(self.logger.id == id for id in ids) if len(ids) > 0 else True)
 
     # noinspection PyShadowingBuiltins
     def has_connector(self, id: Optional[str] = None) -> bool:
-        return self.connector.enabled and self.connector.id == id if id is not None else True
+        return self.connector.enabled and (self.connector.id == id if id is not None else True)
 
     def to_list(self):
         from lori.data import Channels

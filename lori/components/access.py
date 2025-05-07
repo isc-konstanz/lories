@@ -17,7 +17,7 @@ from lori import Context
 from lori.components.core import _Component
 from lori.core import Configurations, Directory, ResourceException
 from lori.core.register import Registrator, RegistratorAccess, RegistratorContext
-from lori.util import get_context
+from lori.util import get_context, update_recursive
 
 C = TypeVar("C", bound=_Component)
 
@@ -85,7 +85,7 @@ class ComponentAccess(RegistratorAccess[C]):
             components.append(self._load_from_configs(self._registrar, configs, **defaults, **kwargs))
 
         configs = configs.get_section(section, defaults={})
-        defaults.update(Registrator._build_defaults(configs, _Component.INCLUDES + list(includes)))
+        update_recursive(defaults, _Component._build_defaults(configs, includes))
 
         configs_dirs = configs.dirs.copy()
         configs_file = configs.name
