@@ -84,7 +84,7 @@ class HDFDatabase(Database):
         if self.__store is not None:
             self.__store.close()
 
-    # noinspection PyTypeChecker
+    # noinspection PyTypeChecker, PyUnresolvedReferences
     def read(
         self,
         resources: Resources,
@@ -97,8 +97,9 @@ class HDFDatabase(Database):
                 group_key = _format_key(group)
                 if group_key not in self.__store:
                     continue
-
-                data.append(self.__store.select(group_key, where=_build_where(start, end), columns=group_resources.ids))
+                group_data = self.__store.select(group_key, where=_build_where(start, end), columns=group_resources.ids)
+                if len(group_data.index) > 0 and not group_data.dropna(axis="columns", how="all").empty:
+                    data.append(group_data)
         except IOError as e:
             raise ConnectionException(self, str(e))
 
