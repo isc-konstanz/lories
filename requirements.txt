@@ -12,5 +12,6 @@ requests~=2.32
 pillow~=10.4
 flask~=3.0
 dash~=2.17
+dash-auth~=2.3
 dash-bootstrap-components~=1.6
 opencv-python~=4.11
