@@ -150,3 +150,6 @@ conf/*
 /data/assets/
 
 /assets/
+
+# MacOS
+.DS_Store
