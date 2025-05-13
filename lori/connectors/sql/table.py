@@ -14,7 +14,7 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple
 import sqlalchemy as sql
 from sqlalchemy import ClauseElement, Dialect, Result, UnaryExpression
 from sqlalchemy.sql import Delete, Insert, Select, and_, asc, between, desc, func, literal, not_, text
-from sqlalchemy.types import DATETIME, TIMESTAMP
+from sqlalchemy.types import DATETIME, TIMESTAMP, BLOB
 
 import numpy as np
 import pandas as pd
@@ -170,6 +170,8 @@ class Table(sql.Table):
                 )
             if column.type == TIMESTAMP or isinstance(column.type, TIMESTAMP):
                 return func.unix_timestamp(column)
+            if column.type == BLOB or isinstance(column.type, BLOB):
+                return method(column)
             else:
                 return column
 

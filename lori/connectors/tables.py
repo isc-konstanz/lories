@@ -107,7 +107,7 @@ class HDFDatabase(Database):
             return pd.DataFrame()
         return pd.concat(data, axis="columns")
 
-    # noinspection PyTypeChecker
+    # noinspection PyTypeChecker, PyUnresolvedReferences
     def read_first(self, resources: Resources) -> Optional[pd.DataFrame]:
         data = []
         try:
@@ -116,7 +116,9 @@ class HDFDatabase(Database):
                 if group_key not in self.__store:
                     continue
 
-                data.append(self.__store.select(group_key, stop=0, columns=group_resources.ids))
+                group_data = self.__store.select(group_key, stop=0, columns=group_resources.ids)
+                if len(group_data.index) > 0 and not group_data.dropna(axis="columns", how="all").empty:
+                    data.append(group_data)
         except IOError as e:
             raise ConnectionException(self, str(e))
 
@@ -124,7 +126,7 @@ class HDFDatabase(Database):
             return pd.DataFrame()
         return pd.concat(data, axis="columns")
 
-    # noinspection PyTypeChecker
+    # noinspection PyTypeChecker, PyUnresolvedReferences
     def read_last(self, resources: Resources) -> Optional[pd.DataFrame]:
         data = []
         try:
@@ -133,7 +135,9 @@ class HDFDatabase(Database):
                 if group_key not in self.__store:
                     continue
 
-                data.append(self.__store.select(group_key, start=0, columns=group_resources.ids))
+                group_data = self.__store.select(group_key, start=0, columns=group_resources.ids)
+                if len(group_data.index) > 0 and not group_data.dropna(axis="columns", how="all").empty:
+                    data.append(group_data)
         except IOError as e:
             raise ConnectionException(self, str(e))
 
@@ -153,7 +157,7 @@ class HDFDatabase(Database):
                 if group_key not in self.__store:
                     continue
 
-                self.__store.remove(_format_key(group_key))
+                self.__store.remove(group_key)
 
         except IOError as e:
             raise ConnectionException(self, str(e))
@@ -162,7 +166,7 @@ class HDFDatabase(Database):
         try:
             for group, group_resources in self.resources.filter(lambda c: c.id in data.columns).groupby("group"):
                 group_key = _format_key(group)
-                group_data = data[group_resources.ids]
+                group_data = data[group_resources.ids].dropna(axis="columns", how="all")
                 if group_key not in self.__store:
                     self.__store.put(group_key, group_data, format="table", encoding="UTF-8")
                 else:

@@ -197,7 +197,7 @@ class _RegistratorContext(Context[R], Generic[R]):
     def get_all(self, *types: Type) -> Collection[R]:
         if len(types) == 0:
             return self.values()
-        return self.filter(lambda r: any(isinstance(r, t) for t in types))
+        return self.filter(lambda r: any(isinstance(r, t) and r.is_enabled() for t in types))
 
     def get_first(self, *types: Optional[str | Type]) -> Optional[R]:
         registrators = self.get_all(*types)
