@@ -21,6 +21,8 @@ class Result(MutableMapping):
     _name: str
     _header: str
 
+    order: int = 100
+
     summary: Any
 
     # noinspection PyShadowingBuiltins
@@ -30,12 +32,15 @@ class Result(MutableMapping):
         name: str,
         summary: Any,
         header: str = "Summary",
+        order: int = 100,
         **kwargs: Any,
     ) -> None:
         self._key = key
         self._name = name
         self._header = header
         self.__map = OrderedDict(kwargs)
+
+        self.order = order
 
         self.summary = summary
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import re
 from collections.abc import Callable
+from functools import reduce
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence
 
 import pandas as pd
@@ -181,6 +182,10 @@ class Results(Configurator, Sequence[Result]):
             return None
         return self.data.index[-1]
 
+    # noinspection PyShadowingBuiltins
+    def filter(self, filter: Callable[[Result], bool]) -> Sequence[Result]:
+        return [result for result in self.__list if filter(result)]
+
     def report(self) -> None:
         self.durations.complete()
         self.progress.complete(**self.to_dict())
@@ -210,8 +215,11 @@ class Results(Configurator, Sequence[Result]):
                             continue
                         resampled.append(resample(self.data[resample_columns], self._freq, method))
 
-                    data = pd.concat(resampled, axis="columns")[self.data.columns]
-                    data.rename(inplace=True, columns=columns)
+                    if len(resampled) == 0:
+                        data = pd.DataFrame()
+                    else:
+                        data = pd.concat(resampled, axis="columns")[self.data.columns]
+                        data.rename(inplace=True, columns=columns)
                 else:
                     data = self.data.rename(columns=columns)
                 excel.write(excel_file, "Timeseries", data)
@@ -240,11 +248,13 @@ class Results(Configurator, Sequence[Result]):
         self.data = pd.concat([self.data, data], axis="index")
 
     def to_dict(self) -> Dict[str, Any]:
-        return {r.key: r.summary for r in self}
+        return {r.key: r.summary for r in self.__list}
 
     def to_frame(self) -> pd.DataFrame:
         summary = pd.DataFrame(columns=pd.MultiIndex.from_tuples((), names=["System", ""]))
-        for result in self:
+        order = list(dict.fromkeys(r.order for r in self.__list))
+        order.sort()
+        for result in reduce(lambda r1, r2: r1+r2, [self.filter(lambda r: r.order == o) for o in order]):
             name = result.name
             value = result.summary
             if re.search(r".*\[.*kWh.*]", name):
