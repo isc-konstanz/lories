@@ -15,3 +15,7 @@ dash~=2.17
 dash-auth~=2.3
 dash-bootstrap-components~=1.6
 opencv-python~=4.11
+openpyxl~=3.1
+matplotlib~=3.10
+seaborn~=0.13
+tqdm~=4.67
