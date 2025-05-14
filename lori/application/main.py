@@ -16,7 +16,7 @@ from typing import Optional, Type
 import tzlocal
 
 import pandas as pd
-from lori import Settings, System
+from lori import Configurations, Settings, System
 from lori.application import Interface
 from lori.connectors import Database, DatabaseException
 from lori.data.manager import DataManager
@@ -121,7 +121,12 @@ class Application(DataManager):
         end: Optional[TimestampType] = None,
         **kwargs,
     ) -> None:
-        simulation = self.settings.get_section("simulation", defaults={"data": {"include": True}})
+        report = Configurations.load(
+            "report.conf",
+            require=False,
+            **self.settings.dirs.to_dict(),
+        )
+        simulation = self.settings.get_section("simulation", defaults={"report": report})
 
         timezone = simulation.get("timezone", None)
         if timezone is None:
@@ -163,7 +168,7 @@ class Application(DataManager):
             else:
                 slices = [(start, end)]
 
-            with Results(system, database, simulation.get_section("data"), total=len(slices)) as results:
+            with Results(system, database, simulation.get_sections(Results.INCLUDES), total=len(slices)) as results:
                 results.durations.start("Simulation")
                 try:
                     for slice_start, slice_end in slices:

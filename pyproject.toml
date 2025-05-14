@@ -72,6 +72,10 @@ dash = [
 ]
 sim = [
     "openpyxl",
+    "svglib",
+    "pillow",
+    "markdown",
+    "reportlab",
     "matplotlib",
     "seaborn",
     "tqdm",
@@ -94,7 +98,13 @@ lori = [
     "application/view/assets/*.css",
     "application/view/assets/*.ico",
 	"application/view/assets/*.jpg",
-	"application/view/assets/*.png"
+	"application/view/assets/*.jpeg",
+	"application/view/assets/*.png",
+    "io/font/*.ttf",
+    "io/img/*.svg",
+	"io/img/*.jpg",
+	"io/img/*.jpeg",
+	"io/img/*.png",
 ]
 
 [tool.setuptools.packages.find]

@@ -17,3 +17,9 @@ from .result import Result  # noqa: F401
 
 from . import results  # noqa: F401
 from .results import Results  # noqa: F401
+
+from . import report  # noqa: F401
+from .report import (  # noqa: F401
+    Report,
+    ReportException,
+)

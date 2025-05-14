@@ -81,6 +81,7 @@ from . import simulation  # noqa: F401
 from .simulation import (  # noqa: F401
     Durations,
     Progress,
+    Report,
     Results,
 )
 

@@ -17,21 +17,20 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence
 import pandas as pd
 from lori.components import Component
 from lori.connectors import Database
-from lori.core import CONSTANTS, Configurations, Configurator, Constant, Directories, ResourceException, Resources
-from lori.data.util import resample, scale_energy, scale_power
+from lori.core import Configurations, Configurator, Constant, Directories, ResourceException, Resources
+from lori.data.util import scale_energy, scale_power
 from lori.simulation import Durations, Progress, Result
 from lori.typing import TimestampType
-from lori.util import parse_freq
 
 
 class Results(Configurator, Sequence[Result]):
+    INCLUDES: List[str] = ["report"]
+
     __list: List[Result]
 
-    __resources: Resources
-    __component: Component
     __database: Database
-
-    _freq: Optional[str]
+    __component: Component
+    _resources: Resources
 
     data: pd.DataFrame
 
@@ -52,7 +51,7 @@ class Results(Configurator, Sequence[Result]):
         self.__list = []
         self.__database = self._assert_database(database)
         self.__component = self._assert_component(component)
-        self.__resources = self._extract_resources(component)
+        self._resources = self._extract_resources(component)
 
         self.dirs = component.configs.dirs
         if not self.dirs.data.exists():
@@ -94,10 +93,6 @@ class Results(Configurator, Sequence[Result]):
 
         extend_resources(component)
         return Resources(resources)
-
-    def configure(self, configs: Configurations) -> None:
-        super().configure(configs)
-        self._freq = parse_freq(configs.get("freq", default=None))
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({', '.join(str(r.key) for r in self.__list)})"
@@ -155,7 +150,7 @@ class Results(Configurator, Sequence[Result]):
         self.close()
 
     def open(self) -> None:
-        self.__database.connect(self.__resources)
+        self.__database.connect(self._resources)
 
     def close(self) -> None:
         self.__database.disconnect()
@@ -190,42 +185,13 @@ class Results(Configurator, Sequence[Result]):
         self.durations.complete()
         self.progress.complete(**self.to_dict())
         try:
-            # TODO: Make reports configurable
-            from lori.io import excel
+            from lori.simulation import Report
 
-            excel_file = str(self.dirs.data.joinpath("results.xlsx"))
-            excel.write(excel_file, "Results", self.to_frame())
+            report = Report(self.configs.get_section("report"))
+            report.write(self)
 
-            if self.configs.get_bool("include", default=True):
-                columns = {c.key: c.full_name(unit=True) for c in CONSTANTS}
-                columns.update({r.get("column", default=r.key): r.full_name(unit=True) for r in self.__resources})
-
-                if self._freq is not None:
-                    resampled = []
-                    for method, resources in self.__resources.groupby("aggregate"):
-                        resample_columns = [r.get("column", default=r.key) for r in resources]
-                        resample_columns = [c for c in resample_columns if c in self.data.columns]
-                        if len(resample_columns) == 0:
-                            continue
-                        if method is None:
-                            self._logger.warning(
-                                "Skipping resources for missing aggregate function: "
-                                + ", ".join(f"'{r.id}'" for r in resources)
-                            )
-                            continue
-                        resampled.append(resample(self.data[resample_columns], self._freq, method))
-
-                    if len(resampled) == 0:
-                        data = pd.DataFrame()
-                    else:
-                        data = pd.concat(resampled, axis="columns")[self.data.columns]
-                        data.rename(inplace=True, columns=columns)
-                else:
-                    data = self.data.rename(columns=columns)
-                excel.write(excel_file, "Timeseries", data)
-
-        except ImportError:
-            pass
+        except ImportError as e:
+            self._logger.warning(f"Failed to write report: {e}")
 
     # noinspection PyTypeChecker
     def submit(
@@ -236,10 +202,10 @@ class Results(Configurator, Sequence[Result]):
         *args,
         **kwargs,
     ) -> None:
-        columns = {r.get("column", default=r.key): r.id for r in self.__resources}
+        columns = {r.get("column", default=r.key): r.id for r in self._resources}
 
-        if self.__database.exists(self.__resources, start, end):
-            data = self.__database.read(self.__resources, start, end)
+        if self.__database.exists(self._resources, start, end):
+            data = self.__database.read(self._resources, start, end)
             data.rename(columns={v: k for k, v in columns.items()}, inplace=True)
         else:
             data = function(start, end, *args, **kwargs)
