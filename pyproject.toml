@@ -68,6 +68,13 @@ dash = [
     "dash",
     "dash-auth",
     "dash-bootstrap-component",
+    "pillow",
+]
+sim = [
+    "openpyxl",
+    "matplotlib",
+    "seaborn",
+    "tqdm",
 ]
 doc = [
     "graphviz",
