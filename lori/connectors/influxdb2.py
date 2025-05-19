@@ -34,7 +34,7 @@ except ImportError:
 @register_connector_type("influxdb2", "influx", "influxdb")
 class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
     HASH_METHODS = ["md5", "sha1", "sha256"]
-    
+
     url: str
     bucket: str
     token: str
@@ -43,33 +43,12 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
     verify_ssl: bool
 
     client: None | InfluxDBClient = None
-    __tables: pd.DataFrame
 
     @property
     def connection(self) -> InfluxDBClient:
         if not self.is_connected():
             raise ConnectionException(self, "InfluxDB connection not open")
         return self.client
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        #TODO: needed?
-        # self.__tables = OrderedDict()
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self.__tables)
-
-    def __len__(self) -> int:
-        return len(self.__tables)
-
-    def __contains__(self, table: str) -> bool:
-        if isinstance(table, str):
-            return table in self.__tables.keys()
-        return False
-
-    def __getitem__(self, name: str) -> np.ndarray:
-        return self.__tables[name]
-
     # noinspection PyShadowingBuiltins, PyProtectedMember
     def _get_vars(self) -> Dict[str, Any]:
         vars = super()._get_vars()
@@ -92,7 +71,7 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
         self.token = configs.get("token")
 
         self.org = configs.get("org", default="org")
-        self.timeout = configs.get_int("timeout", default=10_000) # ms
+        self.timeout = configs.get_int("timeout", default=10_000)  # ms
         self.verify_ssl = configs.get_bool("verify_ssl", default=True)
 
     def connect(self, resources: Resources) -> None:
@@ -115,7 +94,6 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
         buckets_api = self.client.buckets_api()
         existing_buckets = [b.name for b in buckets_api.find_buckets().buckets]
         if self.bucket not in existing_buckets:
-            #TODO: create if not exists?
             self._logger.info(f"InfluxDB Bucket doesn't exist. Creating Bucket {self.bucket}")
             retention = BucketRetentionRules(every_seconds=0)  # 0 means infinite retention
             buckets_api.create_bucket(bucket_name=self.bucket, retention_rules=retention, org=self.org)
@@ -126,7 +104,7 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
             self.client = None
             self._logger.debug("Disconnected from the database")
 
-    #TODO: fix hash
+    # TODO: fix hash
     def hash(
             self,
             resources: Resources,
@@ -176,11 +154,11 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
                     equalFormat = (n, dig) =>
                         if exists n then
                             if types.isType(v: n, type: "float") then
-                                // roundDigits(n: n, dig: dig) + ","
-                                if strings.containsStr(substr: ".", v: roundDigits(n: n, dig: dig)) then
-                                    roundDigits(n: n, dig: dig) + ","
-                                else
-                                    roundDigits(n: n, dig: dig) + ".000" + ","
+                                roundDigits(n: n, dig: dig) + ","
+                                // if strings.containsStr(substr: ".", v: roundDigits(n: n, dig: dig)) then
+                                //     roundDigits(n: n, dig: dig) + ","
+                                // else
+                                //     roundDigits(n: n, dig: dig) + ".000" + ","
                             else
                                 string(v: n)
                         else
@@ -224,7 +202,6 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
         else:
             hashes_joined = ",".join(hashes)
 
-
         normal_hash = super().hash(resources, start, end, method, encoding)
         influx_hash = hashes_joined
         if normal_hash != influx_hash:
@@ -234,7 +211,7 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
 
             return normal_hash
 
-        return hashes_joined #hash_value(hashes_joined, method, encoding)
+        return hashes_joined  # hash_value(hashes_joined, method, encoding)
 
     def exists(
             self,
@@ -253,13 +230,13 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
                 for tag, tagged_field_resources in field_resources.groupby("tag"):
                     rename = {r.id: r.get("field", default=r.get("column", default=r.key))
                               for r in tagged_field_resources if "name" in r}
-    
+
                     field_filters = ", ".join([f'"{field}"' for field in rename.values()])
                     tag_filter = f'|> filter(fn: (r) => r["_measurement"] == "{tag}")' if tag is not None else ""
-    
+
                     query = f"""
                         columns = [{field_filters}]
-    
+
                         from(bucket: "{self.bucket}")
                         |> range(start: {start_str}, stop: {end_str})'
                         |> filter(fn: (r) => r["_measurement"] == "{measurement_name}")
@@ -271,10 +248,10 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
                     result = query_api.query_data_frame(query, org=self.org, data_frame_index=['_time'])
 
                     fetched_fields = result["_fields"]
-    
+
                     if not sorted(rename.values()) == sorted(fetched_fields):
                         return False
-    
+
                     # TODO: Check
 
 
@@ -289,9 +266,10 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
             start: Optional[pd.Timestamp | dt.datetime] = None,
             end: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> pd.DataFrame:
-        end = end + dt.timedelta(seconds=1) #TODO: check again? already done previously to include next full minute? < vs <=
-        start_str = start.isoformat(sep='T', timespec='seconds') if start is not None else "0" #TODO: is this behavior correct?
-        end_str = end.isoformat(sep='T', timespec='seconds') if end is not None else "now()" #TODO: is this behavior correct?
+        # TODO: check again? already done previously to include next full minute? < vs <=
+        end = end + dt.timedelta(seconds=1)
+        start_str = start.isoformat(sep='T', timespec='seconds') if start is not None else "0"
+        end_str = end.isoformat(sep='T', timespec='seconds') if end is not None else "now()"
 
         results = []
         query_api = self.client.query_api()
@@ -306,7 +284,6 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
 
                 query = f"""
                     columns = [{field_filters}]
-
                     from(bucket: "{self.bucket}")
                     |> range(start: {start_str}, stop: {end_str})
                     |> filter(fn: (r) => r["_measurement"] == "{measurement_name}")
@@ -336,7 +313,7 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
 
         if len(results) == 0:
             return pd.DataFrame(columns=[r.id for r in resources])
-            #TODO: always returun all resources?
+            # TODO: always returun all resources?
 
         results = sorted(results, key=lambda d: min(d.index))
         return pd.concat(results, axis="columns")
@@ -395,7 +372,6 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
         try:
             query_api = self.client.query_api()
 
-            
             for measurement_name, field_resources in self.resources.groupby(self._measurement_lambda()):
                 for tag, tagged_field_resources in field_resources.groupby("tag"):
                     rename = {r.id: r.get("field", default=r.get("column", default=r.key))
@@ -406,7 +382,7 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
 
                     query = f"""
                         columns = [{field_filters}]
-                        
+
                         from(bucket: "{self.bucket}")
                         |> range(start: {start_str}, stop: {end_str})
                         |> filter(fn: (r) => r["_measurement"] == "{measurement_name}")
@@ -416,7 +392,7 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
                         |> to(bucket: "{self.bucket}")
                     """
                     # print(query)
-                    #result = query_api.query_data_frame(query, org=self.org, data_frame_index=['_time'])
+                    # result = query_api.query_data_frame(query, org=self.org, data_frame_index=['_time'])
                     query_api.query(query, org=self.org)
                     pass
 
@@ -437,11 +413,11 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
         else:
             raise ConnectionException(self, str(e))
 
-    def _get_first_last_df(self, resources: Resources, mode:str):
-        #TODO: Test
+    def _get_first_last_df(self, resources: Resources, mode: str):
+        # TODO: Test
         results = []
 
-        #TODO better switch case
+        # TODO better switch case
         if mode not in ["first", "last"]:
             raise ValueError(f"Invalid mode '{mode}'")
 
@@ -459,12 +435,11 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
                     |> keep(columns: ["_time"])
                     //|> sort(columns: ["_time"], desc: false)
                     |> {mode}(column: "_time")
-                    """ #TODO: activate delete
+                    """
 
             try:
                 timestamp_result = query_api.query(query_last_timestamp)
             except Exception as e:
-                #self._raise(e)
                 raise ConnectionException(self, str(e))
 
             if not timestamp_result:
