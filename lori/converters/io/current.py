@@ -8,7 +8,7 @@ lori.converters.io.current
 
 from __future__ import annotations
 
-from lori import Configurations, ConfigurationException
+from lori import ConfigurationException, Configurations
 from lori.converters import register_converter_type
 from lori.converters.io.analog import AnalogInput
 

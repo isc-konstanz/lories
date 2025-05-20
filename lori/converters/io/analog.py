@@ -8,9 +8,9 @@ lori.converters.io.analog
 
 from __future__ import annotations
 
-from typing import Any, Optional, Tuple
+from typing import Any, Optional
 
-from lori import Configurations, ConfigurationException
+from lori import ConfigurationException, Configurations
 from lori.converters import ConversionException, register_converter_type
 from lori.converters.converter import FloatConverter
 
@@ -60,9 +60,7 @@ class AnalogInput(FloatConverter):
         if max is None:
             raise ConfigurationException(f"Missing input maximum for '{self.id}'")
         if max <= min:
-            raise ConfigurationException(
-                f"Invalid input boundaries for '{self.id}' with min ({min}) > max ({max})"
-            )
+            raise ConfigurationException(f"Invalid input boundaries for '{self.id}' with min ({min}) > max ({max})")
 
         if zero is None:
             raise ConfigurationException(f"Missing input zero point for '{self.id}'")
@@ -72,8 +70,7 @@ class AnalogInput(FloatConverter):
     def convert(self, value: Any, **kwargs) -> Optional[float]:
         if self._input_min > value > self._input_max:
             raise ConversionException(
-                f"Invalid input signal out of limit ({self._input_min} to {self._input_max}): "
-                + str(value)
+                f"Invalid input signal out of limit ({self._input_min} to {self._input_max}): " + str(value)
             )
         _value = (value - self._input_zero) * self._factor
 

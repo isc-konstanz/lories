@@ -254,7 +254,7 @@ class Results(Configurator, Sequence[Result]):
         summary = pd.DataFrame(columns=pd.MultiIndex.from_tuples((), names=["System", ""]))
         order = list(dict.fromkeys(r.order for r in self.__list))
         order.sort()
-        for result in reduce(lambda r1, r2: r1+r2, [self.filter(lambda r: r.order == o) for o in order]):
+        for result in reduce(lambda r1, r2: r1 + r2, [self.filter(lambda r: r.order == o) for o in order]):
             name = result.name
             value = result.summary
             if re.search(r".*\[.*kWh.*]", name):

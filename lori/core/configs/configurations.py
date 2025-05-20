@@ -66,10 +66,8 @@ class Configurations(MutableMapping[str, Any]):
         elif require:
             raise ConfigurationUnavailableException(f"Invalid configuration file '{self.__path}'")
 
-        for section in self.sections:
-            self[section]._load(require=False)
-
-        self.__dirs.update(self.get_section(Directories.SECTION, defaults={}))
+        if Directories.SECTION in self.__configs:
+            self.__dirs.update(self.__configs[Directories.SECTION])
 
     def _load_toml(self, config_path: str) -> None:
         from .toml import load_toml
@@ -258,7 +256,9 @@ class Configurations(MutableMapping[str, Any]):
         section_name = f"{section}.conf"
         section_dirs = self.__dirs.copy()
         section_dirs.conf = self._sections_dir
-        return Configurations(section_name, section_dirs, configs)
+        section_configs = Configurations(section_name, section_dirs, configs)
+        section_configs._load(require=False)
+        return section_configs
 
     # noinspection PyTypeChecker
     def update(self, update: Mapping[str, Any], replace: bool = True) -> Configurations:
