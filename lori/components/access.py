@@ -88,18 +88,14 @@ class ComponentAccess(RegistratorAccess[C]):
         update_recursive(defaults, _Component._build_defaults(configs, includes))
 
         configs_dirs = configs.dirs.copy()
-        configs_file = configs.name
         configs_sections = configs.get_sections([s for s in configs.sections if s not in defaults])
-
-        if str(configs_dirs.conf.joinpath(configs_file)) != configs_sections.path:
-            components.extend(self._load_from_file(self._registrar, configs_file, configs_dirs, defaults, **kwargs))
 
         components.extend(self._load_from_sections(self._registrar, configs_sections, defaults=defaults, **kwargs))
 
         if "alias" in configs:
             key = configs.get("alias")
         for configs_path in glob.glob(str(configs_dirs.conf.joinpath(f"{key}*.conf"))):
-            if configs_file == os.path.basename(configs_path):
+            if configs.name == os.path.basename(configs_path):
                 continue
 
             configs = Configurations.load(

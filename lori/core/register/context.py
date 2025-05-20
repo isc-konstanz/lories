@@ -61,11 +61,9 @@ class _RegistratorContext(Context[R], Generic[R]):
         if isinstance(configs_dir, str) and not os.path.isabs(configs_dir):
             configs_dir = configs_dirs.conf.joinpath(configs_dir)
         configs_dirs.conf = configs_dir
-        if configs_file is None:
-            configs_file = configs.name
         configs_sections = configs.get_sections([s for s in configs.sections if s not in defaults])
 
-        if str(configs.dirs.conf.joinpath(configs_file)) != configs_sections.path:
+        if configs_file and configs_file != configs.name:
             registrators.extend(self._load_from_file(context, configs_file, configs.dirs, defaults, **kwargs))
 
         registrators.extend(self._load_from_sections(context, configs_sections, defaults, **kwargs))
