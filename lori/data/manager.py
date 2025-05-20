@@ -657,6 +657,7 @@ class DataManager(DataContext, Activator, Entity):
                 if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
 
+
 # noinspection PyShadowingBuiltins
 def _sleep(freq: str, sleep: Callable = time.sleep) -> None:
     now = pd.Timestamp.now(tz.UTC)

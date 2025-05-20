@@ -14,7 +14,7 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple
 import sqlalchemy as sql
 from sqlalchemy import ClauseElement, Dialect, Result, UnaryExpression
 from sqlalchemy.sql import Delete, Insert, Select, and_, asc, between, desc, func, literal, not_, text
-from sqlalchemy.types import DATETIME, TIMESTAMP, BLOB
+from sqlalchemy.types import BLOB, DATETIME, TIMESTAMP
 
 import numpy as np
 import pandas as pd

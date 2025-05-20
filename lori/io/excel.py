@@ -87,7 +87,12 @@ def write(
                 column_length = header_length
                 column_widths = [len(str(i)) for i in data.iloc[:, column - int(index) - 1].values]
 
-            for column_cell, *_ in data_sheet.iter_rows(min_row=1, max_row=column_length, min_col=column, max_col=column):
+            for column_cell, *_ in data_sheet.iter_rows(
+                min_row=1,
+                max_row=column_length,
+                min_col=column,
+                max_col=column,
+            ):
                 column_cell.border = border
                 column_cell.font = font
 
