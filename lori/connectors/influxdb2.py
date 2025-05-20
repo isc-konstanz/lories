@@ -9,19 +9,15 @@ lori.connectors.influx.database
 from __future__ import annotations
 
 import datetime as dt
-import time
-from typing import Any, Dict, Iterator, Mapping, Optional
+from typing import Any, Dict, Mapping, Optional
 
-import numpy as np
-from influxdb_client import InfluxDBClient, BucketRetentionRules
+from influxdb_client import BucketRetentionRules, InfluxDBClient
 from influxdb_client.client.write_api import SYNCHRONOUS
 
+import numpy as np
 import pandas as pd
-import pytz as tz
 from lori.connectors import ConnectionException, Database, DatabaseException, register_connector_type
-from lori.core import ConfigurationException, Configurations, Resources
-from lori.data.util import hash_value
-from lori.util import to_timezone
+from lori.core import Configurations, Resources
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
 try:
@@ -49,6 +45,7 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
         if not self.is_connected():
             raise ConnectionException(self, "InfluxDB connection not open")
         return self.client
+
     # noinspection PyShadowingBuiltins, PyProtectedMember
     def _get_vars(self) -> Dict[str, Any]:
         vars = super()._get_vars()
@@ -84,7 +81,6 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
             org=self.org,
             timeout=self.timeout,
             verify_ssl=self.verify_ssl,
-
             # debug=False,
             # enable_gzip=False
             # Here could be ssl and certification...
@@ -106,17 +102,16 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
 
     # TODO: fix hash
     def hash(
-            self,
-            resources: Resources,
-            start: Optional[pd.Timestamp | dt.datetime] = None,
-            end: Optional[pd.Timestamp | dt.datetime] = None,
-            method: Literal["MD5", "SHA1", "SHA256", "SHA512"] = "MD5",
-            encoding: str = "UTF-8",
+        self,
+        resources: Resources,
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
+        method: Literal["MD5", "SHA1", "SHA256", "SHA512"] = "MD5",
+        encoding: str = "UTF-8",
     ) -> Optional[str]:
-
         end = end + dt.timedelta(seconds=1)
-        start_str = start.isoformat(sep='T', timespec='seconds') if start is not None else "0"
-        end_str = end.isoformat(sep='T', timespec='seconds') if end is not None else "now()"
+        start_str = start.isoformat(sep="T", timespec="seconds") if start is not None else "0"
+        end_str = end.isoformat(sep="T", timespec="seconds") if end is not None else "now()"
 
         hashes = []
         # TODO: Add parameter
@@ -126,16 +121,17 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
         if hash_method not in InfluxDB2_Database.HASH_METHODS:
             raise ValueError(f"Invalid checksum method '{method}'")
         try:
-
             query_api = self.client.query_api()
             for measurement_name, field_resources in resources.groupby("table"):
-                rename = {r.id: r.get("field", default=r.get("column", default=r.key))
-                          for r in field_resources if "name" in r}
+                rename = {
+                    r.id: r.get("field", default=r.get("column", default=r.key)) for r in field_resources if "name" in r
+                }
 
                 field_filters = ", ".join([f'"{field}"' for field in rename.values()])
 
                 concat_fields = "\n\t\t+ ".join(
-                    [f'equalFormat(n: r.{field}, dig: {digits})' for field in rename.values()])
+                    [f"equalFormat(n: r.{field}, dig: {digits})" for field in rename.values()]
+                )
 
                 query = f"""
                     import "types" // = [string, bytes, int, uint, !(float), bool, time, duration, regexp]
@@ -183,10 +179,10 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
                             hash: r.column_string
                             //hash: strings.substring(v: r.column_string, start: 0, end: 50)
                             //hash: hash.{hash_method}(v: r.column_string)
-                            }}))    
+                            }}))
                     """
 
-                #print(query)
+                # print(query)
                 result = query_api.query_data_frame(query, org=self.org)
                 if result.empty:
                     continue
@@ -214,22 +210,24 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
         return hashes_joined  # hash_value(hashes_joined, method, encoding)
 
     def exists(
-            self,
-            resources: Resources,
-            start: Optional[pd.Timestamp | dt.datetime] = None,
-            end: Optional[pd.Timestamp | dt.datetime] = None,
+        self,
+        resources: Resources,
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> bool:
         # TODO: Test (was never called?)
         end = end + dt.timedelta(seconds=1)
-        start_str = start.isoformat(sep='T', timespec='seconds') if start is not None else "0"
-        end_str = end.isoformat(sep='T', timespec='seconds') if end is not None else "now()"
+        start_str = start.isoformat(sep="T", timespec="seconds") if start is not None else "0"
+        end_str = end.isoformat(sep="T", timespec="seconds") if end is not None else "now()"
         try:
-
             query_api = self.client.query_api()
             for measurement_name, field_resources in resources.groupby(self._measurement_lambda()):
                 for tag, tagged_field_resources in field_resources.groupby("tag"):
-                    rename = {r.id: r.get("field", default=r.get("column", default=r.key))
-                              for r in tagged_field_resources if "name" in r}
+                    rename = {
+                        r.id: r.get("field", default=r.get("column", default=r.key))
+                        for r in tagged_field_resources
+                        if "name" in r
+                    }
 
                     field_filters = ", ".join([f'"{field}"' for field in rename.values()])
                     tag_filter = f'|> filter(fn: (r) => r["_measurement"] == "{tag}")' if tag is not None else ""
@@ -242,10 +240,10 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
                         |> filter(fn: (r) => r["_measurement"] == "{measurement_name}")
                         |> filter(fn: (r) => contains(set: columns, value: r["_field"]))
                         {tag_filter}
-                        |> keep(columns: ["_field"]) 
+                        |> keep(columns: ["_field"])
                         |> distinct(column: "_field")  // Get unique field names
                     """
-                    result = query_api.query_data_frame(query, org=self.org, data_frame_index=['_time'])
+                    result = query_api.query_data_frame(query, org=self.org, data_frame_index=["_time"])
 
                     fetched_fields = result["_fields"]
 
@@ -254,30 +252,32 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
 
                     # TODO: Check
 
-
         except Exception as e:
             self._raise(e)
         return True
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
     def read(
-            self,
-            resources: Resources,
-            start: Optional[pd.Timestamp | dt.datetime] = None,
-            end: Optional[pd.Timestamp | dt.datetime] = None,
+        self,
+        resources: Resources,
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> pd.DataFrame:
         # TODO: check again? already done previously to include next full minute? < vs <=
         end = end + dt.timedelta(seconds=1)
-        start_str = start.isoformat(sep='T', timespec='seconds') if start is not None else "0"
-        end_str = end.isoformat(sep='T', timespec='seconds') if end is not None else "now()"
+        start_str = start.isoformat(sep="T", timespec="seconds") if start is not None else "0"
+        end_str = end.isoformat(sep="T", timespec="seconds") if end is not None else "now()"
 
         results = []
         query_api = self.client.query_api()
 
         for measurement_name, field_resources in self.resources.groupby(self._measurement_lambda()):
             for tag, tagged_field_resources in field_resources.groupby("tag"):
-                rename = {r.id: r.get("field", default=r.get("column", default=r.key))
-                          for r in tagged_field_resources if "name" in r}
+                rename = {
+                    r.id: r.get("field", default=r.get("column", default=r.key))
+                    for r in tagged_field_resources
+                    if "name" in r
+                }
 
                 field_filters = ", ".join([f'"{field}"' for field in rename.values()])
                 tag_filter = f'|> filter(fn: (r) => r["_measurement"] == "{tag}")' if tag is not None else ""
@@ -292,7 +292,7 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
                     |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
                 """
                 try:
-                    result = query_api.query_data_frame(query, org=self.org, data_frame_index=['_time'])
+                    result = query_api.query_data_frame(query, org=self.org, data_frame_index=["_time"])
                 except Exception as e:
                     self._raise(e)
                     raise ConnectionException(self, str(e))
@@ -335,12 +335,15 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
                 for tag, tagged_field_resources in field_resources.groupby("tag"):
                     measurement_data = data.loc[:, [r.id for r in tagged_field_resources if r.id in data.columns]]
                     measurement_data = measurement_data.dropna(axis="index", how="all")
-                    measurement_data = measurement_data.dropna(axis=1, how='all')
+                    measurement_data = measurement_data.dropna(axis=1, how="all")
                     if measurement_data.empty:
                         continue
 
-                    rename = {r.id: r.get("field", default=r.get("column", default=r.key))
-                              for r in tagged_field_resources if "name" in r}
+                    rename = {
+                        r.id: r.get("field", default=r.get("column", default=r.key))
+                        for r in tagged_field_resources
+                        if "name" in r
+                    }
                     measurement_data = measurement_data.rename(columns=rename)
 
                     if measurement_name is None:
@@ -353,7 +356,7 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
                         bucket=self.bucket,
                         record=measurement_data,
                         data_frame_measurement_name=measurement_name,
-                        data_frame_tag_columns=tag
+                        data_frame_tag_columns=tag,
                     )
                     write_api.flush()
 
@@ -361,21 +364,24 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
             self._raise(e)
 
     def delete(
-            self,
-            resources: Resources,
-            start: Optional[pd.Timestamp | dt.datetime] = None,
-            end: Optional[pd.Timestamp | dt.datetime] = None,
+        self,
+        resources: Resources,
+        start: Optional[pd.Timestamp | dt.datetime] = None,
+        end: Optional[pd.Timestamp | dt.datetime] = None,
     ) -> None:
         # TODO: Test
-        start_str = start.isoformat(sep='T', timespec='seconds') if start is not None else "0"
-        end_str = end.isoformat(sep='T', timespec='seconds') if end is not None else "now()"
+        start_str = start.isoformat(sep="T", timespec="seconds") if start is not None else "0"
+        end_str = end.isoformat(sep="T", timespec="seconds") if end is not None else "now()"
         try:
             query_api = self.client.query_api()
 
             for measurement_name, field_resources in self.resources.groupby(self._measurement_lambda()):
                 for tag, tagged_field_resources in field_resources.groupby("tag"):
-                    rename = {r.id: r.get("field", default=r.get("column", default=r.key))
-                              for r in tagged_field_resources if "name" in r}
+                    rename = {
+                        r.id: r.get("field", default=r.get("column", default=r.key))
+                        for r in tagged_field_resources
+                        if "name" in r
+                    }
 
                     field_filters = ", ".join([f'"{field}"' for field in rename.values()])
                     tag_filter = f'|> filter(fn: (r) => r["_measurement"] == "{tag}")' if tag is not None else ""
@@ -395,7 +401,6 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
                     # result = query_api.query_data_frame(query, org=self.org, data_frame_index=['_time'])
                     query_api.query(query, org=self.org)
                     pass
-
 
         except Exception as e:
             self._raise(e)
@@ -423,8 +428,9 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
 
         query_api = self.client.query_api()
         for measurement_name, field_resources in self.resources.groupby("table"):
-            rename = {r.id: r.get("field", default=r.get("column", default=r.key))
-                      for r in field_resources if "name" in r}
+            rename = {
+                r.id: r.get("field", default=r.get("column", default=r.key)) for r in field_resources if "name" in r
+            }
 
             field_filters = ", ".join([f'"{field}"' for field in rename.values()])
 
@@ -459,8 +465,8 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
             start_time = last_timestamp
             stop_time = last_timestamp + dt.timedelta(seconds=1)
 
-            start_time_str = start_time.isoformat(sep='T', timespec='seconds')
-            stop_time_str = stop_time.isoformat(sep='T', timespec='seconds')
+            start_time_str = start_time.isoformat(sep="T", timespec="seconds")
+            stop_time_str = stop_time.isoformat(sep="T", timespec="seconds")
 
             query = f"""
                 columns = [{field_filters}]
@@ -472,7 +478,7 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
                 |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
             """
 
-            result = query_api.query_data_frame(query, org=self.org, data_frame_index=['_time'])
+            result = query_api.query_data_frame(query, org=self.org, data_frame_index=["_time"])
 
             # create empty if result is empty
             if result.empty:
@@ -500,7 +506,3 @@ class InfluxDB2_Database(Database, Mapping[str, np.ndarray]):
     @staticmethod
     def _measurement_lambda():
         return lambda r: r.get("measurement", default=r.get("table", default=r.group))
-
-
-
-
