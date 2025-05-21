@@ -58,6 +58,9 @@ mysql = [
     "sqlalchemy >= 2.0",
     "pymysql >= 1.1",
 ]
+influx = [
+    "influxdb-client",
+]
 modbus = [
     "pymodbus <= 3.9",
 ]
