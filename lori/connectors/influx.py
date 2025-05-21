@@ -171,7 +171,7 @@ class InfluxDatabase(Database):
                 #     f"formatValue(n: r.{_get_field(r)}, dig: {r.get('decimals', default=decimals)})"
                 #     for r in tagged_resources
                 # )
-                concat = "            + ".join(f"formatValue(n: r.{_get_field(r)})" for r in tagged_resources)
+                concat = " + ".join(f"formatValue(n: r.{_get_field(r)})" for r in tagged_resources)
 
                 query = f"""
                 {imports}
@@ -439,6 +439,7 @@ class InfluxDatabase(Database):
         columns = ", ".join([f'"{_get_field(r)}"' for r in resources])
         query = f"""
         columns = [{columns}]
+
         from(bucket: "{self.bucket}")
             |> range(start: {start}, stop: {end})
             |> filter(fn: (r) => r["_measurement"] == "{measurement}")
@@ -446,7 +447,10 @@ class InfluxDatabase(Database):
         """
         # TODO: Validate this. Aren't tag names necessary to be configured and customized first?
         if tag is not None:
-            query += f'\n    |> filter(fn: (r) => r["_tag"] == "{tag}")'
+            query = f"""
+            {query}
+               |> filter(fn: (r) => r["_tag"] == "{tag}")
+            """
         return query
 
     # noinspection PyProtectedMember
