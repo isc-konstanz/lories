@@ -8,28 +8,26 @@ lori.connectors.tasks.read
 
 from __future__ import annotations
 
-import datetime as dt
-from typing import Optional
+import inspect
 
 import pandas as pd
-from lori.connectors import Database
 from lori.connectors.tasks.task import ConnectorTask
 
 
 class ReadTask(ConnectorTask):
     results: pd.DataFrame
 
-    def run(
-        self,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
-    ) -> None:
+    # noinspection PyArgumentList
+    def run(self, **kwargs) -> None:
         self._logger.debug(
             f"Reading {len(self.channels)} channels of '{type(self.connector).__name__}': {self.connector.id}"
         )
-        if isinstance(self.connector, Database):
-            self.results = self.connector.read(self.channels, start=start, end=end)
-        else:
-            if start is not None or end is not None:
-                self._logger.warning(f"Trying to read slice of Connector '{self.connector.id}' from {start} to {end}")
-            self.results = self.connector.read(self.channels)
+        signature = inspect.signature(type(self.connector).read)
+        arguments = [p.name for p in signature.parameters.values() if p.kind == p.POSITIONAL_OR_KEYWORD]
+        for argument in list(kwargs.keys()):
+            if argument not in arguments:
+                value = kwargs.pop(argument)
+                self._logger.warning(
+                    f"Trying to read Connector '{self.connector.id}' with unknown argument '{argument}': {value}"
+                )
+        self.results = self.connector.read(self.channels, **kwargs)
