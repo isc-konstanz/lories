@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.connectors.influxdb2
-~~~~~~~~~~~~~~~~~~~~~~~~~
+lori.connectors.influx
+~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -29,7 +29,7 @@ except ImportError:
     from typing_extensions import Literal
 
 
-@register_connector_type("influx", "influxdb", "influxdb2")
+@register_connector_type("influx", "influxdb")
 class InfluxDatabase(Database):
     host: str
     port: int
