@@ -61,7 +61,7 @@ class InfluxDatabase(Database):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        self.host = configs.get("host")
+        self.host = configs.get("host", default="localhost")
         self.port = configs.get_int("port", default=8086)
         self.token = configs.get("token")
 
