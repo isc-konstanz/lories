@@ -8,7 +8,6 @@ lori.connectors.dummy
 
 from __future__ import annotations
 
-import datetime as dt
 import random
 from typing import Optional
 
@@ -16,6 +15,7 @@ import pandas as pd
 import pytz as tz
 from lori import Channel, ConfigurationException, Resource, Resources
 from lori.connectors import Connector, ConnectorException, register_connector_type
+from lori.typing import TimestampType
 
 
 # noinspection PyShadowingBuiltins
@@ -48,8 +48,8 @@ class DummyConnector(Connector):
     def read(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> pd.DataFrame:
         for resource in resources:
             generator = resource.get("generator", default="virtual")

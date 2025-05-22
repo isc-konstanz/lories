@@ -8,7 +8,6 @@ lori.data.database
 
 from __future__ import annotations
 
-import datetime as dt
 from abc import abstractmethod
 from functools import wraps
 from typing import Any, Optional, overload
@@ -22,6 +21,7 @@ from lori.connectors.connector import Connector, ConnectorMeta
 from lori.core import Configurations, Resources
 from lori.data.util import hash_data
 from lori.data.validation import validate_index, validate_timezone
+from lori.typing import TimestampType
 from lori.util import convert_timezone, to_date, to_timezone
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -63,8 +63,8 @@ class Database(Connector, metaclass=DatabaseMeta):
     def hash(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
         method: Literal["MD5", "SHA1", "SHA256", "SHA512"] = "MD5",
         encoding: str = "UTF-8",
     ) -> Optional[str]:
@@ -81,8 +81,8 @@ class Database(Connector, metaclass=DatabaseMeta):
     def _do_hash(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
         method: Literal["MD5", "SHA1", "SHA256", "SHA512"] = "MD5",
         encoding: str = "UTF-8",
         *args,
@@ -97,8 +97,8 @@ class Database(Connector, metaclass=DatabaseMeta):
     def exists(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> bool:
         # TODO: Replace this placeholder more resource efficient
         data = self._run_read(resources, start, end)
@@ -110,8 +110,8 @@ class Database(Connector, metaclass=DatabaseMeta):
     def _do_exists(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
         *args,
         **kwargs,
     ) -> bool:
@@ -128,16 +128,16 @@ class Database(Connector, metaclass=DatabaseMeta):
     def read(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> pd.DataFrame: ...
 
     @abstractmethod
     def read(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> pd.DataFrame:
         pass
 
@@ -145,8 +145,8 @@ class Database(Connector, metaclass=DatabaseMeta):
     def _do_read(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
         *args,
         **kwargs,
     ) -> pd.DataFrame:
@@ -260,15 +260,15 @@ class Database(Connector, metaclass=DatabaseMeta):
     def delete(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> None: ...
 
     def delete(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> None:
         raise NotImplementedError(f"Unable to delete values for database '{self.id}'")
 
@@ -276,8 +276,8 @@ class Database(Connector, metaclass=DatabaseMeta):
     def _do_delete(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
         *args,
         **kwargs,
     ) -> None:

@@ -18,7 +18,7 @@ import pandas as pd
 from lori import ConfigurationException
 from lori.core import Configurations, Context, Directories, Registrator, ResourceException
 from lori.data.channels import Channel, Channels
-from lori.typing import ChannelsType
+from lori.data.typing import ChannelsType
 from lori.util import update_recursive, validate_key
 
 # FIXME: Remove this once Python >= 3.9 is a requirement

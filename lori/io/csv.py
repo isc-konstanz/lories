@@ -8,7 +8,6 @@ lori.io.csv
 
 from __future__ import annotations
 
-import datetime as dt
 import glob
 import os
 from typing import List, Mapping, Optional
@@ -16,6 +15,7 @@ from typing import List, Mapping, Optional
 import pandas as pd
 import pytz as tz
 from lori.core import ResourceException
+from lori.typing import TimestampType
 from lori.util import ceil_date, floor_date, to_date, to_timedelta
 
 
@@ -24,8 +24,8 @@ def has_range(
     path: str,
     freq: str,
     format: str,
-    start: pd.Timestamp | dt.datetime | str,
-    end: pd.Timestamp | dt.datetime | str,
+    start: TimestampType | str,
+    end: TimestampType | str,
     timezone: tz.tzinfo = tz.UTC,
 ):
     files = get_files(path, freq, format, start, end, timezone)
@@ -260,8 +260,8 @@ def get_files(
     path: str,
     freq: str,
     format: str,
-    start: Optional[pd.Timestamp | dt.datetime | str] = None,
-    end: Optional[pd.Timestamp | dt.datetime | str] = None,
+    start: Optional[TimestampType | str] = None,
+    end: Optional[TimestampType | str] = None,
     timezone: tz.tzinfo = tz.UTC,
     exists_only: bool = True,
 ) -> List[str]:

@@ -18,7 +18,9 @@ from typing import Any, Callable, Collection, Dict, List, Mapping, Optional, Tup
 import numpy as np
 import pandas as pd
 import pytz as tz
+import tzlocal
 from lori.core import ResourceException
+from lori.typing import TimestampType, TimezoneType
 
 # noinspection SpellCheckingInspection
 INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
@@ -110,8 +112,8 @@ def update_recursive(configs: Dict[str, Any], update: Mapping[str, Any], replace
 
 
 def convert_timezone(
-    date: dt.datetime | pd.Timestamp | str,
-    timezone: dt.tzinfo = tz.UTC,
+    date: Optional[TimestampType | str],
+    timezone: Optional[TimezoneType] = None,
 ) -> Optional[pd.Timestamp]:
     if date is None:
         return None
@@ -121,6 +123,8 @@ def convert_timezone(
         date = pd.Timestamp(date)
 
     if isinstance(date, pd.Timestamp):
+        if timezone is None:
+            timezone = to_timezone(tzlocal.get_localzone_name())
         if date.tzinfo is None or date.tzinfo.utcoffset(date) is None:
             return date.tz_localize(timezone)
         else:
@@ -130,9 +134,9 @@ def convert_timezone(
 
 
 def slice_range(
-    start: dt.datetime | pd.Timestamp | str,
-    end: dt.datetime | pd.Timestamp | str,
-    timezone: dt.tzinfo = None,
+    start: Optional[TimestampType | str],
+    end: Optional[TimestampType | str],
+    timezone: Optional[TimezoneType] = None,
     freq: str = "D",
     **kwargs,
 ) -> List[Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp]]]:
@@ -166,8 +170,8 @@ def slice_range(
 
 
 def floor_date(
-    date: dt.datetime | pd.Timestamp | str,
-    timezone: dt.tzinfo = None,
+    date: Optional[TimestampType | str],
+    timezone: Optional[TimezoneType] = None,
     freq: str = "D",
 ) -> Optional[pd.Timestamp]:
     if date is None:
@@ -185,47 +189,42 @@ def floor_date(
 
 
 def ceil_date(
-    date: dt.datetime | pd.Timestamp | str,
-    timezone: dt.tzinfo = None,
+    date: Optional[TimestampType | str],
+    timezone: Optional[TimezoneType] = None,
     freq: str = "D",
 ) -> Optional[pd.Timestamp]:
     date = floor_date(date, timezone, freq)
     if date is None:
         return None
 
-    return date + to_timedelta(freq) - dt.timedelta(microseconds=1)
+    return date + to_timedelta(freq) - pd.Timedelta(microseconds=1)
 
 
 # noinspection PyShadowingBuiltins
 def to_date(
-    date: Optional[str | int | dt.datetime | pd.Timestamp],
-    timezone: Optional[dt.tzinfo] = None,
+    date: Optional[TimestampType | str | int],
+    timezone: Optional[TimezoneType] = None,
     format: Optional[str] = None,
 ) -> Optional[pd.Timestamp]:
     if date is None:
         return None
 
-    def _convert_timezone(_date: pd.Timestamp) -> pd.Timestamp:
-        if timezone is not None:
-            _date = convert_timezone(_date, timezone)
-        return _date
-
     if issubclass(type(date), dt.datetime):
-        return _convert_timezone(date)
+        return convert_timezone(date, timezone)
     if isinstance(date, int):
-        return _convert_timezone(pd.Timestamp(date, unit="s"))
+        return convert_timezone(pd.Timestamp(date, unit="s"), timezone)
     if isinstance(date, str):
         if format is None:
-            return _convert_timezone(pd.Timestamp(date))
-        return _convert_timezone(pd.Timestamp(dt.datetime.strptime(date, format)))
+            return convert_timezone(pd.Timestamp(date), timezone)
+        return convert_timezone(pd.Timestamp(dt.datetime.strptime(date, format)), timezone)
 
     raise TypeError(f"Invalid date type: {type(date)}")
 
 
-def to_timezone(timezone: Optional[str | int | float | tz.BaseTzInfo]) -> Optional[tz.BaseTzInfo]:
+def to_timezone(timezone: Optional[TimezoneType | str | int | float]) -> Optional[TimezoneType]:
     if timezone is None:
         return None
-    if isinstance(timezone, tz.BaseTzInfo):
+    if isinstance(timezone, (tz.BaseTzInfo, dt.tzinfo)):
         return timezone
     if isinstance(timezone, str):
         try:

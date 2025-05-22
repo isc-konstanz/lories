@@ -35,7 +35,8 @@ from lori.data.databases import Databases
 from lori.data.listeners import ListenerContext
 from lori.data.replication import Replicator
 from lori.data.retention import Retention
-from lori.typing import ChannelsType, TimestampType
+from lori.data.typing import ChannelsType
+from lori.typing import TimestampType
 from lori.util import floor_date, parse_type, to_timedelta, validate_key
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
