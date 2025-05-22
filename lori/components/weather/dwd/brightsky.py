@@ -54,11 +54,10 @@ class Brightsky(Connector):
 
         data = []
         for source, source_resources in resources.groupby("source"):
+            source_columns = [r.address for r in source_resources if r.address in response.columns]
             source_data = response.loc[
-                response["source_type"].isin(source.split(",")),
-                np.unique(
-                    ["source_id", "source_first_record", "source_last_record"] + [r.address for r in source_resources]
-                ),
+                response["source_type"].isin(s.strip() for s in source.split(",")),
+                np.unique(["source_id", "source_first_record", "source_last_record"] + source_columns),
             ]
             if source_data.empty:
                 self._logger.warning(f"Unable to read {self._id} channels: {[r.id for r in source_resources]}")
