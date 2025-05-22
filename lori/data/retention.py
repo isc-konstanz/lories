@@ -180,7 +180,8 @@ class Retention:
                     data = database.read(resample_resources, start=resample_start, end=resample_end)
                     if data is None or data.empty:
                         self._logger.debug(
-                            f"Skipping empty resampling range for resource{'s' if len(resample_resources) > 1 else ''} ",
+                            f"Skipping empty resampling range for "
+                            f"resource{'s' if len(resample_resources) > 1 else ''} ",
                             ", ".join([f"'{r.id}'" for r in resample_resources]),
                         )
                         continue

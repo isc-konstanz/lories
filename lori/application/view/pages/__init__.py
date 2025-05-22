@@ -27,7 +27,7 @@ from .components import (  # noqa: F401
     ComponentGroup,
 )
 
-from . import login
+from . import login  # noqa: F401
 from .login import LoginPage  # noqa: F401
 
 from .header import PageHeader  # noqa: F401

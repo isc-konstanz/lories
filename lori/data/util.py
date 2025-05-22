@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import hashlib
 from copy import copy, deepcopy
-from typing import Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd

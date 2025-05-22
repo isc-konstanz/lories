@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from typing import Optional
 
-import pandas as pd
 from lori.connectors import Database
 from lori.connectors.tasks.task import ConnectorTask
 from lori.typing import TimestampType

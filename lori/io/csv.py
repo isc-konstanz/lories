@@ -15,7 +15,7 @@ from typing import List, Mapping, Optional
 import pandas as pd
 import pytz as tz
 from lori.core import ResourceException
-from lori.typing import TimestampType
+from lori.typing import TimestampType, TimezoneType
 from lori.util import ceil_date, floor_date, to_date, to_timedelta
 
 
@@ -37,9 +37,9 @@ def read_files(
     path: str,
     freq: str,
     format: str,
-    start: Optional[pd.Timestamp, dt.datetime, str],
-    end: Optional[pd.Timestamp, dt.datetime, str],
-    timezone: Optional[tz.tzinfo] = None,
+    start: Optional[TimestampType | str] = None,
+    end: Optional[TimestampType | str] = None,
+    timezone: Optional[TimezoneType] = None,
     **kwargs,
 ) -> pd.DataFrame:
     data = pd.DataFrame()

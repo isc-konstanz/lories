@@ -8,6 +8,7 @@ lori.data.database
 
 from __future__ import annotations
 
+import datetime as dt
 from abc import abstractmethod
 from functools import wraps
 from typing import Any, Optional, overload
@@ -186,7 +187,7 @@ class Database(Connector, metaclass=DatabaseMeta):
                 raise ConnectionException(self, f"Database '{self.id}' not connected")
 
             index = self._run_read_first_index(resources, *args, **kwargs)
-            if isinstance(index, dt.datetime):
+            if isinstance(index, (pd.Timestamp, dt.datetime)):
                 index = convert_timezone(index, timezone=self.timezone)
             return index
 
@@ -218,7 +219,7 @@ class Database(Connector, metaclass=DatabaseMeta):
                 raise ConnectionException(self, f"Database '{self.id}' not connected")
 
             index = self._run_read_last_index(resources, *args, **kwargs)
-            if isinstance(index, dt.datetime):
+            if isinstance(index, (pd.Timestamp, dt.datetime)):
                 index = convert_timezone(index, timezone=self.timezone)
             return index
 
@@ -239,8 +240,8 @@ class Database(Connector, metaclass=DatabaseMeta):
     @staticmethod
     def _get_range(
         data: pd.DataFrame,
-        start: Optional[pd.Timestamp, dt.datetime, str] = None,
-        end: Optional[pd.Timestamp, dt.datetime, str] = None,
+        start: Optional[TimestampType | str] = None,
+        end: Optional[TimestampType | str] = None,
         **kwargs,
     ) -> pd.DataFrame:
         if data.empty:

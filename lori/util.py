@@ -15,10 +15,11 @@ from dateutil.relativedelta import relativedelta
 from pydoc import locate
 from typing import Any, Callable, Collection, Dict, List, Mapping, Optional, Tuple, Type, TypeVar
 
+import tzlocal
+
 import numpy as np
 import pandas as pd
 import pytz as tz
-import tzlocal
 from lori.core import ResourceException
 from lori.typing import TimestampType, TimezoneType
 
