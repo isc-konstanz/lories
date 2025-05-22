@@ -8,13 +8,13 @@ lori.components.core
 
 from __future__ import annotations
 
-import datetime as dt
 from abc import abstractmethod
 from typing import Any, Collection, Dict, List, Optional
 
 import pandas as pd
 from lori.core import Activator, Configurations, Registrator, ResourceException, ResourceUnavailableException
 from lori.data import Channel, Channels, DataAccess
+from lori.typing import TimestampType
 
 
 class _Component(Registrator, Activator):
@@ -59,8 +59,8 @@ class _Component(Registrator, Activator):
     @abstractmethod
     def get(
         self,
-        start: Optional[pd.Timestamp, dt.datetime, str] = None,
-        end: Optional[pd.Timestamp, dt.datetime, str] = None,
+        start: Optional[TimestampType | str] = None,
+        end: Optional[TimestampType | str] = None,
         **kwargs,
     ) -> pd.DataFrame:
         pass

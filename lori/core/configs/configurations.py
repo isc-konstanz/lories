@@ -8,7 +8,6 @@ lori.core.configurations
 
 from __future__ import annotations
 
-import datetime as dt
 import os
 import shutil
 from collections import OrderedDict
@@ -19,6 +18,7 @@ from typing import Any, Collection, Iterable, List, Mapping, MutableMapping, Opt
 import pandas as pd
 from lori.core import ResourceException, ResourceUnavailableException
 from lori.core.configs import Directories, Directory
+from lori.typing import TimestampType
 from lori.util import to_bool, to_date, to_float, to_int, update_recursive
 
 
@@ -153,7 +153,7 @@ class Configurations(MutableMapping[str, Any]):
     def get_float(self, key: str, default: float = None) -> float:
         return to_float(self._get(key, default))
 
-    def get_date(self, key: str, default: dt.datetime | pd.Timestamp = None, **kwargs) -> pd.Timestamp:
+    def get_date(self, key: str, default: TimestampType = None, **kwargs) -> pd.Timestamp:
         return to_date(self._get(key, default), **kwargs)
 
     def __iter__(self):
