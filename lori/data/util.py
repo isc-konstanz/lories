@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import hashlib
 from copy import copy, deepcopy
-from typing import Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import pytz as tz
 from pandas.tseries.frequencies import to_offset
+import re
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
 try:
@@ -42,9 +43,7 @@ def hash_data(
     data = data[[index_column, *data_columns]]
 
     csv = data.to_csv(index=False, header=False, sep=",", decimal=".", float_format="%.10g")
-    while ",," in csv:
-        csv = csv.replace(",,", ",")
-    csv = ",".join(csv.splitlines())
+    csv = ",".join(re.sub(r',,+', ',', line).strip(",") for line in csv.splitlines())
     return hash_value(csv, method, encoding)
 
 

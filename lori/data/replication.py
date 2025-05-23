@@ -210,7 +210,7 @@ def replicate(
     else:
         start = floor_date(start, freq=freq) + pd.Timedelta(seconds=1)
 
-    if (not any(t is None for t in [start, end]) and start >= end) or all(t is None for t in [start, end]):
+    if any(t is None for t in [start, end]) or start >= end:
         logger.debug(
             f"Skip copying values of resource{'s' if len(resources) > 1 else ''} "
             + ", ".join([f"'{r.id}'" for r in resources])
@@ -297,3 +297,10 @@ def replicate_range(
             + f" to {end.strftime('%d.%m.%Y (%H:%M:%S)')}"
         )
         raise ReplicationException("Checksum mismatch while synchronizing")
+
+    logger.info(
+        f"Replicated {len(data)} values of resource{'s' if len(resources) > 1 else ''} "
+        + ", ".join([f"'{r.id}'" for r in resources])
+        + f" from {start.strftime('%d.%m.%Y (%H:%M:%S)')}"
+        + f" to {end.strftime('%d.%m.%Y (%H:%M:%S)')}"
+    )

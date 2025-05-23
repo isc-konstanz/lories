@@ -12,12 +12,13 @@ import logging
 from typing import Any, Dict, Optional, Tuple
 
 from influxdb_client import BucketRetentionRules, InfluxDBClient
+from influxdb_client.client.exceptions import InfluxDBError
 from influxdb_client.client.write_api import SYNCHRONOUS
 
 import numpy as np
 import pandas as pd
 from lori.connectors import ConnectionException, Database, DatabaseException, register_connector_type
-from lori.core import Configurations, Resource, Resources
+from lori.core import Configurations, Resource, Resources, ConfigurationException
 from lori.data.util import hash_value
 from lori.typing import TimestampType
 
@@ -33,16 +34,16 @@ except ImportError:
 class InfluxDatabase(Database):
     host: str
     port: int
-    token: str
-
-    organisation: Dict[str, str] | str
+    
+    org:  str
     bucket: str
+    token: str
 
     ssl: bool
     ssl_verify: bool
     timeout: int
 
-    _client: InfluxDBClient = None
+    _client: Optional[InfluxDBClient] = None
 
     # noinspection PyShadowingBuiltins
     def _get_vars(self) -> Dict[str, Any]:
@@ -50,9 +51,9 @@ class InfluxDatabase(Database):
         if self.is_configured():
             vars["host"] = self.host
             vars["port"] = self.port
-            vars["token"] = f"...{self.token[-12:]}"
-            vars["organisation"] = self.organisation
+            vars["org"] = self.org
             vars["bucket"] = self.bucket
+            vars["token"] = f"...{self.token[-12:]}"
             vars["ssl"] = self.ssl_verify
             vars["ssl_verify"] = self.ssl_verify
             vars["timeout"] = self.timeout
@@ -63,28 +64,29 @@ class InfluxDatabase(Database):
 
         self.host = configs.get("host", default="localhost")
         self.port = configs.get_int("port", default=8086)
-        self.token = configs.get("token")
 
-        self.organisation = configs.get(
-            "organisation",
-            default={
-                "name": "lori",
-                "description": "Local Resource Integration",
-            },
-        )
+        self.org = configs.get("org")
+        if self.org is None:
+            raise ConfigurationException("Missing 'org' for InfluxDB connector")
+
         self.bucket = configs.get("bucket")
+        if self.bucket is None:
+            raise ConfigurationException("Missing 'bucket' for InfluxDB connector")
+
+        self.token = configs.get("token")
+        if self.token is None:
+            raise ConfigurationException("Missing 'token' for InfluxDB connector")
+
+        # In seconds
+        self.timeout = int(configs.get_float("timeout", default=10) * 1000)
 
         # TODO: Determine SSL usage from certificate availability
         self.ssl = configs.get_bool("ssl", default=False)
         self.ssl_verify = configs.get_bool("ssl_verify", default=True)
 
-        self.timeout = configs.get_int("timeout", default=10_000)  # ms
-
     def connect(self, resources: Resources) -> None:
         self._logger.debug(f"Connecting to InfluxDB ({self.host}:{self.port}) at {self.bucket}")
 
-        # TODO: Create organisation if not existing ?
-        org = self.organisation if isinstance(self.organisation, str) else self.organisation["name"]
         ssl = {
             "verify_ssl": self.ssl_verify,
         }
@@ -92,7 +94,7 @@ class InfluxDatabase(Database):
 
         self._client = InfluxDBClient(
             url=url,
-            org=org,
+            org=self.org,
             token=self.token,
             timeout=self.timeout,
             debug=self._logger.getEffectiveLevel() <= logging.DEBUG,
@@ -102,21 +104,23 @@ class InfluxDatabase(Database):
 
         # Check if bucket exists and create
         buckets_api = self._client.buckets_api()
-
-        existing_buckets = [b.name for b in buckets_api.find_buckets().buckets]
-        if self.bucket not in existing_buckets:
-            self._logger.info(f"InfluxDB Bucket doesn't exist. Creating Bucket {self.bucket}")
-
-            # TODO: Configure retention from channel attributes
-            retention = BucketRetentionRules(every_seconds=0)  # 0 means infinite retention
-            buckets_api.create_bucket(bucket_name=self.bucket, retention_rules=retention)
+        try:
+            existing_buckets = [b.name for b in buckets_api.find_buckets().buckets]
+            if self.bucket not in existing_buckets:
+                self._logger.info(f"InfluxDB Bucket doesn't exist. Creating Bucket {self.bucket}")
+                #TODO: Configure retention from channel attributes
+                retention = BucketRetentionRules(every_seconds=0)  # 0 means infinite retention
+                buckets_api.create_bucket(bucket_name=self.bucket, retention_rules=retention)
+        except Exception as e:
+            self._raise(e)
 
     def disconnect(self) -> None:
         if self._client is not None and self._client.ping():
             self._client.close()
-            self._logger.debug("Disconnected from the database")
+            self._client = None
 
-    def hash(
+    #TODO: Enable hash when util rounding is fixed
+    def _hash(
         self,
         resources: Resources,
         start: Optional[TimestampType] = None,
@@ -178,7 +182,7 @@ class InfluxDatabase(Database):
 
                 {functions}
 
-                {self._build_query(resources, measurement, tag, *_to_isoformat(start, end))}
+                {self._build_query(tagged_resources, measurement, tag, *_to_isoformat(start, end))}
                     |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
                     |> map(fn: (r) => ({{
                         r with
@@ -193,6 +197,7 @@ class InfluxDatabase(Database):
                         r with
                         hash: hash.{method.lower()}(v: r.column_string)
                         }}))
+                    |> keep(columns: ["hash"])
                 """
                 try:
                     result = query_api.query_data_frame(query)
@@ -222,7 +227,7 @@ class InfluxDatabase(Database):
             for tag, tagged_resources in measurement_resources.groupby("tag"):
                 fields = [_get_field(r) for r in tagged_resources]
                 query = f"""
-                {self._build_query(resources, measurement, tag, *_to_isoformat(start, end))}
+                {self._build_query(tagged_resources, measurement, tag, *_to_isoformat(start, end))}
                     |> keep(columns: ["_field"])
                     |> distinct(column: "_field")
                 """
@@ -231,7 +236,6 @@ class InfluxDatabase(Database):
                     if sorted(data["_fields"]) != sorted(fields):
                         return False
 
-                # TODO: Exception to broad. Catch InfluxExceptions and differentiate reason in _raise
                 except Exception as e:
                     self._raise(e)
         return True
@@ -245,101 +249,50 @@ class InfluxDatabase(Database):
     ) -> pd.DataFrame:
         return self._read(resources, start, end)
 
-    def read_first_index(self, resources: Resources) -> Optional[Any]:
-        return self._read_index(resources, "first")
-
     # noinspection PyUnresolvedReferences, PyTypeChecker
     def read_first(self, resources: Resources) -> pd.DataFrame:
-        # TODO: Is this really necessary? Isn't it possible to simply query |> {mode}(column: "_time") ?
-        # return self._read_boundaries(resources, "first")
-        timestamp = self._read_index(resources, "first")
-        return self._read(resources, timestamp, timestamp)
-
-    def read_last_index(self, resources: Resources) -> Optional[Any]:
-        return self._read_index(resources, "last")
+        first = self._read_boundaries(resources, "first")
+        return first
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
     def read_last(self, resources: Resources) -> pd.DataFrame:
-        # TODO: Is this really necessary? Isn't it possible to simply query |> {mode}(column: "_time") ?
-        # return self._read_boundaries(resources, "last")
-        timestamp = self._read_index(resources, "last")
-        return self._read(resources, timestamp, timestamp)
+        last = self._read_boundaries(resources, "last")
+        return last
 
-    def _read_index(self, resources: Resources, mode: Literal["first", "last"]) -> Optional[TimestampType]:
+    # noinspection PyUnresolvedReferences, PyTypeChecker
+    def _read_boundaries(self, resources: Resources, mode: Literal["first", "last"]) -> pd.DataFrame:
         # TODO: Test this function
         if mode not in ["first", "last"]:
             raise ValueError(f"Invalid mode '{mode}'")
-        timestamps = []
-
+        results = []
+   
         query_api = self._client.query_api()
         for measurement, measurement_resources in resources.groupby(lambda r: r.get("measurement", default=r.group)):
             for tag, tagged_resources in measurement_resources.groupby("tag"):
                 query = f"""
-                {self._build_query(resources, measurement, tag)}
-                    |> keep(columns: ["_time"])
+                {self._build_query(tagged_resources, measurement, tag, *_to_isoformat(None, None))}
+                    |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
                     |> {mode}(column: "_time")
                 """
                 try:
-                    result = query_api.query(query)
-                    if not result:
-                        continue
-
-                    # FIXME: Is this necessary with "keep(columns: ..." ?
-                    timestamp_column = None
-                    for i, col in enumerate(result[0].columns):
-                        if col.label == "_time":
-                            timestamp_column = i
-                            break
-                    if timestamp_column is None:
-                        continue
-                    timestamp = result[0].records[0].row[timestamp_column]
-                    timestamps.append(timestamp)
-
-                # TODO: Exception to broad. Catch InfluxExceptions and differentiate reason in _raise
+                    data = query_api.query_data_frame(query, data_frame_index=["_time"])
+                    if not data.empty:
+                        results.append(
+                            data.rename(
+                                columns={_get_field(r): r.id for r in tagged_resources},
+                            )
+                        )
+   
                 except Exception as e:
                     self._raise(e)
-
-        if len(timestamps) == 0:
-            return None
-        if mode == "last":
-            return max(timestamps)
-        if mode == "first":
-            return min(timestamps)
-
-    # # noinspection PyUnresolvedReferences, PyTypeChecker
-    # def _read_boundaries(self, resources: Resources, mode: Literal["first", "last"]) -> pd.DataFrame:
-    #     # TODO: Test this function
-    #     if mode not in ["first", "last"]:
-    #         raise ValueError(f"Invalid mode '{mode}'")
-    #     results = []
-    #
-    #     query_api = self._client.query_api()
-    #     for measurement, measurement_resources in resources.groupby(lambda r: r.get("measurement", default=r.group)):
-    #         for tag, tagged_resources in measurement_resources.groupby("tag"):
-    #             query = f"""
-    #             {self._build_query(resources, measurement, tag, *_to_isoformat(start, end))}
-    #                 |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-    #                 |> {mode}(column: "_time")
-    #             """
-    #             try:
-    #                 data = query_api.query_data_frame(query, data_frame_index=["_time"])
-    #                 if not data.empty:
-    #                     results.append(
-    #                         data.rename(
-    #                             columns={r.get("field", default=r.key): r.id for r in tagged_resources},
-    #                         )
-    #                     )
-    #
-    #             # TODO: Exception to broad. Catch InfluxExceptions and differentiate reason in _raise
-    #             except Exception as e:
-    #                 self._raise(e)
-    #
-    #     if len(results) == 0:
-    #         return pd.DataFrame(columns=[r.id for r in resources])
-    #
-    #     results = pd.concat(results, axis="columns")
-    #     results.sort_index(inplace=True)
-    #     return results
+   
+        if len(results) == 0:
+            return pd.DataFrame(columns=[r.id for r in resources])
+   
+        results = pd.concat(results, axis="columns")
+        results.sort_index(inplace=True)
+        results = results.loc[:, [r.id for r in resources if r.id in results.columns]]
+        return results
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
     def _read(
@@ -354,7 +307,7 @@ class InfluxDatabase(Database):
         for measurement, measurement_resources in resources.groupby(lambda r: r.get("measurement", default=r.group)):
             for tag, tagged_resources in measurement_resources.groupby("tag"):
                 query = f"""
-                {self._build_query(resources, measurement, tag, *_to_isoformat(start, end))}
+                    {self._build_query(tagged_resources, measurement, tag, *_to_isoformat(start, end))}
                     |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
                 """
                 try:
@@ -362,11 +315,10 @@ class InfluxDatabase(Database):
                     if not data.empty:
                         results.append(
                             data.rename(
-                                columns={r.get("field", default=r.key): r.id for r in tagged_resources},
+                                columns={_get_field(r): r.id for r in tagged_resources},
                             )
                         )
 
-                # TODO: Exception to broad. Catch InfluxExceptions and differentiate reason in _raise
                 except Exception as e:
                     self._raise(e)
 
@@ -375,6 +327,7 @@ class InfluxDatabase(Database):
 
         results = pd.concat(results, axis="columns")
         results.sort_index(inplace=True)
+        results = results.loc[:, [r.id for r in resources if r.id in results.columns]]
         return results
 
     # noinspection PyTypeChecker
@@ -386,7 +339,8 @@ class InfluxDatabase(Database):
             for tag, tagged_resources in group_resources.groupby("tag"):
                 for write_type, write_resources in tagged_resources.groupby("type"):
                     if not (issubclass(write_type, (np.integer, int)) or issubclass(write_type, (np.floating, float))):
-                        raise DatabaseException(f"Unable to write '{write_type}' values into InfluxDB")
+                        # raise DatabaseException(self, f"Unable to write '{write_type}' values into InfluxDB")
+                        pass
 
                     write_data = data.loc[:, [r.id for r in write_resources if r.id in data.columns]]
                     write_data = write_data.dropna(axis="index", how="all").dropna(axis="columns", how="all")
@@ -402,7 +356,6 @@ class InfluxDatabase(Database):
                         )
                         write_api.flush()
 
-                    # TODO: Exception to broad. Catch InfluxExceptions and differentiate reason in _raise
                     except Exception as e:
                         self._raise(e)
 
@@ -414,15 +367,15 @@ class InfluxDatabase(Database):
     ) -> None:
         for measurement, group_resources in resources.groupby(lambda r: r.get("measurement", default=r.group)):
             for tag, tagged_resources in group_resources.groupby("tag"):
-                query = (
-                    f"{self._build_query(resources, measurement, tag, *_to_isoformat(start, end))} "
-                    f"|> drop(columns: columns) "
-                    f'|> to(bucket: "{self.bucket}"'
-                )
+
+                query = f"""
+                    {self._build_query(tagged_resources, measurement, tag, *_to_isoformat(start, end))} 
+                    |> drop(columns: columns)
+                    |> to(bucket: "{self.bucket}"
+                """
                 try:
                     self._client.query_api().query(query)
 
-                # TODO: Exception to broad. Catch InfluxExceptions and differentiate reason in _raise
                 except Exception as e:
                     self._raise(e)
 
@@ -435,32 +388,40 @@ class InfluxDatabase(Database):
         end: str = "now()",
     ) -> str:
         if measurement is None:
-            measurement = "None"
+            raise DatabaseException(f"Measurement is None for following resources: {resources}")
         columns = ", ".join([f'"{_get_field(r)}"' for r in resources])
         query = f"""
-        columns = [{columns}]
+            columns = [{columns}]
 
-        from(bucket: "{self.bucket}")
-            |> range(start: {start}, stop: {end})
-            |> filter(fn: (r) => r["_measurement"] == "{measurement}")
-            |> filter(fn: (r) => contains(set: columns, value: r["_field"]))
-        """
-        # TODO: Validate this. Aren't tag names necessary to be configured and customized first?
+            from(bucket: "{self.bucket}")
+                |> range(start: {start}, stop: {end})
+                |> filter(fn: (r) => r["_measurement"] == "{measurement}")
+                |> filter(fn: (r) => contains(set: columns, value: r["_field"]))
+            """
+        # TODO: Tag names can be arbitrarily configured and customized
+        # To simplify: we are using a string so each resource can only have a string as tag
         if tag is not None:
-            query = f"""
-            {query}
-               |> filter(fn: (r) => r["_tag"] == "{tag}")
+            query += f"""
+                |> filter(fn: (r) => r["_tag"] == "{tag}")
             """
         return query
+
 
     # noinspection PyProtectedMember
     def is_connected(self) -> bool:
         if self._client is None:
             return False
-        return self._client.ping()
+        try:
+            return self._client.ping()
+        except Exception as e:
+            self._raise(e)
 
     def _raise(self, e: Exception):
-        if "syntax" in str(e).lower():
+        #TODO: Differentiate reasons (InfluxDBError is all?)
+
+        print("\033[92m" + str(e) + "\033[0m")
+        
+        if isinstance(e, InfluxDBError):
             raise DatabaseException(self, str(e))
         else:
             raise ConnectionException(self, str(e))
