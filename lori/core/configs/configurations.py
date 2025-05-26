@@ -203,8 +203,10 @@ class Configurations(MutableMapping[str, Any]):
     def _sections_dir(self) -> Directory:
         return self.__dirs.conf.joinpath(self.__path.name.replace(".conf", ".d"))
 
-    def has_section(self, section: str) -> bool:
+    def has_section(self, section: str, includes: bool = False) -> bool:
         if section in self.sections:
+            return True
+        if includes and self._sections_dir.joinpath(f"{section}.conf").exists():
             return True
         return False
 
