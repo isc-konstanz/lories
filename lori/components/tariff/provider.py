@@ -1,23 +1,19 @@
 # -*- coding: utf-8 -*-
 """
 lori.components.tariff.provider
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-#TODO: Fix docstring
-This module provides the :class:`lori.components.tariff.provider.TariffProvider`, used as
-reference to calculate e.g. photovoltaic installations generated power. The provided
-environmental data contains temperatures and horizontal solar irradiation, which can be used,
-to calculate the effective irradiance on defined, tilted photovoltaic systems.
+This module provides the :class:`lori.components.tariff.provider.TariffProvider`, which serves
+as a reference for tariff calculations. The TariffProvider supplies import and export tariff
+data, enabling the calculation of energy costs and revenues for various scenarios, such as
+grid consumption and feed-in from renewable energy sources.
 
 """
 
 from __future__ import annotations
 
-from typing import Optional
-
-from lori.components import Component
 from lori.components.tariff import Tariff
-from lori.core import Configurations, Context
+from lori.core import Configurations
 
 
 # noinspection SpellCheckingInspection

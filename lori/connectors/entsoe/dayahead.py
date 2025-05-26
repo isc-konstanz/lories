@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.connector.entsoe.tariff
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lori.connectors.entsoe.dayahead
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.components.price
-~~~~~~~~~~~~~~~~~~~~~
+lori.components.tariff
+~~~~~~~~~~~~~~~~~~~~~~
 
 
 """

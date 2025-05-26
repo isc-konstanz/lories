@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.connector.price.dwd.brightsky
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lori.connectors.entsoe.connector
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
