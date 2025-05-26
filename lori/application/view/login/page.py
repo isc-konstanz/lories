@@ -11,14 +11,14 @@ from __future__ import annotations
 from typing import Optional
 
 import dash_bootstrap_components as dbc
-from dash import Dash, dcc, html, Input, Output, State
+from dash import Dash, Input, Output, State, dcc, html
 from dash_auth import public_callback
 from flask_login import LoginManager
 
-from lori.core import Configurations
 from lori.application import Application
 from lori.application.view.login import Authentication, AuthenticationException
 from lori.application.view.pages import Page, PageLayout
+from lori.core import Configurations
 
 
 # noinspection SpellCheckingInspection

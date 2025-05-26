@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Callable
+from copy import deepcopy
 from typing import Any, Collection, Dict, List, Mapping, Optional, Type
 
 import pandas as pd
@@ -302,7 +303,7 @@ class Channel(Resource):
     @staticmethod
     def _build_defaults(configs: Configurations) -> Dict[str, Any]:
         return Channel._build_configs(
-            {k: v for k, v in configs.items() if not isinstance(v, Mapping) or k in Channel.INCLUDES}
+            {k: deepcopy(v) for k, v in configs.items() if not isinstance(v, Mapping) or k in Channel.INCLUDES}
         )
 
     @staticmethod

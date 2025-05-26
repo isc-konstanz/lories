@@ -8,21 +8,21 @@ lori.application.view.login.authentication
 
 from __future__ import annotations
 
-import os
 import base64
+import os
 import secrets
 from typing import Callable, Dict, List, Optional, Union
 
 import flask
-import pandas as pd
-from flask_login import current_user, login_user
 from dash import Dash
 from dash_auth.auth import Auth
-from werkzeug.wrappers import Response, Request
+from flask_login import current_user, login_user
+from werkzeug.wrappers import Request, Response
 
-from lori.core import Configurations, Configurator
+import pandas as pd
 from lori.application.interface import InterfaceException
 from lori.application.view.login.user import User
+from lori.core import Configurations, Configurator
 
 RANDOM_STRING_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
@@ -52,7 +52,7 @@ class Authentication(Configurator, Auth):
         super().__init__(app=app, public_routes=public_routes)
         self.configure(configs)
         if secret_key is None:
-            secret_key = os.getenv('SECRET_KEY', get_random_string(32))
+            secret_key = os.getenv("SECRET_KEY", get_random_string(32))
         app.server.secret_key = secret_key
 
         self._login_route = login_route
@@ -111,7 +111,7 @@ class Authentication(Configurator, Auth):
         raise AuthenticationException(f"Unknown user '{username}'")
 
     def login_request(self) -> Response:
-        #return flask.redirect(flask.url_for("auth", next_page="/"))
+        # return flask.redirect(flask.url_for("auth", next_page="/"))
         return self.app.server.make_response(flask.redirect("/login"))
 
 
@@ -120,6 +120,7 @@ class AuthenticationException(InterfaceException):
     Raise if an error occurred authenticating a session or user.
 
     """
+
     reason: str
 
     def __init__(self, reason: str) -> None:
