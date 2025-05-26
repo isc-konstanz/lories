@@ -6,5 +6,8 @@ lori.connectors.entsoe
 
 """
 
-from . import dayahead
-from .dayahead import EntsoeDayaheadConnector  # noqa: F401
+from . import connector
+from .connector import EntsoeConnector
+
+from . import day_ahead
+from .day_ahead import EntsoeDayAheadConnector  # noqa: F401

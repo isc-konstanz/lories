@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.connectors.entsoe.dayahead
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lori.connectors.entsoe.day_ahead
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -19,7 +19,7 @@ from lori.typing import TimestampType
 
 
 
-class EntsoeDayaheadConnector(EntsoeConnector):
+class EntsoeDayAheadConnector(EntsoeConnector):
     # https://github.com/EnergieID/entsoe-py?tab=readme-ov-file
     #       	2015	2016	2017	2018	2019	2020	2021
     #DE	        no	    no  	no  	no  	no  	no  	no
@@ -43,12 +43,12 @@ class EntsoeDayaheadConnector(EntsoeConnector):
         end: Optional[TimestampType] = None,
     ) -> pd.DataFrame:
 
-        from lori.components.tariff.entsoe_dayahead import EntsoeDayahead
+        from lori.components.tariff.entsoe_day_ahead import EntsoeDayAhead
 
         results = []
         for r in resources:
             #TODO: better checking of resource type
-            if r.key != EntsoeDayahead.DAY_AHEAD and False:
+            if r.key != EntsoeDayAhead.DAY_AHEAD and False:
                 raise ConfigurationException(
                     f"Resource {r.key} is not a valid EntsoeDayahead resource."
                 )

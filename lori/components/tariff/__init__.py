@@ -18,4 +18,4 @@ from .core import (  # noqa: F401
 from . import provider  # noqa: F401
 from .provider import TariffProvider  # noqa: F401
 
-from .entsoe_dayahead import EntsoeDayahead  # noqa: F401
+from .entsoe_day_ahead import EntsoeDayAhead  # noqa: F401
