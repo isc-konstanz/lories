@@ -22,7 +22,7 @@ from dash_bootstrap_components import themes
 from lori import Configurations
 from lori.application import Application
 from lori.application.interface import Interface, register_interface_type
-from lori.application.view import PageFooter, PageHeader, View
+from lori.application.view import LoginPage, PageFooter, PageHeader, View
 
 logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
@@ -83,7 +83,6 @@ class ViewInterface(Interface, Dash):
             use_pages=True,
             server=True,  # TODO: Replace this with local Flask server, to create custom REST API ?
         )
-
         theme_defaults = {
             "name": context.name,
             "logo": os.path.join(assets_path, "logo.png"),
@@ -94,6 +93,11 @@ class ViewInterface(Interface, Dash):
         footer = PageFooter()
 
         self.view = View(context.id, header, footer)
+
+        login = configs.get_section("login", defaults={"enabled": False})
+        if login.enabled:
+            login_page = LoginPage(self, context, configs)
+            self.view.append(login_page)
 
     # noinspection PyUnresolvedReferences
     def configure(self, configs: Configurations) -> None:
