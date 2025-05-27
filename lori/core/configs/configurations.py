@@ -94,21 +94,21 @@ class Configurations(MutableMapping[str, Any]):
         return f"{Configurations.__name__}({self.__path})"
 
     def __str__(self) -> str:
-        configs = deepcopy(self.__configs)
-        for section in [s for s, c in self.__configs.items() if isinstance(c, Mapping)]:
-            configs.move_to_end(section)
-
         # noinspection PyShadowingNames
-        def parse_section(header: str, section: Mapping[str, Any]) -> str:
+        def parse_configs(header: str, configs: Configurations) -> str:
+            configs = OrderedDict(configs)
+            for section in [s for s, c in configs.items() if isinstance(c, Mapping)]:
+                configs.move_to_end(section)
+
             string = f"[{header}]\n"
-            for k, v in section.items():
-                if isinstance(v, Mapping):
-                    string += "\n" + parse_section(f"{header}.{k}", v)
+            for k, v in configs.items():
+                if isinstance(v, Configurations):
+                    string += "\n" + parse_configs(f"{header}.{k}", v)
                 else:
                     string += f"{k} = {v}\n"
             return string
 
-        return parse_section(self.name.replace(".conf", ""), configs)
+        return parse_configs(self.name.replace(".conf", ""), self)
 
     def __delitem__(self, key: str) -> None:
         del self.__configs[key]
@@ -116,17 +116,19 @@ class Configurations(MutableMapping[str, Any]):
     def __setitem__(self, key: str, value: Any) -> None:
         self.set(key, value)
 
+    # noinspection PyTypeChecker
     def set(self, key: str, value: Any, replace: bool = True) -> None:
-        if key in self.__configs and not replace:
-            return
         if isinstance(value, Mapping):
-            if key not in self.keys():
-                self.__configs[key] = self._create_section(key, value)
-            elif isinstance(self.__configs[key], Mapping) and not replace:
-                update_recursive(self.__configs[key], value, replace=replace)
+            if key not in self.__configs.keys():
+                section = self._create_section(key, value)
             else:
-                self.__configs[key] = value
-        else:
+                section = self.__configs[key]
+                if isinstance(section, Mapping):
+                    section = update_recursive(section, value, replace=replace)
+                elif not replace:
+                    return
+            self.__configs[key] = section
+        elif key not in self.__configs.keys() or replace:
             self.__configs[key] = value
 
     def __getitem__(self, key: str) -> Any:
@@ -263,8 +265,8 @@ class Configurations(MutableMapping[str, Any]):
         return section_configs
 
     # noinspection PyTypeChecker
-    def update(self, update: Mapping[str, Any], replace: bool = True) -> Configurations:
-        return update_recursive(self, update, replace=replace)
+    def update(self, update: Mapping[str, Any], replace: bool = True) -> None:
+        update_recursive(self, update, replace=replace)
 
 
 class ConfigurationException(ResourceException):
