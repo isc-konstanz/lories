@@ -8,15 +8,13 @@ lori.connectors.entsoe.day_ahead
 
 from __future__ import annotations
 
-import datetime as dt
 from typing import Optional
-
 import pandas as pd
+
 from lori import Configurations, Resources, ConfigurationException
+from lori.connectors import ConnectionException, Connector, ConnectorException, register_connector_type
 from lori.connectors.entsoe import EntsoeConnector
 from lori.typing import TimestampType
-
-
 
 
 class EntsoeDayAheadConnector(EntsoeConnector):
@@ -33,6 +31,8 @@ class EntsoeDayAheadConnector(EntsoeConnector):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
+        #TODO: implement DE as county code
+        #TODO: validate country code against entsoe-py/entsoe/mappings.py
         self.country_code = configs.get("country_code", default=self.country_code)
         self.tariff_offset = configs.get("tariff_offset", default=self.tariff_offset)
 
@@ -43,33 +43,35 @@ class EntsoeDayAheadConnector(EntsoeConnector):
         end: Optional[TimestampType] = None,
     ) -> pd.DataFrame:
 
+        #TODO: future import, is this needed?
         from lori.components.tariff.entsoe_day_ahead import EntsoeDayAhead
 
+        #TODO: implement DE as county code handling
         results = []
         for r in resources:
             #TODO: better checking of resource type
             if r.key != EntsoeDayAhead.DAY_AHEAD and False:
                 raise ConfigurationException(
-                    f"Resource {r.key} is not a valid EntsoeDayahead resource."
+                    f"Resource {r.key} is not a valid EntsoeDayAhead resource."
                 )
 
-            #TODO: Exception: Please use a timezoned pandas object for start and end (not localized?)
-            ts = self._client.query_day_ahead_prices(self.country_code, start=start, end=end)
+            #TODO: Expected behavior if start==None or end==None
+
+            #TODO: Exception handling
+            try:
+                ts = self._client.query_day_ahead_prices(self.country_code, start=start, end=end)
+            except Exception as e:
+                #ConnectionError(timeout, unauthorized, ...)
+                raise ConnectionException(self, str(e))
+
+
             result = pd.DataFrame(ts, columns=[r.id])
             results.append(result)
-
 
         if len(results) == 0:
             return pd.DataFrame(columns=[r.id for r in resources])
 
-        #TODO: sort? index name?
-        #results = sorted(results, key=lambda d: min(d.index))
+        results = sorted(results, key=lambda d: min(d.index))
         df = pd.concat(results, axis="columns")
 
-        path = "/Users/jonasbechler/Nextcloud/Master_Share/WS_Python/penguin/data/isc/tariff"
-        csv_filename = f"intraday_{start.strftime('%Y')}.csv"
-        df.to_csv(f"{path}/{csv_filename}", index_label="timestamp")
         return df
-
-    def write(self, data: pd.DataFrame) -> None:
-        raise NotImplementedError("Entsoe connector does not support writing")

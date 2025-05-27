@@ -8,26 +8,16 @@ lori.connectors.entsoe.connector
 
 from __future__ import annotations
 
-import datetime as dt
 from abc import abstractmethod
-import json
-import re
-import xml.etree.ElementTree as ET
-from abc import ABC
 from typing import Optional, Tuple
-
-import xmltodict
-import isodate
-
-import requests
-from entsoe import EntsoePandasClient
-
-
 import numpy as np
 import pandas as pd
-# from lori import ConfigurationException, Configurations, Resources, Tariff
+#TODO: add to requirements
+from entsoe import EntsoePandasClient
+
+from lori.connectors import ConnectionException, Connector
 from lori.core import ConfigurationException, Configurations, Resources
-from lori.connectors import ConnectionException, Connector, register_connector_type
+from lori.typing import TimestampType
 
 
 # noinspection PyShadowingBuiltins
@@ -44,7 +34,6 @@ class EntsoeConnector(Connector):
             raise ConfigurationException("Missing security token")
 
     def connect(self, resources: Resources) -> None:
-        self._logger.debug(f"Connecting to Entsoe")
         self._client = EntsoePandasClient(api_key=self.api_key)
 
     def disconnect(self) -> None:
@@ -57,8 +46,8 @@ class EntsoeConnector(Connector):
     def read(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> pd.DataFrame:
         pass
 
