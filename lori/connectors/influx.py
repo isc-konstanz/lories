@@ -10,14 +10,15 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Dict, Optional, Tuple
-
-from influxdb_client import BucketRetentionRules, InfluxDBClient, Point, WritePrecision
-from influxdb_client.client.exceptions import InfluxDBError
-from influxdb_client.client.write_api import SYNCHRONOUS
-from urllib3.exceptions import HTTPError
-
 import numpy as np
 import pandas as pd
+
+from influxdb_client import BucketRetentionRules, InfluxDBClient
+from influxdb_client.client.write_api import SYNCHRONOUS
+from influxdb_client.client.exceptions import InfluxDBError
+from influxdb_client.rest import ApiException
+from urllib3.exceptions import HTTPError, NewConnectionError
+
 from lori.connectors import ConnectionException, Database, DatabaseException, register_connector_type
 from lori.core import Configurations, Resource, Resources, ConfigurationException
 from lori.data.util import hash_value
@@ -112,16 +113,16 @@ class InfluxDatabase(Database):
                 #TODO: Configure retention from channel attributes
                 retention = BucketRetentionRules(every_seconds=0)  # 0 means infinite retention
                 buckets_api.create_bucket(bucket_name=self.bucket, retention_rules=retention)
-        except [InfluxDBError, HTTPError] as e:
+        except (ApiException, InfluxDBError, HTTPError) as e:
             self._raise(e)
 
     def disconnect(self) -> None:
+        #TODO: Check if "and ping" is necessary
         if self._client is not None and self._client.ping():
             self._client.close()
             self._client = None
 
-    #TODO: Enable hash when util rounding is fixed
-    def no_hash(
+    def hash(
         self,
         resources: Resources,
         start: Optional[TimestampType] = None,
@@ -196,8 +197,8 @@ class InfluxDatabase(Database):
                         }}))
                     |> map(fn: (r) => ({{
                         r with
-                        //hash: hash.{method.lower()}(v: r.column_string)
-                        hash: strings.substring(v: r.column_string, start: 0, end: 300)
+                        hash: hash.{method.lower()}(v: r.column_string)
+                        // hash: strings.substring(v: r.column_string, start: 0, end: 300)
                         }}))
                     |> keep(columns: ["hash"])
                 """
@@ -207,7 +208,7 @@ class InfluxDatabase(Database):
                         continue
                     hashes.append(result["hash"].iloc[0])
 
-                except [InfluxDBError, HTTPError] as e:
+                except (ApiException, InfluxDBError, HTTPError) as e:
                     self._raise(e)
 
         if len(hashes) == 0:
@@ -223,7 +224,6 @@ class InfluxDatabase(Database):
         start: Optional[TimestampType] = None,
         end: Optional[TimestampType] = None,
     ) -> bool:
-        # TODO: Test this function
         query_api = self._client.query_api()
         for measurement, measurement_resources in resources.groupby(lambda r: r.get("measurement", default=r.group)):
             for tag, tagged_resources in measurement_resources.groupby("tag"):
@@ -238,7 +238,7 @@ class InfluxDatabase(Database):
                     if sorted(data["_fields"]) != sorted(fields):
                         return False
 
-                except [InfluxDBError, HTTPError] as e:
+                except (ApiException, InfluxDBError, HTTPError) as e:
                     self._raise(e)
         return True
 
@@ -285,7 +285,7 @@ class InfluxDatabase(Database):
                             )
                         )
    
-                except [InfluxDBError, HTTPError] as e:
+                except (ApiException, InfluxDBError, HTTPError) as e:
                     self._raise(e)
    
         if len(results) == 0:
@@ -322,7 +322,7 @@ class InfluxDatabase(Database):
                             )
                         )
 
-                except [InfluxDBError, HTTPError] as e:
+                except (ApiException, InfluxDBError, HTTPError) as e:
                     self._raise(e)
 
         if len(results) == 0:
@@ -345,7 +345,8 @@ class InfluxDatabase(Database):
                 if tagged_data.empty:
                     continue
 
-                tagged_data["tag"] = tag if tag is not None else "default"
+                if tag is not None:
+                    tagged_data["tag"] = tag
 
                 try:
                     tagged_data = tagged_data.rename(columns={r.id: _get_field(r) for r in tagged_resources})
@@ -353,11 +354,11 @@ class InfluxDatabase(Database):
                         bucket=self.bucket,
                         record=tagged_data,
                         data_frame_measurement_name=measurement,
-                        data_frame_tag_columns=["tag"],
+                        data_frame_tag_columns=["tag"] if tag is not None else None,
                     )
                     write_api.flush()
 
-                except [InfluxDBError, HTTPError] as e:
+                except (ApiException, InfluxDBError, HTTPError) as e:
                     self._raise(e)
 
     def delete(
@@ -371,7 +372,8 @@ class InfluxDatabase(Database):
         for measurement, group_resources in resources.groupby(lambda r: r.get("measurement", default=r.group)):
             for tag, tagged_resources in group_resources.groupby("tag"):
                 # Escaped because "tag" is a keyword
-                predicate = f""" _measurement = "{measurement}" AND "tag" = "{tag if tag is not None else "default"}" """
+                predicate = f"_measurement = \"{measurement}\""
+                predicate += f" AND \"tag\" = \"{tag}\"" if tag is not None else ""
 
                 try:
                     delete_api.delete(
@@ -381,7 +383,7 @@ class InfluxDatabase(Database):
                         bucket=self.bucket,
                         org=self.org,
                     )
-                except [InfluxDBError, HTTPError] as e:
+                except (ApiException, InfluxDBError, HTTPError) as e:
                     self._raise(e)
 
     def _build_query(
@@ -392,25 +394,19 @@ class InfluxDatabase(Database):
         start: str = "0",
         end: str = "now()",
     ) -> str:
-        # Use normal filter for _field with or. Much faster than using contains() with a set
-
         if measurement is None:
             raise DatabaseException(self, f"Measurement is None for following resources: {resources}")
-        field_filter = " or ".join([f'r["_field"] == "{_get_field(r)}"' for r in resources])
         query = f"""
             from(bucket: "{self.bucket}")
                 |> range(start: {start}, stop: {end})
                 |> filter(fn: (r) => r["_measurement"] == "{measurement}")
-                |> filter(fn: (r) => {field_filter})
+                |> filter(fn: (r) => {" or ".join([f'r["_field"] == "{_get_field(r)}"' for r in resources])})
             """
-        # Tags can be columns
-        # To simplify: we are using the column "tag" for the tag value, None equald to "default"
         if tag is not None:
             query += f"""
                 |> filter(fn: (r) => r["tag"] == "{tag}")
             """
         return query
-
 
     # noinspection PyProtectedMember
     def is_connected(self) -> bool:
@@ -418,12 +414,16 @@ class InfluxDatabase(Database):
             return False
         try:
             return self._client.ping()
-        except [InfluxDBError, HTTPError] as e:
+        except (ApiException, InfluxDBError, HTTPError) as e:
             self._raise(e)
         return False
 
     def _raise(self, e: Exception):
-        if isinstance(e, InfluxDBError):
+        if isinstance(e, ApiException):
+            raise DatabaseException(self, str(e))
+        elif isinstance(e, InfluxDBError):
+            raise DatabaseException(self, str(e))
+        elif isinstance(e, NewConnectionError):
             raise DatabaseException(self, str(e))
         else:
             raise ConnectionException(self, str(e))
