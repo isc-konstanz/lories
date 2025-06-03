@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from collections.abc import MutableSequence, Sequence
 from itertools import chain
-from typing import Any, Generic, Iterator, List, Tuple, TypeVar
+from typing import Any, Collection, Generic, Iterator, List, Optional, Tuple, Type, TypeVar
 
 import dash_bootstrap_components as dbc
 from dash import html
@@ -38,8 +38,8 @@ class PageGroup(Page, MutableSequence[P], Generic[P]):
     def __iter__(self) -> Iterator[P]:
         return iter(self._pages)
 
-    def __contains__(self, page: P) -> bool:
-        return page in self._pages
+    def __contains__(self, page: str | P) -> bool:
+        return self.has_page(page)
 
     def __getitem__(self, index: int) -> P:
         return self._pages[index]
@@ -52,6 +52,33 @@ class PageGroup(Page, MutableSequence[P], Generic[P]):
 
     def insert(self, index: int, page: P) -> None:
         self._pages.insert(index, page)
+
+    def has_page(self, _page: str | P) -> bool:
+        if isinstance(_page, str):
+            return len(self.get_page(_page)) > 0
+        elif isinstance(_page, Page):
+            return _page in self._pages
+        raise TypeError(f"Invalid page type '{type(_page)}'")
+
+    def get_page(self, _page: str) -> Optional[P]:
+        for page in self._pages:
+            if page.id == _page:
+                return page
+        return None
+
+    def get_pages(self, *_pages: str | Type[P]) -> Collection[P]:
+        pages = []
+        for _page in _pages:
+            for page in self._pages:
+                if isinstance(_page, str):
+                    if page.id == _page:
+                        pages.append(page)
+                elif isinstance(_page, type):
+                    if isinstance(page, _page):
+                        pages.append(page)
+                else:
+                    raise TypeError(f"Invalid page type '{type(_page)}'")
+        return pages
 
     def sort(self) -> Sequence[Page]:
         def order(page: Page) -> Tuple[Any, ...]:
