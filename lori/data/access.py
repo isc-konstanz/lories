@@ -207,8 +207,17 @@ class DataAccess(DataContext, Configurator):
         unique: bool = False,
     ) -> pd.DataFrame: ...
 
-    # noinspection PyUnresolvedReferences
     def from_logger(
+        self,
+        channels: Optional[ChannelsType] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
+        unique: bool = False,
+    ) -> pd.DataFrame:
+        return self.read_logged(channels, start, end, unique=unique)
+
+    # noinspection PyUnresolvedReferences
+    def read_logged(
         self,
         channels: Optional[ChannelsType] = None,
         start: Optional[TimestampType] = None,
