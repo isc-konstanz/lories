@@ -233,13 +233,6 @@ def replicate(
     else:
         replicate_range(source, target, resources, start, end, force=force)
 
-    logger.info(
-        f"Replicated {len(data)} values of resource{'s' if len(resources) > 1 else ''} "
-        + ", ".join([f"'{r.id}'" for r in resources])
-        + f" from {start.strftime('%d.%m.%Y (%H:%M:%S)')}"
-        + f" to {end.strftime('%d.%m.%Y (%H:%M:%S)')}"
-    )
-
 
 def replicate_range(
     source: Database,

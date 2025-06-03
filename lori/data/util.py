@@ -17,7 +17,6 @@ import numpy as np
 import pandas as pd
 import pytz as tz
 from pandas.tseries.frequencies import to_offset
-import re
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
 try:
@@ -44,7 +43,7 @@ def hash_data(
     data = data[[index_column, *data_columns]]
 
     csv = data.to_csv(index=False, header=False, sep=",", decimal=".", float_format="%.10g")
-    csv = ",".join(re.sub(r',,+', ',', line).strip(",") for line in csv.splitlines())
+    csv = ",".join(re.sub(r",,+", ",", line).strip(",") for line in csv.splitlines())
     return hash_value(csv, method, encoding)
 
 
