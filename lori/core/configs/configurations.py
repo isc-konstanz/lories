@@ -120,14 +120,12 @@ class Configurations(MutableMapping[str, Any]):
     def set(self, key: str, value: Any, replace: bool = True) -> None:
         if isinstance(value, Mapping):
             if key not in self.__configs.keys():
-                section = self._create_section(key, value)
+                value = self._create_section(key, value)
             else:
                 section = self.__configs[key]
-                if isinstance(section, Mapping):
-                    section = update_recursive(section, value, replace=replace)
-                elif not replace:
-                    return
-            self.__configs[key] = section
+                if isinstance(section, Mapping) and not replace:
+                    value = update_recursive(section, value, replace=False)
+            self.__configs[key] = value
         elif key not in self.__configs.keys() or replace:
             self.__configs[key] = value
 
