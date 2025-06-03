@@ -210,7 +210,7 @@ def replicate(
     else:
         start = floor_date(start, freq=freq) + pd.Timedelta(seconds=1)
 
-    if (not any(t is None for t in [start, end]) and start >= end) or all(t is None for t in [start, end]):
+    if any(t is None for t in [start, end]) or start >= end:
         logger.debug(
             f"Skip copying values of resource{'s' if len(resources) > 1 else ''} "
             + ", ".join([f"'{r.id}'" for r in resources])
@@ -222,16 +222,23 @@ def replicate(
         slice = False
 
     if not target_empty:
+        # Validate prior step, before continuing
         prior_end = floor_date(start if start <= now else now, freq=freq)
         prior_start = floor_date(start, timezone=timezone, freq=freq) - to_timedelta(freq) + pd.Timedelta(seconds=1)
         replicate_range(source, target, resources, prior_start, prior_end, force=force)
 
     if slice:
-        # Validate prior step, before continuing
         for slice_start, slice_end in slice_range(start, end, timezone=timezone, freq=freq):
             replicate_range(source, target, resources, slice_start, slice_end, force=force)
     else:
         replicate_range(source, target, resources, start, end, force=force)
+
+    logger.info(
+        f"Replicated {len(data)} values of resource{'s' if len(resources) > 1 else ''} "
+        + ", ".join([f"'{r.id}'" for r in resources])
+        + f" from {start.strftime('%d.%m.%Y (%H:%M:%S)')}"
+        + f" to {end.strftime('%d.%m.%Y (%H:%M:%S)')}"
+    )
 
 
 def replicate_range(

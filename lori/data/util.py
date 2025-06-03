@@ -9,6 +9,7 @@ lori.data.util
 from __future__ import annotations
 
 import hashlib
+import re
 from copy import copy, deepcopy
 from typing import Optional, Tuple
 
@@ -42,9 +43,7 @@ def hash_data(
     data = data[[index_column, *data_columns]]
 
     csv = data.to_csv(index=False, header=False, sep=",", decimal=".", float_format="%.10g")
-    while ",," in csv:
-        csv = csv.replace(",,", ",")
-    csv = ",".join(csv.splitlines())
+    csv = ",".join(re.sub(r',,+', ',', line).strip(",") for line in csv.splitlines())
     return hash_value(csv, method, encoding)
 
 
