@@ -71,6 +71,8 @@ dash = [
     "dash",
     "dash-auth",
     "dash-bootstrap-component",
+    "flask-bcrypt",
+    "flask-login",
 ]
 doc = [
     "graphviz",

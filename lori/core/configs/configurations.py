@@ -8,7 +8,6 @@ lori.core.configurations
 
 from __future__ import annotations
 
-import datetime as dt
 import os
 import shutil
 from collections import OrderedDict
@@ -19,6 +18,7 @@ from typing import Any, Collection, Iterable, List, Mapping, MutableMapping, Opt
 import pandas as pd
 from lori.core import ResourceException, ResourceUnavailableException
 from lori.core.configs import Directories, Directory
+from lori.typing import TimestampType
 from lori.util import to_bool, to_date, to_float, to_int, update_recursive
 
 
@@ -94,21 +94,21 @@ class Configurations(MutableMapping[str, Any]):
         return f"{Configurations.__name__}({self.__path})"
 
     def __str__(self) -> str:
-        configs = deepcopy(self.__configs)
-        for section in [s for s, c in self.__configs.items() if isinstance(c, Mapping)]:
-            configs.move_to_end(section)
-
         # noinspection PyShadowingNames
-        def parse_section(header: str, section: Mapping[str, Any]) -> str:
+        def parse_configs(header: str, configs: Configurations) -> str:
+            configs = OrderedDict(configs)
+            for section in [s for s, c in configs.items() if isinstance(c, Mapping)]:
+                configs.move_to_end(section)
+
             string = f"[{header}]\n"
-            for k, v in section.items():
-                if isinstance(v, Mapping):
-                    string += "\n" + parse_section(f"{header}.{k}", v)
+            for k, v in configs.items():
+                if isinstance(v, Configurations):
+                    string += "\n" + parse_configs(f"{header}.{k}", v)
                 else:
                     string += f"{k} = {v}\n"
             return string
 
-        return parse_section(self.name.replace(".conf", ""), configs)
+        return parse_configs(self.name.replace(".conf", ""), self)
 
     def __delitem__(self, key: str) -> None:
         del self.__configs[key]
@@ -116,17 +116,17 @@ class Configurations(MutableMapping[str, Any]):
     def __setitem__(self, key: str, value: Any) -> None:
         self.set(key, value)
 
+    # noinspection PyTypeChecker
     def set(self, key: str, value: Any, replace: bool = True) -> None:
-        if key in self.__configs and not replace:
-            return
         if isinstance(value, Mapping):
-            if key not in self.keys():
-                self.__configs[key] = self._create_section(key, value)
-            elif isinstance(self.__configs[key], Mapping) and not replace:
-                update_recursive(self.__configs[key], value, replace=replace)
+            if key not in self.__configs.keys():
+                value = self._create_section(key, value)
             else:
-                self.__configs[key] = value
-        else:
+                section = self.__configs[key]
+                if isinstance(section, Mapping) and not replace:
+                    value = update_recursive(section, value, replace=False)
+            self.__configs[key] = value
+        elif key not in self.__configs.keys() or replace:
             self.__configs[key] = value
 
     def __getitem__(self, key: str) -> Any:
@@ -153,7 +153,7 @@ class Configurations(MutableMapping[str, Any]):
     def get_float(self, key: str, default: float = None) -> float:
         return to_float(self._get(key, default))
 
-    def get_date(self, key: str, default: dt.datetime | pd.Timestamp = None, **kwargs) -> pd.Timestamp:
+    def get_date(self, key: str, default: TimestampType = None, **kwargs) -> pd.Timestamp:
         return to_date(self._get(key, default), **kwargs)
 
     def __iter__(self):
@@ -203,8 +203,10 @@ class Configurations(MutableMapping[str, Any]):
     def _sections_dir(self) -> Directory:
         return self.__dirs.conf.joinpath(self.__path.name.replace(".conf", ".d"))
 
-    def has_section(self, section: str) -> bool:
+    def has_section(self, section: str, includes: bool = False) -> bool:
         if section in self.sections:
+            return True
+        if includes and self._sections_dir.joinpath(f"{section}.conf").exists():
             return True
         return False
 
@@ -261,8 +263,8 @@ class Configurations(MutableMapping[str, Any]):
         return section_configs
 
     # noinspection PyTypeChecker
-    def update(self, update: Mapping[str, Any], replace: bool = True) -> Configurations:
-        return update_recursive(self, update, replace=replace)
+    def update(self, update: Mapping[str, Any], replace: bool = True) -> None:
+        update_recursive(self, update, replace=replace)
 
 
 class ConfigurationException(ResourceException):

@@ -108,7 +108,6 @@ class View(PageGroup):
             group = self._get_group(component)
             if group is not None:
                 group.append(page)
-                page.group = group
 
             if isinstance(page, PageGroup):
                 for page_component in page.components.values():
@@ -143,21 +142,16 @@ class View(PageGroup):
 
     # noinspection PyProtectedMember
     def create_layout(self, layout: PageLayout) -> None:
-        if all(isinstance(p._component, System) for p in self):
-            label = "Systems"
-        else:
-            label = "Select"
+        label = "Systems"
+        menu = [dbc.DropdownMenuItem("Select", header=True)]
+        for page in self._pages:
+            if page.key in ["auth", "login"]:
+                continue
+            if not isinstance(page._component, System):
+                label = "Select"
+            menu.append(dbc.DropdownMenuItem(page.name, href=page.path))
 
-        layout.menu = dbc.DropdownMenu(
-            children=[
-                dbc.DropdownMenuItem(label, header=True),
-                *[dbc.DropdownMenuItem(p.name, href=p.path) for p in self],
-            ],
-            nav=True,
-            in_navbar=True,
-            label=label,
-        )
-
+        layout.menu = dbc.DropdownMenu(children=menu, nav=True, in_navbar=True, label=label)
         layout.container.class_name = "card-container card-focus"
         layout.container.children = []
         for page in self._pages:

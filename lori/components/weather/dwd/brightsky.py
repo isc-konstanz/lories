@@ -8,7 +8,6 @@ lori.connector.weather.dwd.brightsky
 
 from __future__ import annotations
 
-import datetime as dt
 import json
 from typing import Optional, Tuple
 
@@ -20,6 +19,7 @@ from lori import ConfigurationException, Configurations, Resources
 from lori.components.weather import Weather
 from lori.connectors import Connector
 from lori.location import Location
+from lori.typing import TimestampType
 
 
 class Brightsky(Connector):
@@ -42,8 +42,8 @@ class Brightsky(Connector):
     def read(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> pd.DataFrame:
         response, sources = self._request(start, end)
         response_sources = sources.loc[response["source_id"], ["observation_type", "first_record", "last_record"]]
@@ -54,11 +54,10 @@ class Brightsky(Connector):
 
         data = []
         for source, source_resources in resources.groupby("source"):
+            source_columns = [r.address for r in source_resources if r.address in response.columns]
             source_data = response.loc[
-                response["source_type"].isin(source.split(",")),
-                np.unique(
-                    ["source_id", "source_first_record", "source_last_record"] + [r.address for r in source_resources]
-                ),
+                response["source_type"].isin(s.strip() for s in source.split(",")),
+                np.unique(["source_id", "source_first_record", "source_last_record"] + source_columns),
             ]
             if source_data.empty:
                 self._logger.warning(f"Unable to read {self._id} channels: {[r.id for r in source_resources]}")
@@ -86,8 +85,8 @@ class Brightsky(Connector):
     # noinspection PyPackageRequirements
     def _request(
         self,
-        date: Optional[pd.Timestamp | dt.datetime] = None,
-        date_last: Optional[pd.Timestamp | dt.datetime] = None,
+        date: Optional[TimestampType] = None,
+        date_last: Optional[TimestampType] = None,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         if date is None:
             date = pd.Timestamp.now(tz=self.location.timezone)

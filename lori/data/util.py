@@ -9,6 +9,7 @@ lori.data.util
 from __future__ import annotations
 
 import hashlib
+import re
 from copy import copy, deepcopy
 from typing import Optional, Tuple
 

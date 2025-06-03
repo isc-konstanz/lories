@@ -8,12 +8,11 @@ lori.connectors.tasks.check
 
 from __future__ import annotations
 
-import datetime as dt
 from typing import Optional
 
-import pandas as pd
 from lori.connectors import Database
 from lori.connectors.tasks.task import ConnectorTask
+from lori.typing import TimestampType
 
 
 class CheckTask(ConnectorTask):
@@ -21,8 +20,8 @@ class CheckTask(ConnectorTask):
 
     def run(
         self,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> None:
         self._logger.debug(
             f"Checking data for {len(self.channels)} channels of '{type(self.connector).__name__}': {self.connector.id}"

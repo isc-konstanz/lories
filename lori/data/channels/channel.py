@@ -8,9 +8,9 @@ lori.data.channels.channel
 
 from __future__ import annotations
 
-import datetime as dt
 from collections import OrderedDict
 from collections.abc import Callable
+from copy import deepcopy
 from typing import Any, Collection, Dict, List, Mapping, Optional, Type
 
 import pandas as pd
@@ -18,6 +18,7 @@ import pytz as tz
 from lori.core import Context, Entity, Resource, ResourceException
 from lori.core.configs import ConfigurationException, Configurations
 from lori.data.channels import ChannelConnector, ChannelConverter, ChannelState
+from lori.typing import TimestampType
 from lori.util import parse_freq, to_timedelta
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -202,8 +203,8 @@ class Channel(Resource):
     # noinspection PyUnresolvedReferences
     def read(
         self,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> pd.DataFrame:
         return self.__context.read(self.to_list(), start, end)
 
@@ -302,7 +303,7 @@ class Channel(Resource):
     @staticmethod
     def _build_defaults(configs: Configurations) -> Dict[str, Any]:
         return Channel._build_configs(
-            {k: v for k, v in configs.items() if not isinstance(v, Mapping) or k in Channel.INCLUDES}
+            {k: deepcopy(v) for k, v in configs.items() if not isinstance(v, Mapping) or k in Channel.INCLUDES}
         )
 
     @staticmethod

@@ -8,7 +8,6 @@ lori.connectors.sql.table
 
 from __future__ import annotations
 
-import datetime as dt
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import sqlalchemy as sql
@@ -22,6 +21,7 @@ import pytz as tz
 from lori.connectors.sql.columns import Column, DatetimeColumn, SurrogateKeyColumn
 from lori.connectors.sql.index import DatetimeIndexType
 from lori.core import Resource, ResourceException, Resources
+from lori.typing import TimestampType
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
 try:
@@ -74,8 +74,8 @@ class Table(sql.Table):
 
     def _primary_clauses(
         self,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> List[ClauseElement]:
         clauses = []
         primary_index = self.primary_index
@@ -140,8 +140,8 @@ class Table(sql.Table):
     def exists(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> Select:
         columns = self.__get_columns(resources)
         query = sql.select(*columns).where(and_(*self._primary_clauses(start, end))).subquery()
@@ -152,8 +152,8 @@ class Table(sql.Table):
     def hash(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
         method: Literal["MD5", "SHA1", "SHA256", "SHA512"] = "MD5",
     ) -> Select:
         if method.lower() not in ["md5", "sha1", "sha256", "sha512"]:
@@ -192,8 +192,8 @@ class Table(sql.Table):
     def read(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
         order_by: Literal["asc", "desc"] = "asc",
     ) -> Select:
         columns = self.__get_columns(resources)
@@ -229,8 +229,8 @@ class Table(sql.Table):
     def delete(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> Delete:
         columns = self.__get_columns(resources)
         if self.columns != columns:

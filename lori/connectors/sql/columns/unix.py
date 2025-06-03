@@ -27,6 +27,7 @@ class UnixTimestampColumn(Column):
         self,
         name: str,
         type: ColumnType = INTEGER,
+        *args,
         default: Optional[Any] = None,
         nullable: bool = False,
         **kwargs,
@@ -36,6 +37,7 @@ class UnixTimestampColumn(Column):
         super().__init__(
             name,
             type,
+            *args,
             default=default,
             nullable=nullable,
             primary_key=True,

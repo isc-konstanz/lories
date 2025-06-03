@@ -8,7 +8,6 @@ lori.connectors.tables
 
 from __future__ import annotations
 
-import datetime as dt
 import os
 import re
 from typing import Optional
@@ -16,6 +15,7 @@ from typing import Optional
 import pandas as pd
 from lori.connectors import ConnectionException, Database, register_connector_type
 from lori.core import Configurations, Resources
+from lori.typing import TimestampType
 from pandas import HDFStore
 
 
@@ -88,8 +88,8 @@ class HDFDatabase(Database):
     def read(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> pd.DataFrame:
         data = []
         try:
@@ -148,8 +148,8 @@ class HDFDatabase(Database):
     def delete(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> None:
         try:
             for group, group_resources in resources.groupby("group"):
@@ -182,8 +182,8 @@ def _format_key(key: str) -> str:
 
 
 def _build_where(
-    start: Optional[pd.Timestamp | dt.datetime] = None,
-    end: Optional[pd.Timestamp | dt.datetime] = None,
+    start: Optional[TimestampType] = None,
+    end: Optional[TimestampType] = None,
 ) -> Optional[str]:
     where = []
     if start is not None:

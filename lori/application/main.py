@@ -13,8 +13,6 @@ import sys
 import traceback
 from typing import Optional, Type
 
-import tzlocal
-
 import pandas as pd
 from lori import Settings, System
 from lori.application import Interface
@@ -124,8 +122,6 @@ class Application(DataManager):
         simulation = self.settings.get_section("simulation", defaults={"data": {"include": True}})
 
         timezone = simulation.get("timezone", None)
-        if timezone is None:
-            timezone = tzlocal.get_localzone_name()
         if start is None:
             start = simulation.get_date("start", default=None, timezone=timezone)
         if end is None:
