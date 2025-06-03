@@ -43,7 +43,7 @@ def hash_data(
     data = data[[index_column, *data_columns]]
 
     csv = data.to_csv(index=False, header=False, sep=",", decimal=".", float_format="%.10g")
-    csv = ",".join(re.sub(r',,+', ',', line).strip(",") for line in csv.splitlines())
+    csv = ",".join(re.sub(r",,+", ",", line).strip(",") for line in csv.splitlines())
     return hash_value(csv, method, encoding)
 
 

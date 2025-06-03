@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Collection, Dict, Iterable
 
-from sqlalchemy import Connection, Dialect, Engine, MetaData, inspect
+from sqlalchemy import Connection, Dialect, Engine, ForeignKey, MetaData, inspect
 
 import pytz as tz
 from lori.connectors.sql.columns import (
@@ -125,9 +125,14 @@ class Schema(Configurator, MetaData):
             "nullable": resource.get("nullable", default=True if not primary else False),
         }
         if primary:
+            relations = []
+            foreign = resource.get("foreign", default=None)
+            if foreign is not None and len(foreign) > 0:
+                relations.append(ForeignKey(foreign, ondelete="CASCADE"))
+
             attribute = resource.get("attribute", default=None)
             if attribute is not None and len(attribute) > 0:
-                return SurrogateKeyColumn(name, type, attribute, **configs)
+                return SurrogateKeyColumn(name, type, attribute, *relations, **configs)
 
         if is_datetime(type):
             configs["timezone"] = to_timezone(resource.get("timezone", default=tz.UTC)) if not primary else tz.UTC

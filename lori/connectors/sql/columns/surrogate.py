@@ -20,9 +20,17 @@ class SurrogateKeyColumn(Column):
         name: str,
         type: ColumnType,
         attribute: str,
+        *args,
         nullable: bool = False,
         primary_key: bool = True,
         **kwargs,
     ) -> None:
-        super().__init__(name, type, nullable=nullable, primary_key=primary_key, **kwargs)
+        super().__init__(
+            name,
+            type,
+            *args,
+            nullable=nullable,
+            primary_key=primary_key,
+            **kwargs,
+        )
         self.attribute = attribute

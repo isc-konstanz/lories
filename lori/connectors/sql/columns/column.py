@@ -30,12 +30,21 @@ class Column(sql.Column):
         self,
         name: str,
         type: ColumnType,
+        *args,
         nullable: bool = True,
         default: Optional[Any] = None,
         onupdate: Optional[Any] = None,
         **kwargs,
     ) -> None:
-        super().__init__(name, type, nullable=nullable, server_default=default, server_onupdate=onupdate, **kwargs)
+        super().__init__(
+            name,
+            type,
+            *args,
+            nullable=nullable,
+            server_default=default,
+            server_onupdate=onupdate,
+            **kwargs,
+        )
 
     @property
     def _constructor(self):
