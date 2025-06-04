@@ -263,13 +263,15 @@ class SqlDatabase(Database, Mapping[str, Table]):
 
                     result = self.connection.execute(select)
                     if result.rowcount > 0:
-                        results.append(table.extract(table_resources, result))
+                        result_data = table.extract(table_resources, result)
+                        if not result_data.empty:
+                            results.append(result_data)
         except SQLAlchemyError as e:
             self._raise(e)
-        if len(results) > 0:
-            results = sorted(results, key=lambda d: min(d.index))
-            return pd.concat(results, axis="index")
-        return pd.DataFrame(columns=[r.id for r in resources])
+
+        if len(results) == 0:
+            return pd.DataFrame()
+        return pd.concat(results, axis="columns")
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
     def read_first(self, resources: Resources) -> pd.DataFrame:
@@ -284,13 +286,15 @@ class SqlDatabase(Database, Mapping[str, Table]):
                     select = table.read(table_resources, order_by="asc").limit(1)
                     result = self.connection.execute(select)
                     if result.rowcount > 0:
-                        results.append(table.extract(table_resources, result))
+                        result_data = table.extract(table_resources, result)
+                        if not result_data.empty:
+                            results.append(result_data)
         except SQLAlchemyError as e:
             self._raise(e)
-        if len(results) > 0:
-            results = sorted(results, key=lambda d: min(d.index))
-            return pd.concat(results, axis="index")
-        return pd.DataFrame(columns=[r.id for r in resources])
+
+        if len(results) == 0:
+            return pd.DataFrame()
+        return pd.concat(results, axis="columns")
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
     def read_last(self, resources: Resources) -> pd.DataFrame:
@@ -305,13 +309,15 @@ class SqlDatabase(Database, Mapping[str, Table]):
                     select = table.read(table_resources, order_by="desc").limit(1)
                     result = self.connection.execute(select)
                     if result.rowcount > 0:
-                        results.append(table.extract(table_resources, result))
+                        result_data = table.extract(table_resources, result)
+                        if not result_data.empty:
+                            results.append(result_data)
         except SQLAlchemyError as e:
             self._raise(e)
-        if len(results) > 0:
-            results = sorted(results, key=lambda d: min(d.index))
-            return pd.concat(results, axis="index")
-        return pd.DataFrame(columns=[r.id for r in resources])
+
+        if len(results) == 0:
+            return pd.DataFrame()
+        return pd.concat(results, axis="columns")
 
     # noinspection PyTypeChecker
     def write(self, data: pd.DataFrame) -> None:

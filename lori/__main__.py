@@ -20,8 +20,8 @@ def main() -> None:
     parser = ArgumentParser(description=__doc__, formatter_class=RawTextHelpFormatter)
     parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {lori.__version__}")
 
-    with lori.load(parser=parser) as application:
-        application.main()
+    application = lori.load(parser=parser)
+    application.main()
 
 
 if __name__ == "__main__":

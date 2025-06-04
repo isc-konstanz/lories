@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-lori.core.configs.configurable
+lori.core.configs.configurator
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
@@ -40,10 +40,17 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
     _configured: bool = False
     _logger: Logger
 
-    def __init__(self, configs: Optional[Configurations] = None, **kwargs) -> None:
+    def __init__(
+        self,
+        configs: Optional[Configurations] = None,
+        logger: Optional[Logger] = None,
+        **kwargs,
+    ) -> None:
         super().__init__(**kwargs)
+        if logger is None:
+            logger = self._get_logger()
+        self._logger = logger
         self.__configs = self._assert_configs(configs)
-        self._logger = logging.getLogger(self.__module__)
 
     def __eq__(self, other: Any) -> bool:
         return self is other
@@ -58,6 +65,10 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
         if not isinstance(configs, Configurations):
             raise ConfigurationException(f"Invalid '{cls.__name__}' configurations: {type(configs)}")
         return configs
+
+    @classmethod
+    def _get_logger(cls) -> Logger:
+        return logging.getLogger(cls.__module__)
 
     def _get_vars(self) -> Dict[str, Any]:
         def _is_var(attr: str, var: Any) -> bool:

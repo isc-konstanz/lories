@@ -31,7 +31,7 @@ class DataAccess(DataContext, Configurator):
     __context: Context
 
     def __init__(self, registrar: Registrator, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
+        super().__init__(logger=registrar._logger, **kwargs)
         self.__registrar = self._assert_registrar(registrar)
         self.__context = self._assert_context(get_context(registrar, DataContext))
 

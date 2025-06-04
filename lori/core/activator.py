@@ -9,7 +9,7 @@ lori.core.activator
 from __future__ import annotations
 
 from functools import wraps
-from typing import Dict
+from typing import Callable, Dict
 
 from lori.core.configs import ConfigurationException
 from lori.core.configs.configurator import Configurator, ConfiguratorMeta
@@ -90,3 +90,22 @@ class Activator(Configurator, metaclass=ActivatorMeta):
 
     def _on_deactivate(self) -> None:
         pass
+
+
+def activating(method: Callable[..., None]) -> Callable[..., None]:
+    @wraps(method)
+    def _activating(activator: Activator, *args, **kwargs):
+        if activator is None or not isinstance(activator, Activator):
+            raise TypeError(f"Method '{method}' not of Activator class")
+        was_activated = False
+        if not activator.is_active():
+            activator.activate()
+            was_activated = True
+        try:
+            method(activator, *args, **kwargs)
+
+        finally:
+            if was_activated:
+                activator.deactivate()
+
+    return _activating
