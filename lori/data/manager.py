@@ -176,36 +176,39 @@ class DataManager(DataContext, Activator, Entity):
             self._logger.info(f"Activated {type(component).__name__} '{component.name}': {component.id}")
 
     def connect(self, *connectors: Connector, channels: Optional[Channels] = None) -> None:
-        connect_futures = []
+        connect_futures = {}
         for connector in connectors:
             if not connector.is_enabled():
                 self._logger.debug(
                     f"Skipping connecting disabled {type(connector).__name__} '{connector.name}': {connector.id}"
                 )
                 continue
+
             if connector._is_connected():
                 self._logger.debug(
                     f"Skipping already connected {type(connector).__name__} '{connector.name}': {connector.id}"
                 )
                 continue
-            connect_futures.append(self._connect(connector, channels))
-        for connect_future in futures.as_completed(connect_futures):
-            self._connect_callback(connect_future)
-        # for connect_future in connect_futures:
-        #     connect_future.add_done_callback(self._connect_callback)
 
-    def _connect(self, connector: Connector, channels: Optional[Channels] = None) -> Future:
+            connect_task = self._connect(connector, channels)
+            connect_future = self._executor.submit(connect_task)
+            connect_futures[connect_future] = connect_task
+
+        for connect_future in futures.as_completed(connect_futures):
+            # connect_future.add_done_callback(self._connect_callback)
+            self._connect_callback(connect_future)
+
+    def _connect(self, connector: Connector, channels: Optional[Channels] = None) -> ConnectTask:
         self._logger.debug(f"Connecting {type(connector).__name__} '{connector.name}': {connector.id}")
         if channels is None:
-            channels = self.channels
-        channels = channels.filter(lambda c: c.has_connector(connector.id))
-        channels.update(channels.filter(lambda c: c.has_logger(connector.id)).apply(lambda c: c.from_logger()))
+            channels = self.channels.filter(lambda c: c.has_connector(connector.id))
+            channels.update(self.channels.filter(lambda c: c.has_logger(connector.id)).apply(lambda c: c.from_logger()))
 
-        return self._executor.submit(ConnectTask(connector, channels))
+        return ConnectTask(connector, channels)
 
     def _connect_callback(self, future: Future) -> None:
         try:
-            connector = future.result().connector
+            connector = future.result()
             self._logger.info(f"Connected {type(connector).__name__} '{connector.name}': {connector.id}")
 
         except ConnectorException as e:
@@ -214,22 +217,26 @@ class DataManager(DataContext, Activator, Entity):
                 self._logger.exception(e)
 
     def reconnect(self, *connectors: Connector) -> None:
-        connect_futures = []
+        connect_futures = {}
         for connector in connectors:
             if not connector.is_enabled():
                 self._logger.debug(
                     f"Skipping reconnecting disabled {type(connector).__name__} '{connector.name}': {connector.id}"
                 )
                 continue
+
             if not connector._is_connected() and connector._connected:
                 # Connection aborted and not yet disconnected properly
                 self._disconnect(connector)
                 continue
-            connect_futures.append(self._connect(connector))
+
+            connect_task = self._connect(connector)
+            connect_future = self._executor.submit(connect_task)
+            connect_futures[connect_future] = connect_task
+
         for connect_future in futures.as_completed(connect_futures):
+            # connect_future.add_done_callback(self._connect_callback)
             self._connect_callback(connect_future)
-        # for connect_future in connect_futures:
-        #     connect_future.add_done_callback(self._connect_callback)
 
     def disconnect(self, *connectors: Connector) -> None:
         for connector in reversed(connectors):
@@ -428,8 +435,8 @@ class DataManager(DataContext, Activator, Entity):
         end: Optional[TimestampType] = None,
     ) -> bool:
         channels = self._filter_by_args(channels)
-        check_tasks = {}
-        check_futures = []
+
+        check_futures = {}
         for id, connector in self.connectors.items():
             if not connector._is_connected():
                 continue
@@ -440,9 +447,10 @@ class DataManager(DataContext, Activator, Entity):
             check_channels = channels.filter(has_database).apply(lambda c: c.from_logger())
             if len(check_channels) == 0:
                 continue
+
             check_task = CheckTask(connector, check_channels)
-            check_tasks[id] = check_task
-            check_futures.append(self._executor.submit(check_task, start=start, end=end))
+            check_future = self._executor.submit(check_task, start=start, end=end)
+            check_futures[check_future] = check_task
 
         check_results = []
         for check_future in futures.as_completed(check_futures):
@@ -451,7 +459,7 @@ class DataManager(DataContext, Activator, Entity):
                 check_results.append(check_task.exists)
 
             except ConnectorException as e:
-                self._logger.warning(f"Failed reading connector '{e.connector.id}': {str(e)}")
+                self._logger.warning(f"Failed checking connector '{e.connector.id}': {str(e)}")
                 if self._logger.getEffectiveLevel() <= logging.DEBUG:
                     self._logger.exception(e)
 
@@ -482,8 +490,8 @@ class DataManager(DataContext, Activator, Entity):
         end: Optional[TimestampType] = None,
     ) -> pd.DataFrame:
         channels = self._filter_by_args(channels)
-        read_tasks = {}
-        read_futures = []
+
+        read_futures = {}
         for id, connector in self.connectors.items():
             if not connector._is_connected():
                 continue
@@ -494,15 +502,16 @@ class DataManager(DataContext, Activator, Entity):
             read_channels = channels.filter(has_database).apply(lambda c: c.from_logger())
             if len(read_channels) == 0:
                 continue
+
             read_task = ReadTask(connector, read_channels)
-            read_tasks[id] = read_task
-            read_futures.append(self._executor.submit(read_task, start=start, end=end))
+            read_future = self._executor.submit(read_task, start=start, end=end)
+            read_futures[read_future] = read_task
 
         read_data = []
         for read_future in futures.as_completed(read_futures):
             try:
-                read_task = read_future.result()
-                read_results = read_task.results
+                read_results = read_future.result()
+                read_results.dropna(axis="columns", how="all", inplace=True)
                 if not read_results.empty:
                     read_data.append(read_results)
 
@@ -517,12 +526,10 @@ class DataManager(DataContext, Activator, Entity):
 
     # noinspection PyShadowingBuiltins, PyShadowingNames, PyUnresolvedReferences, PyTypeChecker
     def read(self, channels: Optional[Channels] = None, **kwargs) -> pd.DataFrame:
+        channels = self._filter_by_args(channels)
         time = pd.Timestamp.now(tz=tz.UTC)
-        if channels is None:
-            channels = self.channels
 
-        read_tasks = {}
-        read_futures = []
+        read_futures = {}
         for id, connector in self.connectors.items():
             if not connector._is_connected():
                 continue
@@ -530,49 +537,50 @@ class DataManager(DataContext, Activator, Entity):
             read_channels = channels.filter(lambda c: c.has_connector(id))
             if len(read_channels) == 0:
                 continue
+
             read_task = ReadTask(connector, read_channels)
-            read_tasks[id] = read_task
-            read_futures.append(self._executor.submit(read_task, **kwargs))
+            read_future = self._executor.submit(read_task, **kwargs)
+            read_futures[read_future] = read_task
+
+            def update_timestamp(read_channel: Channel) -> None:
+                read_channel.connector.timestamp = time
+
+            read_channels.apply(update_timestamp, inplace=True)
 
         read_data = []
         for read_future in futures.as_completed(read_futures):
             try:
-                read_task = read_future.result()
-                read_results = read_task.results
-                read_channels = read_task.channels
+                read_results = read_future.result()
+                read_results.dropna(axis="columns", how="all", inplace=True)
                 if not read_results.empty:
+                    read_task = read_futures[read_future]
+                    read_channels = read_task.channels
                     read_channels.set_frame(read_results)
                     read_data.append(read_results)
 
-                def update_connector(read_channel: Channel) -> None:
-                    read_channel.connector.timestamp = time
-
-                read_channels.apply(update_connector, inplace=True)
-
             except ConnectorException as e:
                 self._logger.warning(f"Failed reading connector '{e.connector.id}': {str(e)}")
-                # if self._logger.getEffectiveLevel() <= logging.DEBUG:
-                self._logger.exception(e)
+                if self._logger.getEffectiveLevel() <= logging.DEBUG:
+                    self._logger.exception(e)
 
+                # noinspection PyShadowingNames
                 def update_state(channel: Channel) -> Channel:
-                    channel.state = ChannelState.UNKNOWN_ERROR
+                    channel.state = ChannelState.READ_ERROR
                     return channel
 
-                read_task = read_tasks[e.connector.id]
+                read_task = read_futures[read_future]
                 read_task.channels.apply(update_state, inplace=True)
 
         if len(read_data) == 0:
             return pd.DataFrame()
         return pd.concat(read_data, axis="columns")
 
-    # noinspection PyShadowingBuiltins, PyTypeChecker
+    # noinspection PyShadowingBuiltins, PyShadowingNames, PyTypeChecker
     def write(self, data: pd.DataFrame, channels: Optional[Channels] = None) -> None:
         time = pd.Timestamp.now(tz=tz.UTC)
-        if channels is None:
-            channels = self.channels
+        channels = self._filter_by_args(channels)
 
-        write_tasks = {}
-        write_futures = []
+        write_futures = {}
         for id, connector in self.connectors.items():
             if not connector._is_connected():
                 continue
@@ -583,19 +591,18 @@ class DataManager(DataContext, Activator, Entity):
 
             write_channels.set_frame(data)
             write_task = WriteTask(connector, write_channels)
-            write_tasks[id] = write_task
-            write_futures.append(self._executor.submit(write_task))
+            write_future = self._executor.submit(write_task)
+            write_futures[write_future] = write_task
+
+            # noinspection PyShadowingNames
+            def update_timestamp(channel: Channel) -> None:
+                channel.connector.timestamp = time
+
+            write_channels.apply(update_timestamp, inplace=True)
 
         for write_future in futures.as_completed(write_futures):
             try:
-                write_task = write_future.result()
-                write_channels = write_task.channels
-
-                # noinspection PyShadowingNames
-                def update_connector(channel: Channel) -> None:
-                    channel.connector.timestamp = time
-
-                write_channels.apply(update_connector, inplace=True)
+                write_future.result()
 
             except ConnectorException as e:
                 self._logger.warning(f"Failed writing connector '{e.connector.id}': {str(e)}")
@@ -604,10 +611,10 @@ class DataManager(DataContext, Activator, Entity):
 
                 # noinspection PyShadowingNames
                 def update_state(channel: Channel) -> Channel:
-                    channel.state = ChannelState.UNKNOWN_ERROR
+                    channel.state = ChannelState.WRITE_ERROR
                     return channel
 
-                write_task = write_tasks[e.connector.id]
+                write_task = write_futures[write_future]
                 write_task.channels.apply(update_state, inplace=True)
 
     # noinspection PyShadowingBuiltins, PyTypeChecker
@@ -615,8 +622,7 @@ class DataManager(DataContext, Activator, Entity):
         if channels is None:
             channels = self.channels
 
-        log_tasks = {}
-        log_futures = []
+        log_futures = {}
         for id, connector in self.connectors.items():
             if not connector._is_connected():
                 continue
@@ -639,18 +645,17 @@ class DataManager(DataContext, Activator, Entity):
                 continue
 
             log_task = LogTask(connector, log_channels)
-            log_tasks[id] = log_task
-            log_futures.append(self._executor.submit(log_task))
+            log_future = self._executor.submit(log_task)
+            log_futures[log_future] = log_task
+
+            def update_timestamp(channel: Channel) -> None:
+                channel.logger.timestamp = channel.timestamp
+
+            log_channels.apply(update_timestamp, inplace=True)
 
         for write_future in futures.as_completed(log_futures):
             try:
-                log_task = write_future.result()
-                log_channels = log_task.channels
-
-                def update_logger(channel: Channel) -> None:
-                    channel.logger.timestamp = channel.timestamp
-
-                log_channels.apply(update_logger, inplace=True)
+                write_future.result()
 
             except ConnectorException as e:
                 self._logger.warning(f"Failed logging connector '{e.connector.id}': {str(e)}")

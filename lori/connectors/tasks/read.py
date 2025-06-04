@@ -15,10 +15,8 @@ from lori.connectors.tasks.task import ConnectorTask
 
 
 class ReadTask(ConnectorTask):
-    results: pd.DataFrame
-
     # noinspection PyArgumentList
-    def run(self, **kwargs) -> None:
+    def run(self, **kwargs) -> pd.DataFrame:
         self._logger.debug(
             f"Reading {len(self.channels)} channels of '{type(self.connector).__name__}': {self.connector.id}"
         )
@@ -30,4 +28,4 @@ class ReadTask(ConnectorTask):
                 self._logger.warning(
                     f"Trying to read Connector '{self.connector.id}' with unknown argument '{argument}': {value}"
                 )
-        self.results = self.connector.read(self.channels, **kwargs)
+        return self.connector.read(self.channels, **kwargs)
