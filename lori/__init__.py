@@ -50,6 +50,7 @@ from .connectors import (  # noqa: F401
     Database,
     DatabaseException,
     DatabaseUnavailableException,
+    Databases,
 )
 
 from . import components  # noqa: F401

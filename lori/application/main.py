@@ -79,12 +79,21 @@ class Application(DataManager):
         try:
             action = self.settings["action"]
             if action == "run":
-                self.run(
-                    start=self.settings.get_date("start", default=None),
-                    end=self.settings.get_date("end", default=None),
-                )
+                with self:
+                    self.run(
+                        start=self.settings.get_date("start", default=None),
+                        end=self.settings.get_date("end", default=None),
+                    )
             elif action == "start":
-                self.start()
+                with self:
+                    self.start()
+
+            elif action == "simulate":
+                with self:
+                    self.simulate(
+                        start=self.settings.get_date("start", default=None),
+                        end=self.settings.get_date("end", default=None),
+                    )
 
             elif action == "rotate":
                 self.rotate(full=self.settings.get_bool("full"))
@@ -92,11 +101,6 @@ class Application(DataManager):
             elif action == "replicate":
                 self.replicate(full=self.settings.get_bool("full"), force=self.settings.get_bool("force"))
 
-            elif action == "simulate":
-                self.simulate(
-                    start=self.settings.get_date("start", default=None),
-                    end=self.settings.get_date("end", default=None),
-                )
         except Exception as e:
             self._logger.warning(repr(e))
             if self._logger.getEffectiveLevel() <= logging.DEBUG:

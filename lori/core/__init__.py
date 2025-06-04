@@ -37,4 +37,7 @@ from .register import (  # noqa: F401
     RegistratorAccess,
 )
 
-from .activator import Activator  # noqa: F401)
+from .activator import (  # noqa: F401)
+    Activator,
+    activating,
+)

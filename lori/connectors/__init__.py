@@ -26,11 +26,15 @@ from .context import (  # noqa: F401
 from . import connector  # noqa: F401
 from .connector import Connector  # noqa: F401
 
-from .database import (  # noqa: F401
+from ..data import database  # noqa: F401
+from ..data.database import (  # noqa: F401
     Database,
     DatabaseException,
     DatabaseUnavailableException,
 )
+
+from ..data import databases  # noqa: F401
+from ..data.databases import Databases  # noqa: F401
 
 import importlib
 

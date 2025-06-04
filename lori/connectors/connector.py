@@ -17,9 +17,9 @@ from typing import Any, Dict, Optional
 
 import pandas as pd
 import pytz as tz
-from lori import Channel, Channels, ChannelState
 from lori.connectors.core import ConnectorException, ConnectType, _Connector
 from lori.core import Context, Registrator, Resource, ResourceException, Resources
+from lori.data.channels import Channel, Channels, ChannelState
 from lori.core.configs import ConfigurationException, Configurations
 from lori.core.configs.configurator import Configurator, ConfiguratorMeta
 from lori.data.validation import validate_index

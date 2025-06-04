@@ -197,8 +197,9 @@ class DataManager(DataContext, Activator, Entity):
     def _connect(self, connector: Connector, channels: Optional[Channels] = None) -> Future:
         self._logger.debug(f"Connecting {type(connector).__name__} '{connector.name}': {connector.id}")
         if channels is None:
-            channels = self.channels.filter(lambda c: c.has_connector(connector.id))
-            channels.update(self.channels.filter(lambda c: c.has_logger(connector.id)).apply(lambda c: c.from_logger()))
+            channels = self.channels
+        channels = channels.filter(lambda c: c.has_connector(connector.id))
+        channels.update(channels.filter(lambda c: c.has_logger(connector.id)).apply(lambda c: c.from_logger()))
 
         return self._executor.submit(ConnectTask(connector, channels))
 
@@ -393,8 +394,7 @@ class DataManager(DataContext, Activator, Entity):
         kwargs.update({k: v for k, v in configs.items() if k not in configs.sections})
 
         databases = Databases(self, configs)
-        future: Future = self._executor.submit(databases.replicate, self.channels, **kwargs)
-        future.result()
+        databases.replicate(self.channels, **kwargs)
 
     def rotate(self, full: bool = False, **kwargs) -> None:
         section = self.configs.get_section(Retention.SECTION, defaults={})
@@ -403,8 +403,7 @@ class DataManager(DataContext, Activator, Entity):
         kwargs["full"] = configs.pop("full", default=full)
 
         databases = Databases(self, configs)
-        future: Future = self._executor.submit(databases.rotate, self.channels, **kwargs)
-        future.result()
+        databases.rotate(self.channels, **kwargs)
 
     @overload
     def has_logged(
