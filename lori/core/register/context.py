@@ -41,7 +41,7 @@ class _RegistratorContext(Context[R], Generic[R]):
         logger: Optional[Logger] = None,
         *args,
         **kwargs,
-     ) -> None:
+    ) -> None:
         super().__init__(*args, **kwargs)
         self._section = section
         if logger is None:

@@ -9,7 +9,7 @@ lori.core.activator
 from __future__ import annotations
 
 from functools import wraps
-from typing import Dict, Callable
+from typing import Callable, Dict
 
 from lori.core.configs import ConfigurationException
 from lori.core.configs.configurator import Configurator, ConfiguratorMeta
@@ -107,4 +107,5 @@ def activating(method: Callable[..., None]) -> Callable[..., None]:
         finally:
             if was_activated:
                 activator.deactivate()
+
     return _activating
