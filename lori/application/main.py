@@ -8,7 +8,6 @@ lori.application.main
 
 from __future__ import annotations
 
-import logging
 import sys
 import traceback
 from typing import Optional, Type
@@ -76,8 +75,8 @@ class Application(DataManager):
         return self._interface
 
     def main(self) -> None:
+        action = self.settings["action"]
         try:
-            action = self.settings["action"]
             if action == "run":
                 with self:
                     self.run(
@@ -102,9 +101,8 @@ class Application(DataManager):
                 self.replicate(full=self.settings.get_bool("full"), force=self.settings.get_bool("force"))
 
         except Exception as e:
-            self._logger.warning(repr(e))
-            if self._logger.getEffectiveLevel() <= logging.DEBUG:
-                self._logger.exception(e)
+            self._logger.warning(f"Error during '{action}': {str(e)}")
+            self._logger.exception(e)
             exit(1)
 
     def start(self, wait: bool = True) -> None:
