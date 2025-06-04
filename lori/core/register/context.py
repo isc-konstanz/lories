@@ -13,6 +13,7 @@ import os
 import re
 from abc import abstractmethod
 from copy import deepcopy
+from logging import Logger
 from typing import Any, Collection, Generic, Mapping, Optional, Type, TypeVar
 
 from lori.core import Configurations, Configurator, Context, Directories, Directory, ResourceException
@@ -32,11 +33,24 @@ R = TypeVar("R", bound=Registrator)
 # noinspection SpellCheckingInspection, PyAbstractClass, PyProtectedMember
 class _RegistratorContext(Context[R], Generic[R]):
     _section: str
+    _logger: Logger
 
-    def __init__(self, section: str, *args, **kwargs) -> None:
+    def __init__(
+        self,
+        section: str,
+        logger: Optional[Logger] = None,
+        *args,
+        **kwargs,
+     ) -> None:
         super().__init__(*args, **kwargs)
-        self._logger = logging.getLogger(self.__module__)
         self._section = section
+        if logger is None:
+            logger = self._get_logger()
+        self._logger = logger
+
+    @classmethod
+    def _get_logger(cls) -> Logger:
+        return logging.getLogger(cls.__module__)
 
     def _load(
         self,

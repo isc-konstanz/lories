@@ -23,6 +23,7 @@ class RegistratorAccess(_RegistratorContext[R], Generic[R]):
     _registrar: Registrator
     __context: Context
 
+    # noinspection PyProtectedMember
     def __init__(
         self,
         context: RegistratorContext,
@@ -30,9 +31,11 @@ class RegistratorAccess(_RegistratorContext[R], Generic[R]):
         section: str,
         **kwargs,
     ) -> None:
-        super().__init__(section, **kwargs)
-        self.__context = self._assert_context(context)
-        self._registrar = self._assert_registrar(registrar)
+        context = self._assert_context(context)
+        registrar = self._assert_registrar(registrar)
+        super().__init__(section, logger=registrar._logger, **kwargs)
+        self.__context = context
+        self._registrar = registrar
 
     @classmethod
     def _assert_registrar(cls, registrar: Registrator):
