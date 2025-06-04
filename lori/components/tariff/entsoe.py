@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.components.tariff.entsoe_dayahead
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lori.components.tariff.entsoe
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -13,7 +13,7 @@ from typing import Any, Collection, Dict
 import pandas as pd
 from lori import Configurations, Constant
 from lori.components.tariff import Tariff, TariffProvider, register_tariff_type
-from lori.connectors.entsoe import EntsoeDayAheadConnector
+from lori.connectors.entsoe import EntsoeConnector
 
 CHANNELS = [
     Tariff.IMPORT,
@@ -30,16 +30,19 @@ CHANNEL_AGGREGATE_ALIAS = {}
 
 # noinspection SpellCheckingInspection
 @register_tariff_type("entsoe_tariff", "entsoe_tariff")
-class EntsoeDayAhead(TariffProvider):
-    DAY_AHEAD = Constant(float, "day_ahead", name="Tariff", unit="ct/kWh")
-
+class EntsoeProvider(TariffProvider):
     # noinspection PyUnresolvedReferences
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        connector = EntsoeDayAheadConnector(self, key="entsoe_tariff", configs=configs)
+        connector = EntsoeConnector(self, key="entsoe", name="ENTSO-e", configs=configs)
         self.connectors.add(connector)
-        self.data.add(EntsoeDayAhead.DAY_AHEAD, aggregate="mean", connector=connector.id, logger={"enabled": False})
+        
+        self.data.add(EntsoeConnector.DAY_AHEAD, 
+                      aggregate="mean", 
+                      connector=connector.id, 
+                      logger={"enabled": False},
+                      )
 
 
 def build_channels(**custom: Any) -> Collection[Dict[str, Any]]:
