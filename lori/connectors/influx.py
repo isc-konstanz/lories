@@ -10,20 +10,18 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Dict, Optional, Tuple
-import numpy as np
-import pandas as pd
 
 from influxdb_client import BucketRetentionRules, InfluxDBClient
-from influxdb_client.client.write_api import SYNCHRONOUS
 from influxdb_client.client.exceptions import InfluxDBError
+from influxdb_client.client.write_api import SYNCHRONOUS
 from influxdb_client.rest import ApiException
 from urllib3.exceptions import HTTPError, NewConnectionError
 
+import pandas as pd
 from lori.connectors import ConnectionException, Database, DatabaseException, register_connector_type
-from lori.core import Configurations, Resource, Resources, ConfigurationException
+from lori.core import ConfigurationException, Configurations, Resource, Resources
 from lori.data.util import hash_value
 from lori.typing import TimestampType
-
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
 try:
@@ -37,8 +35,8 @@ except ImportError:
 class InfluxDatabase(Database):
     host: str
     port: int
-    
-    org:  str
+
+    org: str
     bucket: str
     token: str
 
@@ -110,14 +108,14 @@ class InfluxDatabase(Database):
             existing_buckets = [b.name for b in buckets_api.find_buckets().buckets]
             if self.bucket not in existing_buckets:
                 self._logger.info(f"InfluxDB Bucket doesn't exist. Creating Bucket {self.bucket}")
-                #TODO: Configure retention from channel attributes
+                # TODO: Configure retention from channel attributes
                 retention = BucketRetentionRules(every_seconds=0)  # 0 means infinite retention
                 buckets_api.create_bucket(bucket_name=self.bucket, retention_rules=retention)
         except (ApiException, InfluxDBError, HTTPError) as e:
             self._raise(e)
 
     def disconnect(self) -> None:
-        #TODO: Check if "and ping" is necessary
+        # TODO: Check if "and ping" is necessary
         if self._client is not None and self._client.ping():
             self._client.close()
             self._client = None
@@ -266,7 +264,7 @@ class InfluxDatabase(Database):
         if mode not in ["first", "last"]:
             raise ValueError(f"Invalid mode '{mode}'")
         results = []
-   
+
         query_api = self._client.query_api()
         for measurement, measurement_resources in resources.groupby(lambda r: r.get("measurement", default=r.group)):
             for tag, tagged_resources in measurement_resources.groupby("tag"):
@@ -284,13 +282,13 @@ class InfluxDatabase(Database):
                                 columns={_get_field(r): r.id for r in tagged_resources},
                             )
                         )
-   
+
                 except (ApiException, InfluxDBError, HTTPError) as e:
                     self._raise(e)
-   
+
         if len(results) == 0:
             return pd.DataFrame(columns=[r.id for r in resources])
-   
+
         results = pd.concat(results, axis="columns")
         results.sort_index(inplace=True)
         results = results.loc[:, [r.id for r in resources if r.id in results.columns]]
@@ -372,8 +370,8 @@ class InfluxDatabase(Database):
         for measurement, group_resources in resources.groupby(lambda r: r.get("measurement", default=r.group)):
             for tag, tagged_resources in group_resources.groupby("tag"):
                 # Escaped because "tag" is a keyword
-                predicate = f"_measurement = \"{measurement}\""
-                predicate += f" AND \"tag\" = \"{tag}\"" if tag is not None else ""
+                predicate = f'_measurement = "{measurement}"'
+                predicate += f' AND "tag" = "{tag}"' if tag is not None else ""
 
                 try:
                     delete_api.delete(
