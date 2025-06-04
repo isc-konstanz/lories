@@ -108,7 +108,6 @@ class View(PageGroup):
             group = self._get_group(component)
             if group is not None:
                 group.append(page)
-                page.group = group
 
             if isinstance(page, PageGroup):
                 for page_component in page.components.values():

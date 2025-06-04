@@ -11,7 +11,7 @@ from __future__ import annotations
 import glob
 import os.path
 from collections.abc import Callable
-from typing import Any, Collection, Optional, Type, TypeVar
+from typing import Any, Collection, Mapping, Optional, Type, TypeVar
 
 from lori import Context
 from lori.components.core import _Component
@@ -71,13 +71,15 @@ class ComponentAccess(RegistratorAccess[C]):
         key: str,
         name: Optional[str] = None,
         includes: Optional[Collection[str]] = (),
+        defaults: Optional[Mapping[str, Any]] = None,
         configure: bool = False,
         sort: bool = True,
         **kwargs,
     ) -> Collection[C]:
         kwargs["factory"] = type
         components = []
-        defaults = _Component._build_defaults(self._registrar.configs, strict=True)
+        if defaults is None:
+            defaults = _Component._build_defaults(self._registrar.configs, strict=True)
         if any(i in configs.sections for i in includes):
             configs["key"] = key
             configs["name"] = name

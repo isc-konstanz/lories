@@ -32,6 +32,7 @@ class DatetimeColumn(Column):
         self,
         name: str,
         type: ColumnType,
+        *args,
         default: Optional[Any] = None,
         nullable: bool = True,
         timezone: tz.BaseTzInfo = tz.UTC,
@@ -49,7 +50,14 @@ class DatetimeColumn(Column):
                 default = func.current_date()
             elif type == TIME:
                 default = func.current_time()
-        super().__init__(name, type(timezone), default=default, nullable=nullable, **kwargs)
+        super().__init__(
+            name,
+            type(timezone),
+            *args,
+            default=default,
+            nullable=nullable,
+            **kwargs,
+        )
         self.timezone = timezone
 
     # noinspection PyUnresolvedReferences
