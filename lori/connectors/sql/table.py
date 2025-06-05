@@ -88,6 +88,16 @@ class Table(sql.Table):
                 clauses.append(primary_index <= primary_index.validate(end))
         return clauses
 
+    # noinspection PyTypeChecker
+    def _surrogate_clauses(self, resources: Resources) -> List[ClauseElement]:
+        clauses = []
+
+        for groups, _ in self._groupby(resources):
+            for key, value in groups.items():
+                column = self.primary_key.columns[key]
+                clauses.append(column == value)
+        return clauses
+
     def extract(self, resources: Resources, result: Result[Any]) -> pd.DataFrame:
         result_columns = [r.id for r in resources]
         results = []
@@ -127,11 +137,17 @@ class Table(sql.Table):
                 group_data.loc[:, [index_column.name]] = index_data
                 group_data = group_data.set_index(index_column.name).tz_localize(tz.UTC)
 
-            group_data = group_data.dropna(axis="index", how="all").rename(
-                columns={r.get("column", default=r.key): r.id for r in group_resources}
+            group_data.dropna(axis="index", how="all", inplace=True)
+            group_data.rename(
+                columns={r.get("column", default=r.key): r.id for r in group_resources},
+                inplace=True,
             )
-            results.append(group_data[group_resources.ids])
+            if not group_data.empty:
+                group_data = group_data[[r.id for r in group_resources if r.id in group_data.columns]]
+                results.append(group_data)
 
+        if len(results) == 0:
+            return pd.DataFrame()
         results = pd.concat(sorted(results, key=lambda d: min(d.index)), axis="index")
         for result_column in [c for c in result_columns if c not in results.columns]:
             results.loc[:, [result_column]] = np.nan
@@ -144,8 +160,11 @@ class Table(sql.Table):
         end: Optional[TimestampType] = None,
     ) -> Select:
         columns = self.__get_columns(resources)
-        query = sql.select(*columns).where(and_(*self._primary_clauses(start, end))).subquery()
-        query = sql.select(func.count().label("count")).select_from(query)
+        select = sql.select(*columns)
+        select = select.where(and_(*self._surrogate_clauses(resources)))
+        select = select.where(and_(*self._primary_clauses(start, end)))
+        select = select.subquery(name="exists_range")
+        query = sql.select(func.count().label("count")).select_from(select)
         return query
 
     # noinspection PyShadowingBuiltins, PyProtectedMember, PyArgumentList
@@ -180,6 +199,7 @@ class Table(sql.Table):
         if len(nullable) > 0:
             # Make sure to only query valid values
             select = select.filter(not_(and_(*[c.is_(None) for c in columns if c.nullable])))
+        select = select.where(and_(*self._surrogate_clauses(resources)))
         select = select.where(and_(*self._primary_clauses(start, end)))
         select = select.order_by(*self._primary_order("asc"))
         select = select.subquery(name="hash_range")
@@ -198,6 +218,7 @@ class Table(sql.Table):
     ) -> Select:
         columns = self.__get_columns(resources)
         query = sql.select(*columns)
+        query = query.where(and_(*self._surrogate_clauses(resources)))
         query = query.where(and_(*self._primary_clauses(start, end)))
         return query.order_by(*self._primary_order(order_by))
 
@@ -269,15 +290,16 @@ class Table(sql.Table):
     def _groupby(self, resources: Resources) -> Iterator[Tuple[Dict[str, Any], Resources]]:
         groups: List[Tuple[Dict[str, Any], Resources]] = []
 
+        surrogate_keys = [c for c in self.primary_key.columns if isinstance(c, SurrogateKeyColumn)]
+
         def _group(resource: Resource) -> Resource:
             attributes = {}
-            surrogate_keys = [c for c in self.primary_key.columns if isinstance(c, SurrogateKeyColumn)]
-            for column in surrogate_keys:
-                if not hasattr(resource, column.attribute):
+            for surrogate_key in surrogate_keys:
+                if not hasattr(resource, surrogate_key.attribute):
                     raise ResourceException(
-                        f"SQL resource '{resource.id}' missing surrogate key attribute: {column.attribute}"
+                        f"SQL resource '{resource.id}' missing surrogate key attribute: {surrogate_key.attribute}"
                     )
-                attributes[column.name] = getattr(resource, column.attribute)
+                attributes[surrogate_key.name] = getattr(resource, surrogate_key.attribute)
             for group in groups:
                 if group[0] == attributes:
                     group[1].append(resource)
