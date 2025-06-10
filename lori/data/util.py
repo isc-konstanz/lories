@@ -92,8 +92,10 @@ def resample(
         elif func == "last":
             data = resampled.last()
         data.index += freq
-    data.index.name = index.name
 
+    data.dropna(axis="columns", how="all", inplace=True)
+    data.dropna(axis="index", how="all", inplace=True)
+    data.index.name = index.name
     return data
 
 

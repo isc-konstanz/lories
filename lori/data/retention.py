@@ -145,7 +145,7 @@ class Retention:
                 if end is not None:
                     end = min(floor_date(end, freq=self.freq), retain)
 
-                if any(t is None for t in [start, end]) or start >= end:
+                if (any(t is None for t in [start, end]) or start >= end) and not full:
                     self._logger.debug(
                         f"Skip aggregating values of resource{'s' if len(resample_resources) > 1 else ''} "
                         + ", ".join([f"'{r.id}'" for r in resample_resources])
