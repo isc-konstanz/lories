@@ -153,11 +153,11 @@ class Retention:
                     )
                     continue
 
-                if end - start < to_timedelta(self.freq):
+                if end - start < to_timedelta(self.freq) and not full:
                     self._logger.debug(
                         f"Skip aggregating data of resource{'s' if len(resample_resources) > 1 else ''} "
                         + ", ".join([f"'{r.id}'" for r in resample_resources])
-                        + f"to {end.strftime('%d.%m.%Y (%H:%M:%S)')}"
+                        + f" to {end.strftime('%d.%m.%Y (%H:%M:%S)')}"
                     )
                     continue
 
