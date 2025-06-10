@@ -68,9 +68,8 @@ class EntsoeConnector(Connector):
 
         results = []
         country_code = self._get_country_code(self.country_code, start, end)
-        for key, keyed_resources in resources.groupby(lambda x: x.key):
-            if key == EntsoeConnector.DAY_AHEAD:
-
+        for method, method_resources in resources.groupby("method"):
+            if method.lower() == EntsoeConnector.DAY_AHEAD:
                 # TODO: Exception handling
                 try:
                     prices = self._client.query_day_ahead_prices(country_code, start=start, end=end)
@@ -83,7 +82,7 @@ class EntsoeConnector(Connector):
                     raise ConnectorException(self, str(e))
 
                 result = pd.DataFrame()
-                for resource in keyed_resources:
+                for resource in method_resources:
                     # Append the resource id to the series
                     result[resource.id] = prices
                 results.append(result)

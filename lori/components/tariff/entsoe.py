@@ -26,6 +26,7 @@ class EntsoeProvider(TariffProvider):
 
         self.data.add(
             EntsoeProvider.PRICE_DAY_AHEAD,
+            method=EntsoeConnector.DAY_AHEAD,
             aggregate="mean",
             connector=entsoe_connector.id,
             logger={"enabled": False},
