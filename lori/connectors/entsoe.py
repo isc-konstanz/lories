@@ -8,50 +8,48 @@ lori.connectors.entsoe
 
 from __future__ import annotations
 
-from abc import abstractmethod
 from typing import Optional
-import numpy as np
-import pandas as pd
 
 # TODO: add to requirements
 from entsoe import EntsoePandasClient
 from entsoe.mappings import Area as EntsoeArea
-from urllib3.exceptions import MaxRetryError
 from requests.exceptions import HTTPError
+from urllib3.exceptions import MaxRetryError
 
-from lori.connectors import ConnectorException, ConnectionException, Connector
-from lori.core import ConfigurationException, Configurations, Resources, Constant
+import pandas as pd
+from lori.connectors import ConnectionException, Connector, ConnectorException
+from lori.core import ConfigurationException, Configurations, Resources
 from lori.typing import TimestampType
 
 
-# noinspection PyShadowingBuiltins
+# noinspection SpellCheckingInspection
 class EntsoeConnector(Connector):
-    DAY_AHEAD = Constant(float, "day_ahead", name="Day-Ahead", unit="ct/kWh")
+    DAY_AHEAD: str = "day_ahead"
 
-    api_key: str
-    country_code: str = 'DE_LU'  # Germany-Luxembourg
+    country_code: str = "DE_LU"  # Germany-Luxembourg
+    _api_key: str
 
     _client: Optional[EntsoePandasClient] = None
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-
-        self.api_key = configs.get("api_key")
-        if self.api_key is None:
+        self.country_code = self._validate_country_code(
+            configs.get("country_code", default=EntsoeConnector.country_code)
+        )
+        self._api_key = configs.get("_api_key")
+        if self._api_key is None:
             raise ConfigurationException("Missing security token")
 
-        self.country_code = configs.get("country_code")
-        self._validate_country_code()
-
-    def _validate_country_code(self) -> None:
+    def _validate_country_code(self, country_code) -> str:
         """Validate the country code against the Entsoe mappings."""
-        if self.country_code is None:
+        if country_code is None:
             raise ConfigurationException("Missing country code")
         elif not (EntsoeArea.has_code(self.country_code) or self.country_code == "DE"):
             raise ConfigurationException(f"Invalid country code: {self.country_code}.")
+        return country_code
 
     def connect(self, resources: Resources) -> None:
-        self._client = EntsoePandasClient(api_key=self.api_key)
+        self._client = EntsoePandasClient(api_key=self._api_key)
 
     def disconnect(self) -> None:
         if self._client is not None:
@@ -61,10 +59,10 @@ class EntsoeConnector(Connector):
         return self._client is not None
 
     def read(
-            self,
-            resources: Resources,
-            start: Optional[TimestampType] = None,
-            end: Optional[TimestampType] = None,
+        self,
+        resources: Resources,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> pd.DataFrame:
         # TODO: Expected behavior if start==None and end==None or just one of them is None
 
@@ -75,7 +73,8 @@ class EntsoeConnector(Connector):
 
                 # TODO: Exception handling
                 try:
-                    ts = self._client.query_day_ahead_prices(country_code, start=start, end=end)
+                    prices = self._client.query_day_ahead_prices(country_code, start=start, end=end)
+
                 except (MaxRetryError, HTTPError) as e:
                     if isinstance(e, MaxRetryError):
                         raise ConnectionException(self, str(e))
@@ -84,18 +83,17 @@ class EntsoeConnector(Connector):
                     raise ConnectorException(self, str(e))
 
                 result = pd.DataFrame()
-                for r in keyed_resources:
-                    # append the resource id to the series
-                    result[r.id] = ts
-
+                for resource in keyed_resources:
+                    # Append the resource id to the series
+                    result[resource.id] = prices
                 results.append(result)
 
         if len(results) == 0:
-            return pd.DataFrame(columns=[r.id for r in resources])
+            return pd.DataFrame()
 
         results = sorted(results, key=lambda d: min(d.index))
-        df = pd.concat(results, axis="columns")
-        return df
+        data = pd.concat(results, axis="columns")
+        return data
 
     def write(self, data: pd.DataFrame) -> None:
         raise NotImplementedError("EntsoeConnector does not support writing data")
@@ -110,7 +108,7 @@ class EntsoeConnector(Connector):
         # DE_AT_LU	yes	    yes	    yes	    yes	    no	    no	    no
         # DE_LU	    no	    no  	no  	yes 	yes 	yes 	yes
         # AT	    no	    no  	no  	yes 	yes 	yes 	yes
-        
+
         if county_code in ["DE", "AT", "LU"]:
             if end.year < 2019:
                 return "DE_AT_LU"
@@ -128,6 +126,3 @@ class EntsoeConnector(Connector):
                 return "AT"
 
         return county_code
-
-
-

@@ -15,7 +15,6 @@ from lori.components import Component, register_component_type
 from lori.core import Configurations, Constant, Context, ResourceException, ResourceUnavailableException
 from lori.core.activator import ActivatorMeta
 from lori.core.register import Registrator, Registry
-from lori.location import Location, LocationUnavailableException
 
 
 # noinspection PyShadowingBuiltins
@@ -56,8 +55,8 @@ class TariffMeta(ActivatorMeta):
 # noinspection SpellCheckingInspection
 @register_component_type("tariff")
 class Tariff(Component, metaclass=TariffMeta):
-    IMPORT = Constant(float, "import", name="Import Tariff", unit="ct/kWh")
-    EXPORT = Constant(float, "export", name="Export Tariff", unit="ct/kWh")
+    PRICE_IMPORT = Constant(float, "price_import", name="Import Tariff Price", unit="ct/kWh")
+    PRICE_EXPORT = Constant(float, "price_export", name="Export Tariff Price", unit="ct/kWh")
 
 
 class TariffException(ResourceException):
@@ -69,7 +68,7 @@ class TariffException(ResourceException):
 
 class TariffUnavailableException(ResourceUnavailableException, TariffException):
     """
-    Raise if a configured tariff access can not be found.
+    Raise if a configured tariff can not be found.
 
     """
 

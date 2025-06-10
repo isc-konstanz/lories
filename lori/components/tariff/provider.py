@@ -20,5 +20,5 @@ from lori.core import Configurations
 class TariffProvider(Tariff):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self.data.add(Tariff.IMPORT, aggregate="mean", connector=None)
-        self.data.add(Tariff.EXPORT, aggregate="mean", connector=None)
+        self.data.add(Tariff.PRICE_IMPORT, aggregate="mean", connector=None)
+        self.data.add(Tariff.PRICE_EXPORT, aggregate="mean", connector=None)
