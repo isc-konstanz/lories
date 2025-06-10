@@ -95,5 +95,7 @@ class InterfaceException(ResourceException):
 
 InterfaceType = TypeVar("InterfaceType", bound=Interface)
 
-_instance: Optional[InterfaceType] = None
+# FIXME: Add global variable typing again once Python >= 3.9 is a requirement
+# _instance: Optional[InterfaceType] = None
+_instance = None
 registry = Registry[Interface]()
