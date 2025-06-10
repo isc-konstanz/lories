@@ -271,6 +271,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
 
         if len(results) == 0:
             return pd.DataFrame()
+        results = sorted(results, key=lambda d: min(d.index))
         return pd.concat(results, axis="columns")
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
@@ -294,6 +295,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
 
         if len(results) == 0:
             return pd.DataFrame()
+        results = sorted(results, key=lambda d: min(d.index))
         return pd.concat(results, axis="columns")
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
@@ -317,6 +319,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
 
         if len(results) == 0:
             return pd.DataFrame()
+        results = sorted(results, key=lambda d: min(d.index))
         return pd.concat(results, axis="columns")
 
     # noinspection PyTypeChecker
