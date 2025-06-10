@@ -180,7 +180,7 @@ class Retention:
                     data = database.read(resample_resources, start=resample_start, end=resample_end)
                     if data is None or data.empty:
                         self._logger.debug(
-                            f"Skipping empty resampling range resource{'s' if len(resample_resources) > 1 else ''} "
+                            f"Skipping empty resampling range of resource{'s' if len(resample_resources) > 1 else ''} "
                             + ", ".join([f"'{r.id}'" for r in resample_resources])
                             + f" from {resample_start.strftime('%d.%m.%Y (%H:%M:%S)')}"
                             + f" to {resample_end.strftime('%d.%m.%Y (%H:%M:%S)')}"
@@ -203,7 +203,7 @@ class Retention:
                     resampled_data = resample(data, self.resample, self.method)
                     if hash_data(resampled_data) != hash_data(data):
                         self._logger.debug(
-                            f"Starting to aggregate {len(data)} to {len(resampled_data)} values"
+                            f"Starting to resample {len(data)} to {len(resampled_data)} values"
                             + f" of resource{'s' if len(resample_resources) > 1 else ''} "
                             + ", ".join([f"'{r.id}'" for r in resample_resources])
                             + f" from {resample_start.strftime('%d.%m.%Y (%H:%M:%S)')}"
@@ -213,12 +213,19 @@ class Retention:
                         database.write(resampled_data)
 
                         self._logger.info(
-                            f"Aggregated {len(data)} to {len(resampled_data)} values"
+                            f"Resampled {len(data)} to {len(resampled_data)} values"
                             + f" of resource{'s' if len(resample_resources) > 1 else ''} "
                             + f" from {start.strftime('%d.%m.%Y (%H:%M:%S)')}"
                             + f" to {end.strftime('%d.%m.%Y (%H:%M:%S)')}"
                         )
-                    elif not full:
+                    elif not not full:
+                        self._logger.debug(
+                            f"Skipping already resampled range of resource{'s' if len(resample_resources) > 1 else ''} "
+                            + ", ".join([f"'{r.id}'" for r in resample_resources])
+                            + f" from {resample_start.strftime('%d.%m.%Y (%H:%M:%S)')}"
+                            + f" to {resample_end.strftime('%d.%m.%Y (%H:%M:%S)')}"
+                        )
+                    else:
                         self._logger.debug(
                             f"Ending aggregation of resource{'s' if len(resample_resources) > 1 else ''} "
                             + ", ".join([f"'{r.id}'" for r in resample_resources])
