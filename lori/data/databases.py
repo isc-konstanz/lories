@@ -104,10 +104,12 @@ class Databases(ConnectorContext, Configurator):
             retentions.extend(channel.retentions, unique=True)
             return channel
 
-        channels = channels.apply(build_rotation).filter(lambda c: c.rotate is not None)
+        channels = channels.apply(build_rotation).filter(lambda c: c.rotate is not None or len(c.retentions) > 0)
         self.connect(channels)
         try:
             for rotation, rotation_channels in channels.groupby(lambda c: c.rotate):
+                if rotation is None:
+                    continue
                 freq = self.configs.get("freq", default="D")
                 timezone = to_timezone(self.configs.get("timezone", default=tzlocal.get_localzone_name()))
                 rotate = floor_date(pd.Timestamp.now(tz=timezone) - to_timedelta(rotation), freq=freq)
