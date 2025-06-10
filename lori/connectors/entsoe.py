@@ -26,7 +26,7 @@ from lori.typing import TimestampType
 class EntsoeConnector(Connector):
     DAY_AHEAD: str = "day_ahead"
 
-    country_code: str = "DE_LU"  # Germany-Luxembourg
+    country_code: str
     _api_key: str
 
     _client: Optional[EntsoePandasClient] = None
@@ -34,18 +34,18 @@ class EntsoeConnector(Connector):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
         self.country_code = self._validate_country_code(
-            configs.get("country_code", default=EntsoeConnector.country_code)
+            configs.get("country_code")
         )
-        self._api_key = configs.get("_api_key")
+        self._api_key = configs.get("api_key")
         if self._api_key is None:
             raise ConfigurationException("Missing security token")
 
     def _validate_country_code(self, country_code) -> str:
         """Validate the country code against the Entsoe mappings."""
         if country_code is None:
-            raise ConfigurationException("Missing country code")
-        elif not (EntsoeArea.has_code(self.country_code) or self.country_code == "DE"):
-            raise ConfigurationException(f"Invalid country code: {self.country_code}.")
+            raise ConfigurationException(self, "Missing country code")
+        elif not (EntsoeArea.has_code(country_code) or country_code == "DE"):
+            raise ConfigurationException(self, f"Invalid country code: {country_code}.")
         return country_code
 
     def connect(self, resources: Resources) -> None:
@@ -83,7 +83,6 @@ class EntsoeConnector(Connector):
 
                 result = pd.DataFrame()
                 for resource in method_resources:
-                    # Append the resource id to the series
                     result[resource.id] = prices
                 results.append(result)
 
