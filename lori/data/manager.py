@@ -455,8 +455,8 @@ class DataManager(DataContext, Activator, Entity):
         check_results = []
         for check_future in futures.as_completed(check_futures):
             try:
-                check_task = check_future.result()
-                check_results.append(check_task.exists)
+                check_exists = check_future.result()
+                check_results.append(check_exists)
 
             except ConnectorException as e:
                 self._logger.warning(f"Failed checking connector '{e.connector.id}': {str(e)}")

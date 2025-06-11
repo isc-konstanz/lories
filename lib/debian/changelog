@@ -1,5 +1,12 @@
 lori (<version>) stable; urgency=medium
 
+  * Fix full database rotation being skipped
+  * Fix bloating NaN values in database rotation
+
+ -- Adrian Minde <adrian.minde@isc-konstanz.de>  Tue, 10 Jun 2025 11:30:00 +0200
+
+lori (0.14.2) stable; urgency=medium
+
   * Fix global variable typing for Python < v3.9
 
  -- Adrian Minde <adrian.minde@isc-konstanz.de>  Tue, 10 Jun 2025 09:00:00 +0200
