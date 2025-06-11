@@ -162,7 +162,8 @@ class Retention:
                     continue
 
                 self._logger.debug(
-                    f"Start aggregating data of resource{'s' if len(resample_resources) > 1 else ''} "
+                    f"Start aggregating data"
+                    + f" of resource{'s' if len(resample_resources) > 1 else ''} "
                     + ", ".join([f"'{r.id}'" for r in resample_resources])
                     + f" up to {end.strftime('%d.%m.%Y (%H:%M:%S)')}"
                 )
@@ -171,7 +172,8 @@ class Retention:
                 resample_ranges.reverse()
                 for resample_start, resample_end in resample_ranges:
                     self._logger.debug(
-                        f"Start resampling data of resource{'s' if len(resample_resources) > 1 else ''} "
+                        f"Start resampling data"
+                        + f" of resource{'s' if len(resample_resources) > 1 else ''} "
                         + ", ".join([f"'{r.id}'" for r in resample_resources])
                         + f" from {resample_start.strftime('%d.%m.%Y (%H:%M:%S)')}"
                         + f" to {resample_end.strftime('%d.%m.%Y (%H:%M:%S)')}"
@@ -180,7 +182,8 @@ class Retention:
                     data = database.read(resample_resources, start=resample_start, end=resample_end)
                     if data is None or data.empty:
                         self._logger.debug(
-                            f"Skipping empty resampling range of resource{'s' if len(resample_resources) > 1 else ''} "
+                            f"Skipping empty resampling range"
+                            + f" of resource{'s' if len(resample_resources) > 1 else ''} "
                             + ", ".join([f"'{r.id}'" for r in resample_resources])
                             + f" from {resample_start.strftime('%d.%m.%Y (%H:%M:%S)')}"
                             + f" to {resample_end.strftime('%d.%m.%Y (%H:%M:%S)')}"
@@ -215,19 +218,22 @@ class Retention:
                         self._logger.info(
                             f"Resampled {len(data)} to {len(resampled_data)} values"
                             + f" of resource{'s' if len(resample_resources) > 1 else ''} "
-                            + f" from {start.strftime('%d.%m.%Y (%H:%M:%S)')}"
-                            + f" to {end.strftime('%d.%m.%Y (%H:%M:%S)')}"
+                            + ", ".join([f"'{r.id}'" for r in resample_resources])
+                            + f" from {resample_start.strftime('%d.%m.%Y (%H:%M:%S)')}"
+                            + f" to {resample_end.strftime('%d.%m.%Y (%H:%M:%S)')}"
                         )
                     elif not not full:
                         self._logger.debug(
-                            f"Skipping already resampled range of resource{'s' if len(resample_resources) > 1 else ''} "
+                            f"Skipping already resampled range"
+                            + f" of resource{'s' if len(resample_resources) > 1 else ''} "
                             + ", ".join([f"'{r.id}'" for r in resample_resources])
                             + f" from {resample_start.strftime('%d.%m.%Y (%H:%M:%S)')}"
                             + f" to {resample_end.strftime('%d.%m.%Y (%H:%M:%S)')}"
                         )
                     else:
                         self._logger.debug(
-                            f"Ending aggregation of resource{'s' if len(resample_resources) > 1 else ''} "
+                            f"Ending aggregation"
+                            + f" of resource{'s' if len(resample_resources) > 1 else ''} "
                             + ", ".join([f"'{r.id}'" for r in resample_resources])
                             + " as data is already resampled"
                             + f" from {resample_start.strftime('%d.%m.%Y (%H:%M:%S)')}"
