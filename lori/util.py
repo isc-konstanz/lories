@@ -337,25 +337,29 @@ def to_bool(value: str | bool) -> Optional[bool]:
 def parse_freq(freq: str) -> Optional[str]:
     if freq is None:
         return None
-    value = "".join(s for s in freq if s.isnumeric())
-    value = int(value) if len(value) > 0 else 1
+    match = re.fullmatch(r"\s*(\d*)\s*([a-zA-Z]+)\s*", freq)
+    if not match:
+        raise ValueError(f"Invalid frequency format: '{freq}'")
+
+    number_part, unit_part = match.groups()
+    value = int(number_part) if number_part else 1.0
 
     def _parse_freq(suffix: str) -> str:
         return str(value) + suffix if value > 1 else suffix
 
-    if freq.lower().endswith(("y", "year", "years")):
+    if unit_part.lower() in ["y", "year", "years"]:
         return _parse_freq("Y")
-    elif freq.lower().endswith(("m", "month", "months")):
+    elif unit_part.lower() in ["m", "month", "months"]:
         return _parse_freq("M")
-    elif freq.lower().endswith(("w", "week", "weeks")):
+    elif unit_part.lower() in ["w", "week", "weeks"]:
         return _parse_freq("W")
-    elif freq.lower().endswith(("d", "day", "days")):
+    elif unit_part.lower() in ["d", "day", "days"]:
         return _parse_freq("D")
-    elif freq.lower().endswith(("h", "hour", "hours")):
+    elif unit_part.lower() in ["h", "hour", "hours"]:
         return _parse_freq("h")
-    elif freq.lower().endswith(("t", "min", "mins")):
+    elif unit_part.lower() in ["t", "min", "mins"]:
         return _parse_freq("min")
-    elif freq.lower().endswith(("s", "sec", "secs")):
+    elif unit_part.lower() in ["s", "sec", "secs"]:
         return _parse_freq("s")
     else:
         raise ValueError(f"Invalid frequency: {freq}")
