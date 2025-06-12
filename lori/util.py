@@ -337,12 +337,12 @@ def to_bool(value: str | bool) -> Optional[bool]:
 def parse_freq(freq: str) -> Optional[str]:
     if freq is None:
         return None
-    match = re.fullmatch(r"\s*(\d*\.?\d*)\s*([a-zA-Z]+)\s*", freq)
+    match = re.fullmatch(r"\s*(\d*)\s*([a-zA-Z]+)\s*", freq)
     if not match:
         raise ValueError(f"Invalid frequency format: '{freq}'")
 
     number_part, unit_part = match.groups()
-    value = float(number_part) if number_part else 1.0
+    value = int(number_part) if number_part else 1.0
 
     def _parse_freq(suffix: str) -> str:
         return str(value) + suffix if value > 1 else suffix
