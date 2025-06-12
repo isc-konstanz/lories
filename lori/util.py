@@ -344,10 +344,6 @@ def parse_freq(freq: str) -> Optional[str]:
     number_part, unit_part = match.groups()
     value = float(number_part) if number_part else 1.0
 
-    #value = "".join(s for s in freq if s.isnumeric())
-    #value = int(value) if len(value) > 0 else 1
-    #string = "".join(s for s in freq if not s.isnumeric())
-
     def _parse_freq(suffix: str) -> str:
         return str(value) + suffix if value > 1 else suffix
 
