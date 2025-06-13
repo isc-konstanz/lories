@@ -260,11 +260,11 @@ class Table(sql.Table):
         query = query.where(and_(*self._primary_clauses(start, end)))
         return query
 
+    # noinspection PyTypeChecker
     def _validate(self, resources: Resources, data: pd.DataFrame) -> List[Dict[str, Any]]:
         values = []
 
         for group, group_resources in self._groupby(resources):
-            group_columns = self.__get_columns(group_resources)
             group_data = data[group_resources.ids].dropna(axis="index", how="all")
 
             array_resources = group_resources.filter(lambda r: issubclass(r.type, pd.api.extensions.ExtensionArray))
@@ -272,7 +272,7 @@ class Table(sql.Table):
                 group_data = group_data.explode([r.id for r in array_resources])
             group_data.rename(columns={r.id: r.get("column", default=r.key) for r in group_resources}, inplace=True)
 
-            for column in group_columns:
+            for column in self.columns:
                 if self.__is_datetime_index(column):
                     column_data = group_data.index
                 elif column.name in group_data.columns:
@@ -280,7 +280,7 @@ class Table(sql.Table):
                 elif column.name in group:
                     column_data = group[column.name]
                 else:
-                    continue
+                    column_data = None
                 group_data[column.name] = column.validate(column_data)
 
             values.extend(group_data.to_dict(orient="records"))
