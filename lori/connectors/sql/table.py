@@ -125,7 +125,11 @@ class Table(sql.Table):
             group_data = data[data.apply(_is_group, axis="columns")]
 
             for column in [c for c in group_columns if isinstance(c, DatetimeColumn)]:
-                group_data[column.name] = group_data[column.name].dt.tz_localize(column.timezone)
+                # Drop existing column, as the dtype will change from datetime64[ns] to datetime64[ns, UTC],
+                # which is forbidden
+                column_data = group_data[column.name].dt.tz_localize(column.timezone)
+                group_data.drop(columns=[column.name], inplace=True)
+                group_data[column.name] = column_data
 
             if self.datetime_index_type == DatetimeIndexType.DATE_AND_TIME:
                 date_column, time_column, *_ = self.primary_key.columns
@@ -264,7 +268,7 @@ class Table(sql.Table):
         if self.columns != columns:
             raise ResourceException(f"Unable to delete rows of table '{self.name}' with only subset of columns")
         query = super().delete()
-        query = query.where(and_(*self._primary_clauses(start, end)))
+        query = query.where(and_(*self._primary_clauses(resources, start, end)))
         return query
 
     # noinspection PyTypeChecker
