@@ -12,8 +12,10 @@ import logging
 from collections.abc import Callable
 from logging import Logger
 from threading import Lock
+from typing import Optional
 
 import pandas as pd
+import pytz as tz
 from lori.core import Entity, ResourceException
 from lori.data import Channel, Channels
 
@@ -36,7 +38,8 @@ class Listener(Entity):
     _function: Callable[[pd.DataFrame], None]
     channels: Channels
 
-    timestamp: pd.Timestamp = pd.NaT
+    __start: pd.Timestamp = pd.NaT
+    __complete: pd.Timestamp = pd.NaT
 
     def __init__(
         self,
@@ -57,6 +60,7 @@ class Listener(Entity):
         self.channels = channels
 
     def __call__(self, timestamp: pd.Timestamp) -> Listener:
+        self.__start = pd.Timestamp.now(tz=tz.UTC)
         try:
             self.__lock.acquire()
             self.run()
@@ -64,9 +68,20 @@ class Listener(Entity):
         except Exception as e:
             raise ListenerException(self, str(e))
         finally:
-            self.timestamp = timestamp
+            self.__complete = timestamp
             self.__lock.release()
-        return self
+            self._logger.debug(f"Listener '{self.id}' finished after {round(self.runtime, 3)} seconds")
+            return self
+
+    @property
+    def timestamp(self) -> pd.Timestamp | pd.NaT:
+        return self.__complete
+
+    @property
+    def runtime(self) -> Optional[float]:
+        if pd.isna(self.__start):
+            return None
+        return (pd.Timestamp.now(tz=tz.UTC) - self.__start).total_seconds()
 
     def run(self) -> None:
         data = self.channels.to_frame(unique=self._unique)
