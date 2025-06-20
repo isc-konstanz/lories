@@ -392,8 +392,7 @@ class DataManager(DataContext, Activator, Entity):
                 channels = self.channels.filter(lambda c: is_reading(c, now))
                 if len(channels) > 0:
                     self._logger.debug(f"Reading {len(channels)} channels of application: {self.name}")
-                    self.read(channels, timeout=0)
-                    #self.read(channels, timeout=_timeout(now) - 0.5)
+                    self.read(channels, timeout=_timeout(now) - 0.5)
 
                 self.__interrupt.wait(0.1)
                 self._listeners.wait(0.1, self.__interrupt.wait)
