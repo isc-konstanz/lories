@@ -128,7 +128,7 @@ class Table(sql.Table):
                 # Drop existing column, as the dtype will change from datetime64[ns] to datetime64[ns, UTC],
                 # which is forbidden
                 column_data = group_data[column.name].dt.tz_localize(column.timezone)
-                group_data.drop(columns=[column.name], inplace=True)
+                group_data = group_data.drop(columns=[column.name])
                 group_data[column.name] = column_data
 
             if self.datetime_index_type == DatetimeIndexType.DATE_AND_TIME:
