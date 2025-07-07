@@ -25,6 +25,7 @@ from lori.typing import TimestampType
 # noinspection SpellCheckingInspection
 class EntsoeConnector(Connector):
     DAY_AHEAD: str = "day_ahead"
+    METHODS: list = [DAY_AHEAD]
 
     country_code: str
     _api_key: str
@@ -34,7 +35,7 @@ class EntsoeConnector(Connector):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
         self.country_code = self._validate_country_code(
-            configs.get("country_code")
+            configs.get("country_code").upper()
         )
         self._api_key = configs.get("api_key")
         if self._api_key is None:
@@ -69,6 +70,9 @@ class EntsoeConnector(Connector):
         results = []
         country_code = self._get_country_code(self.country_code, start, end)
         for method, method_resources in resources.groupby("method"):
+            if method not in self.METHODS:
+                raise ConnectorException(self, f"Unsupported method: {method}. Supported methods: {self.METHODS}")
+
             if method.lower() == EntsoeConnector.DAY_AHEAD:
                 # TODO: Exception handling
                 try:
