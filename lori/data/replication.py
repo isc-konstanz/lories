@@ -214,7 +214,7 @@ def replicate(
         logger.debug(
             f"Skip copying values of resource{'s' if len(resources) > 1 else ''} "
             + ", ".join([f"'{r.id}'" for r in resources])
-            + " without any new values found"
+            + " without any values found"
         )
         return
 

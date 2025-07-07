@@ -114,8 +114,10 @@ class ListenerContext(Context[Listener]):
             if any(c.id in ids for c in channels) and listener.has_update():
                 if listener.locked():
                     self._logger.warning(
-                        f"Listener '{listener.id}' not finished yet. Please verify your configurations"
+                        f"Listener '{listener.id}' not finished after {round(listener.runtime, 3)} seconds. "
+                        f"Please verify your configurations"
                     )
+                    listener.cancel()
                 listeners.append(listener)
         return listeners
 
@@ -137,3 +139,5 @@ class ListenerContext(Context[Listener]):
 
         while has_locked() and not is_timeout():
             sleep(0.01)
+        if is_timeout():
+            pass

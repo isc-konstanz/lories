@@ -12,7 +12,7 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import sqlalchemy as sql
 from sqlalchemy import ClauseElement, Dialect, Result, UnaryExpression
-from sqlalchemy.sql import Delete, Insert, Select, and_, asc, between, desc, func, literal, not_, text
+from sqlalchemy.sql import Delete, Insert, Select, and_, asc, between, desc, func, literal, not_, or_, text
 from sqlalchemy.types import BLOB, DATETIME, TIMESTAMP
 
 import numpy as np
@@ -74,6 +74,7 @@ class Table(sql.Table):
 
     def _primary_clauses(
         self,
+        resources: Resources,
         start: Optional[TimestampType] = None,
         end: Optional[TimestampType] = None,
     ) -> List[ClauseElement]:
@@ -86,6 +87,12 @@ class Table(sql.Table):
                 clauses.append(primary_index >= primary_index.validate(start))
             elif end is not None:
                 clauses.append(primary_index <= primary_index.validate(end))
+
+        surrogate_clauses = self._surrogate_clauses(resources)
+        if len(surrogate_clauses) > 1:
+            clauses.append(or_(*surrogate_clauses).self_group())
+        elif len(surrogate_clauses) > 0:
+            clauses.append(surrogate_clauses[0])
         return clauses
 
     # noinspection PyTypeChecker
@@ -93,9 +100,11 @@ class Table(sql.Table):
         clauses = []
 
         for groups, _ in self._groupby(resources):
+            group_clauses = []
             for key, value in groups.items():
                 column = self.primary_key.columns[key]
-                clauses.append(column == value)
+                group_clauses.append(column == value)
+            clauses.append(and_(*group_clauses).self_group())
         return clauses
 
     def extract(self, resources: Resources, result: Result[Any]) -> pd.DataFrame:
@@ -116,7 +125,11 @@ class Table(sql.Table):
             group_data = data[data.apply(_is_group, axis="columns")]
 
             for column in [c for c in group_columns if isinstance(c, DatetimeColumn)]:
-                group_data[column.name] = group_data[column.name].dt.tz_localize(column.timezone)
+                # Drop existing column, as the dtype will change from datetime64[ns] to datetime64[ns, UTC],
+                # which is forbidden
+                column_data = group_data[column.name].dt.tz_localize(column.timezone)
+                group_data = group_data.drop(columns=[column.name])
+                group_data[column.name] = column_data
 
             if self.datetime_index_type == DatetimeIndexType.DATE_AND_TIME:
                 date_column, time_column, *_ = self.primary_key.columns
@@ -148,7 +161,8 @@ class Table(sql.Table):
 
         if len(results) == 0:
             return pd.DataFrame()
-        results = pd.concat(sorted(results, key=lambda d: min(d.index)), axis="index")
+        results = sorted(results, key=lambda d: min(d.index))
+        results = pd.concat(results, axis="columns")
         for result_column in [c for c in result_columns if c not in results.columns]:
             results.loc[:, [result_column]] = np.nan
         return results
@@ -161,8 +175,7 @@ class Table(sql.Table):
     ) -> Select:
         columns = self.__get_columns(resources)
         select = sql.select(*columns)
-        select = select.where(and_(*self._surrogate_clauses(resources)))
-        select = select.where(and_(*self._primary_clauses(start, end)))
+        select = select.where(and_(*self._primary_clauses(resources, start, end)))
         select = select.subquery(name="exists_range")
         query = sql.select(func.count().label("count")).select_from(select)
         return query
@@ -199,8 +212,7 @@ class Table(sql.Table):
         if len(nullable) > 0:
             # Make sure to only query valid values
             select = select.filter(not_(and_(*[c.is_(None) for c in columns if c.nullable])))
-        select = select.where(and_(*self._surrogate_clauses(resources)))
-        select = select.where(and_(*self._primary_clauses(start, end)))
+        select = select.where(and_(*self._primary_clauses(resources, start, end)))
         select = select.order_by(*self._primary_order("asc"))
         select = select.subquery(name="hash_range")
 
@@ -218,8 +230,7 @@ class Table(sql.Table):
     ) -> Select:
         columns = self.__get_columns(resources)
         query = sql.select(*columns)
-        query = query.where(and_(*self._surrogate_clauses(resources)))
-        query = query.where(and_(*self._primary_clauses(start, end)))
+        query = query.where(and_(*self._primary_clauses(resources, start, end)))
         return query.order_by(*self._primary_order(order_by))
 
     # noinspection PyUnresolvedReferences
@@ -257,14 +268,14 @@ class Table(sql.Table):
         if self.columns != columns:
             raise ResourceException(f"Unable to delete rows of table '{self.name}' with only subset of columns")
         query = super().delete()
-        query = query.where(and_(*self._primary_clauses(start, end)))
+        query = query.where(and_(*self._primary_clauses(resources, start, end)))
         return query
 
+    # noinspection PyTypeChecker
     def _validate(self, resources: Resources, data: pd.DataFrame) -> List[Dict[str, Any]]:
         values = []
 
         for group, group_resources in self._groupby(resources):
-            group_columns = self.__get_columns(group_resources)
             group_data = data[group_resources.ids].dropna(axis="index", how="all")
 
             array_resources = group_resources.filter(lambda r: issubclass(r.type, pd.api.extensions.ExtensionArray))
@@ -272,7 +283,7 @@ class Table(sql.Table):
                 group_data = group_data.explode([r.id for r in array_resources])
             group_data.rename(columns={r.id: r.get("column", default=r.key) for r in group_resources}, inplace=True)
 
-            for column in group_columns:
+            for column in self.columns:
                 if self.__is_datetime_index(column):
                     column_data = group_data.index
                 elif column.name in group_data.columns:
@@ -280,7 +291,7 @@ class Table(sql.Table):
                 elif column.name in group:
                     column_data = group[column.name]
                 else:
-                    continue
+                    column_data = None
                 group_data[column.name] = column.validate(column_data)
 
             values.extend(group_data.to_dict(orient="records"))

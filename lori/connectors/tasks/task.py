@@ -37,7 +37,7 @@ class ConnectorTask(ABC, Thread):
                 self.connector.disconnect()
             finally:
                 self.connector.set_channels(ChannelState.DISCONNECTED)
-            raise e
+                raise e
         except ConnectorException as e:
             raise e
         except Exception as e:
