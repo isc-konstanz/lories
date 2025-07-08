@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Dict, Optional
 
-from revpimodio2 import RevPiModIO
+from revpimodio2 import EventCallback, RevPiModIO, io
 
 import pandas as pd
 import pytz as tz
@@ -18,10 +18,11 @@ from lori import Configurations
 from lori.connectors import Connector, register_connector_type
 from lori.core import Resources
 from lori.data import Channel
+from lori.util import to_bool
 
 
 # noinspection PyShadowingBuiltins, SpellCheckingInspection
-@register_connector_type("revpi", "revpi_io", "revpi_aio", "revpi_ro", "revolutionpi")
+@register_connector_type("revpi", "revpi_io", "revpi_aio", "revpi_mio", "revpi_ro", "revolutionpi")
 class RevPiConnector(Connector):
     _core: RevPiModIO
     _cycletime: Optional[int]
@@ -42,18 +43,24 @@ class RevPiConnector(Connector):
         if self._cycletime:
             self._core.cycletime = self._cycletime
 
+        channels = resources.filter(lambda r: isinstance(r, Channel) and to_bool(r.get("listener", False)))
+        for channel in channels:
+            channel_listener = RevPiListener(channel)
+            channel_io = self._core.io[channel_listener.address]
+            channel_io.reg_event(channel_listener, edge=io.RISING, as_thread=True, prefire=True)
+            self._listeners[channel.id] = channel_listener
+
         # Handle SIGINT / SIGTERM to exit program cleanly
         # self._core.handlesignalend(self._core.cleanup)
 
-        # TODO: register listeners
-        # self._core.io[""].reg_event(None, as_thread=True, prefire=True)
-
         # TODO: set all IO output values to optional default attribute value
+        self._core.mainloop(blocking=False)
 
     def disconnect(self) -> None:
         super().disconnect()
-        # TODO: unregister listeners
-        # .unreg_event([func=None, edge=None])
+        for listener in self._listeners.values():
+            listener_io = self._core.io[listener.address]
+            listener_io.unreg_event(listener)
 
         # TODO: set all IO output values to optional default attribute value
 
@@ -83,7 +90,14 @@ class RevPiConnector(Connector):
 
 
 class RevPiListener:
-    channel: Channel
+    address: str
 
-    def __call__(self) -> None:
-        pass
+    _channel: Channel
+
+    def __init__(self, channel: Channel):
+        self._channel = channel
+        self.address = channel.address
+
+    def __call__(self, event: EventCallback) -> None:
+        now = pd.Timestamp.now(tz=tz.UTC).floor(freq="s")
+        self._channel.set(now, event.iovalue)

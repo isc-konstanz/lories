@@ -92,7 +92,7 @@ class Registrator(Configurator, Entity):
         return id
 
     @classmethod
-    def _build_key(cls, key: str, configs: Optional[Configurations]) -> str:
+    def _build_key(cls, key: Optional[str], configs: Optional[Configurations]) -> str:
         if configs is not None:
             if configs.has_section(cls.SECTION) and "key" in configs[cls.SECTION]:
                 key = configs[cls.SECTION]["key"]
@@ -103,7 +103,7 @@ class Registrator(Configurator, Entity):
                     key = validate_key(configs[cls.SECTION]["name"])
                 elif "name" in configs:
                     key = validate_key(configs["name"])
-                else:
+                elif key is None:
                     key = validate_key("_".join(os.path.splitext(configs.name)[:-1]))
         if key is None:
             raise ResourceException(f"Unable to build '{cls.__name__}' Key")

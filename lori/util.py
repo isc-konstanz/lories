@@ -342,7 +342,7 @@ def parse_freq(freq: str) -> Optional[str]:
         raise ValueError(f"Invalid frequency format: '{freq}'")
 
     number_part, unit_part = match.groups()
-    value = int(number_part) if number_part else 1.0
+    value = int(number_part) if number_part else 1
 
     def _parse_freq(suffix: str) -> str:
         return str(value) + suffix if value > 1 else suffix

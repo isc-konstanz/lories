@@ -185,7 +185,7 @@ def write_files(
 
     index_name = data.index.name
     if index_name is None:
-        index_name = "Timestamp"
+        index_name = "timestamp"
     if data.index.tzinfo is None or data.index.tzinfo.utcoffset(data.index) is None:
         data.index = data.index.tz_localize(tz.UTC, ambiguous="infer")
     if timezone is None:
@@ -248,9 +248,8 @@ def write_file(
 
     if rename:
         data = data.rename(columns=rename)
-        data.index.name = data.index.name.title()
-    else:
-        data.index.name = data.index.name.lower()
+    if data.index.name is None:
+        data.index.name = "timestamp"
 
     data.to_csv(path, sep=separator, decimal=decimal, encoding=encoding)
 

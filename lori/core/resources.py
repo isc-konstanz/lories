@@ -20,7 +20,7 @@ class Resources(Generic[R], Sequence[R]):
     _resources: List[R]
 
     def __init__(self, resources=()) -> None:
-        self._logger = logging.getLogger(__name__)
+        self._logger = logging.getLogger(type(self).__module__)
         self._resources = [*resources]
 
     def __repr__(self) -> str:

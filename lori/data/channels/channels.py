@@ -85,7 +85,7 @@ class Channels(Resources[Channel]):
                     if channel.id in data.columns:
                         self._logger.debug(f"Unable to update None value for channel: {channel.id}")
                     else:
-                        self._logger.warning(f"Unable to update not configured channel: {channel.id}")
+                        self._logger.warning(f"Unable to update missing value for channel: {channel.id}")
                     continue
 
                 timestamp = channel_data.index[0]
