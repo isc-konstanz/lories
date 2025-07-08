@@ -18,4 +18,14 @@ from .core import (  # noqa: F401
 from . import provider  # noqa: F401
 from .provider import TariffProvider  # noqa: F401
 
-from .entsoe import EntsoeProvider  # noqa: F401
+import importlib
+
+for import_provider in ["entsoe"]:
+    try:
+        importlib.import_module(f".{import_provider}", "lori.components.tariff")
+
+    except ModuleNotFoundError:
+        # TODO: Implement meaningful logging here
+        pass
+
+del importlib
