@@ -117,7 +117,6 @@ class ListenerContext(Context[Listener]):
                         f"Listener '{listener.id}' not finished after {round(listener.runtime, 3)} seconds. "
                         f"Please verify your configurations"
                     )
-                    listener.cancel()
                 listeners.append(listener)
         return listeners
 
