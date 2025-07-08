@@ -10,22 +10,33 @@ from __future__ import annotations
 
 from typing import Optional
 
-# TODO: add to requirements
+# TODO: Add to requirements
 from entsoe import EntsoePandasClient
 from entsoe.mappings import Area as EntsoeArea
 from requests.exceptions import HTTPError
 from urllib3.exceptions import MaxRetryError
 
 import pandas as pd
+import pytz as tz
 from lori.connectors import ConnectionException, Connector, ConnectorException
 from lori.core import ConfigurationException, Configurations, Resources
 from lori.typing import TimestampType
+from lori.util import parse_freq
+
+# FIXME: Remove this once Python >= 3.9 is a requirement
+try:
+    from typing import Literal
+
+except ImportError:
+    from typing_extensions import Literal
 
 
 # noinspection SpellCheckingInspection
 class EntsoeConnector(Connector):
     DAY_AHEAD: str = "day_ahead"
     METHODS: list = [DAY_AHEAD]
+
+    resolution: Literal["60min", "30min", "15min"] = '60min'
 
     country_code: str
     _api_key: str
@@ -34,12 +45,18 @@ class EntsoeConnector(Connector):
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self.country_code = self._validate_country_code(
-            configs.get("country_code").upper()
-        )
+        self.resolution = self._validate_resolution(configs.get("resolution", default=EntsoeConnector.resolution))
+        self.country_code = self._validate_country_code(configs.get("country_code").upper())
         self._api_key = configs.get("api_key")
         if self._api_key is None:
             raise ConfigurationException("Missing security token")
+
+    # noinspection PyTypeChecker
+    def _validate_resolution(self, resolution: str) -> Literal["60min", "30min", "15min"]:
+        resolution = parse_freq(resolution)
+        if resolution not in ["60min", "30min", "15min"]:
+            raise ConnectorException(self, f"Invalid resolution: {resolution}.")
+        return resolution
 
     def _validate_country_code(self, country_code) -> str:
         """Validate the country code against the Entsoe mappings."""
@@ -65,7 +82,10 @@ class EntsoeConnector(Connector):
         start: Optional[TimestampType] = None,
         end: Optional[TimestampType] = None,
     ) -> pd.DataFrame:
-        # TODO: Expected behavior if start==None and end==None or just one of them is None
+        if start is None:
+            start = pd.Timestamp.now(tz=tz.UTC).floor(self.resolution)
+        if end is None:
+            end = start + pd.Timedelta(days=1) - pd.Timedelta(self.resolution)
 
         results = []
         country_code = self._get_country_code(self.country_code, start, end)

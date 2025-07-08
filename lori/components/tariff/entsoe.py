@@ -18,32 +18,31 @@ from lori.connectors.entsoe import EntsoeConnector
 # noinspection SpellCheckingInspection
 @register_tariff_type("entsoe", "entso_e")
 class EntsoeProvider(TariffProvider):
-    TARIFF_DAY_AHEAD = Constant(float, "tariff_day_ahead", name="Day-Ahead Tariff", unit="ct/kWh")
+    PRICE_DAY_AHEAD = Constant(float, "price_day_ahead", name="Day-Ahead Tariff Price", unit="€/MWh")
+
+    _offset: float = 0
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
+        self._offset = configs.get_float("offset", default=0)
 
         entsoe_connector = EntsoeConnector(self, key="entsoe", name="ENTSO-e", configs=configs)
-        self.connectors.add(entsoe_connector)
 
+        self.connectors.add(entsoe_connector)
         self.data.add(
-            EntsoeProvider.TARIFF_DAY_AHEAD,
-            method=entsoe_connector.DAY_AHEAD,
+            EntsoeProvider.PRICE_DAY_AHEAD,
+            method=EntsoeConnector.DAY_AHEAD,
             aggregate="mean",
             connector=entsoe_connector.id,
             logger={"enabled": False},
         )
 
     def activate(self) -> None:
-        # add callback to update tariff data
-        self.data.register(self._on_tariff_received, [EntsoeProvider.TARIFF_DAY_AHEAD], how="all", unique=False)
+        super().activate()
+        self.data.register(self._on_tariff_received, EntsoeProvider.PRICE_DAY_AHEAD, unique=False)
 
     def _on_tariff_received(self, data: pd.DataFrame) -> None:
-        """
-        Callback to handle received tariff data.
-        """
         timestamp = data.index[0]
-        channel_import: Channel = self.data.get(Tariff.PRICE_IMPORT)
-        channel_import.set(timestamp, data[EntsoeProvider.TARIFF_DAY_AHEAD])
-
-
+        import_data = data[EntsoeProvider.PRICE_DAY_AHEAD] / 10.0 + self._offset
+        import_channel: Channel = self.data.get(Tariff.PRICE_IMPORT)
+        import_channel.set(timestamp, import_data)

@@ -15,6 +15,7 @@ from lori.components import Component, register_component_type
 from lori.core import Configurations, Constant, Context, ResourceException, ResourceUnavailableException
 from lori.core.activator import ActivatorMeta
 from lori.core.register import Registrator, Registry
+from lori.util import validate_key
 
 
 # noinspection PyShadowingBuiltins
@@ -34,7 +35,7 @@ def register_tariff_type(
 
 class TariffMeta(ActivatorMeta):
     def __call__(cls, context: Context | Component, configs: Configurations, **kwargs) -> Tariff:
-        _type = configs.get("type", default="default").lower()
+        _type = validate_key(configs.get("type", default="default"))
         _cls = cls._get_class(_type)
         if cls != _cls:
             return _cls(context, configs, **kwargs)
