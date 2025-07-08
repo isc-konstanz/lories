@@ -8,7 +8,6 @@ lori.connectors.sql.database
 
 from __future__ import annotations
 
-import datetime as dt
 from collections import OrderedDict
 from typing import Any, Dict, Iterator, Mapping, Optional
 
@@ -21,6 +20,7 @@ from lori.connectors import ConnectionException, Database, DatabaseException, re
 from lori.connectors.sql import Schema, Table
 from lori.core import ConfigurationException, Configurations, Resources
 from lori.data.util import hash_value
+from lori.typing import TimestampType
 from lori.util import to_timezone
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -177,8 +177,8 @@ class SqlDatabase(Database, Mapping[str, Table]):
     def hash(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
         method: Literal["MD5", "SHA1", "SHA256", "SHA512"] = "MD5",
         encoding: str = "UTF-8",
     ) -> Optional[str]:
@@ -217,8 +217,8 @@ class SqlDatabase(Database, Mapping[str, Table]):
     def exists(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> bool:
         try:
             for table_schema, schema_resources in resources.groupby("schema"):
@@ -244,8 +244,8 @@ class SqlDatabase(Database, Mapping[str, Table]):
     def read(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> pd.DataFrame:
         results = []
         try:
@@ -263,13 +263,16 @@ class SqlDatabase(Database, Mapping[str, Table]):
 
                     result = self.connection.execute(select)
                     if result.rowcount > 0:
-                        results.append(table.extract(table_resources, result))
+                        result_data = table.extract(table_resources, result)
+                        if not result_data.empty:
+                            results.append(result_data)
         except SQLAlchemyError as e:
             self._raise(e)
-        if len(results) > 0:
-            results = sorted(results, key=lambda d: min(d.index))
-            return pd.concat(results, axis="index")
-        return pd.DataFrame(columns=[r.id for r in resources])
+
+        if len(results) == 0:
+            return pd.DataFrame()
+        results = sorted(results, key=lambda d: min(d.index))
+        return pd.concat(results, axis="columns")
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
     def read_first(self, resources: Resources) -> pd.DataFrame:
@@ -284,13 +287,16 @@ class SqlDatabase(Database, Mapping[str, Table]):
                     select = table.read(table_resources, order_by="asc").limit(1)
                     result = self.connection.execute(select)
                     if result.rowcount > 0:
-                        results.append(table.extract(table_resources, result))
+                        result_data = table.extract(table_resources, result)
+                        if not result_data.empty:
+                            results.append(result_data)
         except SQLAlchemyError as e:
             self._raise(e)
-        if len(results) > 0:
-            results = sorted(results, key=lambda d: min(d.index))
-            return pd.concat(results, axis="index")
-        return pd.DataFrame(columns=[r.id for r in resources])
+
+        if len(results) == 0:
+            return pd.DataFrame()
+        results = sorted(results, key=lambda d: min(d.index))
+        return pd.concat(results, axis="columns")
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
     def read_last(self, resources: Resources) -> pd.DataFrame:
@@ -305,13 +311,16 @@ class SqlDatabase(Database, Mapping[str, Table]):
                     select = table.read(table_resources, order_by="desc").limit(1)
                     result = self.connection.execute(select)
                     if result.rowcount > 0:
-                        results.append(table.extract(table_resources, result))
+                        result_data = table.extract(table_resources, result)
+                        if not result_data.empty:
+                            results.append(result_data)
         except SQLAlchemyError as e:
             self._raise(e)
-        if len(results) > 0:
-            results = sorted(results, key=lambda d: min(d.index))
-            return pd.concat(results, axis="index")
-        return pd.DataFrame(columns=[r.id for r in resources])
+
+        if len(results) == 0:
+            return pd.DataFrame()
+        results = sorted(results, key=lambda d: min(d.index))
+        return pd.concat(results, axis="columns")
 
     # noinspection PyTypeChecker
     def write(self, data: pd.DataFrame) -> None:
@@ -337,8 +346,8 @@ class SqlDatabase(Database, Mapping[str, Table]):
     def delete(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> None:
         try:
             for table_schema, schema_resources in resources.groupby("schema"):

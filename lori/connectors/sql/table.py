@@ -8,13 +8,12 @@ lori.connectors.sql.table
 
 from __future__ import annotations
 
-import datetime as dt
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import sqlalchemy as sql
 from sqlalchemy import ClauseElement, Dialect, Result, UnaryExpression
-from sqlalchemy.sql import Delete, Insert, Select, and_, asc, between, desc, func, literal, not_, text
-from sqlalchemy.types import DATETIME, TIMESTAMP, BLOB
+from sqlalchemy.sql import Delete, Insert, Select, and_, asc, between, desc, func, literal, not_, or_, text
+from sqlalchemy.types import BLOB, DATETIME, TIMESTAMP
 
 import numpy as np
 import pandas as pd
@@ -22,6 +21,7 @@ import pytz as tz
 from lori.connectors.sql.columns import Column, DatetimeColumn, SurrogateKeyColumn
 from lori.connectors.sql.index import DatetimeIndexType
 from lori.core import Resource, ResourceException, Resources
+from lori.typing import TimestampType
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
 try:
@@ -74,8 +74,9 @@ class Table(sql.Table):
 
     def _primary_clauses(
         self,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        resources: Resources,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> List[ClauseElement]:
         clauses = []
         primary_index = self.primary_index
@@ -86,6 +87,24 @@ class Table(sql.Table):
                 clauses.append(primary_index >= primary_index.validate(start))
             elif end is not None:
                 clauses.append(primary_index <= primary_index.validate(end))
+
+        surrogate_clauses = self._surrogate_clauses(resources)
+        if len(surrogate_clauses) > 1:
+            clauses.append(or_(*surrogate_clauses).self_group())
+        elif len(surrogate_clauses) > 0:
+            clauses.append(surrogate_clauses[0])
+        return clauses
+
+    # noinspection PyTypeChecker
+    def _surrogate_clauses(self, resources: Resources) -> List[ClauseElement]:
+        clauses = []
+
+        for groups, _ in self._groupby(resources):
+            group_clauses = []
+            for key, value in groups.items():
+                column = self.primary_key.columns[key]
+                group_clauses.append(column == value)
+            clauses.append(and_(*group_clauses).self_group())
         return clauses
 
     def extract(self, resources: Resources, result: Result[Any]) -> pd.DataFrame:
@@ -106,7 +125,11 @@ class Table(sql.Table):
             group_data = data[data.apply(_is_group, axis="columns")]
 
             for column in [c for c in group_columns if isinstance(c, DatetimeColumn)]:
-                group_data[column.name] = group_data[column.name].dt.tz_localize(column.timezone)
+                # Drop existing column, as the dtype will change from datetime64[ns] to datetime64[ns, UTC],
+                # which is forbidden
+                column_data = group_data[column.name].dt.tz_localize(column.timezone)
+                group_data = group_data.drop(columns=[column.name])
+                group_data[column.name] = column_data
 
             if self.datetime_index_type == DatetimeIndexType.DATE_AND_TIME:
                 date_column, time_column, *_ = self.primary_key.columns
@@ -127,12 +150,19 @@ class Table(sql.Table):
                 group_data.loc[:, [index_column.name]] = index_data
                 group_data = group_data.set_index(index_column.name).tz_localize(tz.UTC)
 
-            group_data = group_data.dropna(axis="index", how="all").rename(
-                columns={r.get("column", default=r.key): r.id for r in group_resources}
+            group_data.dropna(axis="index", how="all", inplace=True)
+            group_data.rename(
+                columns={r.get("column", default=r.key): r.id for r in group_resources},
+                inplace=True,
             )
-            results.append(group_data[group_resources.ids])
+            if not group_data.empty:
+                group_data = group_data[[r.id for r in group_resources if r.id in group_data.columns]]
+                results.append(group_data)
 
-        results = pd.concat(sorted(results, key=lambda d: min(d.index)), axis="index")
+        if len(results) == 0:
+            return pd.DataFrame()
+        results = sorted(results, key=lambda d: min(d.index))
+        results = pd.concat(results, axis="columns")
         for result_column in [c for c in result_columns if c not in results.columns]:
             results.loc[:, [result_column]] = np.nan
         return results
@@ -140,20 +170,22 @@ class Table(sql.Table):
     def exists(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> Select:
         columns = self.__get_columns(resources)
-        query = sql.select(*columns).where(and_(*self._primary_clauses(start, end))).subquery()
-        query = sql.select(func.count().label("count")).select_from(query)
+        select = sql.select(*columns)
+        select = select.where(and_(*self._primary_clauses(resources, start, end)))
+        select = select.subquery(name="exists_range")
+        query = sql.select(func.count().label("count")).select_from(select)
         return query
 
     # noinspection PyShadowingBuiltins, PyProtectedMember, PyArgumentList
     def hash(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
         method: Literal["MD5", "SHA1", "SHA256", "SHA512"] = "MD5",
     ) -> Select:
         if method.lower() not in ["md5", "sha1", "sha256", "sha512"]:
@@ -180,7 +212,7 @@ class Table(sql.Table):
         if len(nullable) > 0:
             # Make sure to only query valid values
             select = select.filter(not_(and_(*[c.is_(None) for c in columns if c.nullable])))
-        select = select.where(and_(*self._primary_clauses(start, end)))
+        select = select.where(and_(*self._primary_clauses(resources, start, end)))
         select = select.order_by(*self._primary_order("asc"))
         select = select.subquery(name="hash_range")
 
@@ -192,13 +224,13 @@ class Table(sql.Table):
     def read(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
         order_by: Literal["asc", "desc"] = "asc",
     ) -> Select:
         columns = self.__get_columns(resources)
         query = sql.select(*columns)
-        query = query.where(and_(*self._primary_clauses(start, end)))
+        query = query.where(and_(*self._primary_clauses(resources, start, end)))
         return query.order_by(*self._primary_order(order_by))
 
     # noinspection PyUnresolvedReferences
@@ -229,21 +261,21 @@ class Table(sql.Table):
     def delete(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> Delete:
         columns = self.__get_columns(resources)
         if self.columns != columns:
             raise ResourceException(f"Unable to delete rows of table '{self.name}' with only subset of columns")
         query = super().delete()
-        query = query.where(and_(*self._primary_clauses(start, end)))
+        query = query.where(and_(*self._primary_clauses(resources, start, end)))
         return query
 
+    # noinspection PyTypeChecker
     def _validate(self, resources: Resources, data: pd.DataFrame) -> List[Dict[str, Any]]:
         values = []
 
         for group, group_resources in self._groupby(resources):
-            group_columns = self.__get_columns(group_resources)
             group_data = data[group_resources.ids].dropna(axis="index", how="all")
 
             array_resources = group_resources.filter(lambda r: issubclass(r.type, pd.api.extensions.ExtensionArray))
@@ -251,7 +283,7 @@ class Table(sql.Table):
                 group_data = group_data.explode([r.id for r in array_resources])
             group_data.rename(columns={r.id: r.get("column", default=r.key) for r in group_resources}, inplace=True)
 
-            for column in group_columns:
+            for column in self.columns:
                 if self.__is_datetime_index(column):
                     column_data = group_data.index
                 elif column.name in group_data.columns:
@@ -259,7 +291,7 @@ class Table(sql.Table):
                 elif column.name in group:
                     column_data = group[column.name]
                 else:
-                    continue
+                    column_data = None
                 group_data[column.name] = column.validate(column_data)
 
             values.extend(group_data.to_dict(orient="records"))
@@ -269,15 +301,16 @@ class Table(sql.Table):
     def _groupby(self, resources: Resources) -> Iterator[Tuple[Dict[str, Any], Resources]]:
         groups: List[Tuple[Dict[str, Any], Resources]] = []
 
+        surrogate_keys = [c for c in self.primary_key.columns if isinstance(c, SurrogateKeyColumn)]
+
         def _group(resource: Resource) -> Resource:
             attributes = {}
-            surrogate_keys = [c for c in self.primary_key.columns if isinstance(c, SurrogateKeyColumn)]
-            for column in surrogate_keys:
-                if not hasattr(resource, column.attribute):
+            for surrogate_key in surrogate_keys:
+                if not hasattr(resource, surrogate_key.attribute):
                     raise ResourceException(
-                        f"SQL resource '{resource.id}' missing surrogate key attribute: {column.attribute}"
+                        f"SQL resource '{resource.id}' missing surrogate key attribute: {surrogate_key.attribute}"
                     )
-                attributes[column.name] = getattr(resource, column.attribute)
+                attributes[surrogate_key.name] = getattr(resource, surrogate_key.attribute)
             for group in groups:
                 if group[0] == attributes:
                     group[1].append(resource)

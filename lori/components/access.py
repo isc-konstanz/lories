@@ -11,7 +11,7 @@ from __future__ import annotations
 import glob
 import os.path
 from collections.abc import Callable
-from typing import Any, Collection, Optional, Type, TypeVar
+from typing import Any, Collection, Mapping, Optional, Type, TypeVar
 
 from lori import Context
 from lori.components.core import _Component
@@ -71,33 +71,33 @@ class ComponentAccess(RegistratorAccess[C]):
         key: str,
         name: Optional[str] = None,
         includes: Optional[Collection[str]] = (),
+        defaults: Optional[Mapping[str, Any]] = None,
         configure: bool = False,
         sort: bool = True,
         **kwargs,
     ) -> Collection[C]:
         kwargs["factory"] = type
         components = []
-        defaults = _Component._build_defaults(self._registrar.configs, strict=True)
+        if defaults is None:
+            defaults = _Component._build_defaults(self._registrar.configs, strict=True)
         if any(i in configs.sections for i in includes):
-            configs = configs.get_sections(includes)
             configs["key"] = key
             configs["name"] = name
-            components.append(self._load_from_configs(self._registrar, configs, **defaults, **kwargs))
+        configs = configs.get_section(section, defaults={**configs.get_sections(includes), **defaults})
+        if any(i in configs.sections for i in includes):
+            components.append(self._load_from_configs(self._registrar, configs, **kwargs))
 
-        configs = configs.get_section(section, defaults={})
         update_recursive(defaults, _Component._build_defaults(configs, includes))
 
         configs_dirs = configs.dirs.copy()
-        configs_file = configs.name
         configs_sections = configs.get_sections([s for s in configs.sections if s not in defaults])
 
         components.extend(self._load_from_sections(self._registrar, configs_sections, defaults=defaults, **kwargs))
-        components.extend(self._load_from_file(self._registrar, configs_file, configs_dirs, defaults, **kwargs))
 
         if "alias" in configs:
             key = configs.get("alias")
         for configs_path in glob.glob(str(configs_dirs.conf.joinpath(f"{key}*.conf"))):
-            if configs_file == os.path.basename(configs_path):
+            if configs.name == os.path.basename(configs_path):
                 continue
 
             configs = Configurations.load(

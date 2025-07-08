@@ -13,6 +13,7 @@ import os
 import re
 from abc import abstractmethod
 from copy import deepcopy
+from logging import Logger
 from typing import Any, Collection, Generic, Mapping, Optional, Type, TypeVar
 
 from lori.core import Configurations, Configurator, Context, Directories, Directory, ResourceException
@@ -32,11 +33,24 @@ R = TypeVar("R", bound=Registrator)
 # noinspection SpellCheckingInspection, PyAbstractClass, PyProtectedMember
 class _RegistratorContext(Context[R], Generic[R]):
     _section: str
+    _logger: Logger
 
-    def __init__(self, section: str, *args, **kwargs) -> None:
+    def __init__(
+        self,
+        section: str,
+        logger: Optional[Logger] = None,
+        *args,
+        **kwargs,
+    ) -> None:
         super().__init__(*args, **kwargs)
-        self._logger = logging.getLogger(self.__module__)
         self._section = section
+        if logger is None:
+            logger = self._get_logger()
+        self._logger = logger
+
+    @classmethod
+    def _get_logger(cls) -> Logger:
+        return logging.getLogger(cls.__module__)
 
     def _load(
         self,
@@ -61,12 +75,12 @@ class _RegistratorContext(Context[R], Generic[R]):
         if isinstance(configs_dir, str) and not os.path.isabs(configs_dir):
             configs_dir = configs_dirs.conf.joinpath(configs_dir)
         configs_dirs.conf = configs_dir
-        if configs_file is None:
-            configs_file = configs.name
         configs_sections = configs.get_sections([s for s in configs.sections if s not in defaults])
 
+        if configs_file and configs_file != configs.name:
+            registrators.extend(self._load_from_file(context, configs_file, configs.dirs, defaults, **kwargs))
+
         registrators.extend(self._load_from_sections(context, configs_sections, defaults, **kwargs))
-        registrators.extend(self._load_from_file(context, configs_file, configs.dirs, defaults, **kwargs))
         registrators.extend(self._load_from_dir(context, configs_dirs, defaults, **kwargs))
 
         if sort:
@@ -194,6 +208,7 @@ class _RegistratorContext(Context[R], Generic[R]):
         if registrator.is_enabled():
             registrator.configure(configs)
 
+    # noinspection PyUnresolvedReferences
     def get_all(self, *types: Type) -> Collection[R]:
         if len(types) == 0:
             return self.values()

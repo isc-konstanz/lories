@@ -11,9 +11,9 @@ from __future__ import annotations
 import re
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, MutableMapping
 from itertools import chain
-from typing import Any, Collection, Generic, Iterable, Iterator, MutableMapping, Tuple, TypeVar
+from typing import Any, Collection, Generic, Iterable, Iterator, Tuple, TypeVar
 
 import pandas as pd
 from lori.core import Entity, ResourceException

@@ -13,6 +13,9 @@ body:has(.card-container) {
   height: 100%;
 }
 
+.auth-container {
+  height: calc(100vh - 60px);
+}
 .card-container,
 .page-container {
   padding-top: 1rem;

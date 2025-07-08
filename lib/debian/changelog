@@ -1,5 +1,36 @@
 lori (<version>) stable; urgency=medium
 
+  * Fix full database rotation being skipped
+  * Fix bloating NaN values in database rotation
+
+ -- Adrian Minde <adrian.minde@isc-konstanz.de>  Tue, 10 Jun 2025 11:30:00 +0200
+
+lori (0.14.2) stable; urgency=medium
+
+  * Fix global variable typing for Python < v3.9
+
+ -- Adrian Minde <adrian.minde@isc-konstanz.de>  Tue, 10 Jun 2025 09:00:00 +0200
+
+lori (0.14.1) stable; urgency=medium
+
+  * Add Modbus Connector
+  * Add InfluxDB v2 Connector
+  * Add cycletime configuration to RevPi connector
+  * Implement virtual dummy generator
+  * Implement short waiting for listeners before logging
+  * Implement generic analog IO converters
+  * Fix reconnecting connectors
+  * Fix float from str conversion
+  * Fix recursive registrator inclusion
+  * Fix default pandas hashing for consecutive NaN values
+  * Fix SQL hashing for large BLOB types
+  * Fix SQL database bool column creation
+  * Fix RevPi Connector timestamp flooring
+
+ -- Adrian Minde <adrian.minde@isc-konstanz.de>  Fri, 06 Jun 2025 10:30:00 +0200
+
+lori (0.12.5) stable; urgency=medium
+
   * Implement force replication
 
  -- Adrian Minde <adrian.minde@isc-konstanz.de>  Tue, 11 Mar 2025 10:30:00 +0100

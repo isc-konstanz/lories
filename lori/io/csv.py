@@ -8,7 +8,6 @@ lori.io.csv
 
 from __future__ import annotations
 
-import datetime as dt
 import glob
 import os
 from typing import List, Mapping, Optional
@@ -16,6 +15,7 @@ from typing import List, Mapping, Optional
 import pandas as pd
 import pytz as tz
 from lori.core import ResourceException
+from lori.typing import TimestampType, TimezoneType
 from lori.util import ceil_date, floor_date, to_date, to_timedelta
 
 
@@ -24,8 +24,8 @@ def has_range(
     path: str,
     freq: str,
     format: str,
-    start: pd.Timestamp | dt.datetime | str,
-    end: pd.Timestamp | dt.datetime | str,
+    start: TimestampType | str,
+    end: TimestampType | str,
     timezone: tz.tzinfo = tz.UTC,
 ):
     files = get_files(path, freq, format, start, end, timezone)
@@ -37,9 +37,9 @@ def read_files(
     path: str,
     freq: str,
     format: str,
-    start: Optional[pd.Timestamp, dt.datetime, str],
-    end: Optional[pd.Timestamp, dt.datetime, str],
-    timezone: Optional[tz.tzinfo] = None,
+    start: Optional[TimestampType | str] = None,
+    end: Optional[TimestampType | str] = None,
+    timezone: Optional[TimezoneType] = None,
     **kwargs,
 ) -> pd.DataFrame:
     data = pd.DataFrame()
@@ -185,7 +185,7 @@ def write_files(
 
     index_name = data.index.name
     if index_name is None:
-        index_name = "Timestamp"
+        index_name = "timestamp"
     if data.index.tzinfo is None or data.index.tzinfo.utcoffset(data.index) is None:
         data.index = data.index.tz_localize(tz.UTC, ambiguous="infer")
     if timezone is None:
@@ -248,9 +248,8 @@ def write_file(
 
     if rename:
         data = data.rename(columns=rename)
-        data.index.name = data.index.name.title()
-    else:
-        data.index.name = data.index.name.lower()
+    if data.index.name is None:
+        data.index.name = "timestamp"
 
     data.to_csv(path, sep=separator, decimal=decimal, encoding=encoding)
 
@@ -260,8 +259,8 @@ def get_files(
     path: str,
     freq: str,
     format: str,
-    start: Optional[pd.Timestamp | dt.datetime | str] = None,
-    end: Optional[pd.Timestamp | dt.datetime | str] = None,
+    start: Optional[TimestampType | str] = None,
+    end: Optional[TimestampType | str] = None,
     timezone: tz.tzinfo = tz.UTC,
     exists_only: bool = True,
 ) -> List[str]:

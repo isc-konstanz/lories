@@ -6,11 +6,11 @@ lori.connectors.tasks.log
 
 """
 
-from lori.connectors.tasks.task import ConnectorTask
+from lori.connectors.tasks.write import WriteTask
 from lori.data.channels import Channels
 
 
-class LogTask(ConnectorTask):
+class LogTask(WriteTask):
     def run(self) -> None:
         self._logger.debug(
             f"Logging {len(self.channels)} channels of '{type(self.connector).__name__}': {self.connector.id}"
@@ -18,4 +18,4 @@ class LogTask(ConnectorTask):
         # Pass copied connectors instead of actual objects, including parsed logger specific connector configurations
         channels = Channels(c.from_logger() for c in self.channels)
 
-        self.connector.write(channels.to_frame(unique=True))
+        self._run_write(channels)

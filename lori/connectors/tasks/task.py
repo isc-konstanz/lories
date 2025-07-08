@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from threading import Thread
+from typing import Any
 
 from lori.connectors import ConnectionException, Connector, ConnectorException
 from lori.data.channels import Channels, ChannelState
@@ -26,9 +27,9 @@ class ConnectorTask(ABC, Thread):
         self.connector = connector
         self.channels = channels
 
-    def __call__(self, **kwargs) -> ConnectorTask:
+    def __call__(self, **kwargs) -> Any:
         try:
-            self.run(**kwargs)
+            return self.run(**kwargs)
 
         except ConnectionException as e:
             try:
@@ -36,14 +37,12 @@ class ConnectorTask(ABC, Thread):
                 self.connector.disconnect()
             finally:
                 self.connector.set_channels(ChannelState.DISCONNECTED)
-            raise e
+                raise e
         except ConnectorException as e:
             raise e
         except Exception as e:
             raise ConnectorException(self.connector, str(e))
 
-        return self
-
     @abstractmethod
-    def run(self, **kwargs) -> None:
+    def run(self, **kwargs) -> Any:
         pass

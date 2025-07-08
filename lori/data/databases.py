@@ -9,7 +9,7 @@ lori.data.databases
 from __future__ import annotations
 
 import logging
-from typing import Any, Collection
+from typing import Any, Collection, Optional
 
 import tzlocal
 
@@ -53,6 +53,14 @@ class Databases(ConnectorContext, Configurator):
         )
 
     # noinspection PyUnresolvedReferences
+    def connect(self, channels: Optional[Channels] = None) -> None:
+        self.context.connect(*self.values(), channels=channels)
+
+    # noinspection PyUnresolvedReferences
+    def disconnect(self):
+        self.context.disconnect(*self.values())
+
+    # noinspection PyUnresolvedReferences
     def replicate(self, channels: Channels, full: bool = False, force: bool = False, **kwargs) -> None:
         def build_replicator(channel: Channel) -> Channel:
             channel = channel.from_logger()
@@ -67,26 +75,23 @@ class Databases(ConnectorContext, Configurator):
                 and isinstance(channel.logger._connector, Database)
             )
 
-        replication_channels = channels.apply(build_replicator).filter(is_replicating)
-        for database in self.values():
-            database_connected = database.is_connected()
-            database_channels = replication_channels.filter(lambda c: c.replicator.database.id == database.id)
-            if len(database_channels) == 0:
-                continue
-            try:
-                if not database_connected:
-                    self.context.connect(database, channels=database_channels)
+        channels = channels.apply(build_replicator).filter(is_replicating)
+        self.connect(channels)
+        try:
+            for database in self.values():
+                database_channels = channels.filter(lambda c: c.replicator.database.id == database.id)
+                if len(database_channels) == 0:
+                    continue
+                try:
+                    for replicator, replicator_channels in database_channels.groupby(lambda c: c.replicator):
+                        replicator.replicate(replicator_channels, full=to_bool(full), force=to_bool(force))
 
-                for replicator, replicator_channels in database_channels.groupby(lambda c: c.replicator):
-                    replicator.replicate(replicator_channels, full=to_bool(full), force=to_bool(force))
-
-            except ResourceException as e:
-                self._logger.warning(f"Error replicating database '{database.id}': {str(e)}")
-                if self._logger.getEffectiveLevel() <= logging.DEBUG:
-                    self._logger.exception(e)
-            finally:
-                if database.is_connected() and not database_connected:
-                    self.context.disconnect(database)
+                except ResourceException as e:
+                    self._logger.warning(f"Error replicating database '{database.id}': {str(e)}")
+                    if self._logger.getEffectiveLevel() <= logging.DEBUG:
+                        self._logger.exception(e)
+        finally:
+            self.disconnect()
 
     # noinspection PyProtectedMember
     def rotate(self, channels: Channels, full: bool = False) -> None:
@@ -99,45 +104,51 @@ class Databases(ConnectorContext, Configurator):
             retentions.extend(channel.retentions, unique=True)
             return channel
 
-        channels = channels.apply(build_rotation)
-        for rotation, rotation_channels in channels.filter(lambda c: c.rotate is not None).groupby(lambda c: c.rotate):
-            freq = self.configs.get("freq", default="D")
-            timezone = to_timezone(self.configs.get("timezone", default=tzlocal.get_localzone_name()))
-            rotate = floor_date(pd.Timestamp.now(tz=timezone) - to_timedelta(rotation), freq=freq)
+        channels = channels.apply(build_rotation).filter(lambda c: c.rotate is not None or len(c.retentions) > 0)
+        self.connect(channels)
+        try:
+            for rotation, rotation_channels in channels.groupby(lambda c: c.rotate):
+                if rotation is None:
+                    continue
+                freq = self.configs.get("freq", default="D")
+                timezone = to_timezone(self.configs.get("timezone", default=tzlocal.get_localzone_name()))
+                rotate = floor_date(pd.Timestamp.now(tz=timezone) - to_timedelta(rotation), freq=freq)
 
-            for database, database_resources in rotation_channels.groupby(lambda c: c.logger._connector):
-                for _, deletion_resources in database_resources.groupby(lambda c: c.group):
-                    start = database.read_first_index(deletion_resources)
-                    if start is None or start > rotate:
-                        self._logger.debug(
-                            f"Skip rotating values of resource{'s' if len(deletion_resources) > 1 else ''} "
+                for database, database_resources in rotation_channels.groupby(lambda c: c.logger._connector):
+                    for _, deletion_resources in database_resources.groupby(lambda c: c.group):
+                        start = database.read_first_index(deletion_resources)
+                        if start is None or start > rotate:
+                            self._logger.debug(
+                                f"Skip rotating values of resource{'s' if len(deletion_resources) > 1 else ''} "
+                                + ", ".join([f"'{r.id}'" for r in deletion_resources])
+                                + " without any values found"
+                            )
+                            continue
+
+                        self._logger.info(
+                            f"Deleting values of resource{'s' if len(deletion_resources) > 1 else ''} "
                             + ", ".join([f"'{r.id}'" for r in deletion_resources])
-                            + " without any values found"
+                            + f" up to {rotate.strftime('%d.%m.%Y (%H:%M:%S)')}"
                         )
-                        continue
+                        database.delete(deletion_resources, end=rotate)
 
-                    self._logger.info(
-                        f"Deleting values of resource{'s' if len(deletion_resources) > 1 else ''} "
-                        + ", ".join([f"'{r.id}'" for r in deletion_resources])
-                        + f" up to {rotate.strftime('%d.%m.%Y (%H:%M:%S)')}"
-                    )
-                    database.delete(deletion_resources, end=rotate)
+            retentions.sort()
+            for retention in retentions:
+                if not retention.enabled:
+                    self._logger.debug(f"Skipping disabled retention '{retention.keep}'")
+                    continue
+                try:
+                    # noinspection PyProtectedMember
+                    def has_retention(channel: Channel) -> bool:
+                        return (
+                            channel.logger.enabled
+                            and isinstance(channel.logger._connector, Database)
+                            and retention in channel.retentions
+                        )
 
-        retentions.sort()
-        for retention in retentions:
-            if not retention.enabled:
-                self._logger.debug(f"Skipping disabled retention '{retention.keep}'")
-                continue
-            try:
-                # noinspection PyProtectedMember
-                def has_retention(channel: Channel) -> bool:
-                    return (
-                        channel.logger.enabled
-                        and isinstance(channel.logger._connector, Database)
-                        and retention in channel.retentions
-                    )
+                    retention.aggregate(channels.filter(has_retention), full=to_bool(full))
 
-                retention.aggregate(channels.filter(has_retention), full=to_bool(full))
-
-            except ResourceException as e:
-                self._logger.warning(f"Error aggregating '{retention.method}' retaining {retention.keep}: {str(e)}")
+                except ResourceException as e:
+                    self._logger.warning(f"Error aggregating '{retention.method}' retaining {retention.keep}: {str(e)}")
+        finally:
+            self.disconnect()

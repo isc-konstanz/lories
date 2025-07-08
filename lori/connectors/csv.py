@@ -8,7 +8,6 @@ lori.connectors.csv
 
 from __future__ import annotations
 
-import datetime as dt
 import os
 from typing import Mapping, Optional, Tuple
 
@@ -16,6 +15,7 @@ import pandas as pd
 from lori.connectors import ConnectionException, Database, register_connector_type
 from lori.core import ConfigurationException, Configurations, Resources
 from lori.io import csv
+from lori.typing import TimestampType
 from lori.util import ceil_date, floor_date, parse_freq
 
 
@@ -140,8 +140,8 @@ class CsvDatabase(Database):
     def read(
         self,
         resources: Resources,
-        start: Optional[pd.Timestamp | dt.datetime] = None,
-        end: Optional[pd.Timestamp | dt.datetime] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
     ) -> pd.DataFrame:
         def _infer_dates(s=start, e=end) -> Tuple[pd.Timestamp, pd.Timestamp]:
             if all(pd.isna(d) for d in [s, e]):
@@ -277,7 +277,10 @@ class CsvDatabase(Database):
             "override": self.override,
             "rename": columns,
         }
-        data.index.name = self.index_column
+        if self.pretty:
+            data.index.name = self.index_column.title()
+        else:
+            data.index.name = self.index_column
 
         if self.slice:
             csv.write_files(data, self._data_dir, self.freq, self.format, **kwargs)

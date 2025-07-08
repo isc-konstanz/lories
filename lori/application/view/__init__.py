@@ -6,8 +6,12 @@ lori.application.view
 
 """
 
-from . import authentication  # noqa: F401
-from .authentication import Authentication  # noqa: F401
+from . import login  # noqa: F401
+from .login import (  # noqa: F401
+    Authentication,
+    AuthenticationException,
+    LoginPage,
+)
 
 from . import pages  # noqa: F401
 from .pages import (  # noqa: F401
@@ -15,7 +19,6 @@ from .pages import (  # noqa: F401
     PageGroup,
     PageHeader,
     PageFooter,
-    LoginPage,
     ComponentPage,
     ComponentGroup,
     View,

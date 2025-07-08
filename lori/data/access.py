@@ -13,7 +13,8 @@ from typing import Any, Callable, Collection, Optional, Type, overload
 import pandas as pd
 from lori.core import Configurator, Constant, Context, Registrator, ResourceException
 from lori.data import Channel, Channels, DataContext
-from lori.typing import ChannelsType, TimestampType
+from lori.data.typing import ChannelsType
+from lori.typing import TimestampType
 from lori.util import get_context, update_recursive
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -30,7 +31,7 @@ class DataAccess(DataContext, Configurator):
     __context: Context
 
     def __init__(self, registrar: Registrator, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
+        super().__init__(logger=registrar._logger, **kwargs)
         self.__registrar = self._assert_registrar(registrar)
         self.__context = self._assert_context(get_context(registrar, DataContext))
 
@@ -206,8 +207,17 @@ class DataAccess(DataContext, Configurator):
         unique: bool = False,
     ) -> pd.DataFrame: ...
 
-    # noinspection PyUnresolvedReferences
     def from_logger(
+        self,
+        channels: Optional[ChannelsType] = None,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
+        unique: bool = False,
+    ) -> pd.DataFrame:
+        return self.read_logged(channels, start, end, unique=unique)
+
+    # noinspection PyUnresolvedReferences
+    def read_logged(
         self,
         channels: Optional[ChannelsType] = None,
         start: Optional[TimestampType] = None,

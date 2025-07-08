@@ -11,15 +11,14 @@ from __future__ import annotations
 from abc import abstractmethod
 from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Callable, Collection, Iterable, List, Optional, Tuple, Type
+from typing import Any, Callable, Collection, Iterable, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-
 from lori import ConfigurationException
 from lori.core import Configurations, Context, Directories, Registrator, ResourceException
 from lori.data.channels import Channel, Channels
-from lori.typing import ChannelsType
+from lori.data.typing import ChannelsType
 from lori.util import update_recursive, validate_key
 
 # FIXME: Remove this once Python >= 3.9 is a requirement

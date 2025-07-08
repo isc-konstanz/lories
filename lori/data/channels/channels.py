@@ -85,10 +85,17 @@ class Channels(Resources[Channel]):
                     if channel.id in data.columns:
                         self._logger.debug(f"Unable to update None value for channel: {channel.id}")
                     else:
-                        self._logger.warning(f"Unable to update not configured channel: {channel.id}")
+                        self._logger.warning(f"Unable to update missing value for channel: {channel.id}")
                     continue
 
                 timestamp = channel_data.index[0]
                 if len(channel_data.index) == 1:
                     channel_data = channel_data.values[0]
                 channel.set(timestamp, channel_data)
+
+    def set_state(self, state: ChannelState) -> None:
+        def _set_state(channel: Channel) -> Channel:
+            channel.state = state
+            return channel
+
+        self.apply(_set_state, inplace=True)

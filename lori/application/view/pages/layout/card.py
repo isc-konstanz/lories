@@ -9,7 +9,7 @@ lori.application.view.pages.layout.card
 from __future__ import annotations
 
 from collections.abc import MutableSequence
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 import dash_bootstrap_components as dbc
 from dash import html
@@ -66,6 +66,11 @@ class PageCard(dbc.Card, MutableSequence[PageCardItem]):
 
     def append(self, *children: Any, focus: bool = False) -> None:
         self.items.append(PageCardItem(list(children), focus=focus))
+
+    def extend(self, items: Iterable[PageCardItem] | PageCard) -> None:
+        if isinstance(items, PageCard):
+            items = items.items
+        self.items.extend(items)
 
     def has_items(self) -> bool:
         return len(self.items) > 0

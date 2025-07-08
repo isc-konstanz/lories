@@ -8,7 +8,6 @@ lori.components.component
 
 from __future__ import annotations
 
-import datetime as dt
 from typing import Any, Dict, Optional
 
 import pandas as pd
@@ -18,6 +17,7 @@ from lori.connectors import ConnectorAccess
 from lori.converters import ConverterAccess
 from lori.core import Configurations, Context, Registrator
 from lori.data import DataAccess
+from lori.typing import TimestampType
 from lori.util import to_date
 
 
@@ -78,8 +78,8 @@ class Component(_Component):
 
     def get(
         self,
-        start: Optional[pd.Timestamp, dt.datetime, str] = None,
-        end: Optional[pd.Timestamp, dt.datetime, str] = None,
+        start: Optional[TimestampType | str] = None,
+        end: Optional[TimestampType | str] = None,
         **kwargs,
     ) -> pd.DataFrame:
         data = self.__data.to_frame(unique=False)
@@ -92,8 +92,8 @@ class Component(_Component):
     @staticmethod
     def _get_range(
         data: pd.DataFrame,
-        start: Optional[pd.Timestamp, dt.datetime, str] = None,
-        end: Optional[pd.Timestamp, dt.datetime, str] = None,
+        start: Optional[TimestampType | str] = None,
+        end: Optional[TimestampType | str] = None,
         **kwargs,
     ) -> pd.DataFrame:
         if data.empty:
