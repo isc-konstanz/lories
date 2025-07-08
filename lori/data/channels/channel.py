@@ -42,6 +42,8 @@ class Channel(Resource):
     TIMESTAMP: str = "timestamp"
 
     __context: Context
+    __buffer: pd.DataFrame
+
 
     _timestamp: pd.Timestamp = pd.NaT
     _value: Optional[Any] = None
@@ -206,7 +208,28 @@ class Channel(Resource):
         start: Optional[TimestampType] = None,
         end: Optional[TimestampType] = None,
     ) -> pd.DataFrame:
-        return self.__context.read(self.to_list(), start, end)
+        # return self.__context.read(self.to_list(), start, end)
+
+
+
+
+        if start is None or end is None:
+            return self.__context.read(self.to_list(), start, end)
+        if end - start >= pd.Timedelta(month=1):
+            return self.__context.read(self.to_list(), start, end)
+
+        if hasattr(self, "_buffer") and not self._buffer.empty:
+            if start >= self.__buffer.index.min() and end <= self._buffer.index.max():
+                return self.__buffer.loc[start:end]
+
+        buffer_start = start - pd.Timedelta(month=1)
+        buffer_end = end + pd.Timedelta(month=2)
+        self.__buffer = self.__context.read(self.to_list(), buffer_start, buffer_end)
+
+        return self.__buffer.loc[start:end]
+
+
+
 
     # noinspection PyUnresolvedReferences
     def write(self, data: pd.DataFrame | pd.Series | Any) -> None:
