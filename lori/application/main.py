@@ -12,8 +12,9 @@ import sys
 import traceback
 from typing import Optional, Type
 
+import numpy as np
 import pandas as pd
-from lori import Settings, System
+from lori import Settings, System, Configurations
 from lori.application import Interface
 from lori.connectors import Database, DatabaseException
 from lori.data.manager import DataManager
@@ -154,6 +155,11 @@ class Application(DataManager):
         error = False
         summary = []
         systems = self.components.get_all(System)
+
+        # systems = [self.hyper_systems(system) for system in systems]
+        # systems = [s for sublist in systems for s in sublist]  # Flatten the list of lists
+
+
         for system in systems:
             self._logger.info(f"Starting simulation of system '{system.name}': {system.id}")
             if slice and freq is not None and start + to_timedelta(freq) < end:
@@ -215,3 +221,92 @@ class Application(DataManager):
 
             except ImportError:
                 pass
+
+    def hyper_systems(self, system: System) -> list[System]:
+        simulation = self.settings.get_section("simulation", defaults={"data": {"include": True}})
+        hyperparameters = simulation.get_section("hyperparameters", defaults={})
+
+        def get_hyperparameters(hp_config: Configurations, hp: dict, root: str) -> dict:
+            for key, value in hp_config.items():
+                ident = f"{root}.{key}" if root else key
+                if isinstance(value, Configurations):
+                    hp = get_hyperparameters(value, hp, ident)
+                elif isinstance(value, list):
+                    hp[ident] = value
+                else:
+                    raise ValueError(f"Hyperparameter '{ident}' must be a list, got {type(value)}")
+            return hp
+
+        hp_dict = get_hyperparameters(hyperparameters, {}, None)
+        if not hp_dict:
+            return [system]
+
+        hp_keys = list(hp_dict.keys())
+        system_key = set([key.split(".")[0] for key in hp_dict.keys()])
+        # check if all systems have the same id
+        if len(set(system_key)) > 1:
+            raise ValueError("Hyperparameters must have the same system id")
+        system_key = system_key.pop()
+        if system.key != system_key:
+            return [system]
+        # remove system key from hyperparameter keys
+        #hp_keys = [key.replace(f"{system_key}.", "") for key in hp_keys]
+
+        meshgrid = np.meshgrid( *[np.array(v) for v in hp_dict.values()], indexing="ij")
+        meshgrid = np.array(meshgrid).reshape(len(hp_keys), -1).T
+        print(hp_keys)
+        print(meshgrid)
+
+
+        pass
+        # # check if folder exists
+        # if not self.configs.dirs.data.joinpath("simulations").exists():
+        #     self.configs.dirs.data.joinpath("simulations").mkdir(parents=True, exist_ok=True)
+        #
+        # # check if configs folder exists
+        # if not self.configs.dirs.data.joinpath("configs").exists():
+        #     self.configs.dirs.data.joinpath("configs").mkdir(parents=True, exist_ok=True)
+        #
+        # # copy configs to ./configs
+        # self.configs.dirs.conf.copy_to(self.configs.dirs.data.joinpath("configs"))
+        #
+        # for key in hp_keys:
+        #     pass
+        # return [system]
+
+        # Build Simulation id (ISC_001_parameters?)
+        # Foreach over hyperparameters
+        #   Create folder structure
+        #       ./simulations/ISC_001/
+        #       ./simulations/ISC_001/configs/
+        #       ./simulations/ISC_001/results/
+        #   Copy configs to ./configs
+        #   Replace hyperparameters in configs
+        #   Start new Application? self simulation one after the other
+        #   Save results in ./results
+        #   Evaluate results?
+
+        systems = []
+        for index, hp in enumerate(meshgrid[:1]):
+            new_key = f"{system_key}_sim_{index}_{'_'.join([str(v) for v in hp])}"
+
+            system_copy = system.copy(new_key)
+            print(system_copy.data)
+            for key in system_copy.data.keys():
+                print(key)
+            print(system_copy.connectors)
+            for key in system_copy.connectors.keys():
+                print(key)
+            print(system_copy.components)
+            for key in system_copy.components.keys():
+                print(key)
+            for key, value in zip(hp_keys, hp):
+                pass
+                #system_copy.configs.set()
+            systems.append(system_copy)
+
+
+
+        pass
+        return systems
+
