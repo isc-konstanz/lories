@@ -277,7 +277,10 @@ class CsvDatabase(Database):
             "override": self.override,
             "rename": columns,
         }
-        data.index.name = self.index_column
+        if self.pretty:
+            data.index.name = self.index_column.title()
+        else:
+            data.index.name = self.index_column
 
         if self.slice:
             csv.write_files(data, self._data_dir, self.freq, self.format, **kwargs)
