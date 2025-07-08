@@ -227,8 +227,7 @@ class DataManager(DataContext, Activator, Entity):
     def _connect_callback(self, future: Future) -> None:
         try:
             connector = future.result()
-            self._logger.info(
-                f"Connected {type(connector).__name__} '{connector.name}': {connector.id}")
+            self._logger.info(f"Connected {type(connector).__name__} '{connector.name}': {connector.id}")
 
         except ConnectorException as e:
             self._logger.warning(f"Failed opening connector '{e.connector.id}': {str(e)}")
@@ -594,7 +593,7 @@ class DataManager(DataContext, Activator, Entity):
         self,
         task: ReadTask,
         future: Future,
-        inplace: bool = False
+        inplace: bool = False,
     ) -> Optional[pd.DataFrame]:
         channels = task.channels
         try:
@@ -664,7 +663,7 @@ class DataManager(DataContext, Activator, Entity):
         self,
         task: WriteTask,
         future: Future,
-        inplace: bool = False
+        inplace: bool = False,
     ) -> None:
         channels = task.channels
         try:

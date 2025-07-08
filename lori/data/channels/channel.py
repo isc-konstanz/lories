@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Callable
 from copy import deepcopy
-from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Type
+from typing import Any, Collection, Dict, List, Mapping, Optional, Type
 
 import pandas as pd
 import pytz as tz
