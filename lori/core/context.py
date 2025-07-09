@@ -95,7 +95,7 @@ class Context(ABC, MutableMapping[str, E], Generic[E]):
     def sort(self):
         def order(text: str) -> Tuple[Any, ...]:
             elements = re.split(r"[^0-9A-Za-zäöüÄÖÜß]+", text)
-            elements = list(chain(*[re.split(r"([0-9])+", t) for t in elements]))
+            elements = list(chain(*[re.findall(r"\D+|\d+", t) for t in elements]))
             elements = [int(t) if t.isdigit() else t for t in elements if pd.notna(t) and t.strip()]
             return tuple(elements)
 
