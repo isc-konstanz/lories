@@ -10,13 +10,15 @@ from __future__ import annotations
 
 import sys
 import traceback
-from typing import Optional, Type
+from collections import OrderedDict
+from typing import Any, Collection, Dict, Optional, OrderedDict, Type
 
 import numpy as np
 import pandas as pd
-from lori import Settings, System, Configurations
+from lori import Settings, System
 from lori.application import Interface
 from lori.connectors import Database, DatabaseException
+from lori.core import ConfigurationException, Configurations, Configurator, Context, ResourceException
 from lori.data.manager import DataManager
 from lori.simulation import Results
 from lori.typing import TimestampType
@@ -33,6 +35,101 @@ class Application(DataManager):
         app.configure(settings, factory)
         return app
 
+    def _load_hyper_systems(self, configs: Configurations, *systems: System) -> Collection[System]:
+        # noinspection PyShadowingBuiltins, PyShadowingNames
+        def _load_hyper_parameters(configs: Configurations, context: Optional[str] = None) -> Dict[str, Any]:
+            hyper_parameters = OrderedDict()
+            for key, value in configs.items():
+                id = f"{context}.{key}" if context else key
+                if isinstance(value, Configurations):
+                    hyper_parameters.update(_load_hyper_parameters(value, id))
+                elif isinstance(value, list):
+                    hyper_parameters[id] = value
+                else:
+                    raise ResourceException(f"Hyperparameter '{id}' must be a list, got {type(value)}")
+            return hyper_parameters
+
+        hyper_systems = []
+        hyper_parameters = _load_hyper_parameters(configs)
+        if not hyper_parameters:
+            return systems
+
+        for system in systems:
+            system_parameters = {k: v for k, v in hyper_parameters.items() if k.split(".")[0] == system.id}
+            hyper_systems.extend(self._load_hyper_system(system_parameters, system))
+        return hyper_systems
+
+    # noinspection SpellCheckingInspection
+    def _load_hyper_system(self, parameters: Dict[str, Any], system: System) -> Collection[System]:
+        def _clear_system() -> None:
+            self.converters._remove(*[c for c in self.converters if c.split(".")[0] == system.id])
+            self.connectors._remove(*[c for c in self.connectors if c.split(".")[0] == system.id])
+            self.components._remove(*[c for c in self.components if c.split(".")[0] == system.id])
+            self._remove(*[c.id for c in self.channels if c.id.split(".")[0] == system.id])
+
+        if len(parameters) == 0:
+            self._logger.warning(f"No hyperparameters configured for system '{system.id}'. Will be removed")
+            _clear_system()
+            return []
+
+        simulation_dir = system.configs.dirs.data.joinpath(".systems")
+        if not simulation_dir.exists():
+            simulation_dir.mkdir(parents=True, exist_ok=True)
+
+        systems = []
+        meshgrid = np.meshgrid(*[np.array(v) for v in parameters.values()], indexing="ij")
+        meshgrid = np.array(meshgrid, dtype=object).reshape(len(parameters.keys()), -1).T
+        meshkeys = [(i, k.split(".")[-1]) for i, k in enumerate(parameters.keys())]
+        for system_params in meshgrid:
+            system_path = f"{system.key}_{'_'.join(f'{k}-{str(system_params[i]).lower()}' for i, k in meshkeys)}"
+            system_name = f"{system.name} ({', '.join(f'{k.title()}: {str(system_params[i])}' for i, k in meshkeys)})"
+            system_key = f"{system.key}_{'_'.join(str(v).lower() for v in system_params)}"
+            system_dir = simulation_dir.joinpath(system_path)
+            system_dirs = system.configs.dirs.copy()
+            system_dirs.data = system_dir
+            system_dirs.conf = system_dir.joinpath("conf")
+            system_configs = system.configs.copy(system_dirs)
+            system_configs["key"] = system_key
+            system_configs["name"] = system_name
+            system_configs.write()
+
+            self._logger.info(f"Preparing hyperparameter system '{system_name}': {system_key}")
+            system_duplicate = system.duplicate(
+                key=system_key,
+                name=system_name,
+                configs=system_configs,
+            )
+
+            # noinspection PyUnresolvedReferences, PyArgumentList, PyShadowingNames
+            def _get_member(_object: Any, _key: str) -> Any:
+                if not isinstance(_object, Context):
+                    return getattr(_object, _key)
+                return _object.get(_key)
+
+            for key, parameter in [(k, system_params[i]) for i, k in enumerate(parameters.keys())]:
+                _key = key.split(".")[1:]
+                configurator = system_duplicate
+                try:
+                    while len(_key) > 1:
+                        configurator = _get_member(configurator, _key.pop(0))
+
+                except (AttributeError, KeyError) as e:
+                    raise ConfigurationException(f"Invalid hyperparameter '{key}' for key {e}")
+                if not isinstance(configurator, Configurator):
+                    raise ConfigurationException(
+                        f"Invalid configurator type for hyperparameter '{key}': {type(configurator)}"
+                    )
+                configurations = configurator.configs
+                configurations[_key[0]] = parameter
+                configurations.write()
+                if configurations.enabled:
+                    configurator.update(configurations)
+
+            systems.append(system_duplicate)
+
+        _clear_system()
+        return systems
+
     # noinspection PyProtectedMember
     def __init__(self, settings: Settings, **kwargs) -> None:
         super().__init__(settings, name=settings["name"], **kwargs)
@@ -41,7 +138,7 @@ class Application(DataManager):
         self._interface = Interface(self, settings.get_section(Interface.SECTION))
 
     # noinspection PyProtectedMember, PyTypeChecker, PyMethodOverriding
-    def configure(self, settings: Settings, factory: Type[System]) -> None:
+    def configure(self, settings: Settings, factory: Type[System], **_) -> None:
         super().configure(settings)
         self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
         components = []
@@ -89,11 +186,10 @@ class Application(DataManager):
                     self.start()
 
             elif action == "simulate":
-                with self:
-                    self.simulate(
-                        start=self.settings.get_date("start", default=None),
-                        end=self.settings.get_date("end", default=None),
-                    )
+                self.simulate(
+                    start=self.settings.get_date("start", default=None),
+                    end=self.settings.get_date("end", default=None),
+                )
 
             elif action == "rotate":
                 self.rotate(full=self.settings.get_bool("full"))
@@ -156,61 +252,63 @@ class Application(DataManager):
         summary = []
         systems = self.components.get_all(System)
 
-        # systems = [self.hyper_systems(system) for system in systems]
-        # systems = [s for sublist in systems for s in sublist]  # Flatten the list of lists
+        if "hyperparameters" in simulation:
+            systems = self._load_hyper_systems(simulation["hyperparameters"], *systems)
 
+        # TODO: Implement optional Callable argument to self.activate(), to filter registrators by system id
+        # self.activate(lambda r: filter by system name)
+        with self:
+            for system in systems:
+                self._logger.info(f"Starting simulation of system '{system.name}': {system.id}")
+                if slice and freq is not None and start + to_timedelta(freq) < end:
+                    slices = slice_range(start, end, timezone=system.location.timezone, freq=freq)
+                else:
+                    slices = [(start, end)]
 
-        for system in systems:
-            self._logger.info(f"Starting simulation of system '{system.name}': {system.id}")
-            if slice and freq is not None and start + to_timedelta(freq) < end:
-                slices = slice_range(start, end, timezone=system.location.timezone, freq=freq)
-            else:
-                slices = [(start, end)]
+                with Results(system, database, simulation.get_section("data"), total=len(slices)) as results:
+                    results.durations.start("Simulation")
+                    try:
+                        for slice_start, slice_end in slices:
+                            slice_prior = results.data.tail(1) if not results.data.empty else None
+                            results.submit(
+                                system.simulate,
+                                slice_start,
+                                slice_end,
+                                slice_prior,
+                                **kwargs,
+                            )
+                            results.progress.update()
 
-            with Results(system, database, simulation.get_section("data"), total=len(slices)) as results:
-                results.durations.start("Simulation")
-                try:
-                    for slice_start, slice_end in slices:
-                        slice_prior = results.data.tail(1) if not results.data.empty else None
-                        results.submit(
-                            system.simulate,
-                            slice_start,
-                            slice_end,
-                            slice_prior,
-                            **kwargs,
+                        results.durations.stop("Simulation")
+                        self._logger.debug(
+                            f"Finished simulation of system '{system.name}' in {results.durations['Simulation']} minutes"
                         )
-                        results.progress.update()
 
-                    results.durations.stop("Simulation")
-                    self._logger.debug(
-                        f"Finished simulation of system '{system.name}' in {results.durations['Simulation']} minutes"
-                    )
+                        self._logger.debug(f"Starting evaluation of system '{system.name}': {system.id}")
+                        results.durations.start("Evaluation")
+                        results_data = system.evaluate(results)
+                        results.report()
 
-                    self._logger.debug(f"Starting evaluation of system '{system.name}': {system.id}")
-                    results.durations.start("Evaluation")
-                    results_data = system.evaluate(results)
-                    results.report()
+                        # TODO: Call evaluations from configs
 
-                    # TODO: Call evaluations from configs
+                        results.durations.stop("Evaluation")
+                        self._logger.debug(
+                            f"Finished evaluation of system '{system.name}' in {results.durations['Evaluation']} minutes"
+                        )
 
-                    results.durations.stop("Evaluation")
-                    self._logger.debug(
-                        f"Finished evaluation of system '{system.name}' in {results.durations['Evaluation']} minutes"
-                    )
+                        summary.append(results.to_frame())
 
-                    summary.append(results.to_frame())
-
-                except Exception as e:
-                    error = True
-                    self._logger.error(f"Error simulating system {system.name}: {str(e)}")
-                    self._logger.debug("%s: %s", type(e).__name__, traceback.format_exc())
-                    results.durations.complete()
-                    results.progress.complete(
-                        status="error",
-                        message=str(e),
-                        error=type(e).__name__,
-                        trace=traceback.format_exc(),
-                    )
+                    except Exception as e:
+                        error = True
+                        self._logger.error(f"Error simulating system {system.name}: {str(e)}")
+                        self._logger.debug("%s: %s", type(e).__name__, traceback.format_exc())
+                        results.durations.complete()
+                        results.progress.complete(
+                            status="error",
+                            message=str(e),
+                            error=type(e).__name__,
+                            trace=traceback.format_exc(),
+                        )
 
         if not error and len(summary) > 1:
             try:
@@ -221,92 +319,3 @@ class Application(DataManager):
 
             except ImportError:
                 pass
-
-    def hyper_systems(self, system: System) -> list[System]:
-        simulation = self.settings.get_section("simulation", defaults={"data": {"include": True}})
-        hyperparameters = simulation.get_section("hyperparameters", defaults={})
-
-        def get_hyperparameters(hp_config: Configurations, hp: dict, root: str) -> dict:
-            for key, value in hp_config.items():
-                ident = f"{root}.{key}" if root else key
-                if isinstance(value, Configurations):
-                    hp = get_hyperparameters(value, hp, ident)
-                elif isinstance(value, list):
-                    hp[ident] = value
-                else:
-                    raise ValueError(f"Hyperparameter '{ident}' must be a list, got {type(value)}")
-            return hp
-
-        hp_dict = get_hyperparameters(hyperparameters, {}, None)
-        if not hp_dict:
-            return [system]
-
-        hp_keys = list(hp_dict.keys())
-        system_key = set([key.split(".")[0] for key in hp_dict.keys()])
-        # check if all systems have the same id
-        if len(set(system_key)) > 1:
-            raise ValueError("Hyperparameters must have the same system id")
-        system_key = system_key.pop()
-        if system.key != system_key:
-            return [system]
-        # remove system key from hyperparameter keys
-        #hp_keys = [key.replace(f"{system_key}.", "") for key in hp_keys]
-
-        meshgrid = np.meshgrid( *[np.array(v) for v in hp_dict.values()], indexing="ij")
-        meshgrid = np.array(meshgrid).reshape(len(hp_keys), -1).T
-        print(hp_keys)
-        print(meshgrid)
-
-
-        pass
-        # # check if folder exists
-        # if not self.configs.dirs.data.joinpath("simulations").exists():
-        #     self.configs.dirs.data.joinpath("simulations").mkdir(parents=True, exist_ok=True)
-        #
-        # # check if configs folder exists
-        # if not self.configs.dirs.data.joinpath("configs").exists():
-        #     self.configs.dirs.data.joinpath("configs").mkdir(parents=True, exist_ok=True)
-        #
-        # # copy configs to ./configs
-        # self.configs.dirs.conf.copy_to(self.configs.dirs.data.joinpath("configs"))
-        #
-        # for key in hp_keys:
-        #     pass
-        # return [system]
-
-        # Build Simulation id (ISC_001_parameters?)
-        # Foreach over hyperparameters
-        #   Create folder structure
-        #       ./simulations/ISC_001/
-        #       ./simulations/ISC_001/configs/
-        #       ./simulations/ISC_001/results/
-        #   Copy configs to ./configs
-        #   Replace hyperparameters in configs
-        #   Start new Application? self simulation one after the other
-        #   Save results in ./results
-        #   Evaluate results?
-
-        systems = []
-        for index, hp in enumerate(meshgrid[:1]):
-            new_key = f"{system_key}_sim_{index}_{'_'.join([str(v) for v in hp])}"
-
-            system_copy = system.copy(new_key)
-            print(system_copy.data)
-            for key in system_copy.data.keys():
-                print(key)
-            print(system_copy.connectors)
-            for key in system_copy.connectors.keys():
-                print(key)
-            print(system_copy.components)
-            for key in system_copy.components.keys():
-                print(key)
-            for key, value in zip(hp_keys, hp):
-                pass
-                #system_copy.configs.set()
-            systems.append(system_copy)
-
-
-
-        pass
-        return systems
-

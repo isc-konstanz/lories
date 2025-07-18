@@ -143,3 +143,11 @@ class RegistratorAccess(_RegistratorContext[R], Generic[R]):
             registrator = self._load_from_configs(self._registrar, registrator_configs)
             if registrator.is_enabled():
                 registrator.configure(registrator_configs)
+
+    # noinspection PyUnresolvedReferences
+    def duplicate(self, configs: Configurations, **_) -> None:
+        for registrator in self.values():
+            relative_dir = registrator.configs.dirs.conf.relative_to(registrator.context.configs.dirs.conf)
+            registrator_dirs = configs.dirs.copy()
+            registrator_dirs.conf = registrator_dirs.conf.joinpath(relative_dir)
+            registrator.configs.copy(registrator_dirs)

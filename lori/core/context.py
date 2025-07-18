@@ -75,21 +75,19 @@ class Context(ABC, MutableMapping[str, E], Generic[E]):
 
     def _add(self, *__objects: E) -> None:
         for __object in __objects:
-            self._set(__object.id, __object)
+            self._set(str(__object.id), __object)
 
     @abstractmethod
-    def _create(self, *args, **kwargs) -> E:
-        pass
+    def _create(self, *args, **kwargs) -> E: ...
 
     @abstractmethod
-    def _update(self, *args, **kwargs) -> None:
-        pass
+    def _update(self, *args, **kwargs) -> None: ...
 
     def _remove(self, *__objects: str | E) -> None:
         for __object in __objects:
             if isinstance(__object, str):
                 del self.__map[__object]
-            elif isinstance(__object, Entity):
+            if isinstance(__object, Entity):
                 del self.__map[__object.id]
 
     def sort(self):

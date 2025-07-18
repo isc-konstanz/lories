@@ -158,3 +158,9 @@ class Registrator(Configurator, Entity):
     @property
     def context(self) -> Context:
         return self.__context
+
+    # noinspection PyProtectedMember, PyTypeChecker, PyShadowingBuiltins
+    def duplicate(self, context: Optional[Context | Registrator] = None, **changes):
+        if context is None:
+            context = self.__context
+        return super().duplicate(context=context, **changes)

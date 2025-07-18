@@ -12,7 +12,9 @@ from collections import OrderedDict
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
+from lori import ConfigurationException
 from lori.core import ResourceException
+from lori.util import to_bool, update_recursive
 
 
 class ChannelConverter:
@@ -20,6 +22,8 @@ class ChannelConverter:
 
     # noinspection PyShadowingBuiltins
     def __init__(self, converter, **configs: Any) -> None:
+        if "converter" in configs:
+            raise ConfigurationException("Invalid channel converter configuration 'converter'")
         self.__configs = OrderedDict(configs)
         self._converter = self._assert_converter(converter)
 
@@ -68,8 +72,12 @@ class ChannelConverter:
             f"{k}={v}" for k, v in self._get_vars().items()
         )
 
-    def __call__(self, value: Any) -> Any:
-        return self._converter.to_dtype(value, **self._get_configs())
+    def __call__(self, data: Any) -> Any:
+        converter_args = self._get_configs()
+        if isinstance(data, pd.Series):
+            converted_data = data.apply(self._converter.convert, **converter_args)
+            return converted_data.apply(self._converter.to_dtype, **converter_args)
+        return self._converter.to_dtype(data, **converter_args)
 
     @property
     def id(self) -> str:
@@ -84,6 +92,14 @@ class ChannelConverter:
 
     def to_json(self, value: Any) -> str:
         return self._converter.to_json(value)
+
+    def to_configs(self) -> Dict[str, Any]:
+        configs = {
+            "converter": self._converter.key,
+            "enabled": self.enabled,
+            **self._copy_configs(),
+        }
+        return configs
 
     def to_series(self, value: Any, timestamp: Optional[pd.Timestamp] = None, name: Optional[str] = None) -> pd.Series:
         return self._converter.to_series(value, timestamp=timestamp, name=name)
@@ -105,6 +121,28 @@ class ChannelConverter:
 
     def _copy_configs(self) -> Dict[str, Any]:
         return OrderedDict(**self._get_configs())
+
+    def __update_configs(self, configs: Dict[str, Any]) -> None:
+        update_recursive(self.__configs, configs)
+
+    # noinspection PyShadowingBuiltins
+    def _update(
+        self,
+        converter: Optional[str | ChannelConverter] = None,
+        enabled: Optional[str | bool] = None,
+        **configs: Any,
+    ) -> None:
+        if converter is not None:
+            if isinstance(converter, str):
+                if self._converter.key != converter:
+                    raise ConfigurationException(f"Unable to update channel converter from key '{converter}'")
+            elif not isinstance(converter, ChannelConverter):
+                raise ConfigurationException(f"Unable to update channel converter to invalid type '{type(converter)}'")
+            else:
+                self._converter = converter
+        if enabled is not None:
+            self.enabled = to_bool(enabled)
+        self.__update_configs(configs)
 
     def copy(self) -> ChannelConverter:
         configs = self._copy_configs()

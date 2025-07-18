@@ -42,6 +42,7 @@ class Component(_Component):
 
     def _at_configure(self, configs: Configurations) -> None:
         super()._at_configure(configs)
+        # TODO: Implement configurator.update() method to replace this hack
         self.__data.configure(configs.get_section(DataAccess.SECTION, ensure_exists=True))
 
     def _on_configure(self, configs: Configurations) -> None:
@@ -59,6 +60,12 @@ class Component(_Component):
         self.__components.configure()
 
         self.__data.load()
+
+    def _at_duplicate(self, **changes) -> None:
+        super()._at_duplicate(**changes)
+        self.converters.duplicate(**changes)
+        self.connectors.duplicate(**changes)
+        self.components.duplicate(**changes)
 
     @property
     def components(self) -> ComponentAccess:
