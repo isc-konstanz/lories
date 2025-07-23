@@ -66,11 +66,11 @@ class Resources(Generic[R], Sequence[R]):
 
     @property
     def ids(self) -> Sequence[str]:
-        return [resource.id for resource in self._resources]
+        return [str(resource.id) for resource in self._resources]
 
     @property
     def keys(self) -> Sequence[str]:
-        return [resource.key for resource in self._resources]
+        return [str(resource.key) for resource in self._resources]
 
     def copy(self):
         return type(self)([resource.copy() for resource in self._resources])

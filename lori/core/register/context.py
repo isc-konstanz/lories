@@ -187,6 +187,7 @@ class _RegistratorContext(Context[R], Generic[R]):
                         pass
         return registrators
 
+    # noinspection PyUnresolvedReferences, PyTypeChecker
     def configure(self, configurators: Optional[Collection[Configurator]] = None) -> None:
         if configurators is None:
             configurators = self.values()
@@ -202,7 +203,7 @@ class _RegistratorContext(Context[R], Generic[R]):
             if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.debug(f"Configured {configurator}")
 
-    # noinspection PyShadowingBuiltins, PyArgumentList
+    # noinspection PyArgumentList, PyShadowingBuiltins
     def _update(self, id: str, configs: Configurations) -> None:
         registrator = self._get(id)
         if registrator.is_enabled():

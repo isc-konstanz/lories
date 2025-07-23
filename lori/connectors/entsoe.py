@@ -36,7 +36,7 @@ class EntsoeConnector(Connector):
     DAY_AHEAD: str = "day_ahead"
     METHODS: list = [DAY_AHEAD]
 
-    resolution: Literal["60min", "30min", "15min"] = '60min'
+    resolution: Literal["60min", "30min", "15min"] = "60min"
 
     country_code: str
     _api_key: str
