@@ -11,7 +11,14 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from pathlib import Path, PosixPath, WindowsPath
-from typing import Dict, LiteralString, Optional
+from typing import Dict, Optional
+
+# FIXME: Remove this once Python >= 3.9 is a requirement
+try:
+    from typing import LiteralString
+
+except ImportError:
+    from typing_extensions import LiteralString
 
 
 class Directories:

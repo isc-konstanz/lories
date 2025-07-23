@@ -181,7 +181,7 @@ class Configurations(MutableMapping[str, Any]):
             lines = self.__read_lines()
             lines_section = len(lines) - 1
             for line_index, line in enumerate(lines):
-                if "=" in line and not line.lstrip().startswith(("#", ";")):
+                if "=" in line:
                     line = line.rstrip()
                     key, value, *_ = line.split("=")
                     key = key.lstrip().lstrip("#").lstrip(";").strip()
@@ -224,6 +224,10 @@ class Configurations(MutableMapping[str, Any]):
     def __parse_line(self, key, value: Any) -> str:
         if is_bool(value):
             value = str(value).lower()
+        if "\\" in value:
+            value = value.translate(str.maketrans({"\\": r"\\"}))
+        if isinstance(value, str):
+            value = f'"{value}"'
         return f"{key} = {value}\n"
 
     def copy(self, dirs: Optional[Directories] = None) -> Configurations:
@@ -250,11 +254,11 @@ class Configurations(MutableMapping[str, Any]):
 
             def _include(pattern):
                 def _ignore(path, names):
-                    return set(n for n in names if n != pattern and not os.path.isdir(os.path.join(path, n)))
+                    return set(n for n in names if not re.match(pattern, n) and not os.path.isdir(os.path.join(path, n)))
 
                 return _ignore
 
-            shutil.copytree(source, destination, ignore=_include("*.conf"), dirs_exist_ok=True)
+            shutil.copytree(source, destination, ignore=_include(".*\.conf"), dirs_exist_ok=True)
         elif not destination.exists():
             shutil.copy2(source, destination)
 
