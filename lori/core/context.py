@@ -94,7 +94,7 @@ class Context(ABC, MutableMapping[str, E], Generic[E]):
         def order(text: str) -> Tuple[Any, ...]:
             elements = re.split(r"[^0-9A-Za-zäöüÄÖÜß]+", text)
             elements = list(chain(*[re.findall(r"\D+|\d+", t) for t in elements]))
-            elements = [int(t) if t.isdigit() else t for t in elements if pd.notna(t) and t.strip()]
+            elements = [(int(t), 0) if t.isdigit() else (0, t) for t in elements if pd.notna(t) and t.strip()]
             return tuple(elements)
 
         self.__map = OrderedDict(sorted(self.__map.items(), key=lambda e: order(e[0])))

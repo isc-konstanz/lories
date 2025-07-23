@@ -84,7 +84,7 @@ class PageGroup(Page, MutableSequence[P], Generic[P]):
         def order(page: Page) -> Tuple[Any, ...]:
             elements = re.split(r"[^0-9A-Za-zäöüÄÖÜß]+", page.id)
             elements = list(chain(*[re.findall(r"\D+|\d+", t) for t in elements]))
-            elements = [int(t) if t.isdigit() else t for t in elements if pd.notna(t) and t.strip()]
+            elements = [(int(t), 0) if t.isdigit() else (0, t) for t in elements if pd.notna(t) and t.strip()]
             return page.order, *elements
 
         self._pages.sort(key=lambda p: order(p))
