@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Callable, MutableMapping
 from itertools import chain
-from typing import Any, Collection, Generic, Iterable, Iterator, Tuple, TypeVar
+from typing import Any, Collection, Generic, Iterable, Iterator, MutableMapping, Tuple, TypeVar
 
 import pandas as pd
 from lori.core import Entity, ResourceException
@@ -89,7 +89,7 @@ class Context(ABC, MutableMapping[str, E], Generic[E]):
         for __object in __objects:
             if isinstance(__object, str):
                 del self.__map[__object]
-            if isinstance(__object, Entity):
+            elif isinstance(__object, Entity):
                 del self.__map[__object.id]
 
     def sort(self):

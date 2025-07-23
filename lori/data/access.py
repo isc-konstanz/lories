@@ -27,12 +27,12 @@ except ImportError:
 
 # noinspection PyProtectedMember, PyShadowingBuiltins
 class DataAccess(DataContext, Configurator):
-    __registrar: Registrator
+    __registrator: Registrator
     __context: Context
 
     def __init__(self, registrar: Registrator, **kwargs: Any) -> None:
         super().__init__(logger=registrar._logger, **kwargs)
-        self.__registrar = self._assert_registrar(registrar)
+        self.__registrator = self._assert_registrar(registrar)
         self.__context = self._assert_context(get_context(registrar, DataContext))
 
     @classmethod
@@ -65,7 +65,7 @@ class DataAccess(DataContext, Configurator):
 
     def __validate_id(self, id: str) -> str:
         if not len(id.split(".")) > 1:
-            id = f"{self.__registrar.id}.{id}"
+            id = f"{self.__registrator.id}.{id}"
         return id
 
     def _contains(self, __channel: str | Channel) -> bool:
@@ -113,9 +113,9 @@ class DataAccess(DataContext, Configurator):
         if self.configs.has_section(Channels.SECTION):
             section = self.configs.get_section(Channels.SECTION)
             defaults = Channel._build_defaults(section)
-            channels.extend(self._load_from_sections(self.__registrar, section))
+            channels.extend(self._load_from_sections(self.__registrator, section))
         channels.extend(
-            self._load_from_file(self.__registrar, self.configs.dirs, f"{Channels.SECTION}.conf", defaults=defaults)
+            self._load_from_file(self.__registrator, self.configs.dirs, f"{Channels.SECTION}.conf", defaults=defaults)
         )
 
         if sort:
@@ -139,7 +139,7 @@ class DataAccess(DataContext, Configurator):
             channel_configs = update_recursive(channel_configs, configs, replace=False)
             channels[key] = channel_configs
 
-        if self.__registrar.is_configured():
+        if self.__registrator.is_configured():
             channel_defaults = Channel._build_defaults(channels)
             channel_configs = Channel._build_configs(channel_defaults)
             # Be wary of the order. First, update the channel core with the default core
@@ -147,7 +147,7 @@ class DataAccess(DataContext, Configurator):
             # everything with the channel specific configurations of the file.
             channel_configs = update_recursive(channel_configs, configs)
             channel_configs = update_recursive(channel_configs, channels[key])
-            channel_id = f"{self.__registrar.id}.{key}"
+            channel_id = f"{self.__registrator.id}.{key}"
             if self._contains(channel_id):
                 self._update(id=channel_id, key=key, **channel_configs)
             else:

@@ -3,10 +3,6 @@
 lori.components.tariff.provider
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This module provides the :class:`lori.components.tariff.provider.TariffProvider`, which serves
-as a reference for tariff calculations. The TariffProvider supplies import and export tariff
-data, enabling the calculation of energy costs and revenues for various scenarios, such as
-grid consumption and feed-in from renewable energy sources.
 
 """
 
