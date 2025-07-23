@@ -52,13 +52,13 @@ class Databases(ConnectorContext, Configurator):
             **kwargs,
         )
 
-    # noinspection PyUnresolvedReferences
+    # noinspection PyUnresolvedReferences, PyProtectedMember
     def connect(self, channels: Optional[Channels] = None) -> None:
-        self.context.connect(*self.values(), channels=channels)
+        self.context._connect(*self.values(), channels=channels)
 
-    # noinspection PyUnresolvedReferences
+    # noinspection PyUnresolvedReferences, PyProtectedMember
     def disconnect(self):
-        self.context.disconnect(*self.values())
+        self.context._disconnect(*self.values())
 
     # noinspection PyUnresolvedReferences
     def replicate(self, channels: Channels, full: bool = False, force: bool = False, **kwargs) -> None:

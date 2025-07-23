@@ -86,3 +86,6 @@ class Durations(Mapping):
         for key in self.keys():
             self._durations[key]["complete"] = True
             self.stop(key)
+
+    def is_complete(self) -> bool:
+        return all(d["complete"] for d in self._durations.values())

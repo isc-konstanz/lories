@@ -28,7 +28,7 @@ from lori.connectors.tasks import CheckTask, ConnectTask, LogTask, ReadTask, Wri
 from lori.converters.context import ConverterContext
 from lori.core import Activator, Context, Entity
 from lori.core.configs import ConfigurationException, Configurations
-from lori.core.register import RegistratorContext
+from lori.core.register import Registrator, RegistratorContext
 from lori.data.channels import Channel, ChannelConnector, ChannelConverter, Channels, ChannelState
 from lori.data.context import DataContext
 from lori.data.databases import Databases
@@ -157,25 +157,37 @@ class DataManager(DataContext, Activator, Entity):
         self._components.sort()
         self.sort()
 
-    def activate(self) -> None:
+    # noinspection PyShadowingBuiltins
+    def activate(self, filter: Optional[Callable[[Registrator], bool]] = None) -> None:
         super().activate()
-        self.connect(*self._connectors.filter(lambda c: c._is_connectable()))
-        self._activate(*self._components.values())
+        self._connect(*self._connectors.filter(_filter(filter)))
+        self._activate(*self._components.filter(_filter(filter)))
 
-    def _activate(self, *components: Component) -> None:
-        for component in components:
+    def _activate(self, *component: Component) -> None:
+        for component in component:
             if not component.is_enabled():
                 self._logger.debug(
-                    f"Skipping activating disabled {type(component).__name__} '{component.name}': {component.id}"
+                    f"Skipping to activate disabled {type(component).__name__} '{component.name}': {component.id}"
                 )
                 continue
+            self.__activate(component)
 
-            self._logger.debug(f"Activating {type(component).__name__} '{component.name}': {component.id}")
-            component.activate()
+    def __activate(self, component: Component) -> None:
+        self._logger.debug(f"Activating {type(component).__name__} '{component.name}': {component.id}")
+        component.activate()
 
-            self._logger.info(f"Activated {type(component).__name__} '{component.name}': {component.id}")
+        self._logger.info(f"Activated {type(component).__name__} '{component.name}': {component.id}")
 
+    # noinspection PyShadowingBuiltins
     def connect(
+        self,
+        filter: Optional[Callable[[Registrator], bool]] = None,
+        channels: Optional[Channels] = None,
+        timeout: Optional[int] = None
+    ) -> None:
+        self._connect(*self._connectors.filter(_filter(filter)), channels=channels, timeout=timeout)
+
+    def _connect(
         self,
         *connectors: Connector,
         channels: Optional[Channels] = None,
@@ -185,7 +197,7 @@ class DataManager(DataContext, Activator, Entity):
         for connector in connectors:
             if not connector.is_enabled():
                 self._logger.debug(
-                    f"Skipping connecting disabled {type(connector).__name__} '{connector.name}': {connector.id}"
+                    f"Skipping to connect disabled {type(connector).__name__} '{connector.name}': {connector.id}"
                 )
                 continue
 
@@ -195,13 +207,19 @@ class DataManager(DataContext, Activator, Entity):
                 )
                 continue
 
-            connect_task = self._connect(connector, channels)
+            if not connector._is_connectable():
+                self._logger.debug(
+                    f"Skipping not connectable {type(connector).__name__} '{connector.name}': {connector.id}"
+                )
+                continue
+
+            connect_task = self.__connect(connector, channels)
             connect_future = self._executor.submit(connect_task)
             connect_futures[connect_future] = connect_task
 
-        self._connect_futures(connect_futures, timeout)
+        self.__connect_futures(connect_futures, timeout)
 
-    def _connect(self, connector: Connector, channels: Optional[Channels] = None) -> ConnectTask:
+    def __connect(self, connector: Connector, channels: Optional[Channels] = None) -> ConnectTask:
         self._logger.debug(f"Connecting {type(connector).__name__} '{connector.name}': {connector.id}")
         if channels is None:
             channels = self.channels.filter(lambda c: c.has_connector(connector.id))
@@ -209,7 +227,7 @@ class DataManager(DataContext, Activator, Entity):
 
         return ConnectTask(connector, channels)
 
-    def _connect_futures(
+    def __connect_futures(
         self,
         futures: Dict[Future, ConnectTask],
         timeout: Optional[int] = None,
@@ -217,14 +235,14 @@ class DataManager(DataContext, Activator, Entity):
         try:
             for future in as_completed(futures, timeout=timeout):
                 futures.pop(future)
-                self._connect_callback(future)
+                self.__connect_callback(future)
 
         except TimeoutError:
             for future, task in futures.items():
                 self._logger.warning(f"Timed out opening connector '{task.connector.id}' after {timeout} seconds")
                 future.cancel()
 
-    def _connect_callback(self, future: Future) -> None:
+    def __connect_callback(self, future: Future) -> None:
         try:
             connector = future.result()
             self._logger.info(f"Connected {type(connector).__name__} '{connector.name}': {connector.id}")
@@ -234,7 +252,14 @@ class DataManager(DataContext, Activator, Entity):
             if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(e)
 
-    def reconnect(self, *connectors: Connector) -> None:
+    # noinspection PyShadowingBuiltins
+    def reconnect(
+        self,
+        filter: Optional[Callable[[Registrator], bool]] = None,
+    ) -> None:
+        self._reconnect(*self._connectors.filter(_filter(filter)))
+
+    def _reconnect(self, *connectors: Connector) -> None:
         for connector in connectors:
             if not connector.is_enabled():
                 self._logger.debug(
@@ -247,20 +272,27 @@ class DataManager(DataContext, Activator, Entity):
                 self._disconnect(connector)
                 continue
 
-            connect_task = self._connect(connector)
+            connect_task = self.__connect(connector)
             connect_future = self._executor.submit(connect_task)
-            connect_future.add_done_callback(self._connect_callback)
+            connect_future.add_done_callback(self.__connect_callback)
 
-    def disconnect(self, *connectors: Connector) -> None:
+    # noinspection PyShadowingBuiltins
+    def disconnect(
+        self,
+        filter: Optional[Callable[[Registrator], bool]] = None,
+    ) -> None:
+        self._disconnect(*self._connectors.filter(_filter(filter)))
+
+    def _disconnect(self, *connectors: Connector) -> None:
         for connector in reversed(connectors):
             if not connector._is_connected():
                 self._logger.debug(
-                    f"Skipping disconnecting unconnected {type(connector).__name__} '{connector.name}': {connector.id}"
+                    f"Skipping to disconnect unconnected {type(connector).__name__} '{connector.name}': {connector.id}"
                 )
                 continue
-            self._disconnect(connector)
+            self.__disconnect(connector)
 
-    def _disconnect(self, connector: Connector) -> None:
+    def __disconnect(self, connector: Connector) -> None:
         try:
             self._logger.debug(f"Disconnecting {type(connector).__name__} '{connector.name}': {connector.id}")
             connector.set_channels(ChannelState.DISCONNECTING)
@@ -275,26 +307,40 @@ class DataManager(DataContext, Activator, Entity):
         finally:
             connector.set_channels(ChannelState.DISCONNECTED)
 
-    def deactivate(self, *_) -> None:
+    # noinspection PyShadowingBuiltins
+    def deactivate(self, *_, filter: Optional[Callable[[Registrator], bool]] = None) -> None:
         self.interrupt()
         super().deactivate()
-        self._deactivate(*self._components.values())
-        self.disconnect(*self._connectors.values())
+        self._deactivate(*self._components.filter(_filter(filter)))
+        self._disconnect(*self._connectors.filter(_filter(filter)))
 
     def _deactivate(self, *components: Component) -> None:
         for component in reversed(list(components)):
             if not component.is_active():
-                continue
-            try:
-                self._logger.debug(f"Deactivating {type(component).__name__} '{component.name}': {component.id}")
-                component.deactivate()
+                self._logger.debug(
+                    f"Skipping to deactivate already deactivated {type(component).__name__} '{component.name}': "
+                    f"{component.id}"
+                )
+                return
+            self.__deactivate(component)
 
-                self._logger.info(f"Deactivated {type(component).__name__} '{component.name}': {component.id}")
+    def __deactivate(self, component: Component) -> None:
+        if not component.is_active():
+            self._logger.debug(
+                f"Skipping to deactivate already deactivated {type(component).__name__} '{component.name}': "
+                f"{component.id}"
+            )
+            return
+        try:
+            self._logger.debug(f"Deactivating {type(component).__name__} '{component.name}': {component.id}")
+            component.deactivate()
 
-            except Exception as e:
-                self._logger.warning(f"Failed deactivating component '{component.id}': {str(e)}")
-                if self._logger.getEffectiveLevel() <= logging.DEBUG:
-                    self._logger.exception(e)
+            self._logger.info(f"Deactivated {type(component).__name__} '{component.name}': {component.id}")
+
+        except Exception as e:
+            self._logger.warning(f"Failed deactivating component '{component.id}': {str(e)}")
+            if self._logger.getEffectiveLevel() <= logging.DEBUG:
+                self._logger.exception(e)
 
     def interrupt(self, *_) -> None:
         self.__interrupt.set()
@@ -763,3 +809,8 @@ def _next(freq: str, now: Optional[pd.Timestamp] = None) -> pd.Timestamp:
     while next <= now:
         next += to_timedelta(freq)
     return next
+
+def _filter(*filters: Optional[Callable[[Connector | Component], bool]]) -> Callable[[...], bool]:
+    def _all_filters(registrator: Connector | Component) -> bool:
+        return all(f(registrator) for f in filters if f is not None)
+    return _all_filters

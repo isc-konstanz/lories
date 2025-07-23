@@ -17,6 +17,7 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence
 import pandas as pd
 from lori.components import Component
 from lori.connectors import Database
+from lori.connectors.tables import HDFDatabase
 from lori.core import CONSTANTS, Configurations, Configurator, Constant, Directories, ResourceException, Resources
 from lori.data.util import resample, scale_energy, scale_power
 from lori.simulation import Durations, Progress, Result
@@ -49,6 +50,23 @@ class Results(Configurator, Sequence[Result]):
         **kwargs,
     ) -> None:
         super().__init__(configs)
+        if database is None:
+            database_configs = component.configs \
+                .get_section("connectors", ensure_exists=True) \
+                .get_section("results", defaults={})
+            database_configs.update(
+                {
+                    "key": "results",
+                    "type": "tables",
+                    "file": str(component.configs.dirs.data.joinpath(".results.h5")),
+                    "compression_level": 9,
+                    "compression_lib": "zlib",
+                }
+            )
+            database = HDFDatabase(component, configs=database_configs)
+            database.configure(database_configs)
+            component.connectors.add(database)
+
         self.__list = []
         self.__database = self._assert_database(database)
         self.__component = self._assert_component(component)
@@ -246,6 +264,12 @@ class Results(Configurator, Sequence[Result]):
             self.__database.write(data.rename(columns=columns))
 
         self.data = pd.concat([self.data, data], axis="index")
+
+    def is_complete(self) -> bool:
+        return len(self.__list) > 0 and self.durations.is_complete()
+
+    def is_success(self) -> bool:
+        return self.is_complete() and self.progress.status == "success"
 
     def to_dict(self) -> Dict[str, Any]:
         return {r.key: r.summary for r in self.__list}
