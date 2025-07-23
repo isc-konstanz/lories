@@ -181,7 +181,7 @@ class Configurations(MutableMapping[str, Any]):
             lines = self.__read_lines()
             lines_section = len(lines) - 1
             for line_index, line in enumerate(lines):
-                if "=" in line:
+                if "=" in line and not line.lstrip().startswith(("#", ";")):
                     line = line.rstrip()
                     key, value, *_ = line.split("=")
                     key = key.lstrip().lstrip("#").lstrip(";").strip()
