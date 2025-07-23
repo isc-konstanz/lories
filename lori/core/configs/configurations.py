@@ -255,13 +255,6 @@ class Configurations(MutableMapping[str, Any]):
 
         destination.parents[0].mkdir(parents=True, exist_ok=True)
         if source.is_dir():
-
-            def _include(pattern):
-                def _ignore(path, names):
-                    return set(n for n in names if not re.match(pattern, n) and not os.path.isdir(os.path.join(path, n)))
-
-                return _ignore
-
             shutil.copytree(source, destination, ignore=_include(".*\.conf"), dirs_exist_ok=True)
         elif not destination.exists():
             shutil.copy2(source, destination)
@@ -374,3 +367,10 @@ class ConfigurationUnavailableException(ResourceUnavailableException, Configurat
     Raise if a configuration file can not be found.
 
     """
+
+
+def _include(pattern):
+    def _ignore(path, names):
+        return set(n for n in names if not re.match(pattern, n) and not os.path.isdir(os.path.join(path, n)))
+
+    return _ignore

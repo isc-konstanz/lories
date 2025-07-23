@@ -17,8 +17,8 @@ import numpy as np
 import pandas as pd
 from lori import Settings, System
 from lori.application import Interface
-from lori.connectors import Database, DatabaseException
-from lori.core import ConfigurationException, Configurations, Configurator, Context, ResourceException
+from lori.core import ConfigurationException, Configurations, Configurator, Context, Registrator, RegistratorContext
+from lori.connectors import Database
 from lori.data.manager import DataManager
 from lori.simulation import Results
 from lori.typing import TimestampType
@@ -38,15 +38,13 @@ class Application(DataManager):
     def _load_hyper_systems(self, configs: Configurations, *systems: System) -> Collection[System]:
         # noinspection PyShadowingBuiltins, PyShadowingNames
         def _load_hyper_parameters(configs: Configurations, context: Optional[str] = None) -> Dict[str, Any]:
-            hyper_parameters = OrderedDict()
+            hyper_parameters = OrderedDict[str, Any]()
             for key, value in configs.items():
                 id = f"{context}.{key}" if context else key
                 if isinstance(value, Configurations):
                     hyper_parameters.update(_load_hyper_parameters(value, id))
-                elif isinstance(value, list):
-                    hyper_parameters[id] = value
                 else:
-                    raise ResourceException(f"Hyperparameter '{id}' must be a list, got {type(value)}")
+                    hyper_parameters[id] = value
             return hyper_parameters
 
         hyper_systems = []
@@ -79,11 +77,11 @@ class Application(DataManager):
         systems = []
         meshgrid = np.meshgrid(*[np.array(v) for v in parameters.values()], indexing="ij")
         meshgrid = np.array(meshgrid, dtype=object).reshape(len(parameters.keys()), -1).T
-        meshkeys = [(i, k.split(".")[-1]) for i, k in enumerate(parameters.keys())]
+        meshkeys = [(i, k.split(".")[-1]) for i, k in enumerate(parameters.keys()) if isinstance(parameters[k], list)]
         for system_params in meshgrid:
+            system_key = f"{system.key}_{'_'.join(str(system_params[i]).lower()  for i, _ in meshkeys)}"
             system_path = f"{system.key}_{'_'.join(f'{k}-{str(system_params[i]).lower()}' for i, k in meshkeys)}"
             system_name = f"{system.name} ({', '.join(f'{k.title()}: {str(system_params[i])}' for i, k in meshkeys)})"
-            system_key = f"{system.key}_{'_'.join(str(v).lower() for v in system_params)}"
             system_dir = simulation_dir.joinpath(system_path)
             system_dirs = system.configs.dirs.copy()
             system_dirs.data = system_dir
@@ -126,6 +124,8 @@ class Application(DataManager):
                     configurator.update(configurations)
 
             systems.append(system_duplicate)
+            self._components._add(system_duplicate)
+        self._components.sort()
 
         _clear_system()
         return systems
@@ -211,7 +211,7 @@ class Application(DataManager):
         if has_interface:
             self._interface.start()
 
-    # noinspection PyUnresolvedReferences, PyProtectedMember, PyShadowingBuiltins
+    # noinspection PyUnresolvedReferences, PyProtectedMember
     def simulate(
         self,
         start: Optional[TimestampType] = None,
@@ -230,85 +230,41 @@ class Application(DataManager):
             self._logger.error("Invalid settings missing specified simulation period")
             sys.exit(1)
 
-        slice = simulation.get_bool("slice", default=True)
-        freq = simulation.get("freq", default=None)
-
         database_id = simulation.get("database", default="results")
         database_section = simulation.get_section("databases", defaults={})
-        if database_id == "results" and "results" not in database_section:
-            database_section["results"] = {
-                "type": "tables",
-                "file": ".results.h5",
-                "compression_level": 9,
-                "compression_lib": "zlib",
-            }
-        self.connectors.load(database_section)
-
-        database = self.connectors.get(database_id)
-        if not isinstance(database, Database):
-            raise DatabaseException(database, f"Invalid results cache type '{type(database)}'")
+        if len(database_section) > 0:
+            self._connectors.load(database_section)
+        database = self._connectors.get(database_id) if database_id in self._connectors else None
 
         error = False
         summary = []
-        systems = self.components.get_all(System)
+        systems = self._components.get_all(System)
 
         if "hyperparameters" in simulation:
             systems = self._load_hyper_systems(simulation["hyperparameters"], *systems)
 
-        # TODO: Implement optional Callable argument to self.activate(), to filter registrators by system id
-        # self.activate(lambda r: filter by system name)
-        with self:
+        def _has_no_system(registrator: Registrator) -> bool:
+            return isinstance(registrator.context, RegistratorContext)
+        try:
+            self.activate(_has_no_system)
+
             for system in systems:
-                self._logger.info(f"Starting simulation of system '{system.name}': {system.id}")
-                if slice and freq is not None and start + to_timedelta(freq) < end:
-                    slices = slice_range(start, end, timezone=system.location.timezone, freq=freq)
-                else:
-                    slices = [(start, end)]
+                def _is_system(registrator) -> bool:
+                    return registrator.id.split(".")[0] == system.id
+                try:
+                    self._connect(*self._connectors.filter(_is_system))
+                    self._activate(*self._components.filter(_is_system))
 
-                with Results(system, database, simulation.get_section("data"), total=len(slices)) as results:
-                    results.durations.start("Simulation")
-                    try:
-                        for slice_start, slice_end in slices:
-                            slice_prior = results.data.tail(1) if not results.data.empty else None
-                            results.submit(
-                                system.simulate,
-                                slice_start,
-                                slice_end,
-                                slice_prior,
-                                **kwargs,
-                            )
-                            results.progress.update()
-
-                        results.durations.stop("Simulation")
-                        self._logger.debug(
-                            f"Finished simulation of system '{system.name}' in {results.durations['Simulation']} minutes"
-                        )
-
-                        self._logger.debug(f"Starting evaluation of system '{system.name}': {system.id}")
-                        results.durations.start("Evaluation")
-                        results_data = system.evaluate(results)
-                        results.report()
-
-                        # TODO: Call evaluations from configs
-
-                        results.durations.stop("Evaluation")
-                        self._logger.debug(
-                            f"Finished evaluation of system '{system.name}' in {results.durations['Evaluation']} minutes"
-                        )
-
+                    results = self._simulate(system, simulation, start, end, database, **kwargs)
+                    if results.is_success():
                         summary.append(results.to_frame())
-
-                    except Exception as e:
+                    else:
                         error = True
-                        self._logger.error(f"Error simulating system {system.name}: {str(e)}")
-                        self._logger.debug("%s: %s", type(e).__name__, traceback.format_exc())
-                        results.durations.complete()
-                        results.progress.complete(
-                            status="error",
-                            message=str(e),
-                            error=type(e).__name__,
-                            trace=traceback.format_exc(),
-                        )
+                finally:
+                    self._deactivate(*self._components.filter(_is_system))
+                    self._disconnect(*self._connectors.filter(_is_system))
+        finally:
+            self.deactivate(filter=_has_no_system)
 
         if not error and len(summary) > 1:
             try:
@@ -319,3 +275,68 @@ class Application(DataManager):
 
             except ImportError:
                 pass
+
+    # noinspection PyUnresolvedReferences, PyProtectedMember, PyShadowingBuiltins
+    def _simulate(
+        self,
+        system: System,
+        configs: Configurations,
+        start: TimestampType,
+        end: TimestampType,
+        database: Optional[Database] = None,
+        **kwargs,
+    ) -> Results:
+        slice = configs.get_bool("slice", default=True)
+        freq = configs.get("freq", default=None)
+
+        if slice and freq is not None and start + to_timedelta(freq) < end:
+            slices = slice_range(start, end, timezone=system.location.timezone, freq=freq)
+        else:
+            slices = [(start, end)]
+
+        with Results(
+            system,
+            database,
+            configs.get_section("data"),
+            total=len(slices)
+        ) as results:
+            results.durations.start("Simulation")
+            try:
+                for slice_start, slice_end in slices:
+                    slice_prior = results.data.tail(1) if not results.data.empty else None
+                    results.submit(
+                        system.simulate,
+                        slice_start,
+                        slice_end,
+                        slice_prior,
+                        **kwargs,
+                    )
+                    results.progress.update()
+
+                results.durations.stop("Simulation")
+                self._logger.debug(
+                    f"Finished simulation of system '{system.name}' in {results.durations['Simulation']} minutes"
+                )
+
+                self._logger.debug(f"Starting evaluation of system '{system.name}': {system.id}")
+                results.durations.start("Evaluation")
+                results_data = system.evaluate(results)
+                results.report()
+
+                # TODO: Call evaluations from configs
+
+                results.durations.stop("Evaluation")
+                self._logger.debug(
+                    f"Finished evaluation of system '{system.name}' in {results.durations['Evaluation']} minutes"
+                )
+            except Exception as e:
+                self._logger.error(f"Error simulating system {system.name}: {str(e)}")
+                self._logger.debug("%s: %s", type(e).__name__, traceback.format_exc())
+                results.durations.complete()
+                results.progress.complete(
+                    status="error",
+                    message=str(e),
+                    error=type(e).__name__,
+                    trace=traceback.format_exc(),
+                )
+        return results
