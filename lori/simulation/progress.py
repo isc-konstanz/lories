@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import multiprocessing as process
+import os
 from typing import Any, Optional
 
 
@@ -36,6 +37,11 @@ class Progress:
         self._total = total
         self._value = value
         self._file = file
+        if os.path.exists(file):
+            with open(self._file, "r", encoding="utf-8") as file:
+                self.status = json.load(file).get("status", "loaded")
+        else:
+            self.status = "initialized"
         try:
             from tqdm import tqdm
 
@@ -51,7 +57,7 @@ class Progress:
 
     # noinspection PyTypeChecker
     def complete(self, status: str = "success", **results: Any) -> None:
-        self._update(self._total, dump=False)
+        self._update(self._total, status, dump=False)
         if self._file is not None:
             with open(self._file, "w", encoding="utf-8") as file:
                 json.dump({"status": status, **results}, file, ensure_ascii=False, indent=4)
@@ -70,14 +76,16 @@ class Progress:
             self._bar.update()
 
     # noinspection PyTypeChecker
-    def _update(self, value: int, dump: bool = True) -> None:
+    def _update(self, value: int, status: str = "running", dump: bool = True) -> None:
         progress = value / self._total * 100
         if progress % 1 <= 1 / self._total * 100 and self._file is not None and dump:
             with open(self._file, "w", encoding="utf-8") as file:
                 results = {
-                    "status": "running",
+                    "status": status,
                     "progress": int(progress),
                 }
                 json.dump(results, file, ensure_ascii=False, indent=4)
+
+        self.status = status
         if self._bar:
             self._bar.update(value - self._bar.n)

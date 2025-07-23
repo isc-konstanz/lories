@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Optional
+from typing import Optional, Sequence
 
 import pandas as pd
 from lori.connectors import ConnectionException, Database, register_connector_type
@@ -27,6 +27,8 @@ class HDFDatabase(Database):
     _store_path: str
 
     _mode: str = "a"
+
+    _columns_unique: bool = True
 
     _compression_level: int | None = None
     _compression_lib = None
@@ -57,6 +59,7 @@ class HDFDatabase(Database):
         self._store_path = store_path
 
         self._mode = configs.get("mode", default="a")
+        self._columns_unique = configs.get_bool("columns_unique", default=False)
         self._compression_level = configs.get_int("compression_level", None)
         self._compression_lib = configs.get("compression_lib", None)
 
@@ -97,14 +100,21 @@ class HDFDatabase(Database):
                 group_key = _format_key(group)
                 if group_key not in self.__store:
                     continue
-                group_data = self.__store.select(group_key, where=_build_where(start, end), columns=group_resources.ids)
-                if len(group_data.index) > 0 and not group_data.dropna(axis="columns", how="all").empty:
+
+                group_data = self.__store.select(
+                    group_key,
+                    where=_build_where(start, end),
+                    columns=self.__build_columns(group_resources),
+                )
+                group_data = self.__extract_data(group_resources, group_data)
+                if not group_data.empty:
                     data.append(group_data)
         except IOError as e:
             raise ConnectionException(self, str(e))
 
         if len(data) == 0:
             return pd.DataFrame()
+        data = sorted(data, key=lambda d: min(d.index))
         return pd.concat(data, axis="columns")
 
     # noinspection PyTypeChecker, PyUnresolvedReferences
@@ -116,14 +126,16 @@ class HDFDatabase(Database):
                 if group_key not in self.__store:
                     continue
 
-                group_data = self.__store.select(group_key, stop=0, columns=group_resources.ids)
-                if len(group_data.index) > 0 and not group_data.dropna(axis="columns", how="all").empty:
+                group_data = self.__store.select(group_key, stop=1, columns=self.__build_columns(group_resources))
+                group_data = self.__extract_data(group_resources, group_data)
+                if not group_data.empty:
                     data.append(group_data)
         except IOError as e:
             raise ConnectionException(self, str(e))
 
         if len(data) == 0:
             return pd.DataFrame()
+        data = sorted(data, key=lambda d: min(d.index))
         return pd.concat(data, axis="columns")
 
     # noinspection PyTypeChecker, PyUnresolvedReferences
@@ -135,14 +147,16 @@ class HDFDatabase(Database):
                 if group_key not in self.__store:
                     continue
 
-                group_data = self.__store.select(group_key, start=0, columns=group_resources.ids)
-                if len(group_data.index) > 0 and not group_data.dropna(axis="columns", how="all").empty:
+                group_data = self.__store.select(group_key, start=-1, columns=self.__build_columns(group_resources))
+                group_data = self.__extract_data(group_resources, group_data)
+                if not group_data.empty:
                     data.append(group_data)
         except IOError as e:
             raise ConnectionException(self, str(e))
 
         if len(data) == 0:
             return pd.DataFrame()
+        data = sorted(data, key=lambda d: min(d.index))
         return pd.concat(data, axis="columns")
 
     def delete(
@@ -167,6 +181,12 @@ class HDFDatabase(Database):
             for group, group_resources in self.resources.filter(lambda c: c.id in data.columns).groupby("group"):
                 group_key = _format_key(group)
                 group_data = data[group_resources.ids].dropna(axis="columns", how="all")
+
+                if not self._columns_unique:
+                    group_data.rename(
+                        columns={r.id: r.get("column", default=r.key) for r in group_resources},
+                        inplace=True,
+                    )
                 if group_key not in self.__store:
                     self.__store.put(group_key, group_data, format="table", encoding="UTF-8")
                 else:
@@ -174,6 +194,17 @@ class HDFDatabase(Database):
 
         except IOError as e:
             raise ConnectionException(self, str(e))
+
+    def __build_columns(self, resources: Resources) -> Sequence[str]:
+        if self._columns_unique:
+            return [r.id for r in resources]
+        return [r.get("column", default=r.key) for r in resources]
+
+    def __extract_data(self, resources: Resources, data: pd.DataFrame) -> pd.DataFrame:
+        data.dropna(axis="columns", how="all", inplace=True)
+        if not self._columns_unique:
+            return data.rename(columns={r.get("column", default=r.key): r.id for r in resources})
+        return data
 
 
 def _format_key(key: str) -> str:

@@ -115,6 +115,10 @@ class Configurations(MutableMapping[str, Any]):
     def __delitem__(self, key: str) -> None:
         del self.__configs[key]
 
+    def remove(self, *keys: str) -> None:
+        for key in keys:
+            del self.__configs[key]
+
     def __setitem__(self, key: str, value: Any) -> None:
         self.set(key, value)
 

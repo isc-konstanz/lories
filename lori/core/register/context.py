@@ -97,11 +97,10 @@ class _RegistratorContext(Context[R], Generic[R]):
     ) -> R:
         registrator_id = Registrator._build_id(context=context, configs=configs)
         if self._contains(registrator_id):
-            self._update(registrator_id, configs)
-            return self._get(registrator_id)
-
-        registrator = self._create(context, configs, **kwargs)
-        self._add(registrator)
+            registrator = self._update(registrator_id, configs)
+        else:
+            registrator = self._create(context, configs, **kwargs)
+            self._add(registrator)
         return registrator
 
     def _load_from_sections(
@@ -203,11 +202,16 @@ class _RegistratorContext(Context[R], Generic[R]):
             if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.debug(f"Configured {configurator}")
 
-    # noinspection PyArgumentList, PyShadowingBuiltins
-    def _update(self, id: str, configs: Configurations) -> None:
+    # noinspection PyUnresolvedReferences, PyArgumentList, PyShadowingBuiltins
+    def _update(self, id: str, configs: Configurations) -> R:
         registrator = self._get(id)
-        if registrator.is_enabled():
-            registrator.configure(configs)
+        if registrator.is_configured() and configs.enabled:
+            registrator_configs = registrator.configs.copy()
+            registrator_configs.update(configs)
+            registrator.update(registrator_configs)
+        else:
+            registrator.configs.update(configs)
+        return registrator
 
     # noinspection PyUnresolvedReferences
     def get_all(self, *types: Type) -> Collection[R]:
