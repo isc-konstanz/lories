@@ -51,9 +51,13 @@ class Results(Configurator, Sequence[Result]):
     ) -> None:
         super().__init__(configs)
         if database is None:
-            database_configs = component.configs \
-                .get_section("connectors", ensure_exists=True) \
-                .get_section("results", defaults={})
+            database_configs = component.configs.get_section(
+                section="connectors",
+                ensure_exists=True,
+            ).get_section(
+                section="results",
+                defaults={},
+            )
             database_configs.update(
                 {
                     "key": "results",

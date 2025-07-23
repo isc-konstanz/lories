@@ -104,7 +104,7 @@ class HDFDatabase(Database):
                 group_data = self.__store.select(
                     group_key,
                     where=_build_where(start, end),
-                    columns=self.__build_columns(group_resources)
+                    columns=self.__build_columns(group_resources),
                 )
                 group_data = self.__extract_data(group_resources, group_data)
                 if not group_data.empty:
@@ -185,7 +185,7 @@ class HDFDatabase(Database):
                 if not self._columns_unique:
                     group_data.rename(
                         columns={r.id: r.get("column", default=r.key) for r in group_resources},
-                        inplace=True
+                        inplace=True,
                     )
                 if group_key not in self.__store:
                     self.__store.put(group_key, group_data, format="table", encoding="UTF-8")

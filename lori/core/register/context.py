@@ -13,7 +13,6 @@ import os
 import re
 from abc import abstractmethod
 from copy import deepcopy
-from collections.abc import Callable
 from logging import Logger
 from typing import Any, Collection, Generic, Mapping, Optional, Type, TypeVar
 

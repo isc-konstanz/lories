@@ -183,7 +183,7 @@ class DataManager(DataContext, Activator, Entity):
         self,
         filter: Optional[Callable[[Registrator], bool]] = None,
         channels: Optional[Channels] = None,
-        timeout: Optional[int] = None
+        timeout: Optional[int] = None,
     ) -> None:
         self._connect(*self._connectors.filter(_filter(filter)), channels=channels, timeout=timeout)
 
@@ -810,7 +810,9 @@ def _next(freq: str, now: Optional[pd.Timestamp] = None) -> pd.Timestamp:
         next += to_timedelta(freq)
     return next
 
+
 def _filter(*filters: Optional[Callable[[Connector | Component], bool]]) -> Callable[[...], bool]:
     def _all_filters(registrator: Connector | Component) -> bool:
         return all(f(registrator) for f in filters if f is not None)
+
     return _all_filters
