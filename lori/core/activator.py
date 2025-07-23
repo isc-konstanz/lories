@@ -76,12 +76,12 @@ class Activator(Configurator, metaclass=ActivatorMeta):
 
     # noinspection PyUnresolvedReferences
     @wraps(deactivate, updated=())
-    def _do_deactivate(self) -> None:
+    def _do_deactivate(self, *args, **kwargs) -> None:
         if not self.is_active():
             return
 
         self._at_deactivate()
-        self._run_deactivate()
+        self._run_deactivate(*args, **kwargs)
         self._on_deactivate()
         self._active = False
 

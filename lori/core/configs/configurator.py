@@ -24,6 +24,7 @@ class ConfiguratorMeta(ABCMeta):
     def __call__(cls, *args, **kwargs):
         configurator = super().__call__(*args, **kwargs)
         cls._wrap_method(configurator, "configure")
+        cls._wrap_method(configurator, "update")
 
         return configurator
 
@@ -125,7 +126,6 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
             raise ConfigurationException(f"Invalid NoneType configuration for {type(self).__name__}: {self.name}")
         if not configs.enabled:
             raise ConfigurationException(f"Trying to configure disabled {type(self).__name__}: {configs.name}")
-
         if self.is_configured():
             self._logger.warning(f"{type(self).__name__} '{configs.path}' already configured")
             return
@@ -141,4 +141,31 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
         pass
 
     def _on_configure(self, configs: Configurations) -> None:
+        pass
+
+    # noinspection PyUnresolvedReferences
+    def update(self, configs: Configurations) -> None:
+        self._run_configure(configs)
+
+    # noinspection PyUnresolvedReferences
+    @wraps(update, updated=())
+    def _do_update(self, configs: Configurations, *args, **kwargs) -> None:
+        if configs is None:
+            raise ConfigurationException(f"Invalid NoneType configuration for {type(self).__name__}: {self.name}")
+        if not configs.enabled:
+            raise ConfigurationException(f"Trying to update disabled {type(self).__name__}: {configs.name}")
+        if not self.is_configured():
+            self._logger.warning(f"Trying to update unconfigured {type(self).__name__}: '{configs.path}'")
+            return
+
+        self._assert_configs(configs)
+        self._at_update(configs)
+        self._run_update(configs, *args, **kwargs)
+        self._on_update(configs)
+        self.__configs = configs
+
+    def _at_update(self, configs: Configurations) -> None:
+        pass
+
+    def _on_update(self, configs: Configurations) -> None:
         pass
