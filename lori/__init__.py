@@ -40,6 +40,7 @@ from .data import (  # noqa: F401
     Channel,
     Channels,
     Listener,
+    Predictor,
 )
 
 from . import connectors  # noqa: F401

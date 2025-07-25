@@ -65,6 +65,15 @@ class _Component(Registrator, Activator):
     ) -> pd.DataFrame:
         pass
 
+    @abstractmethod
+    def predict(
+        self,
+        start: Optional[TimestampType | str] = None,
+        end: Optional[TimestampType | str] = None,
+        **kwargs,
+    ) -> pd.DataFrame:
+        pass
+
 
 class ComponentException(ResourceException):
     """

@@ -89,13 +89,13 @@ class DataAccess(DataContext, Configurator):
     def _create(self, id: str, key: str, type: Type, **configs: Any) -> Channel:
         return self.context._create(id=id, key=key, type=type, **configs)
 
-    def _remove(self, *__objects: str | Channel) -> None:
-        for __object in __objects:
-            if isinstance(__object, str):
-                __object = self.__validate_id(__object)
+    def _remove(self, *__channels: str | Channel) -> None:
+        for __channel in __channels:
+            if isinstance(__channel, str):
+                __channel = self.__validate_id(__channel)
 
-            self.context._remove(__object)
-            super()._remove(__object)
+            self.context._remove(__channel)
+            super()._remove(__channel)
 
     # noinspection PyTypeChecker
     @property
@@ -121,6 +121,12 @@ class DataAccess(DataContext, Configurator):
         if sort:
             self.sort()
         return channels
+
+    @overload
+    def add(self, constant: Constant, **configs: Any) -> None: ...
+
+    @overload
+    def add(self, key: str, **configs: Any) -> None: ...
 
     # noinspection PyUnresolvedReferences
     def add(self, key: str | Constant, **configs: Any) -> None:

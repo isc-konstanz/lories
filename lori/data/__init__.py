@@ -19,6 +19,13 @@ from .listeners import (  # noqa: F401
     ListenerException,
 )
 
+from . import predictors  # noqa: F401
+from .predictors import (  # noqa: F401
+    Predictor,
+    PredictorException,
+    PredictorUnavailableException,
+)
+
 from .context import DataContext  # noqa: F401
 
 from .access import DataAccess  # noqa: F401

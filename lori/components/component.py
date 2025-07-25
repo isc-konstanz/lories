@@ -17,6 +17,7 @@ from lori.connectors import ConnectorAccess
 from lori.converters import ConverterAccess
 from lori.core import Configurations, Context, Registrator
 from lori.data import DataAccess
+from lori.data.predictors import PredictorAccess
 from lori.typing import TimestampType
 from lori.util import to_date
 
@@ -26,6 +27,7 @@ class Component(_Component):
     __converters: ConverterAccess
     __connectors: ConnectorAccess
     __components: ComponentAccess
+    __predictors: PredictorAccess
     __data: DataAccess
 
     def __init__(
@@ -38,7 +40,14 @@ class Component(_Component):
         self.__converters = ConverterAccess(self)
         self.__connectors = ConnectorAccess(self)
         self.__components = ComponentAccess(self)
+        self.__predictors = PredictorAccess(self)
         self.__data = DataAccess(self)
+
+    # noinspection PyShadowingBuiltins
+    def _get_vars(self) -> Dict[str, Any]:
+        vars = super()._get_vars()
+        vars.pop("type", None)
+        return vars
 
     def _at_configure(self, configs: Configurations) -> None:
         super()._at_configure(configs)
@@ -46,6 +55,10 @@ class Component(_Component):
 
     def _on_configure(self, configs: Configurations) -> None:
         super()._on_configure(configs)
+        self.__predictors.load(configure=False, sort=False)
+        self.__predictors.sort()
+        self.__predictors.configure()
+
         self.__converters.load(configure=False, sort=False)
         self.__converters.sort()
         self.__converters.configure()
@@ -71,6 +84,10 @@ class Component(_Component):
     @property
     def connectors(self) -> ConnectorAccess:
         return self.__connectors
+
+    @property
+    def predictors(self) -> PredictorAccess:
+        return self.__predictors
 
     @property
     def data(self):
@@ -106,8 +123,11 @@ class Component(_Component):
             data = data[data.index <= end]
         return data
 
-    # noinspection PyShadowingBuiltins
-    def _get_vars(self) -> Dict[str, Any]:
-        vars = super()._get_vars()
-        vars.pop("type", None)
-        return vars
+    def predict(
+        self,
+        start: Optional[TimestampType | str] = None,
+        end: Optional[TimestampType | str] = None,
+        **kwargs,
+    ) -> pd.DataFrame:
+        # TODO: Implement by accessing local predictors
+        raise NotImplementedError()

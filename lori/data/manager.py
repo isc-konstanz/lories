@@ -33,6 +33,7 @@ from lori.data.channels import Channel, ChannelConnector, ChannelConverter, Chan
 from lori.data.context import DataContext
 from lori.data.databases import Databases
 from lori.data.listeners import ListenerContext
+from lori.data.predictors import PredictorContext
 from lori.data.replication import Replicator
 from lori.data.retention import Retention
 from lori.data.typing import ChannelsType
@@ -53,6 +54,7 @@ class DataManager(DataContext, Activator, Entity):
     _connectors: ConnectorContext
     _components: ComponentContext
 
+    _predictors: PredictorContext
     _listeners: ListenerContext
 
     _executor: ThreadPoolExecutor
@@ -69,6 +71,7 @@ class DataManager(DataContext, Activator, Entity):
         self._converters = ConverterContext(self)
         self._connectors = ConnectorContext(self)
         self._components = ComponentContext(self)
+        self._predictors = PredictorContext(self)
         self._listeners = ListenerContext(self)
         self._executor = ThreadPoolExecutor(
             thread_name_prefix=self.name, max_workers=max(int((os.cpu_count() or 1) / 2), 1)
@@ -139,7 +142,8 @@ class DataManager(DataContext, Activator, Entity):
 
     def _at_configure(self, configs: Configurations) -> None:
         super()._at_configure(configs)
-        self._load(self, configs, sort=False)
+        self._predictors.load(configure=False, sort=False)
+        self._predictors.configure()
 
         self._converters.load(configure=False, sort=False)
         self._converters.configure()
@@ -150,8 +154,11 @@ class DataManager(DataContext, Activator, Entity):
         self._components.load(configure=False, sort=False)
         self._components.configure()
 
+        self._load(self, configs, sort=False)
+
     def _on_configure(self, configs: Configurations) -> None:
         super()._on_configure(configs)
+        self._predictors.sort()
         self._converters.sort()
         self._connectors.sort()
         self._components.sort()

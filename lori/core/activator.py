@@ -46,7 +46,7 @@ class Activator(Configurator, metaclass=ActivatorMeta):
     def is_active(self) -> bool:
         return self._active
 
-    def activate(self) -> None:
+    def activate(self, *args) -> None:
         pass
 
     # noinspection PyUnresolvedReferences
@@ -60,15 +60,15 @@ class Activator(Configurator, metaclass=ActivatorMeta):
             self._logger.warning(f"Trying to activate already active '{type(self).__name__}': {self.id}")
             return
 
-        self._at_activate()
+        self._at_activate(*args)
         self._run_activate(*args, **kwargs)
-        self._on_activate()
+        self._on_activate(*args)
         self._active = True
 
-    def _at_activate(self) -> None:
+    def _at_activate(self, *args) -> None:
         pass
 
-    def _on_activate(self) -> None:
+    def _on_activate(self, *args) -> None:
         pass
 
     def deactivate(self) -> None:

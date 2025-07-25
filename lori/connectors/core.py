@@ -46,17 +46,14 @@ class _Connector(Registrator):
 
     @property
     @abstractmethod
-    def resources(self) -> Resources:
-        pass
+    def resources(self) -> Resources: ...
 
     @property
     @abstractmethod
-    def channels(self) -> Channels:
-        pass
+    def channels(self) -> Channels: ...
 
     @abstractmethod
-    def is_connected(self) -> bool:
-        pass
+    def is_connected(self) -> bool: ...
 
     def connect(self, resources: Resources) -> None:
         pass
@@ -65,12 +62,10 @@ class _Connector(Registrator):
         pass
 
     @abstractmethod
-    def read(self, resources: Resources) -> pd.DataFrame:
-        pass
+    def read(self, resources: Resources) -> pd.DataFrame: ...
 
     @abstractmethod
-    def write(self, data: pd.DataFrame) -> None:
-        pass
+    def write(self, data: pd.DataFrame) -> None: ...
 
 
 class ConnectorException(ResourceException):
