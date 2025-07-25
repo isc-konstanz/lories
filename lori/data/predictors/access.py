@@ -24,7 +24,7 @@ class PredictorAccess(RegistratorAccess[P]):
     # noinspection PyUnresolvedReferences
     def __init__(self, registrar: Registrator, **kwargs) -> None:
         context = get_context(registrar, RegistratorContext).context.predictors
-        super().__init__(context, registrar, "connectors", **kwargs)
+        super().__init__(context, registrar, "predictors", **kwargs)
 
     # noinspection PyShadowingBuiltins
     def _set(self, id: str, predictor: P) -> None:

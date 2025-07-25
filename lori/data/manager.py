@@ -379,6 +379,10 @@ class DataManager(DataContext, Activator, Entity):
         return self._components
 
     @property
+    def predictors(self) -> PredictorContext:
+        return self._predictors
+
+    @property
     def listeners(self) -> ListenerContext:
         return self._listeners
 

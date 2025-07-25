@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.predictors.util
-~~~~~~~~~~~~~~~~~~~~
+lori.data.predictors.util
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
