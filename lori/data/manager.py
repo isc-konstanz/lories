@@ -71,7 +71,8 @@ class DataManager(DataContext, Activator, Entity):
         self._components = ComponentContext(self)
         self._listeners = ListenerContext(self)
         self._executor = ThreadPoolExecutor(
-            thread_name_prefix=self.name, max_workers=max(int((os.cpu_count() or 1) / 2), 1)
+            thread_name_prefix=self.name,
+            max_workers=max(int((os.cpu_count() or 1) / 2), 1),
         )
         self.__runner = Thread(name=self.name, target=self.run)
 
@@ -432,12 +433,11 @@ class DataManager(DataContext, Activator, Entity):
                     self._logger.debug(f"Reading {len(channels)} channels of application: {self.name}")
                     self._run_read(channels)
 
+                self.reconnect(lambda c: c._is_reconnectable())
+
                 self.__interrupt.wait(self._interval / 2)
                 self._listeners.wait(self._interval / 4, self.__interrupt.wait)
                 self.log()
-
-                for connector in self.connectors.filter(lambda c: c._is_reconnectable()):
-                    self.reconnect(connector)
 
                 _sleep(interval, self.__interrupt.wait)
 
