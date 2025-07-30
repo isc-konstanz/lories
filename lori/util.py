@@ -312,7 +312,7 @@ def to_int(value: str | int) -> Optional[int]:
 
 def is_bool(value: str | bool) -> bool:
     if issubclass(type(value), (np.bool, bool, np.integer, int)) or (
-        isinstance(value, str) and (value.lower() in ["true", "false" "yes", "no", "y", "n"])
+        isinstance(value, str) and any(value.lower() == b for b in ["true", "false", "yes", "no", "y", "n"])
     ):
         return True
     return False

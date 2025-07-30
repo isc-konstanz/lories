@@ -74,6 +74,12 @@ dash = [
     "flask-bcrypt",
     "flask-login",
 ]
+sim = [
+    "openpyxl",
+    "matplotlib",
+    "seaborn",
+    "tqdm",
+]
 doc = [
     "graphviz",
     "sphinx",

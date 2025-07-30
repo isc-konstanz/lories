@@ -9,8 +9,7 @@ lori.components.tariff.entsoe
 from __future__ import annotations
 
 import pandas as pd
-
-from lori import Configurations, Constant, Channel
+from lori import Channel, Configurations, Constant
 from lori.components.tariff import Tariff, TariffProvider, register_tariff_type
 from lori.connectors.entsoe import EntsoeConnector
 

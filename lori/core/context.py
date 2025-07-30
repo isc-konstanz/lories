@@ -75,28 +75,26 @@ class Context(ABC, MutableMapping[str, E], Generic[E]):
 
     def _add(self, *__objects: E) -> None:
         for __object in __objects:
-            self._set(__object.id, __object)
+            self._set(str(__object.id), __object)
 
     @abstractmethod
-    def _create(self, *args, **kwargs) -> E:
-        pass
+    def _create(self, *args, **kwargs) -> E: ...
 
     @abstractmethod
-    def _update(self, *args, **kwargs) -> None:
-        pass
+    def _update(self, *args, **kwargs) -> None: ...
 
     def _remove(self, *__objects: str | E) -> None:
         for __object in __objects:
             if isinstance(__object, str):
                 del self.__map[__object]
-            if isinstance(__object, Entity):
+            elif isinstance(__object, Entity):
                 del self.__map[__object.id]
 
     def sort(self):
         def order(text: str) -> Tuple[Any, ...]:
             elements = re.split(r"[^0-9A-Za-zäöüÄÖÜß]+", text)
             elements = list(chain(*[re.findall(r"\D+|\d+", t) for t in elements]))
-            elements = [int(t) if t.isdigit() else t for t in elements if pd.notna(t) and t.strip()]
+            elements = [(int(t), 0) if t.isdigit() else (0, t) for t in elements if pd.notna(t) and t.strip()]
             return tuple(elements)
 
         self.__map = OrderedDict(sorted(self.__map.items(), key=lambda e: order(e[0])))

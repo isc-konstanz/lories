@@ -144,8 +144,9 @@ class Resource(Entity):
         id: Optional[str] = None,
         key: Optional[str] = None,
         name: Optional[str] = None,
-        unit: Optional[str] = None,
+        group: Optional[str] = None,
         type: Optional[str | Type] = None,
+        unit: Optional[str] = None,
         **configs: Any,
     ) -> None:
         if id is not None and id != self.id:
@@ -154,9 +155,11 @@ class Resource(Entity):
             raise ConfigurationException(f"Invalid channel update, trying to change Key from '{self.key}' to '{key}'")
         if name is not None:
             self._name = name
+        if group is not None:
+            self._group = self._assert_group(group)
         if type is not None:
-            self._type = parse_type(type)
-        self._unit = unit
+            self._type = self._assert_type(parse_type(type))
+        self._unit = self._assert_unit(unit)
         self.__update_configs(configs)
 
     def __update_configs(self, configs: Dict[str, Any]) -> None:
