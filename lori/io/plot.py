@@ -18,6 +18,9 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 
+from functools import wraps
+
+
 logging.getLogger("PIL.PngImagePlugin").setLevel(logging.WARN)
 logging.getLogger("matplotlib").setLevel(logging.WARN)
 logger = logging.getLogger(__name__)
@@ -31,8 +34,42 @@ INCH = 2.54
 WIDTH = 32
 HEIGHT = 9
 
+def plot(func):
+    @wraps(func)
+    def wrapper(
+            *args,
+            width: int = WIDTH,
+            height: int = HEIGHT,
+            show: bool = False,
+            file: Optional[str] = None,
+            await_safe: bool = False,
+            **kwargs
+    ) -> Optional[Tuple[plt.Figure, callable]]:
+        plt.figure(figsize=(width / INCH, height / INCH), dpi=120, tight_layout=True)
+
+        fig = func(*args, **kwargs)
+
+        def safe_and_close():
+            if show:
+                plt.show()
+
+            if file is not None:
+                fig.savefig(file)
+
+                plt.close(fig)
+                plt.clf()
+
+        if await_safe:
+            return fig, safe_and_close
+        else:
+            safe_and_close()
+            return
+
+    return wrapper
+
 
 # noinspection PyDefaultArgument, SpellCheckingInspection
+@plot
 def line(
     x: Optional[pd.Series | str] = None,
     y: Optional[pd.DataFrame | pd.Series | str] = None,
@@ -46,14 +83,10 @@ def line(
     colors: List[str] = COLORS,
     palette: Optional[str] = None,
     hue: Optional[str] = None,
-    width: int = WIDTH,
-    height: int = HEIGHT,
-    show: bool = False,
-    file: str = None,
+    errorbar: Literal["pi", "se", "sd"] | Tuple[str, int] = None,
+    estimator: callable = None,
     **kwargs,
-) -> None:
-    plt.figure(figsize=(width / INCH, height / INCH), dpi=120, tight_layout=True)
-
+) -> plt.Figure:
     color_num = max(len(np.unique(data[hue])) if hue else len(data.columns) - 1, 1)
     if color_num > 1:
         if palette is None:
@@ -63,12 +96,13 @@ def line(
     else:
         kwargs["color"] = colors[0]
 
+    kwargs["errorbar"] = errorbar
+    kwargs["estimator"] = estimator
+
     plot = sns.lineplot(
         x=x,
         y=y,
         data=data,
-        errorbar=("pi", 50),
-        estimator=np.median,
         **kwargs,
     )
 
@@ -88,16 +122,11 @@ def line(
     if grids is not None:
         plt.grid(color="grey", linestyle="--", linewidth=0.25, alpha=0.5, axis=grids)
 
-    if show:
-        plt.show()
-    if file is not None:
-        plot.figure.savefig(file)
-
-    plt.close(plot.figure)
-    plt.clf()
+    return plot.figure
 
 
 # noinspection PyDefaultArgument, SpellCheckingInspection
+@plot
 def bar(
     x: Optional[pd.Index | pd.Series | str] = None,
     y: Optional[pd.DataFrame | pd.Series | str] = None,
@@ -109,14 +138,8 @@ def bar(
     colors: List[str] = COLORS,
     palette: Optional[str] = None,
     hue: Optional[str] = None,
-    width: int = WIDTH,
-    height: int = HEIGHT,
-    show: bool = False,
-    file: str = None,
     **kwargs,
-) -> None:
-    plt.figure(figsize=(width / INCH, height / INCH), dpi=120, tight_layout=True)
-
+) -> plt.Figure:
     color_num = max(len(np.unique(data[hue])) if hue else len(data.columns) - 1, 1)
     if color_num > 1:
         if palette is None:
@@ -140,16 +163,11 @@ def bar(
     if label_type is not None:
         plot.bar_label(plot.containers[0], label_type=label_type)
 
-    if show:
-        plt.show()
-    if file is not None:
-        plot.figure.savefig(file)
-
-    plt.close(plot.figure)
-    plt.clf()
+    return plot.figure
 
 
 # noinspection PyDefaultArgument, SpellCheckingInspection
+#TODO: also wrap this function with @plot decorator
 def quartiles(
     x: Optional[pd.Series | str] = None,
     y: Optional[pd.DataFrame | pd.Series | str] = None,
@@ -231,7 +249,7 @@ def quartiles(
     plt.close(plot.figure)
     plt.clf()
 
-
+#TODO: also wrap this function with @plot decorator
 def histograms(data: pd.DataFrame, bins: int = 100, show: bool = False, path: str = "") -> None:
     for column in data.columns:
         plt.figure(figsize=(WIDTH, HEIGHT), dpi=120, tight_layout=True)
@@ -275,3 +293,53 @@ def histograms(data: pd.DataFrame, bins: int = 100, show: bool = False, path: st
             plt.show()
         plt.close()
         plt.clf()
+
+# noinspection PyDefaultArgument, SpellCheckingInspection
+@plot
+def ridge(
+    x: Optional[pd.Series | str] = None,
+    y: Optional[pd.DataFrame | pd.Series | str] = None,
+    data: Optional[pd.DataFrame] = None,
+    title: str = "",
+    xlabel: str = "",
+    ylabel: str = "",
+    xlim: Tuple[float, float] = None,
+    ylim: Tuple[float, float] = None,
+    grids: Optional[Literal["both", "x", "y"]] = None,
+    colors: List[str] = COLORS,
+    palette: Optional[str] = None,
+    hue: Optional[str] = None,
+
+    **kwargs,
+) -> plt.Figure:
+
+    sns.set_theme(style="white", rc={"axes.facecolor": (0, 0, 0, 0)})
+
+    plot = sns.FacetGrid(data, row=hue, hue=hue, aspect=15, height=.5, palette=palette)
+
+    # Draw the densities in a few steps
+    plot.map(sns.kdeplot, y,
+          bw_adjust=.5, clip_on=False,
+          fill=True, alpha=1, linewidth=1.5)
+    plot.map(sns.kdeplot, y, clip_on=False, color="w", lw=2, bw_adjust=.5)
+
+    # passing color=None to refline() uses the hue mapping
+    plot.refline(y=0, linewidth=2, linestyle="-", color=None, clip_on=False)
+
+    # Define and use a simple function to label the plot in axes coordinates
+    def label(x, color, label_text):
+        ax = plt.gca()
+        ax.text(0, .2, label_text, fontweight="bold", color=color,
+                ha="left", va="center", transform=ax.transAxes)
+
+    #plot.map(label, y)
+
+    # Set the subplots to overlap
+    plot.figure.subplots_adjust(hspace=-.25)
+
+    # Remove axes details that don't play well with overlap
+    plot.set_titles("")
+    plot.set(yticks=[], ylabel="")
+    plot.despine(bottom=True, left=True)
+
+    return plot.figure
