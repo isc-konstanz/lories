@@ -17,7 +17,7 @@ from lori.connectors.entsoe import EntsoeConnector
 # noinspection SpellCheckingInspection
 @register_tariff_type("entsoe", "entso_e")
 class EntsoeProvider(TariffProvider):
-    PRICE_DAY_AHEAD = Constant(float, "price_day_ahead", name="Day-Ahead Tariff Price", unit="€/MWh")
+    TARIFF_DAY_AHEAD = Constant(float, "tariff_day_ahead", name="Day-Ahead Tariff", unit="€/MWh")
 
     _offset: float = 0
 
@@ -25,11 +25,16 @@ class EntsoeProvider(TariffProvider):
         super().configure(configs)
         self._offset = configs.get_float("offset", default=0)
 
-        entsoe_connector = EntsoeConnector(self, key="entsoe", name="ENTSO-e", configs=configs)
+        entsoe_connector = EntsoeConnector(
+            self, 
+            key="entsoe_connector", 
+            name="ENTSO-e Connector",
+            configs=configs
+        )
 
         self.connectors.add(entsoe_connector)
         self.data.add(
-            EntsoeProvider.PRICE_DAY_AHEAD,
+            EntsoeProvider.TARIFF_DAY_AHEAD,
             method=EntsoeConnector.DAY_AHEAD,
             aggregate="mean",
             connector=entsoe_connector.id,
@@ -38,10 +43,10 @@ class EntsoeProvider(TariffProvider):
 
     def activate(self) -> None:
         super().activate()
-        self.data.register(self._on_tariff_received, EntsoeProvider.PRICE_DAY_AHEAD, unique=False)
+        self.data.register(self._on_tariff_received, EntsoeProvider.TARIFF_DAY_AHEAD, unique=False)
 
     def _on_tariff_received(self, data: pd.DataFrame) -> None:
         timestamp = data.index[0]
-        import_data = data[EntsoeProvider.PRICE_DAY_AHEAD] / 10.0 + self._offset
-        import_channel: Channel = self.data.get(Tariff.PRICE_IMPORT)
+        import_data = data[EntsoeProvider.TARIFF_DAY_AHEAD] / 10.0 + self._offset
+        import_channel: Channel = self.data.get(Tariff.TARIFF_IMPORT)
         import_channel.set(timestamp, import_data)
