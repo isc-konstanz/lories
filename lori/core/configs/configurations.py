@@ -255,7 +255,7 @@ class Configurations(MutableMapping[str, Any]):
 
         destination.parents[0].mkdir(parents=True, exist_ok=True)
         if source.is_dir():
-            shutil.copytree(source, destination, ignore=_include(".*\.conf"), dirs_exist_ok=True)
+            shutil.copytree(source, destination, ignore=_include(r".*\.conf"), dirs_exist_ok=True)
         elif not destination.exists():
             shutil.copy2(source, destination)
 
