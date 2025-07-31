@@ -38,7 +38,7 @@ from ..data.databases import Databases  # noqa: F401
 
 import importlib
 
-for import_connector in ["dummy", "csv", "sql", "influx", "tables", "camera", "modbus", "revpi", "entsoe"]:
+for import_connector in ["dummy", "csv", "sql", "influx", "tables", "cameras", "modbus", "revpi", "entsoe"]:
     try:
         importlib.import_module(f".{import_connector}", "lori.connectors")
 
