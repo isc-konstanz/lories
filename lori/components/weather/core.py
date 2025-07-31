@@ -56,7 +56,7 @@ class WeatherMeta(ActivatorMeta):
 # noinspection SpellCheckingInspection
 @register_component_type("weather")
 class Weather(Component, metaclass=WeatherMeta):
-    GHI = Constant(float, "ghi", name="Global Horizontal Irradiance", unit="W/m2")
+    GHI = Constant(float, "ghi", "Global Horizontal Irradiance", "W/m2")
     DNI = Constant(float, "dni", "Direct Normal Irradiance", "W/m2")
     DHI = Constant(float, "dhi", "Diffuse Horizontal Irradiance", "W/m2")
     TEMP_AIR = Constant(float, "temp_air", "Air Temperature", "°C")
