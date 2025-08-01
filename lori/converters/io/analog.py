@@ -25,6 +25,7 @@ class AnalogInput(FloatConverter):
 
     _invert: bool
     _factor: float
+    _divisor: float
 
     max: float
     min: float
@@ -41,7 +42,8 @@ class AnalogInput(FloatConverter):
         self._assert_input(self._input_min, self._input_max, self._input_zero)
 
         self._invert = configs.get_bool("invert", default=False)
-        self._factor = 1 / ((self._input_max - self._input_min) / (self.max - self.min))
+        self._factor = configs.get_float("factor", default=1)
+        self._divisor = ((self._input_max - self._input_min) / (self.max - self.min))
 
     def _configure_input(
         self,
@@ -72,7 +74,7 @@ class AnalogInput(FloatConverter):
             raise ConversionException(
                 f"Invalid input signal out of limit ({self._input_min} to {self._input_max}): " + str(value)
             )
-        _value = (value - self._input_zero) * self._factor
+        _value = (value * self._factor - self._input_zero) / self._divisor
 
         if self._invert:
             _value = self.max - _value
