@@ -398,9 +398,10 @@ class DataManager(DataContext, Activator, Entity):
             return False
 
         while _submit_listeners(timeout):
-            timeout -= (pd.Timestamp.now(tz.UTC) - now).total_seconds()
-            if timeout <= 0:
-                break
+            if timeout is not None:
+                timeout -= (pd.Timestamp.now(tz.UTC) - now).total_seconds()
+                if timeout <= 0:
+                    break
 
     # noinspection PyUnresolvedReferences
     def _notify_callback(self, future: Future) -> None:
