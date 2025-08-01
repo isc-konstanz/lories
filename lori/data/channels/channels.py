@@ -80,12 +80,9 @@ class Channels(Resources[Channel]):
             converted_data = converter.from_frame(data, channels)
             for channel in channels:
                 channel_data = converted_data.loc[:, channel.id].dropna()
-                if channel_data.empty:
+                if channel_data.empty or channel_data.isna().all():
                     channel.state = ChannelState.NOT_AVAILABLE
-                    if channel.id in data.columns:
-                        self._logger.debug(f"Unable to update None value for channel: {channel.id}")
-                    else:
-                        self._logger.warning(f"Unable to update missing value for channel: {channel.id}")
+                    self._logger.debug(f"Missing value for channel: {channel.id}")
                     continue
 
                 timestamp = channel_data.index[0]

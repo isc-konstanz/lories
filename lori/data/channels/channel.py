@@ -188,8 +188,6 @@ class Channel(Resource):
             raise ResourceException(f"Invalid value for valid state '{self.id}': {value}")
         self._value = value
         self._state = state
-        if self.is_valid():
-            self.__context.notify(self)
 
     # noinspection PyUnresolvedReferences
     def register(

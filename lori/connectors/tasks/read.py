@@ -12,11 +12,12 @@ import inspect
 
 import pandas as pd
 from lori.connectors.tasks.task import ConnectorTask
+from lori.data.channels import ChannelState
 
 
 class ReadTask(ConnectorTask):
     # noinspection PyArgumentList
-    def run(self, **kwargs) -> pd.DataFrame:
+    def run(self, inplace: bool = False, **kwargs) -> pd.DataFrame:
         self._logger.debug(
             f"Reading {len(self.channels)} channels of '{type(self.connector).__name__}': {self.connector.id}"
         )
@@ -28,4 +29,13 @@ class ReadTask(ConnectorTask):
                 self._logger.warning(
                     f"Trying to read Connector '{self.connector.id}' with unknown argument '{argument}': {value}"
                 )
-        return self.connector.read(self.channels, **kwargs)
+
+        data = self.connector.read(self.channels, **kwargs)
+        data.dropna(axis="columns", how="all", inplace=True)
+        if data is not None and not data.empty and not all(data.isna().all(axis="columns")):
+            if inplace:
+                self.channels.set_frame(data)
+        elif inplace:
+            self.channels.set_state(ChannelState.NOT_AVAILABLE)
+
+        return data
