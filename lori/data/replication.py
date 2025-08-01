@@ -207,8 +207,8 @@ def replicate(
     if start is None:
         start = source.read_first_index(resources)
         target_empty = True
-    else:
-        start = floor_date(start, freq=freq) + pd.Timedelta(seconds=1)
+    # else:
+    #     start = floor_date(start, freq=freq) + pd.Timedelta(seconds=1)
 
     if any(t is None for t in [start, end]) or start >= end:
         logger.debug(
@@ -223,8 +223,9 @@ def replicate(
 
     if not target_empty:
         # Validate prior step, before continuing
-        prior_end = floor_date(start if start <= now else now, freq=freq)
-        prior_start = floor_date(start, timezone=timezone, freq=freq) - to_timedelta(freq) + pd.Timedelta(seconds=1)
+        prior_freq = freq if floor is None else floor
+        prior_end = floor_date(start if start <= now else now, timezone=timezone, freq=prior_freq)
+        prior_start = prior_end - to_timedelta(prior_freq) + pd.Timedelta(seconds=1)
         replicate_range(source, target, resources, prior_start, prior_end, force=force)
 
     if slice:
