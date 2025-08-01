@@ -9,6 +9,7 @@ lori.components.tariff.entsoe
 from __future__ import annotations
 
 import pandas as pd
+
 from lori import Channel, Configurations, Constant
 from lori.components.tariff import Tariff, TariffProvider, register_tariff_type
 from lori.connectors.entsoe import EntsoeConnector
@@ -17,14 +18,14 @@ from lori.connectors.entsoe import EntsoeConnector
 # noinspection SpellCheckingInspection
 @register_tariff_type("entsoe", "entso_e")
 class EntsoeProvider(TariffProvider):
-    TARIFF_DAY_AHEAD = Constant(float, "tariff_day_ahead", name="Day-Ahead Tariff", unit="€/MWh")
+    PRICE_DAY_AHEAD = Constant(float, "tariff_day_ahead", name="Day-Ahead Tariff Price", unit="€/MWh")
 
     _offset: float = 0
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
         self._offset = configs.get_float("offset", default=0)
-
+        
         entsoe_connector = EntsoeConnector(
             self, 
             key="entsoe_connector", 

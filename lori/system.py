@@ -13,8 +13,10 @@ from shutil import copytree, ignore_patterns
 from typing import Any, List, Optional
 
 import pandas as pd
-from lori import ConfigurationException, Configurations, Settings
-from lori.components import Component, ComponentContext, Weather, WeatherUnavailableException
+from lori import Configurations, ConfigurationException, Settings
+from lori.components import Component, ComponentContext
+from lori.components.weather import Weather, WeatherUnavailableException
+from lori.components.tariff import Tariff, TariffUnavailableException
 from lori.location import Location, LocationUnavailableException
 from lori.simulation import Results
 from lori.typing import TimestampType
@@ -140,6 +142,14 @@ class System(Component):
         if weather is None:
             raise WeatherUnavailableException(f"System '{self.name}' has no weather configured")
         return weather
+
+    # noinspection PyTypeChecker
+    @property
+    def tariff(self) -> Tariff:
+        tariff = self.components.get_first(Tariff)
+        if tariff is None:
+            raise TariffUnavailableException(f"System '{self.name}' has no tariff configured")
+        return tariff
 
     def simulate(
         self,
