@@ -580,7 +580,7 @@ class DataManager(DataContext, Activator, Entity):
 
         return self._read_futures(read_futures, timeout)
 
-    # noinspection PyShadowingBuiltins
+    # noinspection PyShadowingBuiltins, PyTypeChecker
     def read(
         self,
         channels: Optional[Channels] = None,
@@ -600,7 +600,7 @@ class DataManager(DataContext, Activator, Entity):
                 continue
 
             read_task = ReadTask(connector, read_channels)
-            read_future = self._executor.submit(read_task, **kwargs)
+            read_future = self._executor.submit(read_task, inplace=inplace, **kwargs)
             read_futures[read_future] = read_task
 
         return self._read_futures(read_futures, timeout, inplace)
