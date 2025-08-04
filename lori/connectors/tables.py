@@ -180,7 +180,9 @@ class HDFDatabase(Database):
         try:
             for group, group_resources in self.resources.filter(lambda c: c.id in data.columns).groupby("group"):
                 group_key = _format_key(group)
-                group_data = data[group_resources.ids].dropna(axis="columns", how="all")
+                group_data = data[group_resources.ids]
+                group_data.dropna(axis="index", how="all", inplace=True)
+                group_data.dropna(axis="columns", how="all", inplace=True)
 
                 if not self._columns_unique:
                     group_data.rename(

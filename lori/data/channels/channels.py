@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Callable
 
+import numpy as np
 import pandas as pd
 from lori.core import Resources
 from lori.data.channels import Channel, ChannelState
@@ -41,6 +42,7 @@ class Channels(Resources[Channel]):
 
     def to_frame(self, unique: bool = False, states: bool = False) -> pd.DataFrame:
         data = OrderedDict()
+        columns = list(self.keys if not unique else self.ids)
         for channel in self:
             if pd.isna(channel.timestamp):
                 continue
@@ -51,11 +53,11 @@ class Channels(Resources[Channel]):
                 continue
             for timestamp, channel_values in channel_data.to_frame().to_dict(orient="index").items():
                 if timestamp not in data:
-                    timestamp_data = data[timestamp] = {}
+                    timestamp_data = data[timestamp] = {c: np.nan for c in columns}
                 else:
                     timestamp_data = data[timestamp]
 
-                    if any(k in timestamp_data for k in channel_values.keys()):
+                    if any(not pd.isna(timestamp_data[k]) for k in channel_values.keys()):
                         self._logger.warning(
                             f"Overriding value for duplicate index while merging channel '{channel.id}' into "
                             f"DataFrame for index: {channel_data.index}"
@@ -63,13 +65,12 @@ class Channels(Resources[Channel]):
                 timestamp_data.update(channel_values)
 
         if len(data) == 0:
-            return pd.DataFrame()
+            return pd.DataFrame(columns=columns)
         data = pd.DataFrame.from_records(
             data=list(data.values()),
             index=list(data.keys()),
         )
         data.dropna(axis="index", how="all", inplace=True)
-        data.dropna(axis="columns", how="all", inplace=True)
         data = validate_index(data)
         data.index.name = Channel.TIMESTAMP
         return data
@@ -80,12 +81,9 @@ class Channels(Resources[Channel]):
             converted_data = converter.from_frame(data, channels)
             for channel in channels:
                 channel_data = converted_data.loc[:, channel.id].dropna()
-                if channel_data.empty:
+                if channel_data.empty or channel_data.isna().all():
                     channel.state = ChannelState.NOT_AVAILABLE
-                    if channel.id in data.columns:
-                        self._logger.debug(f"Unable to update None value for channel: {channel.id}")
-                    else:
-                        self._logger.warning(f"Unable to update missing value for channel: {channel.id}")
+                    self._logger.debug(f"Missing value for channel: {channel.id}")
                     continue
 
                 timestamp = channel_data.index[0]
