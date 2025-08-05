@@ -8,7 +8,7 @@ lori.data.access
 
 from __future__ import annotations
 
-from typing import Any, Callable, Collection, Optional, Type, overload
+from typing import Any, Callable, Collection, Iterable, Optional, Type, overload
 
 import pandas as pd
 from lori.core import Configurator, Constant, Context, Registrator, ResourceException
@@ -54,6 +54,13 @@ class DataAccess(DataContext, Configurator):
 
     def __str__(self) -> str:
         return f"{type(self).__name__}:\n\t" + "\n\t".join(f"{v.key} = {repr(v)}" for v in self.values())
+
+    def __getitem__(self, id: Iterable[str] | str) -> Channel | Channels:
+        if isinstance(id, str):
+            return self._get(id)
+        if isinstance(id, Iterable):
+            return Channels([self._get(i) for i in id])
+        raise KeyError(id)
 
     # noinspection PyArgumentList
     def __getattr__(self, attr):

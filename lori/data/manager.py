@@ -13,7 +13,8 @@ import os
 import signal
 import time
 from collections.abc import Callable
-from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError, as_completed
+from concurrent import futures
+from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError
 from functools import partial
 from threading import Event, Thread
 from typing import Any, Dict, Mapping, Optional, Type, overload
@@ -71,7 +72,8 @@ class DataManager(DataContext, Activator, Entity):
         self._components = ComponentContext(self)
         self._listeners = ListenerContext(self)
         self._executor = ThreadPoolExecutor(
-            thread_name_prefix=self.name, max_workers=max(int((os.cpu_count() or 1) / 2), 1)
+            thread_name_prefix=self.name,
+            max_workers=max(int((os.cpu_count() or 1) / 2), 1),
         )
         self.__runner = Thread(name=self.name, target=self.run)
 
@@ -183,7 +185,7 @@ class DataManager(DataContext, Activator, Entity):
         self,
         filter: Optional[Callable[[Registrator], bool]] = None,
         channels: Optional[Channels] = None,
-        timeout: Optional[int] = None,
+        timeout: Optional[float] = None,
     ) -> None:
         self._connect(*self._connectors.filter(_filter(filter)), channels=channels, timeout=timeout)
 
@@ -191,7 +193,7 @@ class DataManager(DataContext, Activator, Entity):
         self,
         *connectors: Connector,
         channels: Optional[Channels] = None,
-        timeout: Optional[int] = None,
+        timeout: Optional[float] = None,
     ) -> None:
         connect_futures = {}
         for connector in connectors:
@@ -229,16 +231,16 @@ class DataManager(DataContext, Activator, Entity):
 
     def __connect_futures(
         self,
-        futures: Dict[Future, ConnectTask],
-        timeout: Optional[int] = None,
+        tasks: Dict[Future, ConnectTask],
+        timeout: Optional[float] = None,
     ) -> None:
         try:
-            for future in as_completed(futures, timeout=timeout):
-                futures.pop(future)
+            for future in futures.as_completed(tasks, timeout=timeout):
+                tasks.pop(future)
                 self.__connect_callback(future)
 
         except TimeoutError:
-            for future, task in futures.items():
+            for future, task in tasks.items():
                 self._logger.warning(f"Timed out opening connector '{task.connector.id}' after {timeout} seconds")
                 future.cancel()
 
@@ -375,12 +377,31 @@ class DataManager(DataContext, Activator, Entity):
     def listeners(self) -> ListenerContext:
         return self._listeners
 
-    def notify(self, *channels: Channel) -> None:
+    def notify(
+        self,
+        channels: Optional[Channels] = None,
+        timeout: Optional[float] = None,
+    ) -> None:
+        channels = self._filter_by_args(channels)
         now = pd.Timestamp.now(tz.UTC)
-        with self.listeners:
-            for listener in self.listeners.notify(*channels):
-                listener_future = self._executor.submit(listener, now)
-                listener_future.add_done_callback(self._notify_callback)
+
+        def _submit_listeners(_timeout: float) -> bool:
+            _futures = []
+            with self.listeners:
+                for _listener in self.listeners.notify(*channels):
+                    _future = self._executor.submit(_listener, now)
+                    _future.add_done_callback(self._notify_callback)
+                    _futures.append(_future)
+            if len(_futures) > 0:
+                futures.wait(_futures, timeout=_timeout)
+                return True
+            return False
+
+        while _submit_listeners(timeout):
+            if timeout is not None:
+                timeout -= (pd.Timestamp.now(tz.UTC) - now).total_seconds()
+                if timeout <= 0:
+                    break
 
     # noinspection PyUnresolvedReferences
     def _notify_callback(self, future: Future) -> None:
@@ -430,14 +451,12 @@ class DataManager(DataContext, Activator, Entity):
                 channels = self.channels.filter(lambda c: is_reading(c, now))
                 if len(channels) > 0:
                     self._logger.debug(f"Reading {len(channels)} channels of application: {self.name}")
-                    self._run_read(channels)
+                    self.__read(channels, timeout=self._interval / 4)
 
-                self.__interrupt.wait(self._interval / 2)
-                self._listeners.wait(self._interval / 4, self.__interrupt.wait)
+                self.reconnect(lambda c: c._is_reconnectable())
+
+                self.notify(timeout=self._interval / 4)
                 self.log()
-
-                for connector in self.connectors.filter(lambda c: c._is_reconnectable()):
-                    self.reconnect(connector)
 
                 _sleep(interval, self.__interrupt.wait)
 
@@ -445,30 +464,8 @@ class DataManager(DataContext, Activator, Entity):
                 self.interrupt()
                 break
 
-        self._listeners.wait()
+        self.notify()
         self.log()
-
-    # noinspection PyShadowingBuiltins
-    def _run_read(self, channels: Optional[Channels] = None, **kwargs) -> None:
-        channels = self._filter_by_args(channels)
-        timestamp = pd.Timestamp.now(tz=tz.UTC)
-
-        for id, connector in self.connectors.items():
-            if not connector._is_connected():
-                continue
-
-            read_channels = channels.filter(lambda c: c.has_connector(id))
-            if len(read_channels) == 0:
-                continue
-
-            read_task = ReadTask(connector, read_channels)
-            read_future = self._executor.submit(read_task, **kwargs)
-            read_future.add_done_callback(partial(self._read_callback, read_task, inplace=True))
-
-            def update_timestamp(read_channel: Channel) -> None:
-                read_channel.connector.timestamp = timestamp
-
-            read_channels.apply(update_timestamp, inplace=True)
 
     @overload
     def has_logged(
@@ -491,7 +488,7 @@ class DataManager(DataContext, Activator, Entity):
         channels: Optional[ChannelsType] = None,
         start: Optional[TimestampType] = None,
         end: Optional[TimestampType] = None,
-        timeout: Optional[int] = None,
+        timeout: Optional[float] = None,
     ) -> bool:
         channels = self._filter_by_args(channels)
 
@@ -513,7 +510,7 @@ class DataManager(DataContext, Activator, Entity):
 
         check_results = []
         try:
-            for check_future in as_completed(check_futures, timeout=timeout):
+            for check_future in futures.as_completed(check_futures, timeout=timeout):
                 check_task = check_futures.pop(check_future)
                 try:
                     check_exists = check_future.result()
@@ -543,7 +540,7 @@ class DataManager(DataContext, Activator, Entity):
         self,
         start: Optional[TimestampType] = None,
         end: Optional[TimestampType] = None,
-        timeout: Optional[int] = None,
+        timeout: Optional[float] = None,
     ) -> pd.DataFrame: ...
 
     @overload
@@ -552,7 +549,7 @@ class DataManager(DataContext, Activator, Entity):
         channels: ChannelsType,
         start: Optional[TimestampType] = None,
         end: Optional[TimestampType] = None,
-        timeout: Optional[int] = None,
+        timeout: Optional[float] = None,
     ) -> pd.DataFrame: ...
 
     # noinspection PyShadowingBuiltins
@@ -561,7 +558,7 @@ class DataManager(DataContext, Activator, Entity):
         channels: Optional[Channels] = None,
         start: Optional[TimestampType] = None,
         end: Optional[TimestampType] = None,
-        timeout: Optional[int] = None,
+        timeout: Optional[float] = None,
     ) -> pd.DataFrame:
         channels = self._filter_by_args(channels)
 
@@ -583,7 +580,7 @@ class DataManager(DataContext, Activator, Entity):
 
         return self._read_futures(read_futures, timeout)
 
-    # noinspection PyShadowingBuiltins
+    # noinspection PyShadowingBuiltins, PyTypeChecker
     def read(
         self,
         channels: Optional[Channels] = None,
@@ -603,27 +600,27 @@ class DataManager(DataContext, Activator, Entity):
                 continue
 
             read_task = ReadTask(connector, read_channels)
-            read_future = self._executor.submit(read_task, **kwargs)
+            read_future = self._executor.submit(read_task, inplace=inplace, **kwargs)
             read_futures[read_future] = read_task
 
         return self._read_futures(read_futures, timeout, inplace)
 
     def _read_futures(
         self,
-        futures: Dict[Future, ReadTask],
-        timeout: Optional[int] = None,
+        tasks: Dict[Future, ReadTask],
+        timeout: Optional[float] = None,
         inplace: bool = False,
     ) -> pd.DataFrame:
         results = []
         try:
-            for future in as_completed(futures, timeout=timeout):
-                task = futures.pop(future)
+            for future in futures.as_completed(tasks, timeout=timeout):
+                task = tasks.pop(future)
                 data = self._read_callback(task, future, inplace)
                 if data is not None:
                     results.append(data)
 
         except TimeoutError:
-            for future, task in futures.items():
+            for future, task in tasks.items():
                 self._logger.warning(f"Timed out reading connector '{task.connector.id}' after {timeout} seconds")
                 future.cancel()
                 if inplace:
@@ -643,22 +640,46 @@ class DataManager(DataContext, Activator, Entity):
     ) -> Optional[pd.DataFrame]:
         channels = task.channels
         try:
-            data = future.result()
-            data.dropna(axis="columns", how="all", inplace=True)
-            if data is not None and not data.empty:
-                if inplace:
-                    channels.set_frame(data)
-                return data
-            elif inplace:
-                channels.set_state(ChannelState.NOT_AVAILABLE)
+            return future.result()
 
         except ConnectorException as e:
             self._logger.warning(f"Failed reading connector '{task.connector.id}': {str(e)}")
             if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(e)
-
-            channels.set_state(ChannelState.READ_ERROR)
+            if inplace:
+                channels.set_state(ChannelState.READ_ERROR)
         return None
+
+    # noinspection PyShadowingBuiltins, PyTypeChecker
+    def __read(
+        self,
+        channels: Optional[Channels] = None,
+        timeout: Optional[float] = None,
+        **kwargs,
+    ) -> None:
+        channels = self._filter_by_args(channels)
+        timestamp = pd.Timestamp.now(tz=tz.UTC)
+
+        read_futures = []
+        for id, connector in self.connectors.items():
+            if not connector._is_connected():
+                continue
+
+            read_channels = channels.filter(lambda c: c.has_connector(id))
+            if len(read_channels) == 0:
+                continue
+
+            read_task = ReadTask(connector, read_channels)
+            read_future = self._executor.submit(read_task, inplace=True, **kwargs)
+            read_future.add_done_callback(partial(self._read_callback, read_task, inplace=True))
+            read_futures.append(read_future)
+
+            def update_timestamp(read_channel: Channel) -> None:
+                read_channel.connector.timestamp = timestamp
+
+            read_channels.apply(update_timestamp, inplace=True)
+
+        futures.wait(read_futures, timeout=timeout)
 
     # noinspection PyShadowingBuiltins, PyShadowingNames, PyTypeChecker
     def write(
@@ -688,17 +709,17 @@ class DataManager(DataContext, Activator, Entity):
 
     def _write_futures(
         self,
-        futures: Dict[Future, WriteTask | LogTask],
-        timeout: Optional[int] = None,
+        tasks: Dict[Future, WriteTask | LogTask],
+        timeout: Optional[float] = None,
         inplace: bool = False,
     ) -> None:
         try:
-            for future in as_completed(futures, timeout=timeout):
-                task = futures.pop(future)
+            for future in futures.as_completed(tasks, timeout=timeout):
+                task = tasks.pop(future)
                 self._write_callback(task, future, inplace)
 
         except TimeoutError:
-            for future, task in futures.items():
+            for future, task in tasks.items():
                 self._logger.warning(f"Timed out writing connector '{task.connector.id}' after {timeout} seconds")
                 future.cancel()
                 if inplace:

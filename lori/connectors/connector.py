@@ -40,9 +40,10 @@ class ConnectorMeta(ConfiguratorMeta):
 class Connector(_Connector, metaclass=ConnectorMeta):
     _connected: bool = False
     _connect_type: ConnectType = ConnectType.AUTO
-    _connect_timestamp: pd.Timestamp = pd.NaT
-    _disconnect_timestamp: pd.Timestamp = pd.NaT
-    _reconnect_interval: pd.Timedelta = pd.Timedelta(minutes=1)
+
+    _timestamp_connect: pd.Timestamp = pd.NaT
+    _timestamp_disconnect: pd.Timestamp = pd.NaT
+    _interval_reconnect: pd.Timedelta = pd.Timedelta(minutes=1)
 
     __resources: Resources
 
@@ -135,9 +136,11 @@ class Connector(_Connector, metaclass=ConnectorMeta):
     def _is_reconnectable(self) -> bool:
         if not self.is_enabled() or not self.is_configured() or not self._is_connectable():
             return False
-        if pd.isna(self._disconnect_timestamp):
-            return True
-        return self._disconnect_timestamp + self._reconnect_interval <= pd.Timestamp.now(tz.UTC)
+        if not pd.isna(self._timestamp_connect):
+            return self._timestamp_connect + self._interval_reconnect <= pd.Timestamp.now(tz.UTC)
+        if not pd.isna(self._timestamp_disconnect):
+            return self._timestamp_disconnect + self._interval_reconnect <= pd.Timestamp.now(tz.UTC)
+        return False
 
     def _is_connectable(self) -> bool:
         return self._is_disconnected() and self._connect_type == ConnectType.AUTO
@@ -159,17 +162,19 @@ class Connector(_Connector, metaclass=ConnectorMeta):
                 raise ConfigurationException(f"Trying to connect disabled {type(self).__name__}: {self.id}")
             if not self.is_configured():
                 raise ConfigurationException(f"Trying to connect unconfigured {type(self).__name__}: {self.id}")
+
+            self._timestamp_connect = pd.Timestamp.now(tz.UTC)
+            self._timestamp_disconnect = pd.NaT
+
             if not self._is_connected():
                 self._at_connect(resources)
                 self._run_connect(resources, *args, **kwargs)
                 self._on_connect(resources)
+                self.__resources = resources
             else:
                 self._logger.warning(f"{type(self).__name__} '{self.id}' already connected")
 
-            self._disconnect_timestamp = pd.NaT
-            self._connect_timestamp = pd.Timestamp.now(tz.UTC)
             self._connected = True
-            self.__resources = resources
 
     def _at_connect(self, resources: Resources) -> None:
         pass
@@ -184,13 +189,14 @@ class Connector(_Connector, metaclass=ConnectorMeta):
     @wraps(disconnect, updated=())
     def _do_disconnect(self) -> None:
         with self._lock:
-            if self._is_connected():
+            self._timestamp_connect = pd.NaT
+            self._timestamp_disconnect = pd.Timestamp.now(tz.UTC)
+
+            if not self._is_disconnected():
                 self._at_disconnect()
                 self._run_disconnect()
                 self._on_disconnect()
 
-            self._disconnect_timestamp = pd.Timestamp.now(tz.UTC)
-            self._connect_timestamp = pd.NaT
             self._connected = False
 
     def _at_disconnect(self) -> None:
