@@ -57,10 +57,18 @@ class Application(DataManager):
         def _convert_ranges(value: any) -> any:
             if isinstance(value, str):
                 #TODO: use full_match instead of match?
-                range_pattern = r"<range\(\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*\)>"
-                range_match = re.match(range_pattern, value)
-                if range_match:
-                    start, stop, step = range_match.groups()
+
+                i_range_pattern = r"<range\(\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)>"
+                i_range_match = re.match(i_range_pattern, value)
+                if i_range_match:
+                    start, stop, step = map(int, i_range_match.groups())
+                    value = list(range(start, stop, step))
+                    return  value  # Return unchanged if no match
+
+                f_range_pattern = r"<range\(\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*\)>"
+                f_range_match = re.match(f_range_pattern, value)
+                if f_range_match:
+                    start, stop, step = f_range_match.groups()
                     value = np.arange(float(start), float(stop), float(step)).tolist()
                     return value
 
@@ -159,105 +167,34 @@ class Application(DataManager):
             else:
                 non_mesh_groups.append(group_parameters[group])
 
-        scenarios = [{"Reference": OrderedDict()}]
+        scenarios = {"Reference": OrderedDict()}
         if len(mesh_groups) >= 2:
             meshed = _mesh_group(mesh_groups, [])
-            [scenarios.append(mesh_item) for mesh_item in meshed]
+            [scenarios.update({k: v}) for d in meshed for k, v in d.items()]
 
-        [scenarios.append(non_mesh_item) for non_mesh_item in non_mesh_groups]
-
-        for scenario in scenarios:
-            for value in scenario.values():
-                value.update(base_parameters)
-
-        print("help here")
-        for s in scenarios:
-            print(s)
-
-        #TODO: refactor / fix _load_hyper_system using scenarios
-        #TODO: check system.id fits
-        #TODO: replace <system.key> with system.key in system loop
-
-
-
-        def _apply_configs(system: System, scenario: dict):
-            return self._load_hyper_system(
-                scenario,
-                system,
-            )
-
-
+        [scenarios.update({k: v}) for d in non_mesh_groups for k, v in d.items()]
 
         hyper_systems = []
+        for name, parameters in scenarios.items():
+            params = base_parameters.copy()
+            params.update(parameters)
+            scenarios.update({name: params}) #TODO: fix
+
         for system in systems:
-            for scenario in scenarios:
-                hyper_systems.extend(
-                    self._load_hyper_system(
-                        scenario,
-                        system,
-                    )
+            hyper_systems.extend(
+                self._load_hyper_system(
+                    system,
+                    scenarios,
                 )
+            )
 
-            # for group_name in groups:
-            #     hyper_systems.extend(_apply_configs(system, groups.get_section(group_name), do_mesh=False))
-
-            # for mesh_group in mesh_groups:
-            #     hyper_systems.extend(_apply_configs(system, mesh_group, do_mesh=True))
-
-                # meshgrid = group.pop("meshgrid", default=False)
-                # group = configs.get_section(group_name, default={})
-                # group_parameters = _load_hyper_parameters(group)
-                # system_parameters = {k: v for k, v in group_parameters.items() if k.split(".")[0] == system.id}
-                # system_parameters = {}
-                # for k, v in group_parameters.items():
-                #     if k.split(".")[0] != system.id:
-                #         continue
-                #
-                #     if isinstance(v, tuple) and len(v) == 3:
-                #         start, end, count = v
-                #         if not all(isinstance(x, float) for x in (start, end)) and not isinstance(count, int):
-                #             raise ConfigurationException(
-                #                 f"Invalid hyperparameter '{k}': expected a tuple of (start, end, count) with start and end as float and count as int"
-                #             )
-                #         # _range = re.match(range_pattern, v)
-                #         # _linspace = re.match(linspace_pattern, v)
-                #
-                #         # if _range:
-                #         #     start, end, step = map(int, _range.groups())
-                #         #     v = np.arange(start, end, step).tolist()
-                #         # elif _linspace:
-                #         #     start = float(_linspace.group(1))
-                #         #     end = float(_linspace.group(2))
-                #         #     count = int(_linspace.group(3))
-                #         #     v = np.linspace(start, end, int(count)).astype(int).tolist()
-                #
-                #     system_parameters.update({k: v})
-                # pass
-                #
-                #
-                #
-                # if not meshgrid:
-                #     if not all(isinstance(v, list) for v in system_parameters.values()):
-                #         raise ConfigurationException("Hyperparameters must be lists if meshgrid is False")
-                #     lengths = {len(v) for v in system_parameters.values()}
-                #     if len(lengths) > 1:
-                #         raise ConfigurationException("Hyperparameters must have the same length if meshgrid is False")
-                #
-                # parameters = base_parameters.copy()
-                # parameters.update({k: v for k, v in system_parameters.items()})
-                #
-                # hyper_systems.extend(self._load_hyper_system(
-                #     parameters,
-                #     system,
-                #     name=group_name,
-                #     do_mesh=meshgrid))
         return hyper_systems
 
     # noinspection SpellCheckingInspection
     def _load_hyper_system(
             self,
-            parameters: Dict[str, Any],
             system: System,
+            scenarios: dict[str, dict],
     ) -> Collection[System]:
         def _clear_system() -> None:
             self.converters._remove(*[c for c in self.converters if c.split(".")[0] == system.id])
@@ -265,28 +202,33 @@ class Application(DataManager):
             self.components._remove(*[c for c in self.components if c.split(".")[0] == system.id])
             self._remove(*[c.id for c in self.channels if c.id.split(".")[0] == system.id])
 
-        if len(parameters) == 0:
-            self._logger.warning(f"No hyperparameters configured for system '{system.id}'. Will be removed")
+        if len(scenarios) == 0:
+            self._logger.warning(f"No hyperparameters configured for system '{system.name}'. Will be removed")
             _clear_system()
             return []
 
         simulation_dir = system.configs.dirs.data.joinpath(".systems")
         if not simulation_dir.exists():
             simulation_dir.mkdir(parents=True, exist_ok=True)
-
+        
         systems = []
-        meshkeys = [(i, "_".join(k.split(".")[-2:])) for i, k in enumerate(parameters.keys()) if isinstance(parameters[k], list)]
 
-        def is_list_like_but_not_str(x):
-            return isinstance(x, Iterable) and not isinstance(x, (str, bytes))
+        for index, (name, params) in enumerate(scenarios.items()):
+            replace_map = {
+                " ": "_",
+                "=": "_",
+                "(": "",
+                ")": "",
+                ",": "",
+                ".": "f"
+            }
+            key = name.lower()
+            for old, new in replace_map.items():
+                key = key.replace(old, new)
 
-        meshgrid = np.meshgrid(*[np.array(v) for v in parameters.values()], indexing="ij")
-        meshgrid = np.array(meshgrid, dtype=object).reshape(len(parameters.keys()), -1).T
-
-        for system_params in meshgrid:
-            system_key = f"{system.key}_{name}_{'_'.join(str(system_params[i]).lower()  for i, _ in meshkeys)}"
-            system_path = f"{system.key}_{name}_{'_'.join(f'{k}-{str(system_params[i]).lower()}' for i, k in meshkeys)}"
-            system_name = f"{system.name} ({name.title()} {', '.join(f'{k.title()}: {str(system_params[i])}' for i, k in meshkeys)})"
+            system_key = f"{system.key}_{key}"
+            system_path = f"{system.key}_sim_{index:03d}"
+            system_name = f"{system.name} ({name})"
             system_dir = simulation_dir.joinpath(system_path)
             system_dirs = system.configs.dirs.copy()
             system_dirs.data = system_dir
@@ -309,7 +251,7 @@ class Application(DataManager):
                     return getattr(_object, _key)
                 return _object.get(_key)
 
-            for key, parameter in [(k, system_params[i]) for i, k in enumerate(parameters.keys())]:
+            for key, value in params.items():
                 _key = key.split(".")[1:]
                 configurator = system_duplicate
                 try:
@@ -322,8 +264,16 @@ class Application(DataManager):
                     raise ConfigurationException(
                         f"Invalid configurator type for hyperparameter '{key}': {type(configurator)}"
                     )
+
+                def handle_replace(v: any) -> Any:
+                    if v == "<system.key>":
+                        return system_key
+                    return v
+
+                value = handle_replace(value)
+
                 configurations = configurator.configs
-                configurations[_key[0]] = parameter
+                configurations[_key[0]] = value
                 configurations.write()
                 if configurations.enabled:
                     configurator.update(configurations)
