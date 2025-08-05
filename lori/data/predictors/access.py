@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any, Collection, Optional, TypeVar
 
 from lori.core import Configurations, Directory, Registrator, RegistratorAccess, RegistratorContext, ResourceException
-from lori.data import Channel, Channels
+from lori.data import Channels
 from lori.data.predictors.core import _Predictor
 from lori.util import get_context
 
@@ -56,6 +56,3 @@ class PredictorAccess(RegistratorAccess[P]):
             includes=_Predictor.INCLUDES,
             **kwargs,
         )
-
-    def add(self, channel: Channel, **configs: Any) -> None:
-        pass

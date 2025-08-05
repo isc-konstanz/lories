@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.predictors.dummy
-~~~~~~~~~~~~~~~~~~~~~
+lori.data.predictors.virtual
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -15,8 +15,8 @@ from lori.typing import TimestampType
 
 
 # noinspection PyShadowingBuiltins
-@register_predictor_type("dummy")
-class DummyPredictor(Predictor):
+@register_predictor_type("virtual")
+class VirtualPredictor(Predictor):
     def predict(
         self,
         resources: Resources,

@@ -27,7 +27,7 @@ from .predictor import Predictor  # noqa: F401
 
 import importlib
 
-for import_predictor in ["dummy"]:
+for import_predictor in ["virtual"]:
     try:
         importlib.import_module(f".{import_predictor}", "lori.data.predictors")
 

@@ -34,6 +34,7 @@ class Channel(Resource):
         "logger",
         "connector",
         "converter",
+        "predictor",
         "replicator",
         "replication",
         "retention",
@@ -317,6 +318,7 @@ class Channel(Resource):
         _build_registrator("converter")
         _build_registrator("connector")
         _build_registrator("connector", "logger")
+        _build_registrator("predictor")
         return configs
 
     @staticmethod

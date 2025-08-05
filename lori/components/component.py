@@ -55,9 +55,6 @@ class Component(_Component):
 
     def _on_configure(self, configs: Configurations) -> None:
         super()._on_configure(configs)
-        self.__predictors.load(configure=False, sort=False)
-        self.__predictors.sort()
-        self.__predictors.configure()
 
         self.__converters.load(configure=False, sort=False)
         self.__converters.sort()
@@ -66,6 +63,10 @@ class Component(_Component):
         self.__connectors.load(configure=False, sort=False)
         self.__connectors.sort()
         self.__connectors.configure()
+
+        self.__predictors.load(configure=False, sort=False)
+        self.__predictors.sort()
+        self.__predictors.configure()
 
         self.__components.load(configure=False, sort=False)
         self.__components.sort()

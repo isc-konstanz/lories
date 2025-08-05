@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.connectors.dummy
-~~~~~~~~~~~~~~~~~~~~~
+lori.connectors.virtual
+~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -19,8 +19,8 @@ from lori.typing import TimestampType
 
 
 # noinspection PyShadowingBuiltins
-@register_connector_type("dummy", "random")
-class DummyConnector(Connector):
+@register_connector_type("virtual", "dummy", "random")
+class VirtualConnector(Connector):
     _data: pd.Series
 
     def connect(self, resources: Resources) -> None:
