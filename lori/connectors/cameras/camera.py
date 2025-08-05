@@ -10,8 +10,8 @@ from time import sleep, time
 from typing import Iterable
 
 import pandas as pd
+from lori.connectors import ConnectionException, Connector
 from lori.core import Resources
-from lori.connectors import Connector, ConnectionException
 
 
 class CameraConnector(Connector):
@@ -19,7 +19,7 @@ class CameraConnector(Connector):
         # TODO: Wrap read_frame() and cache latest frame to only read if frame is older than a second
         data = self.read_frame()
         timestamp = pd.Timestamp.now(tz="UTC").floor(freq="s")
-        return pd.DataFrame(data=[data]*len(resources), index=[timestamp], columns=list(resources.ids))
+        return pd.DataFrame(data=[data] * len(resources), index=[timestamp], columns=list(resources.ids))
 
     @abstractmethod
     def read_frame(self) -> bytes: ...

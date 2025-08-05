@@ -15,7 +15,7 @@ import tempfile
 from collections import OrderedDict
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Collection, Iterable, List, Mapping, MutableMapping, Optional
+from typing import Any, Collection, Iterable, Iterator, List, Mapping, MutableMapping, Optional
 
 import pandas as pd
 from lori.core import ResourceException, ResourceUnavailableException
@@ -119,6 +119,12 @@ class Configurations(MutableMapping[str, Any]):
         for key in keys:
             del self.__configs[key]
 
+    def pop(self, key: str, default: Any = None) -> Any:
+        value = self._get(key, default)
+        if key in self.__configs:
+            self.remove(key)
+        return value
+
     def __setitem__(self, key: str, value: Any) -> None:
         self.set(key, value)
 
@@ -162,7 +168,10 @@ class Configurations(MutableMapping[str, Any]):
     def get_date(self, key: str, default: TimestampType = None, **kwargs) -> pd.Timestamp:
         return to_date(self._get(key, default), **kwargs)
 
-    def __iter__(self):
+    def __contains__(self, key: str) -> bool:
+        return key in self.__configs
+
+    def __iter__(self) -> Iterator[str]:
         return iter(self.__configs)
 
     def __len__(self) -> int:
@@ -228,9 +237,9 @@ class Configurations(MutableMapping[str, Any]):
     def __parse_line(self, key, value: Any) -> str:
         if is_bool(value):
             value = str(value).lower()
-        if "\\" in value:
-            value = value.translate(str.maketrans({"\\": r"\\"}))
-        if isinstance(value, str):
+        elif isinstance(value, str):
+            if "\\" in value:
+                value = value.translate(str.maketrans({"\\": r"\\"}))
             value = f'"{value}"'
         return f"{key} = {value}\n"
 
@@ -348,6 +357,16 @@ class Configurations(MutableMapping[str, Any]):
         section_dirs.conf = self._sections_dir
         section_configs = Configurations(section_name, section_dirs, configs)
         section_configs._load(require=False)
+        return section_configs
+
+    def pop_section(
+        self,
+        section: str,
+        defaults: Optional[Mapping[str, Any]] = None,
+    ) -> Configurations:
+        section_configs = self.get_section(section, defaults=defaults)
+        if section in self.__configs:
+            self.remove(section)
         return section_configs
 
     # noinspection PyTypeChecker

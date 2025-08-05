@@ -7,23 +7,19 @@ lori.application.main
 """
 
 from __future__ import annotations
-from collections.abc import Iterable
 
 import sys
 import traceback
-from collections import OrderedDict
-from typing import Any, Collection, Dict, Optional, OrderedDict, Type
+from typing import Collection, Optional, Type
 
-import numpy as np
 import pandas as pd
-import re
-
 from lori import Settings, System
 from lori.application import Interface
-from lori.core import ConfigurationException, Configurations, Configurator, Context, Registrator, RegistratorContext
 from lori.connectors import Database
+from lori.core import Configurations, Registrator, RegistratorContext
 from lori.data.manager import DataManager
 from lori.simulation import Results
+from lori.simulation.comparisons import Comparison, Comparisons
 from lori.typing import TimestampType
 from lori.util import slice_range, to_timedelta
 
@@ -38,163 +34,18 @@ class Application(DataManager):
         app.configure(settings, factory)
         return app
 
-    def _load_hyper_systems(self, configs: Configurations, *systems: System) -> Collection[System]:
-        # noinspection PyShadowingBuiltins, PyShadowingNames
-        def _load_static_parameters(
-                configs: Configurations | dict,
-                context: Optional[str] = None,
-        ) -> Dict[str, Any]:
-            hyper_parameters = OrderedDict[str, Any]()
-            for key, value in configs.items():
-                id = f"{context}.{key}" if context else key
-                if isinstance(value, Configurations):
-                    hyper_parameters.update(_load_static_parameters(value, id))
-                else:
-                    hyper_parameters[id] = value
-            return hyper_parameters
-
-        # noinspection PyShadowingBuiltins, PyShadowingNames
-        def _convert_ranges(value: any) -> any:
-            if isinstance(value, str):
-                #TODO: use full_match instead of match?
-
-                i_range_pattern = r"<range\(\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)>"
-                i_range_match = re.match(i_range_pattern, value)
-                if i_range_match:
-                    start, stop, step = map(int, i_range_match.groups())
-                    value = list(range(start, stop, step))
-                    return  value  # Return unchanged if no match
-
-                f_range_pattern = r"<range\(\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*\)>"
-                f_range_match = re.match(f_range_pattern, value)
-                if f_range_match:
-                    start, stop, step = f_range_match.groups()
-                    value = np.arange(float(start), float(stop), float(step)).tolist()
-                    return value
-
-                linspace_patters = r"<linspace\(\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d+)\s*\)>"
-                linspace_match = re.match(linspace_patters, value)
-                if linspace_match:
-                    start, stop, count = linspace_match.groups()
-                    value = np.linspace(float(start), float(stop), int(count)).tolist()
-                    return value
-
-            return value
-
-        def _convert_hyperparameters(
-                component_id: str,
-                hyperparameters: Dict,
-                static_parameters: Dict,
-                context: str) -> Dict:
-            name = ", ".join(f"{k.title()}={v}" for k, v in hyperparameters.items())
-            name = f"{component_id} ({name})"
-            _hyperparameters = _load_static_parameters(hyperparameters, context=context)
-            parameters = static_parameters.copy()
-            parameters.update(_hyperparameters)
-            return {name: parameters}
-
-
-        # noinspection PyShadowingBuiltins, PyShadowingNames
-        def _load_group_parameters(configs: Configurations) -> Dict[str, any]:
-            system_id = configs.pop("system")
-            registrator = configs.pop("registrator", default="components")
-            key = configs.key
-
-            mesh = configs.pop("mesh", default=False)
-
-            hyper_names = configs.pop("hyperparameters", default=[])
-            hyperparameters = {name: _convert_ranges(configs.pop(name)) for name in hyper_names}
-
-            static_parameters = _load_static_parameters(configs, context=f"{system_id}.{registrator}.{key}")
-
-            parameters = {}
-            if len(hyperparameters) == 0:
-                parameters.update({key: static_parameters.copy()})
-
-            elif not mesh:
-                if not all(isinstance(v, list) for v in hyperparameters.values()):
-                    raise ConfigurationException("Hyperparameters must be lists if meshgrid is False")
-                lengths = {len(v) for v in hyperparameters.values()}
-                if len(lengths) > 1:
-                    raise ConfigurationException("Hyperparameters must have the same length if meshgrid is False")
-
-                for index in range(next(iter(lengths))):
-                    _hyperparameters = {k: v[index] for k, v in hyperparameters.items()}
-                    para = _convert_hyperparameters(key, _hyperparameters, static_parameters, context=f"{system_id}.{registrator}.{key}")
-                    parameters.update(para)
-
-            else:
-                meshgrid = np.meshgrid(*[np.array(v) for v in hyperparameters.values()], indexing="ij")
-                meshgrid = np.array(meshgrid, dtype=object).reshape(len(hyperparameters.keys()), -1).T
-
-                for index in range(len(meshgrid)):
-                    _hyperparameters = {k: v for k, v in zip(hyperparameters.keys(), meshgrid[index])}
-                    para = _convert_hyperparameters(key, _hyperparameters, static_parameters, context=f"{system_id}.{registrator}.{key}")
-                    parameters.update(para)
-
-            return parameters
-
-        def _mesh_group(group: list[Dict], context: list) -> list:
-            if len(group) == 0:
-                name = ", ".join([key for key, value in context])
-                parameters = OrderedDict()
-                for key, value in context:
-                    parameters.update(value)
-
-                return [{name: parameters}]
-
-            else:
-                results = []
-                for g in group[0].items():
-                    results.extend(_mesh_group(group[1:], [*context, g]))  # flatten
-                return results
-
-        mesh_group_names = configs.get("mesh_groups", default=[])
-        groups = configs.get_section("group", defaults={})
-
-        base_parameters = _load_static_parameters(configs.get_section("static", defaults={}))
-        group_parameters = {name: _load_group_parameters(group) for name, group in groups.items()}
-
-        for mesh_group_name in mesh_group_names:
-            if mesh_group_name not in groups:
-                raise ConfigurationException(f"Mesh group '{mesh_group_name}' not found in groups")
-
-        mesh_groups = []
-        non_mesh_groups = []
-        for group in groups:
-            if group in mesh_group_names:
-                mesh_groups.append(group_parameters[group])
-            else:
-                non_mesh_groups.append(group_parameters[group])
-
-        scenarios = {"Reference": OrderedDict()}
-        if len(mesh_groups) >= 2:
-            meshed = _mesh_group(mesh_groups, [])
-            [scenarios.update({k: v}) for d in meshed for k, v in d.items()]
-
-        [scenarios.update({k: v}) for d in non_mesh_groups for k, v in d.items()]
-
-        hyper_systems = []
-        for name, parameters in scenarios.items():
-            params = base_parameters.copy()
-            params.update(parameters)
-            scenarios.update({name: params}) #TODO: fix
-
+    def load_comparisons(self, configs: Configurations, *systems: System) -> Collection[System]:
+        comparisons = Comparisons.load(configs)
+        comparison_systems = []
         for system in systems:
-            hyper_systems.extend(
-                self._load_hyper_system(
-                    system,
-                    scenarios,
-                )
-            )
-
-        return hyper_systems
+            comparison_systems.extend(self._load_comparison_system(system, comparisons.from_system(system)))
+        return comparison_systems
 
     # noinspection SpellCheckingInspection
-    def _load_hyper_system(
-            self,
-            system: System,
-            scenarios: dict[str, dict],
+    def _load_comparison_system(
+        self,
+        system: System,
+        comparisons: Collection[Comparison],
     ) -> Collection[System]:
         def _clear_system() -> None:
             self.converters._remove(*[c for c in self.converters if c.split(".")[0] == system.id])
@@ -202,7 +53,7 @@ class Application(DataManager):
             self.components._remove(*[c for c in self.components if c.split(".")[0] == system.id])
             self._remove(*[c.id for c in self.channels if c.id.split(".")[0] == system.id])
 
-        if len(scenarios) == 0:
+        if len(comparisons) == 0:
             self._logger.warning(f"No hyperparameters configured for system '{system.name}'. Will be removed")
             _clear_system()
             return []
@@ -210,26 +61,12 @@ class Application(DataManager):
         simulation_dir = system.configs.dirs.data.joinpath(".systems")
         if not simulation_dir.exists():
             simulation_dir.mkdir(parents=True, exist_ok=True)
-        
+
         systems = []
-
-        for index, (name, params) in enumerate(scenarios.items()):
-            replace_map = {
-                " ": "_",
-                "=": "_",
-                "(": "",
-                ")": "",
-                ",": "",
-                ".": "f"
-            }
-            key = name.lower()
-            for old, new in replace_map.items():
-                key = key.replace(old, new)
-
-            system_key = f"{system.key}_{key}"
-            system_path = f"{system.key}_sim_{index:03d}"
-            system_name = f"{system.name} ({name})"
-            system_dir = simulation_dir.joinpath(system_path)
+        for comparison in comparisons:
+            system_key = f"{system.key}_{comparison.key}"
+            system_name = f"{system.name} ({comparison.name})"
+            system_dir = simulation_dir.joinpath(system_key)
             system_dirs = system.configs.dirs.copy()
             system_dirs.data = system_dir
             system_dirs.conf = system_dir.joinpath("conf")
@@ -238,46 +75,13 @@ class Application(DataManager):
             system_configs["name"] = system_name
             system_configs.write()
 
-            self._logger.info(f"Preparing hyperparameter system '{system_name}': {system_key}")
+            self._logger.info(f"Preparing comparison system '{system_name}': {system_key}")
             system_duplicate = system.duplicate(
                 key=system_key,
                 name=system_name,
                 configs=system_configs,
             )
-
-            # noinspection PyUnresolvedReferences, PyArgumentList, PyShadowingNames
-            def _get_member(_object: Any, _key: str) -> Any:
-                if not isinstance(_object, Context):
-                    return getattr(_object, _key)
-                return _object.get(_key)
-
-            for key, value in params.items():
-                _key = key.split(".")[1:]
-                configurator = system_duplicate
-                try:
-                    while len(_key) > 1:
-                        configurator = _get_member(configurator, _key.pop(0))
-
-                except (AttributeError, KeyError) as e:
-                    raise ConfigurationException(f"Invalid hyperparameter '{key}' for key {e}")
-                if not isinstance(configurator, Configurator):
-                    raise ConfigurationException(
-                        f"Invalid configurator type for hyperparameter '{key}': {type(configurator)}"
-                    )
-
-                def handle_replace(v: any) -> Any:
-                    if v == "<system.key>":
-                        return system_key
-                    return v
-
-                value = handle_replace(value)
-
-                configurations = configurator.configs
-                configurations[_key[0]] = value
-                configurations.write()
-                if configurations.enabled:
-                    configurator.update(configurations)
-
+            comparison.write(system_duplicate)
             systems.append(system_duplicate)
             self._components._add(system_duplicate)
         self._components.sort()
@@ -395,17 +199,22 @@ class Application(DataManager):
         summary = []
         systems = self._components.get_all(System)
 
-        if "comparison" in simulation:
-            systems = self._load_hyper_systems(simulation["comparison"], *systems)
+        if "comparisons" in simulation:
+            systems = self.load_comparisons(simulation["comparisons"], *systems)
 
         def _has_no_system(registrator: Registrator) -> bool:
+            if any(registrator.id == s.id for s in systems):
+                return False
             return isinstance(registrator.context, RegistratorContext)
+
         try:
             self.activate(_has_no_system)
 
             for system in systems:
+
                 def _is_system(registrator) -> bool:
                     return registrator.id.split(".")[0] == system.id
+
                 try:
                     self._connect(*self._connectors.filter(_is_system))
                     self._activate(*self._components.filter(_is_system))
@@ -453,7 +262,7 @@ class Application(DataManager):
             system,
             database,
             configs.get_section("data"),
-            total=len(slices)
+            total=len(slices),
         ) as results:
             results.durations.start("Simulation")
             try:
