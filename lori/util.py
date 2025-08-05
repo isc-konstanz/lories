@@ -330,7 +330,7 @@ def to_bool(value: str | bool) -> Optional[bool]:
             return False
     if issubclass(type(value), (np.bool, bool, int)):
         return bool(value)
-    raise TypeError(f"Invalid bool type: {type(value)}")
+    raise TypeError(f"Invalid bool: {value}")
 
 
 # noinspection SpellCheckingInspection
