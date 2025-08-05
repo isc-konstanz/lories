@@ -143,6 +143,9 @@ class System(Component):
             raise WeatherUnavailableException(f"System '{self.name}' has no weather configured")
         return weather
 
+    def has_tariff(self) -> bool:
+        return self.components.has_type(Tariff)
+    
     # noinspection PyTypeChecker
     @property
     def tariff(self) -> Tariff:
