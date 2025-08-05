@@ -54,7 +54,7 @@ class InfluxDatabase(Database):
             vars["port"] = self.port
             vars["org"] = self.org
             vars["bucket"] = self.bucket
-            vars["token"] = f"...{self.token[-12:]}"
+            vars["token"] = f"...{self.token[-6:]}"
             vars["ssl"] = self.ssl_verify
             vars["ssl_verify"] = self.ssl_verify
             vars["timeout"] = self.timeout
