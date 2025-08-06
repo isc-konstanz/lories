@@ -157,13 +157,31 @@ class Resource(Entity):
     def _copy_configs(self) -> Dict[str, Any]:
         return OrderedDict(**self.__configs)
 
-    def copy(self) -> Resource:
-        return type(self)(
-            id=self.id,
-            key=self.key,
-            name=self.name,
-            group=self.group,
-            unit=self.unit,
-            type=self.type,
+    def _copy_args(self) -> Dict[str, Any]:
+        return {
+            "id": self._id,
+            **self.to_configs(),
+        }
+
+    def copy(self):
+        return self.duplicate()
+
+    def duplicate(self, **changes):
+        arguments = self._copy_args()
+        arguments.update(changes)
+        return super().duplicate(**arguments)
+
+    def to_list(self):
+        from lori.core import Resources
+
+        return Resources([self])
+
+    def to_configs(self) -> Dict[str, Any]:
+        return {
+            "key": self._key,
+            "name": self._name,
+            "group": self._group,
+            "unit": self._unit,
+            "type": self._type,
             **self._copy_configs(),
-        )
+        }

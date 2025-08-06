@@ -23,6 +23,7 @@ from lori.util import get_members
 class ConfiguratorMeta(ABCMeta):
     def __call__(cls, *args, **kwargs):
         configurator = super().__call__(*args, **kwargs)
+        cls._wrap_method(configurator, "duplicate")
         cls._wrap_method(configurator, "configure")
         cls._wrap_method(configurator, "update")
 
@@ -58,6 +59,12 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
 
     def __hash__(self) -> int:
         return hash(id(self))
+
+    def __copy__(self):
+        return self.copy()
+
+    def __replace__(self, **changes):
+        return self.duplicate(**changes)
 
     @classmethod
     def _assert_configs(cls, configs: Optional[Configurations]) -> Optional[Configurations]:
@@ -169,3 +176,38 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
 
     def _on_update(self, configs: Configurations) -> None:
         pass
+
+    # noinspection PyUnresolvedReferences, PyTypeChecker
+    def copy(self):
+        try:
+            copier = super().copy
+        except AttributeError:
+            copier = self.duplicate
+        return copier()
+
+    # noinspection PyUnresolvedReferences
+    def duplicate(self, configs: Optional[Configurations] = None, **changes):
+        if configs is None:
+            configs = self.__configs.copy()
+        try:
+            duplicator = super().duplicate
+        except AttributeError:
+            duplicator = type(self)
+        return duplicator(configs=configs, **changes)
+
+    # noinspection PyUnresolvedReferences
+    @wraps(duplicate, updated=())
+    def _do_duplicate(self, configs: Configurations, **changes):
+        if configs is None:
+            configs = self.__configs.copy()
+        self._at_duplicate(configs=configs, **changes)
+
+        duplicate = self._run_duplicate(configs=configs, **changes)
+        if configs.enabled:
+            duplicate.configure(configs)
+        self._on_duplicate(duplicate)
+        return duplicate
+
+    def _at_duplicate(self, **changes) -> None: ...
+
+    def _on_duplicate(self, configurator: Configurator) -> None: ...

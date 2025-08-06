@@ -13,6 +13,13 @@ from collections.abc import Mapping
 from pathlib import Path, PosixPath, WindowsPath
 from typing import Dict, Optional
 
+# FIXME: Remove this once Python >= 3.9 is a requirement
+try:
+    from typing import LiteralString
+
+except ImportError:
+    from typing_extensions import LiteralString
+
 
 class Directories:
     SECTION = "directories"
@@ -47,6 +54,12 @@ class Directories:
     def __str__(self) -> str:
         attrs = ["conf", "data", "tmp", "log", "lib"]
         return f"[{self.SECTION}]\n" + "\n".join(f'{attr} = "{str(getattr(self, attr))}"' for attr in attrs)
+
+    def __copy__(self) -> Directories:
+        return self.copy()
+
+    def __deepcopy__(self, memo) -> Directories:
+        return self.__copy__()
 
     # noinspection PyProtectedMember
     def to_dict(self) -> Dict[str, Optional[str]]:
@@ -109,8 +122,8 @@ class Directories:
 
     # noinspection PyShadowingBuiltins
     @conf.setter
-    def conf(self, dir: str | Directory) -> None:
-        if isinstance(dir, Directory):
+    def conf(self, dir: str | Path) -> None:
+        if isinstance(dir, Path):
             dir = str(dir)
         self._conf = Directory(dir, default="conf", base=self.data)
 
@@ -160,14 +173,14 @@ class Directory(Path):
             super().__init__()
 
     @staticmethod
-    def __parse_base(base: Optional[str | Path]) -> Path:
+    def __parse_base(base: Optional[LiteralString | str | Path]) -> Path:
         if base is None or (isinstance(base, Directory) and base.is_default()):
             base = Path.cwd()
-        elif not isinstance(base, Path):
+        elif isinstance(base, Directory) or not isinstance(base, Path):
             base = Path(base)
         # FIXME: Remove this once Python >= 3.9 is a requirement
-        # if dir.is_relative_to("~"):
-        if str(dir).startswith("~"):
+        # if base.is_relative_to("~"):
+        if str(base).startswith("~"):
             base = base.expanduser()
         if not base.is_absolute():
             base = base.absolute()
@@ -190,15 +203,25 @@ class Directory(Path):
         return dir
 
     @staticmethod
-    def __parse(base: Path, path: Optional[Path], default: Optional[str] = None) -> str:
+    def __parse(base: Path, path: Optional[Path], default: Optional[str] = None) -> Path:
         if path is None:
-            path = default
+            path = Path(default)
         if path is not None and not os.path.isabs(path):
-            path = os.path.join(base, path)
-        return str(path)
+            path = base.joinpath(path)
+        return path
 
     def is_default(self) -> bool:
+        if self.default is None:
+            return False
         return self._dir is None or str(self) == os.path.join(self._base, self.default)
+
+    # noinspection SpellCheckingInspection
+    def joinpath(self, *paths: LiteralString | str | Path) -> Directory:
+        _dir = self.__parse(self._base, self._dir, self.default)
+        return Directory(_dir.joinpath(*paths), default=self.default, base=self._base)
+
+    def relative_to(self, path: LiteralString | str | Path, *_, walk_up=False) -> Path:
+        return self.__parse(self._base, self._dir, self.default).relative_to(path)
 
 
 class PosixDirectory(Directory, PosixPath):

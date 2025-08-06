@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 from lori import ConfigurationException
 from lori.core import ResourceException
+from lori.util import to_bool, update_recursive
 
 
 class ChannelConverter:
@@ -92,6 +93,14 @@ class ChannelConverter:
     def to_json(self, value: Any) -> str:
         return self._converter.to_json(value)
 
+    def to_configs(self) -> Dict[str, Any]:
+        configs = {
+            "converter": self._converter.key,
+            "enabled": self.enabled,
+            **self._copy_configs(),
+        }
+        return configs
+
     def to_series(self, value: Any, timestamp: Optional[pd.Timestamp] = None, name: Optional[str] = None) -> pd.Series:
         return self._converter.to_series(value, timestamp=timestamp, name=name)
 
@@ -112,6 +121,28 @@ class ChannelConverter:
 
     def _copy_configs(self) -> Dict[str, Any]:
         return OrderedDict(**self._get_configs())
+
+    def __update_configs(self, configs: Dict[str, Any]) -> None:
+        update_recursive(self.__configs, configs)
+
+    # noinspection PyShadowingBuiltins
+    def _update(
+        self,
+        converter: Optional[str | ChannelConverter] = None,
+        enabled: Optional[str | bool] = None,
+        **configs: Any,
+    ) -> None:
+        if converter is not None:
+            if isinstance(converter, str):
+                if self._converter.key != converter.split(".")[-1]:
+                    raise ConfigurationException(f"Unable to update channel converter from key '{converter}'")
+            elif not isinstance(converter, ChannelConverter):
+                raise ConfigurationException(f"Unable to update channel converter to invalid type '{type(converter)}'")
+            else:
+                self._converter = converter
+        if enabled is not None:
+            self.enabled = to_bool(enabled)
+        self.__update_configs(configs)
 
     def copy(self) -> ChannelConverter:
         configs = self._copy_configs()
