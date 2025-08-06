@@ -160,12 +160,7 @@ class Directory(Path):
         dir = Directory.__parse_dir(base, *dirs, default=default)
         return super().__new__(cls, Directory.__parse(base, dir, default), base=base, default=default)
 
-    def __init__(
-        self,
-        *dirs: LiteralString | str | Path,
-        base: Optional[LiteralString | str | Path] = None,
-        default: Optional[str] = None,
-    ) -> None:
+    def __init__(self, *dirs: str, base: Optional[str | Directory] = None, default: Optional[str] = None):
         self.default = default
         self._base = Directory.__parse_base(base)
         self._dir = Directory.__parse_dir(self._base, *dirs, default=default)

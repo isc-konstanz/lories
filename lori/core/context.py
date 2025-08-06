@@ -87,7 +87,7 @@ class Context(ABC, MutableMapping[str, E], Generic[E]):
         for __object in __objects:
             if isinstance(__object, str):
                 del self.__map[__object]
-            if isinstance(__object, Entity):
+            elif isinstance(__object, Entity):
                 del self.__map[__object.id]
 
     def sort(self):

@@ -97,7 +97,7 @@ class Application(DataManager):
         self._interface = Interface(self, settings.get_section(Interface.SECTION))
 
     # noinspection PyProtectedMember, PyTypeChecker, PyMethodOverriding
-    def configure(self, settings: Settings, factory: Type[System], **_) -> None:
+    def configure(self, settings: Settings, factory: Type[System]) -> None:
         super().configure(settings)
         self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
         components = []

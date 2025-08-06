@@ -42,7 +42,6 @@ class Component(_Component):
 
     def _at_configure(self, configs: Configurations) -> None:
         super()._at_configure(configs)
-        # TODO: Implement configurator.update() method to replace this hack
         self.__data.configure(configs.get_section(DataAccess.SECTION, ensure_exists=True))
 
     def _on_configure(self, configs: Configurations) -> None:
