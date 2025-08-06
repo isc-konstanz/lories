@@ -8,41 +8,39 @@ lori.components.tariff.static
 
 from __future__ import annotations
 
+from typing import Optional
+
 import pandas as pd
-from lori import Channel, Configurations, Constant
-from lori.components.tariff import Tariff, TariffProvider, register_tariff_type
-from lori.connectors import DummyConnector
+from lori import Configurations
+from lori.components import TariffException
+from lori.components.tariff import Tariff, register_tariff_type
+from lori.typing import TimestampType
 
 
 # noinspection SpellCheckingInspection
 @register_tariff_type("static")
-class StaticProvider(TariffProvider):
-    PRICE_STATIC = Constant(float, "tariff_static", name="Static Tariff Price", unit="ct/kWh")
+class StaticProvider(Tariff):
+    _price_import: float
+    _price_export: float
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
+        self._price_import = configs.get_float("import")
+        self._price_export = configs.get_float("export", default=0)
 
-        static_connector = DummyConnector(
-            self, 
-            key="static_connnector", 
-            name="Static Tariff Connector", 
-            configs=configs
+    def get(
+        self,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
+        freq: str = "15min",
+        **kwargs,
+    ) -> pd.DataFrame:
+        if any(t is None for t in [start, end]):
+            raise TariffException("Unable to generate static tariff for incomplete or missing time range")
+        return pd.DataFrame(
+            index=pd.date_range(start=start, end=end, freq=freq),
+            data={
+                Tariff.PRICE_IMPORT: self._price_import,
+                Tariff.PRICE_EXPORT: self._price_export,
+            },
         )
-
-        self.connectors.add(static_connector)
-        self.data.add(
-            StaticProvider.PRICE_STATIC,
-            aggregate="mean",
-            connector=static_connector.id,
-            logger={"enabled": False},
-        )
-
-    def activate(self) -> None:
-        super().activate()
-        self.data.register(self._on_tariff_received, StaticProvider.PRICE_STATIC, unique=False)
-
-    def _on_tariff_received(self, data: pd.DataFrame) -> None:
-        timestamp = data.index[0]
-        import_data = data[StaticProvider.PRICE_STATIC]
-        import_channel: Channel = self.data.get(Tariff.PRICE_IMPORT)
-        import_channel.set(timestamp, import_data)
