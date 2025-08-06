@@ -27,7 +27,7 @@ class ChannelConnector:
     # noinspection PyShadowingBuiltins
     def __init__(self, connector, **configs: Any) -> None:
         if "connector" in configs:
-            raise ConfigurationException("Invalid channel connector configurations 'connector'")
+            raise ConfigurationException("Invalid channel connector configuration 'connector'")
         self.__configs = OrderedDict(configs)
         self._connector = self._assert_connector(connector)
 

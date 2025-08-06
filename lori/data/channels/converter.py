@@ -12,6 +12,7 @@ from collections import OrderedDict
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
+from lori import ConfigurationException
 from lori.core import ResourceException
 
 
@@ -20,6 +21,8 @@ class ChannelConverter:
 
     # noinspection PyShadowingBuiltins
     def __init__(self, converter, **configs: Any) -> None:
+        if "converter" in configs:
+            raise ConfigurationException("Invalid channel converter configuration 'converter'")
         self.__configs = OrderedDict(configs)
         self._converter = self._assert_converter(converter)
 
@@ -68,8 +71,12 @@ class ChannelConverter:
             f"{k}={v}" for k, v in self._get_vars().items()
         )
 
-    def __call__(self, value: Any) -> Any:
-        return self._converter.to_dtype(value, **self._get_configs())
+    def __call__(self, data: Any) -> Any:
+        converter_args = self._get_configs()
+        if isinstance(data, pd.Series):
+            converted_data = data.apply(self._converter.convert, **converter_args)
+            return converted_data.apply(self._converter.to_dtype, **converter_args)
+        return self._converter.to_dtype(data, **converter_args)
 
     @property
     def id(self) -> str:

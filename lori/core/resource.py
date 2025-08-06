@@ -20,10 +20,7 @@ from lori.util import parse_type, update_recursive, validate_key
 class Resource(Entity):
     __configs: OrderedDict[str, Any]
 
-    _key: str
-    _name: str
     _group: str
-
     _unit: Optional[str]
     _type: Type[Any]
 
@@ -111,14 +108,6 @@ class Resource(Entity):
 
     def __str__(self) -> str:
         return f"{type(self).__name__}:\n\t" + "\n\t".join(f"{k}={v}" for k, v in self._get_vars().items())
-
-    @property
-    def key(self) -> str:
-        return self._key
-
-    @property
-    def name(self) -> str:
-        return self._name
 
     def full_name(self, unit: bool = False) -> str:
         name = self.name
