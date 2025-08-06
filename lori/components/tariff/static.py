@@ -19,7 +19,7 @@ from lori.typing import TimestampType
 
 # noinspection SpellCheckingInspection
 @register_tariff_type("static")
-class StaticProvider(Tariff):
+class StaticTariff(Tariff):
     _price_import: float
     _price_export: float
 
