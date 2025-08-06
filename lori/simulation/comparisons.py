@@ -176,7 +176,7 @@ class ComparisonGroup(Mapping[AnyStr, Any]):
                 raise ConfigurationException(
                     "Comparison list parameters must be of the same length or 'mesh' needs to be true"
                 )
-            length = next(iter(lengths))
+            length = next(iter(lengths)) if len(lengths) > 0 else 1
             for group_index in range(length):
                 group_parameters = {k: v[group_index] if isinstance(v, list) else v for k, v in parameters.items()}
                 comparison_key = _substitute_key(key, f"{self.key}_{group_index + 1}", group_parameters)
@@ -303,7 +303,8 @@ def _substitute_parameter(
     replacements: Mapping[AnyStr, Any] = None,
     system: Optional[System] = None,
 ) -> Any:
-    if not isinstance(parameter, str):
+    substitute_pattern = r".*<[\w.]+>.*"
+    if not isinstance(parameter, str) or not re.fullmatch(substitute_pattern, parameter):
         return parameter
 
     if replacements is None:
@@ -316,14 +317,16 @@ def _substitute_parameter(
         )
 
     for search, replacement in replacements.items():
-        if isinstance(replacement, str) and re.match(r".*<.*>.*", replacement):
+        if isinstance(replacement, str) and re.fullmatch(substitute_pattern, replacement):
             continue
-        pattern = f"<{search}>"
-        if pattern == parameter:
-            return replacement
-        if pattern in parameter:
-            return parameter.replace(pattern, str(replacement))
-    if re.match(r".*<.*>.*", parameter):
+        replace_pattern = f"<{search}>"
+        if replace_pattern == parameter:
+            parameter = replacement
+        if replace_pattern in parameter:
+            parameter = parameter.replace(replace_pattern, str(replacement))
+        if not re.fullmatch(substitute_pattern, parameter):
+            break
+    if re.fullmatch(substitute_pattern, parameter):
         raise ConfigurationException(f"Unable to substitute parameter '{parameter}'")
     return parameter
 
