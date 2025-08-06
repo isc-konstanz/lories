@@ -74,6 +74,12 @@ class Component(_Component):
 
         self.__data.load()
 
+    def _at_duplicate(self, **changes) -> None:
+        super()._at_duplicate(**changes)
+        self.converters.duplicate(**changes)
+        self.connectors.duplicate(**changes)
+        self.components.duplicate(**changes)
+
     @property
     def components(self) -> ComponentAccess:
         return self.__components

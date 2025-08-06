@@ -6,6 +6,7 @@ lori.core.configs.toml
 
 """
 
+import re
 from typing import Any, Mapping
 
 try:
@@ -15,5 +16,8 @@ except ModuleNotFoundError:
 
 
 def load_toml(conf_path: str) -> Mapping[str, Any]:
-    with open(conf_path, mode="rb") as conf_file:
-        return toml.load(conf_file)
+    with open(conf_path, mode="r") as conf_file:
+        conf_string = conf_file.read()
+        conf_string = re.sub(r"^;+", "#", conf_string, flags=re.MULTILINE)
+
+        return toml.loads(conf_string)

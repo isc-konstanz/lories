@@ -190,79 +190,6 @@ class Channel(Resource):
         self._value = value
         self._state = state
 
-    # noinspection PyUnresolvedReferences
-    def register(
-        self,
-        function: Callable[[pd.DataFrame], None],
-        how: Literal["any", "all"] = "any",
-        unique: bool = False,
-    ) -> None:
-        self.__context.register(function, self, how=how, unique=unique)
-
-    # noinspection PyUnresolvedReferences
-    def read(
-        self,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
-    ) -> pd.DataFrame:
-        return self.__context.read(self.to_list(), start, end)
-
-    # noinspection PyUnresolvedReferences
-    def write(self, data: pd.DataFrame | pd.Series | Any) -> None:
-        if data is None:
-            raise ResourceException(f"Invalid data to write '{self.id}': {data}")
-        if isinstance(data, pd.Series):
-            data.name = self.id
-            data = data.to_frame()
-        elif not isinstance(data, pd.DataFrame):
-            data = pd.DataFrame(index=[pd.Timestamp.now(tz.UTC).floor(freq="s")], data=[data], columns=[self.id])
-
-        self.__context.write(data, self.to_list())
-
-    # noinspection PyShadowingBuiltins
-    def has_logger(self, *ids: Optional[str]) -> bool:
-        return self.logger.enabled and (any(self.logger.id == id for id in ids) if len(ids) > 0 else True)
-
-    # noinspection PyShadowingBuiltins
-    def has_connector(self, id: Optional[str] = None) -> bool:
-        return self.connector.enabled and (self.connector.id == id if id is not None else True)
-
-    def to_list(self):
-        from lori.data import Channels
-
-        return Channels([self])
-
-    def to_series(self, state: bool = False) -> pd.Series:
-        if not self.is_valid() and state:
-            return pd.Series(data=[self.state], index=[self.timestamp], name=self.key)
-
-        return self.converter.to_series(self.value, self.timestamp, name=self.key)
-
-    # noinspection PyProtectedMember
-    def from_logger(self) -> Channel:
-        channel = self.copy()
-        channel._update(**self.logger._copy_configs())
-        return channel
-
-    def copy(self) -> Channel:
-        channel = Channel(
-            id=self.id,
-            key=self.key,
-            name=self.name,
-            group=self.group,
-            unit=self.unit,
-            type=self.type,
-            context=self.__context,
-            converter=self.converter.copy(),
-            connector=self.connector.copy(),
-            logger=self.logger.copy(),
-            **self._copy_configs(),
-        )
-        channel._timestamp = self._timestamp
-        channel._value = self._value
-        channel._state = self._state
-        return channel
-
     # noinspection PyShadowingBuiltins, PyProtectedMember
     def _update(
         self,
@@ -308,17 +235,17 @@ class Channel(Resource):
     @staticmethod
     # noinspection PyShadowingNames
     def _build_configs(configs: Dict[str, Any]) -> Dict[str, Any]:
-        def _build_registrator(key: str, section: Optional[str] = None) -> None:
+        def _build_wrapper(key: str, section: Optional[str] = None) -> None:
             if section is None:
                 section = key
             if section not in configs:
                 return
             configs[section] = Channel._build_section(configs[section], key)
 
-        _build_registrator("converter")
-        _build_registrator("connector")
-        _build_registrator("connector", "logger")
-        _build_registrator("predictor")
+        _build_wrapper("converter")
+        _build_wrapper("connector")
+        _build_wrapper("connector", "logger")
+        _build_wrapper("predictor")
         return configs
 
     @staticmethod
@@ -329,3 +256,81 @@ class Channel(Resource):
         elif not isinstance(section, Mapping):
             raise ConfigurationException(f"Invalid channel {key} type: " + str(section))
         return dict(section)
+
+    def _copy_args(self) -> Dict[str, Any]:
+        arguments = super()._copy_args()
+        arguments["context"] = self.__context
+        # arguments["processors"] = self.processors.copy()
+        arguments["converter"] = self.converter.copy()
+        arguments["connector"] = self.connector.copy()
+        arguments["logger"] = self.logger.copy()
+
+        return arguments
+
+    def copy(self) -> Channel:
+        channel = super().copy()
+        channel._timestamp = self._timestamp
+        channel._value = self._value
+        channel._state = self._state
+        return channel
+
+    def to_list(self):
+        from lori.data import Channels
+
+        return Channels([self])
+
+    def to_configs(self) -> Dict[str, Any]:
+        configs = super().to_configs()
+        configs["converter"] = self.converter.to_configs()
+        configs["connector"] = self.connector.to_configs()
+        configs["logger"] = self.logger.to_configs()
+        return configs
+
+    def to_series(self, state: bool = False) -> pd.Series:
+        if not self.is_valid() and state:
+            return pd.Series(data=[self.state], index=[self.timestamp], name=self.key)
+
+        return self.converter.to_series(self.value, self.timestamp, name=self.key)
+
+    # noinspection PyProtectedMember
+    def from_logger(self) -> Channel:
+        channel = self.copy()
+        channel._update(**self.logger._copy_configs())
+        return channel
+
+    # noinspection PyShadowingBuiltins
+    def has_logger(self, *ids: Optional[str]) -> bool:
+        return self.logger.enabled and (any(self.logger.id == id for id in ids) if len(ids) > 0 else True)
+
+    # noinspection PyShadowingBuiltins
+    def has_connector(self, id: Optional[str] = None) -> bool:
+        return self.connector.enabled and (self.connector.id == id if id is not None else True)
+
+    # noinspection PyUnresolvedReferences
+    def register(
+        self,
+        function: Callable[[pd.DataFrame], None],
+        how: Literal["any", "all"] = "any",
+        unique: bool = False,
+    ) -> None:
+        self.__context.register(function, self, how=how, unique=unique)
+
+    # noinspection PyUnresolvedReferences
+    def read(
+        self,
+        start: Optional[TimestampType] = None,
+        end: Optional[TimestampType] = None,
+    ) -> pd.DataFrame:
+        return self.__context.read(self.to_list(), start, end)
+
+    # noinspection PyUnresolvedReferences
+    def write(self, data: pd.DataFrame | pd.Series | Any) -> None:
+        if data is None:
+            raise ResourceException(f"Invalid data to write '{self.id}': {data}")
+        if isinstance(data, pd.Series):
+            data.name = self.id
+            data = data.to_frame()
+        elif not isinstance(data, pd.DataFrame):
+            data = pd.DataFrame(index=[pd.Timestamp.now(tz.UTC).floor(freq="s")], data=[data], columns=[self.id])
+
+        self.__context.write(data, self.to_list())

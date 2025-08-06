@@ -27,7 +27,7 @@ class ChannelConnector:
     # noinspection PyShadowingBuiltins
     def __init__(self, connector, **configs: Any) -> None:
         if "connector" in configs:
-            raise ConfigurationException("Invalid channel connector configurations 'connector'")
+            raise ConfigurationException("Invalid channel connector configuration 'connector'")
         self.__configs = OrderedDict(configs)
         self._connector = self._assert_connector(connector)
 
@@ -97,6 +97,14 @@ class ChannelConnector:
 
         return isinstance(self._connector, Database) if self.enabled else False
 
+    def to_configs(self) -> Dict[str, Any]:
+        configs = {
+            "connector": self._connector.key if self._connector else None,
+            "enabled": self.enabled,
+            **self._copy_configs(),
+        }
+        return configs
+
     def get(self, attr: str, default: Optional[Any] = None) -> Any:
         return self._get_vars().get(attr, default)
 
@@ -122,11 +130,18 @@ class ChannelConnector:
     # noinspection PyShadowingBuiltins
     def _update(
         self,
-        enabled: Optional[str, bool] = None,
+        connector: Optional[str | ChannelConnector] = None,
+        enabled: Optional[str | bool] = None,
         **configs: Any,
     ) -> None:
-        if "connector" in configs:
-            raise ConfigurationException("Invalid channel connector configurations 'connector'")
+        if connector is not None:
+            if isinstance(connector, str):
+                if self._connector is None or self._connector.key != connector.split(".")[-1]:
+                    raise ConfigurationException(f"Unable to update channel connector from key '{connector}'")
+            elif not isinstance(connector, ChannelConnector):
+                raise ConfigurationException(f"Unable to update channel connector to invalid type '{type(connector)}'")
+            else:
+                self._connector = connector
         if enabled is not None:
             self.enabled = to_bool(enabled)
         self.__update_configs(configs)

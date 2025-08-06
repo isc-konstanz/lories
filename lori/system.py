@@ -9,55 +9,20 @@ lori.system
 from __future__ import annotations
 
 import os
-from shutil import copytree, ignore_patterns
 from typing import Any, List, Optional
 
 import pandas as pd
-from lori import ConfigurationException, Configurations, Settings
+from lori import Configurations
 from lori.components import Component, ComponentContext, Weather, WeatherUnavailableException
 from lori.location import Location, LocationUnavailableException
 from lori.simulation import Results
 from lori.typing import TimestampType
-from lori.util import validate_key
 
 
 class System(Component):
     SECTION: str = "system"
 
     _location: Optional[Location] = None
-
-    # noinspection PyShadowingBuiltins
-    @classmethod
-    def copy(cls, settings: Settings) -> bool:
-        configs = Configurations.load(f"{cls.__name__.lower()}.conf", **settings.dirs.to_dict())
-        if "key" in configs:
-            key = validate_key(configs["key"])
-        elif "name" in configs:
-            key = validate_key(configs["name"])
-            configs["key"] = key
-        else:
-            raise ConfigurationException("Invalid configuration, missing specified system name")
-
-        configs.dirs._data = os.path.join(configs.dirs.data, key)
-
-        if os.path.isdir(configs.dirs.data):
-            return False
-        os.makedirs(configs.dirs.data, exist_ok=True)
-
-        copytree(
-            settings.dirs.conf,
-            configs.dirs.conf,
-            ignore=ignore_patterns(
-                "*.default.conf",
-                "connectors*",
-                "databases*",
-                "evaluations*",
-                "replications*",
-                "settings*",
-                "logging*",
-            ),
-        )
-        return True
 
     @classmethod
     def scan(cls, context: ComponentContext, scan_dir: str, **kwargs) -> List[System]:

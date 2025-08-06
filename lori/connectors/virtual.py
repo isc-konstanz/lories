@@ -19,8 +19,11 @@ from lori.typing import TimestampType
 
 
 # noinspection PyShadowingBuiltins
-@register_connector_type("virtual", "dummy", "random")
+@register_connector_type("virtual", "random", "dummy")
 class VirtualConnector(Connector):
+    VIRTUAL: str = "virtual"
+    RANDOM: str = "random"
+
     _data: pd.Series
 
     def connect(self, resources: Resources) -> None:
@@ -31,7 +34,7 @@ class VirtualConnector(Connector):
             index.append(resource.id)
 
             generator = resource.get("generator", default=None)
-            if generator == "random":
+            if generator == VirtualConnector.RANDOM:
                 for attr in ["min", "max"]:
                     if attr not in resource:
                         raise ConfigurationException(
@@ -52,10 +55,11 @@ class VirtualConnector(Connector):
         end: Optional[TimestampType] = None,
     ) -> pd.DataFrame:
         for resource in resources:
-            generator = resource.get("generator", default="virtual")
-            if generator == "random":
+            generator = resource.get("generator", default=VirtualConnector.VIRTUAL)
+            if generator == VirtualConnector.RANDOM:
                 self._read_random(resource)
-            elif generator != "virtual":
+
+            elif generator != VirtualConnector.VIRTUAL:
                 raise ConnectorException(
                     self, f"Trying to read dummy channel '{resource.id}' with generator: {generator}"
                 )
@@ -74,11 +78,13 @@ class VirtualConnector(Connector):
         for id in data.columns:
             if id in self.channels:
                 channel = self.channels[id]
-                generator = channel.get("generator", default="virtual")
-                if generator == "random":
-                    self._write_random(data, channel)
-                elif generator == "virtual":
+                generator = channel.get("generator", default=VirtualConnector.VIRTUAL)
+                if generator == VirtualConnector.VIRTUAL:
                     self._write_virtual(data, channel)
+
+                elif generator == VirtualConnector.RANDOM:
+                    self._write_random(data, channel)
+
                 else:
                     raise ConnectorException(
                         self, f"Trying to write to dummy channel '{channel.id}' with generator: {generator}"

@@ -6,6 +6,8 @@ lori.core.entity
 
 """
 
+from __future__ import annotations
+
 from typing import Any, Optional
 
 from lori.core import ResourceException
@@ -39,6 +41,12 @@ class Entity:
 
     def __hash__(self) -> int:
         return hash(id(self))
+
+    def __copy__(self):
+        return self.copy()
+
+    def __replace__(self, **changes):
+        return self.duplicate(**changes)
 
     # noinspection PyShadowingBuiltins
     @classmethod
@@ -80,3 +88,32 @@ class Entity:
     @property
     def name(self) -> str:
         return self._name
+
+    # noinspection PyUnresolvedReferences
+    def copy(self):
+        try:
+            copier = super().copy
+        except AttributeError:
+            copier = self.duplicate
+        return copier()
+
+    # noinspection PyUnresolvedReferences, PyShadowingBuiltins
+    def duplicate(
+        self,
+        id: Optional[str] = None,
+        key: Optional[str] = None,
+        name: Optional[str] = None,
+        **changes,
+    ):
+        if key is None:
+            key = self.key
+        try:
+            duplicator = super().duplicate
+        except AttributeError:
+            duplicator = type(self)
+        return duplicator(
+            id=id,
+            key=key,
+            name=name,
+            **changes,
+        )
