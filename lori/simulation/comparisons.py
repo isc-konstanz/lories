@@ -276,6 +276,8 @@ class Comparison(Mapping[str, Any]):
 
 
 def _mesh_grid(objects: Collection[Any]) -> Iterable[Sequence[Any]]:
+    if objects is None or len(objects) == 0:
+        return []
     mesh_grid = np.meshgrid(*[np.array(v) for v in objects], indexing="ij")
     return np.array(mesh_grid, dtype=object).reshape(len(objects), -1).T
 
