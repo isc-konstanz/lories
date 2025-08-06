@@ -12,8 +12,7 @@ from typing import Optional
 
 import pandas as pd
 from lori import Configurations
-from lori.components import TariffException
-from lori.components.tariff import Tariff, register_tariff_type
+from lori.components.tariff import Tariff, TariffException, register_tariff_type
 from lori.typing import TimestampType
 
 
