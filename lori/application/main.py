@@ -10,17 +10,16 @@ from __future__ import annotations
 
 import sys
 import traceback
-from collections import OrderedDict
-from typing import Any, Collection, Dict, Optional, OrderedDict, Type
+from typing import Collection, Optional, Type
 
-import numpy as np
 import pandas as pd
 from lori import Settings, System
 from lori.application import Interface
-from lori.core import ConfigurationException, Configurations, Configurator, Context, Registrator, RegistratorContext
 from lori.connectors import Database
+from lori.core import Configurations, Registrator, RegistratorContext
 from lori.data.manager import DataManager
 from lori.simulation import Results
+from lori.simulation.comparisons import Comparison, Comparisons
 from lori.typing import TimestampType
 from lori.util import slice_range, to_timedelta
 
@@ -35,38 +34,27 @@ class Application(DataManager):
         app.configure(settings, factory)
         return app
 
-    def _load_hyper_systems(self, configs: Configurations, *systems: System) -> Collection[System]:
-        # noinspection PyShadowingBuiltins, PyShadowingNames
-        def _load_hyper_parameters(configs: Configurations, context: Optional[str] = None) -> Dict[str, Any]:
-            hyper_parameters = OrderedDict[str, Any]()
-            for key, value in configs.items():
-                id = f"{context}.{key}" if context else key
-                if isinstance(value, Configurations):
-                    hyper_parameters.update(_load_hyper_parameters(value, id))
-                else:
-                    hyper_parameters[id] = value
-            return hyper_parameters
-
-        hyper_systems = []
-        hyper_parameters = _load_hyper_parameters(configs)
-        if not hyper_parameters:
-            return systems
-
+    def load_comparisons(self, configs: Configurations, *systems: System) -> Collection[System]:
+        comparisons = Comparisons.load(configs)
+        comparison_systems = []
         for system in systems:
-            system_parameters = {k: v for k, v in hyper_parameters.items() if k.split(".")[0] == system.id}
-            hyper_systems.extend(self._load_hyper_system(system_parameters, system))
-        return hyper_systems
+            comparison_systems.extend(self._load_comparison_system(system, comparisons.from_system(system)))
+        return comparison_systems
 
     # noinspection SpellCheckingInspection
-    def _load_hyper_system(self, parameters: Dict[str, Any], system: System) -> Collection[System]:
+    def _load_comparison_system(
+        self,
+        system: System,
+        comparisons: Collection[Comparison],
+    ) -> Collection[System]:
         def _clear_system() -> None:
             self.converters._remove(*[c for c in self.converters if c.split(".")[0] == system.id])
             self.connectors._remove(*[c for c in self.connectors if c.split(".")[0] == system.id])
             self.components._remove(*[c for c in self.components if c.split(".")[0] == system.id])
             self._remove(*[c.id for c in self.channels if c.id.split(".")[0] == system.id])
 
-        if len(parameters) == 0:
-            self._logger.warning(f"No hyperparameters configured for system '{system.id}'. Will be removed")
+        if len(comparisons) == 0:
+            self._logger.warning(f"No hyperparameters configured for system '{system.name}'. Will be removed")
             _clear_system()
             return []
 
@@ -75,14 +63,10 @@ class Application(DataManager):
             simulation_dir.mkdir(parents=True, exist_ok=True)
 
         systems = []
-        meshgrid = np.meshgrid(*[np.array(v) for v in parameters.values()], indexing="ij")
-        meshgrid = np.array(meshgrid, dtype=object).reshape(len(parameters.keys()), -1).T
-        meshkeys = [(i, k.split(".")[-1]) for i, k in enumerate(parameters.keys()) if isinstance(parameters[k], list)]
-        for system_params in meshgrid:
-            system_key = f"{system.key}_{'_'.join(str(system_params[i]).lower()  for i, _ in meshkeys)}"
-            system_path = f"{system.key}_{'_'.join(f'{k}-{str(system_params[i]).lower()}' for i, k in meshkeys)}"
-            system_name = f"{system.name} ({', '.join(f'{k.title()}: {str(system_params[i])}' for i, k in meshkeys)})"
-            system_dir = simulation_dir.joinpath(system_path)
+        for comparison in comparisons:
+            system_key = f"{system.key}_{comparison.key}"
+            system_name = f"{system.name} ({comparison.name})"
+            system_dir = simulation_dir.joinpath(system_key)
             system_dirs = system.configs.dirs.copy()
             system_dirs.data = system_dir
             system_dirs.conf = system_dir.joinpath("conf")
@@ -91,38 +75,13 @@ class Application(DataManager):
             system_configs["name"] = system_name
             system_configs.write()
 
-            self._logger.info(f"Preparing hyperparameter system '{system_name}': {system_key}")
+            self._logger.info(f"Preparing comparison system '{system_name}': {system_key}")
             system_duplicate = system.duplicate(
                 key=system_key,
                 name=system_name,
                 configs=system_configs,
             )
-
-            # noinspection PyUnresolvedReferences, PyArgumentList, PyShadowingNames
-            def _get_member(_object: Any, _key: str) -> Any:
-                if not isinstance(_object, Context):
-                    return getattr(_object, _key)
-                return _object.get(_key)
-
-            for key, parameter in [(k, system_params[i]) for i, k in enumerate(parameters.keys())]:
-                _key = key.split(".")[1:]
-                configurator = system_duplicate
-                try:
-                    while len(_key) > 1:
-                        configurator = _get_member(configurator, _key.pop(0))
-
-                except (AttributeError, KeyError) as e:
-                    raise ConfigurationException(f"Invalid hyperparameter '{key}' for key {e}")
-                if not isinstance(configurator, Configurator):
-                    raise ConfigurationException(
-                        f"Invalid configurator type for hyperparameter '{key}': {type(configurator)}"
-                    )
-                configurations = configurator.configs
-                configurations[_key[0]] = parameter
-                configurations.write()
-                if configurations.enabled:
-                    configurator.update(configurations)
-
+            comparison.write(system_duplicate)
             systems.append(system_duplicate)
             self._components._add(system_duplicate)
         self._components.sort()
@@ -240,17 +199,22 @@ class Application(DataManager):
         summary = []
         systems = self._components.get_all(System)
 
-        if "hyperparameters" in simulation:
-            systems = self._load_hyper_systems(simulation["hyperparameters"], *systems)
+        if "comparisons" in simulation:
+            systems = self.load_comparisons(simulation["comparisons"], *systems)
 
         def _has_no_system(registrator: Registrator) -> bool:
+            if any(registrator.id == s.id for s in systems):
+                return False
             return isinstance(registrator.context, RegistratorContext)
+
         try:
             self.activate(_has_no_system)
 
             for system in systems:
+
                 def _is_system(registrator) -> bool:
                     return registrator.id.split(".")[0] == system.id
+
                 try:
                     self._connect(*self._connectors.filter(_is_system))
                     self._activate(*self._components.filter(_is_system))
@@ -298,7 +262,7 @@ class Application(DataManager):
             system,
             database,
             configs.get_section("data"),
-            total=len(slices)
+            total=len(slices),
         ) as results:
             results.durations.start("Simulation")
             try:

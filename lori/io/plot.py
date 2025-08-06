@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+from functools import wraps
 from typing import List, Literal, Optional, Tuple
 
 import matplotlib.pyplot as plt
@@ -17,9 +18,6 @@ import seaborn as sns
 
 import numpy as np
 import pandas as pd
-
-from functools import wraps
-
 
 logging.getLogger("PIL.PngImagePlugin").setLevel(logging.WARN)
 logging.getLogger("matplotlib").setLevel(logging.WARN)
@@ -34,16 +32,17 @@ INCH = 2.54
 WIDTH = 32
 HEIGHT = 9
 
+
 def plot(func):
     @wraps(func)
     def wrapper(
-            *args,
-            width: int = WIDTH,
-            height: int = HEIGHT,
-            show: bool = False,
-            file: Optional[str] = None,
-            await_safe: bool = False,
-            **kwargs
+        *args,
+        width: int = WIDTH,
+        height: int = HEIGHT,
+        show: bool = False,
+        file: Optional[str] = None,
+        await_safe: bool = False,
+        **kwargs,
     ) -> Optional[Tuple[plt.Figure, callable]]:
         plt.figure(figsize=(width / INCH, height / INCH), dpi=120, tight_layout=True)
 
@@ -167,7 +166,7 @@ def bar(
 
 
 # noinspection PyDefaultArgument, SpellCheckingInspection
-#TODO: also wrap this function with @plot decorator
+# TODO: also wrap this function with @plot decorator
 def quartiles(
     x: Optional[pd.Series | str] = None,
     y: Optional[pd.DataFrame | pd.Series | str] = None,
@@ -249,7 +248,8 @@ def quartiles(
     plt.close(plot.figure)
     plt.clf()
 
-#TODO: also wrap this function with @plot decorator
+
+# TODO: also wrap this function with @plot decorator
 def histograms(data: pd.DataFrame, bins: int = 100, show: bool = False, path: str = "") -> None:
     for column in data.columns:
         plt.figure(figsize=(WIDTH, HEIGHT), dpi=120, tight_layout=True)
@@ -294,6 +294,7 @@ def histograms(data: pd.DataFrame, bins: int = 100, show: bool = False, path: st
         plt.close()
         plt.clf()
 
+
 # noinspection PyDefaultArgument, SpellCheckingInspection
 @plot
 def ridge(
@@ -309,19 +310,15 @@ def ridge(
     colors: List[str] = COLORS,
     palette: Optional[str] = None,
     hue: Optional[str] = None,
-
     **kwargs,
 ) -> plt.Figure:
-
     sns.set_theme(style="white", rc={"axes.facecolor": (0, 0, 0, 0)})
 
-    plot = sns.FacetGrid(data, row=hue, hue=hue, aspect=15, height=.5, palette=palette)
+    plot = sns.FacetGrid(data, row=hue, hue=hue, aspect=15, height=0.5, palette=palette)
 
     # Draw the densities in a few steps
-    plot.map(sns.kdeplot, y,
-          bw_adjust=.5, clip_on=False,
-          fill=True, alpha=1, linewidth=1.5)
-    plot.map(sns.kdeplot, y, clip_on=False, color="w", lw=2, bw_adjust=.5)
+    plot.map(sns.kdeplot, y, bw_adjust=0.5, clip_on=False, fill=True, alpha=1, linewidth=1.5)
+    plot.map(sns.kdeplot, y, clip_on=False, color="w", lw=2, bw_adjust=0.5)
 
     # passing color=None to refline() uses the hue mapping
     plot.refline(y=0, linewidth=2, linestyle="-", color=None, clip_on=False)
@@ -329,13 +326,12 @@ def ridge(
     # Define and use a simple function to label the plot in axes coordinates
     def label(x, color, label_text):
         ax = plt.gca()
-        ax.text(0, .2, label_text, fontweight="bold", color=color,
-                ha="left", va="center", transform=ax.transAxes)
+        ax.text(0, 0.2, label_text, fontweight="bold", color=color, ha="left", va="center", transform=ax.transAxes)
 
-    #plot.map(label, y)
+    # plot.map(label, y)
 
     # Set the subplots to overlap
-    plot.figure.subplots_adjust(hspace=-.25)
+    plot.figure.subplots_adjust(hspace=-0.25)
 
     # Remove axes details that don't play well with overlap
     plot.set_titles("")

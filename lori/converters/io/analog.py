@@ -43,7 +43,7 @@ class AnalogInput(FloatConverter):
 
         self._invert = configs.get_bool("invert", default=False)
         self._factor = configs.get_float("factor", default=1)
-        self._divisor = ((self._input_max - self._input_min) / (self.max - self.min))
+        self._divisor = (self._input_max - self._input_min) / (self.max - self.min)
 
     def _configure_input(
         self,

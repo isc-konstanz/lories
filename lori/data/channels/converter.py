@@ -134,7 +134,7 @@ class ChannelConverter:
     ) -> None:
         if converter is not None:
             if isinstance(converter, str):
-                if self._converter.key != converter:
+                if self._converter.key != converter.split(".")[-1]:
                     raise ConfigurationException(f"Unable to update channel converter from key '{converter}'")
             elif not isinstance(converter, ChannelConverter):
                 raise ConfigurationException(f"Unable to update channel converter to invalid type '{type(converter)}'")

@@ -136,14 +136,12 @@ class ChannelConnector:
     ) -> None:
         if connector is not None:
             if isinstance(connector, str):
-                if self._connector is None or self._connector.key != connector:
+                if self._connector is None or self._connector.key != connector.split(".")[-1]:
                     raise ConfigurationException(f"Unable to update channel connector from key '{connector}'")
             elif not isinstance(connector, ChannelConnector):
                 raise ConfigurationException(f"Unable to update channel connector to invalid type '{type(connector)}'")
             else:
                 self._connector = connector
-        if connector is not None and (self._connector is None or self._connector.key != connector):
-            raise ConfigurationException(f"Invalid channel connector configurations 'connector': {connector}")
         if enabled is not None:
             self.enabled = to_bool(enabled)
         self.__update_configs(configs)
