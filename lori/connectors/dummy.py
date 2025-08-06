@@ -21,9 +21,8 @@ from lori.typing import TimestampType
 # noinspection PyShadowingBuiltins
 @register_connector_type("dummy", "random")
 class DummyConnector(Connector):
-    STATIC: str = "static"
-    RANDOM: str = "random"
     VIRTUAL: str = "virtual"
+    RANDOM: str = "random"
 
     _data: pd.Series
 
@@ -35,14 +34,7 @@ class DummyConnector(Connector):
             index.append(resource.id)
 
             generator = resource.get("generator", default=None)
-            if generator == DummyConnector.STATIC:
-                attr = "value"
-                if attr not in resource:
-                    raise ConfigurationException(
-                        f"Invalid dummy channel '{resource.id}', missing attribute: {attr}"
-                    )
-
-            elif generator == DummyConnector.RANDOM:
+            if generator == DummyConnector.RANDOM:
                 for attr in ["min", "max"]:
                     if attr not in resource:
                         raise ConfigurationException(
@@ -64,10 +56,7 @@ class DummyConnector(Connector):
     ) -> pd.DataFrame:
         for resource in resources:
             generator = resource.get("generator", default=DummyConnector.VIRTUAL)
-            if generator == DummyConnector.STATIC:
-                self._read_static(resource)
-
-            elif generator == DummyConnector.STATIC:
+            if generator == DummyConnector.RANDOM:
                 self._read_random(resource)
 
             elif generator != DummyConnector.VIRTUAL:
@@ -75,10 +64,6 @@ class DummyConnector(Connector):
                     self, f"Trying to read dummy channel '{resource.id}' with generator: {generator}"
                 )
         return self._data.to_frame(pd.Timestamp.now(tz.UTC).floor(freq="s")).T
-
-    def _read_static(self, resource: Resource) -> None:
-        value = resource.get("value")
-        self._data[resource.id] = value
 
     def _read_random(self, resource: Resource) -> None:
         range = int(abs(resource.max - resource.min))
@@ -94,22 +79,16 @@ class DummyConnector(Connector):
             if id in self.channels:
                 channel = self.channels[id]
                 generator = channel.get("generator", default=DummyConnector.VIRTUAL)
-                if generator == DummyConnector.STATIC:
-                    self._write_static(data, channel)
+                if generator == DummyConnector.VIRTUAL:
+                    self._write_virtual(data, channel)
 
                 elif generator == DummyConnector.RANDOM:
                     self._write_random(data, channel)
-
-                elif generator == DummyConnector.VIRTUAL:
-                    self._write_virtual(data, channel)
 
                 else:
                     raise ConnectorException(
                         self, f"Trying to write to dummy channel '{channel.id}' with generator: {generator}"
                     )
-
-    def _write_static(self, data: pd.DataFrame, channel: Channel) -> None:
-        self._data[channel.id] = data.at[data.index[-1], channel.id]
 
     def _write_virtual(self, data: pd.DataFrame, channel: Channel) -> None:
         self._data[channel.id] = data.at[data.index[-1], channel.id]
