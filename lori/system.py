@@ -16,7 +16,6 @@ import pandas as pd
 from lori import Configurations, ConfigurationException, Settings
 from lori.components import Component, ComponentContext
 from lori.components.weather import Weather, WeatherUnavailableException
-from lori.components.tariff import Tariff, TariffUnavailableException
 from lori.location import Location, LocationUnavailableException
 from lori.simulation import Results
 from lori.typing import TimestampType
@@ -142,17 +141,6 @@ class System(Component):
         if weather is None:
             raise WeatherUnavailableException(f"System '{self.name}' has no weather configured")
         return weather
-
-    def has_tariff(self) -> bool:
-        return self.components.has_type(Tariff)
-    
-    # noinspection PyTypeChecker
-    @property
-    def tariff(self) -> Tariff:
-        tariff = self.components.get_first(Tariff)
-        if tariff is None:
-            raise TariffUnavailableException(f"System '{self.name}' has no tariff configured")
-        return tariff
 
     def simulate(
         self,
