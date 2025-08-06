@@ -331,23 +331,22 @@ def _substitute_parameter(
 # noinspection PyShadowingBuiltins, PyShadowingNames, SpellCheckingInspection
 def _substitute_ranges(value: Any) -> Any:
     if isinstance(value, str):
-        # TODO: Use full_match instead of match?
-        int_range_pattern = r"<range\(\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)>"
-        int_range_match = re.match(int_range_pattern, value)
+        int_range_pattern = r"\s*<range\(\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)>\s*"
+        int_range_match = re.fullmatch(int_range_pattern, value)
         if int_range_match:
             start, stop, step = map(int, int_range_match.groups())
             value = list(range(start, stop, step))
             return value  # Return unchanged if no match
 
-        float_range_pattern = r"<range\(\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*\)>"
-        float_range_match = re.match(float_range_pattern, value)
+        float_range_pattern = r"\s*<range\(\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*\)>\s*"
+        float_range_match = re.fullmatch(float_range_pattern, value)
         if float_range_match:
             start, stop, step = float_range_match.groups()
             value = np.arange(float(start), float(stop), float(step)).tolist()
             return value
 
-        linspace_patters = r"<linspace\(\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d+)\s*\)>"
-        linspace_match = re.match(linspace_patters, value)
+        linspace_patters = r"\s*<linspace\(\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d+)\s*\)>\s*"
+        linspace_match = re.fullmatch(linspace_patters, value)
         if linspace_match:
             start, stop, count = linspace_match.groups()
             value = np.linspace(float(start), float(stop), int(count)).tolist()
