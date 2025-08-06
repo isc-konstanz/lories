@@ -208,7 +208,7 @@ class BoolConverter(Converter[bool]):
     dtype: Type[bool] = bool
 
     def is_dtype(self, value: str | bool) -> bool:
-        return is_bool(value)
+        return is_bool(value) or is_int(value)
 
     def to_dtype(self, value: str | bool, **_) -> Optional[bool]:
         return to_bool(value)
