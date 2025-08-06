@@ -183,6 +183,66 @@ class Configurations(MutableMapping[str, Any]):
     def move_to_bottom(self, key: str) -> None:
         self.__configs.move_to_end(key, True)
 
+    def write(self) -> None:
+        configs = {k: v for k, v in self.__configs.items() if k not in self.sections}
+
+        if not self.__dirs.conf.exists():
+            self.__dirs.conf.mkdir(parents=True, exist_ok=True)
+
+        file_desc, file_path = tempfile.mkstemp(prefix=self.name, dir=self.dirs.conf)
+        with os.fdopen(file_desc, "w") as file:
+            lines = self.__read_lines()
+            lines_section = len(lines) - 1
+            for line_index, line in enumerate(lines):
+                if "=" in line:
+                    line = line.rstrip()
+                    key, value, *_ = line.split("=")
+                    key = key.lstrip().lstrip("#").lstrip(";").strip()
+                    value = value.strip().strip('"')
+                    if key in configs:
+                        config_value = str(configs.pop(key))
+                        if config_value.lower() != value.lower() or line.lstrip().startswith(("#", ";")):
+                            lines[line_index] = self.__parse_line(key, config_value)
+
+                if re.match(r"(#.*|;.*|)\[.*?]", line):
+                    lines_section = line_index - 1
+                    break
+            while lines_section > 0 and lines[lines_section - 1].strip() == "":
+                lines_section -= 1
+
+            if len(configs) > 0:
+                if len(lines) > 0:
+                    lines.insert(lines_section, "\n")
+                    lines_section += 1
+                for key, value in configs.items():
+                    lines.insert(lines_section, self.__parse_line(key, value))
+                    lines_section += 1
+
+            file.writelines(lines)
+
+        # Copy the file permissions from the configuration file to the temporary file and remove it
+        if self.__path.exists():
+            shutil.copymode(self.__path, file_path)
+            os.remove(self.__path)
+
+        shutil.move(file_path, self.__path)
+
+    def __read_lines(self) -> List[str]:
+        if not self.__path.exists():
+            return []
+        with open(self.__path, "r") as file:
+            return file.readlines()
+
+    # noinspection PyMethodMayBeStatic
+    def __parse_line(self, key, value: Any) -> str:
+        if is_bool(value):
+            value = str(value).lower()
+        elif isinstance(value, str):
+            if "\\" in value:
+                value = value.translate(str.maketrans({"\\": r"\\"}))
+            value = f'"{value}"'
+        return f"{key} = {value}\n"
+
     def copy(self, dirs: Optional[Directories] = None) -> Configurations:
         if dirs is None:
             dirs = deepcopy(self.dirs)
