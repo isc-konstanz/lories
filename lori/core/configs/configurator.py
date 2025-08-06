@@ -186,7 +186,7 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
         return copier()
 
     # noinspection PyUnresolvedReferences
-    def duplicate(self, configs: Options[Configurations] = None, **changes):
+    def duplicate(self, configs: Optional[Configurations] = None, **changes):
         if configs is None:
             configs = self.__configs.copy()
         try:

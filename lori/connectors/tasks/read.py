@@ -9,6 +9,7 @@ lori.connectors.tasks.read
 from __future__ import annotations
 
 import inspect
+from typing import Optional
 
 import pandas as pd
 from lori.connectors.tasks.task import ConnectorTask
@@ -17,7 +18,7 @@ from lori.data.channels import ChannelState
 
 class ReadTask(ConnectorTask):
     # noinspection PyArgumentList
-    def run(self, inplace: bool = False, **kwargs) -> pd.DataFrame:
+    def run(self, inplace: bool = False, **kwargs) -> Optional[pd.DataFrame]:
         self._logger.debug(
             f"Reading {len(self.channels)} channels of '{type(self.connector).__name__}': {self.connector.id}"
         )
@@ -31,11 +32,10 @@ class ReadTask(ConnectorTask):
                 )
 
         data = self.connector.read(self.channels, **kwargs)
-        data.dropna(axis="columns", how="all", inplace=True)
-        if data is not None and not data.empty and not all(data.isna().all(axis="columns")):
+        if data is None or data.dropna(axis="columns", how="all").empty:
             if inplace:
-                self.channels.set_frame(data)
-        elif inplace:
-            self.channels.set_state(ChannelState.NOT_AVAILABLE)
-
+                self.channels.set_state(ChannelState.NOT_AVAILABLE)
+            return None
+        if inplace:
+            self.channels.set_frame(data)
         return data

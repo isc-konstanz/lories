@@ -122,7 +122,7 @@ class Configurations(MutableMapping[str, Any]):
     def pop(self, key: str, default: Any = None) -> Any:
         value = self._get(key, default)
         if key in self.__configs:
-            self.remove(key)
+            del self.__configs[key]
         return value
 
     def __setitem__(self, key: str, value: Any) -> None:
@@ -366,7 +366,7 @@ class Configurations(MutableMapping[str, Any]):
     ) -> Configurations:
         section_configs = self.get_section(section, defaults=defaults)
         if section in self.__configs:
-            self.remove(section)
+            del self.__configs[section]
         return section_configs
 
     # noinspection PyTypeChecker
