@@ -56,8 +56,8 @@ class TariffMeta(ActivatorMeta):
 # noinspection SpellCheckingInspection
 @register_component_type("tariff")
 class Tariff(Component, metaclass=TariffMeta):
-    PRICE_IMPORT = Constant(float, "tariff_import", name="Import Tariff Price", unit="ct/kWh")
-    PRICE_EXPORT = Constant(float, "tariff_export", name="Export Tariff Price", unit="ct/kWh")
+    PRICE_IMPORT = Constant(float, "price_import", name="Import Tariff Price", unit="ct/kWh")
+    PRICE_EXPORT = Constant(float, "price_export", name="Export Tariff Price", unit="ct/kWh")
 
 
 class TariffException(ResourceException):
