@@ -20,7 +20,7 @@ from .provider import TariffProvider  # noqa: F401
 
 import importlib
 
-for import_provider in ["entsoe"]:
+for import_provider in ["static", "entsoe"]:
     try:
         importlib.import_module(f".{import_provider}", "lori.components.tariff")
 
