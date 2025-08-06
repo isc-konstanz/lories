@@ -6,6 +6,8 @@ lori.core.entity
 
 """
 
+from __future__ import annotations
+
 from typing import Any, Optional
 
 from lori.core import ResourceException
@@ -39,6 +41,12 @@ class Entity:
 
     def __hash__(self) -> int:
         return hash(id(self))
+
+    def __copy__(self):
+        return self.copy()
+
+    def __replace__(self, **changes):
+        return self.duplicate(**changes)
 
     # noinspection PyShadowingBuiltins
     @classmethod
