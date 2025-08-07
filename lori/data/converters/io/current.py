@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.converters.io.current
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+lori.data.converters.io.current
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -9,8 +9,8 @@ lori.converters.io.current
 from __future__ import annotations
 
 from lori import ConfigurationException, Configurations
-from lori.converters import register_converter_type
-from lori.converters.io.analog import AnalogInput
+from lori.data.converters import register_converter_type
+from lori.data.converters.io.analog import AnalogInput
 
 
 # noinspection PyAbstractClass

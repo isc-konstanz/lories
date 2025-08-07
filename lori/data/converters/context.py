@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.converters.context
-~~~~~~~~~~~~~~~~~~~~~~~
+lori.data.converters.context
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -11,7 +11,9 @@ from __future__ import annotations
 from typing import Any, Callable, Collection, List, Optional, Type, TypeVar
 
 from lori import ResourceException
-from lori.converters.converter import (
+from lori.core import Context, Registrator, RegistratorContext, Registry
+from lori.core.configs import Configurations
+from lori.data.converters.converter import (
     BoolConverter,
     BytesConverter,
     Converter,
@@ -21,8 +23,6 @@ from lori.converters.converter import (
     StringConverter,
     TimestampConverter,
 )
-from lori.core import Context, Registrator, RegistratorContext, Registry
-from lori.core.configs import Configurations
 
 C = TypeVar("C", bound=Converter)
 
