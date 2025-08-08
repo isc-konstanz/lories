@@ -16,9 +16,10 @@ from lori.core import Resources
 
 class CameraConnector(Connector):
     def read(self, resources: Resources) -> pd.DataFrame:
+        timestamp = pd.Timestamp.now(tz="UTC").floor(freq="s")
+        
         # TODO: Wrap read_frame() and cache latest frame to only read if frame is older than a second
         data = self.read_frame()
-        timestamp = pd.Timestamp.now(tz="UTC").floor(freq="s")
         return pd.DataFrame(data=[data] * len(resources), index=[timestamp], columns=list(resources.ids))
 
     @abstractmethod

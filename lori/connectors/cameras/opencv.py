@@ -59,7 +59,7 @@ class OpenCV(CameraConnector):
             raise ConnectionException(self, f"Cannot open RTSP stream: 'rtsp://#:#@{address}'")
 
         success = False
-        for _ in range(1, 3):  # flush stale frames
+        for _ in range(3):  # flush stale frames
             success = self._capture.grab()
         if not success:
             raise ConnectionException(self, "Failed to grab frame")
@@ -73,7 +73,9 @@ class OpenCV(CameraConnector):
 
     def read_frame(self) -> cv2.typing.MatLike:
         try:
-            success = self._capture.grab()
+            success = False
+            for _ in range(3):  # flush stale frames
+                success = self._capture.grab()
             if not success:
                 raise ConnectionException(self, "Failed to grab frame")
 
