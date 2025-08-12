@@ -65,6 +65,7 @@ class Application(DataManager):
         systems = []
         for comparison in comparisons:
             system_key = f"{system.key}_{comparison.key}"
+            system_key = system_key.replace("-", "n").replace(".", "c")
             system_name = f"{system.name} ({comparison.name})"
             system_dir = simulation_dir.joinpath(system_key)
             system_dirs = system.configs.dirs.copy()
