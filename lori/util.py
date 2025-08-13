@@ -154,7 +154,7 @@ def slice_range(
         if _timestamp > timestamp:
             return _timestamp
         # Handle daylight savings
-        return floor_date(timestamp + freq_delta * 2, freq=freq)
+        return floor_date(timestamp + freq_delta + pd.Timedelta(hours=1), freq=freq)
 
     ranges = []
     range_start = start
