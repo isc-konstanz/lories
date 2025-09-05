@@ -32,13 +32,13 @@ from lori.core.configs import ConfigurationException, Configurations
 from lori.core.register import Registrator, RegistratorContext
 from lori.data.channels import Channel, ChannelConnector, ChannelConverter, Channels, ChannelState
 from lori.data.context import DataContext
-from lori.data.databases import Databases
+from lori.data.databases import Database, Databases
 from lori.data.listeners import ListenerContext
-from lori.data.replication import Replicator
+from lori.data.replication import Replication
 from lori.data.retention import Retention
 from lori.data.typing import ChannelsType
 from lori.typing import TimestampType
-from lori.util import floor_date, parse_type, to_timedelta, validate_key
+from lori.util import floor_date, parse_type, to_bool, to_timedelta, validate_key
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
 try:
@@ -194,6 +194,7 @@ class DataManager(DataContext, Activator, Entity):
         *connectors: Connector,
         channels: Optional[Channels] = None,
         timeout: Optional[float] = None,
+        force: bool = False,
     ) -> None:
         connect_futures = {}
         for connector in connectors:
@@ -209,7 +210,7 @@ class DataManager(DataContext, Activator, Entity):
                 )
                 continue
 
-            if not connector._is_connectable():
+            if not connector._is_connectable() and not force:
                 self._logger.debug(
                     f"Skipping not connectable {type(connector).__name__} '{connector.name}': {connector.id}"
                 )
@@ -423,21 +424,7 @@ class DataManager(DataContext, Activator, Entity):
     def run(self, **kwargs) -> None:
         now = pd.Timestamp.now(tz.UTC)
 
-        def is_reading(channel: Channel, timestamp: pd.Timestamp) -> bool:
-            freq = channel.freq
-            if (
-                freq is None
-                or not channel.has_connector()
-                or not self.connectors.get(channel.connector.id, False)
-                or not self.connectors.get(channel.connector.id).is_connected()
-            ):
-                return False
-            if pd.isna(channel.connector.timestamp):
-                return True
-            next_reading = _next(freq, channel.connector.timestamp)
-            return timestamp >= next_reading
-
-        channels = self.channels.filter(lambda c: is_reading(c, now))
+        channels = self.channels.filter(lambda c: self.__is_reading(c, now))
         if len(channels) > 0:
             self.read(channels, inplace=True, **kwargs)
 
@@ -448,13 +435,9 @@ class DataManager(DataContext, Activator, Entity):
             try:
                 now = pd.Timestamp.now(tz.UTC)
 
-                channels = self.channels.filter(lambda c: is_reading(c, now))
-                if len(channels) > 0:
-                    self._logger.debug(f"Reading {len(channels)} channels of application: {self.name}")
-                    self.__read(channels, timeout=self._interval / 4)
+                self.__read(now, timeout=self._interval / 4)
 
                 self.reconnect(lambda c: c._is_reconnectable())
-
                 self.notify(timeout=self._interval / 4)
                 self.log()
 
@@ -653,12 +636,14 @@ class DataManager(DataContext, Activator, Entity):
     # noinspection PyShadowingBuiltins, PyTypeChecker
     def __read(
         self,
-        channels: Optional[Channels] = None,
+        timestamp: TimestampType,
         timeout: Optional[float] = None,
         **kwargs,
     ) -> None:
-        channels = self._filter_by_args(channels)
-        timestamp = pd.Timestamp.now(tz=tz.UTC)
+        channels = self.channels.filter(lambda c: self.__is_reading(c, timestamp))
+        if len(channels) < 1:
+            return
+        self._logger.debug(f"Reading {len(channels)} channels of application: {self.name}")
 
         read_futures = []
         for id, connector in self.connectors.items():
@@ -680,6 +665,20 @@ class DataManager(DataContext, Activator, Entity):
             read_channels.apply(update_timestamp, inplace=True)
 
         futures.wait(read_futures, timeout=timeout)
+
+    def __is_reading(self, channel: Channel, timestamp: pd.Timestamp) -> bool:
+        freq = channel.freq
+        if (
+            freq is None
+            or not channel.has_connector()
+            or not self.connectors.get(channel.connector.id, False)
+            or not self.connectors.get(channel.connector.id).is_connected()
+        ):
+            return False
+        if pd.isna(channel.connector.timestamp):
+            return True
+        next_reading = _next(freq, channel.connector.timestamp)
+        return timestamp >= next_reading
 
     # noinspection PyShadowingBuiltins, PyShadowingNames, PyTypeChecker
     def write(
@@ -790,28 +789,60 @@ class DataManager(DataContext, Activator, Entity):
         if blocking:
             self._write_futures(log_futures, timeout, inplace=False)
 
-    def replicate(self, full: bool = False, force: bool = False, **kwargs) -> None:
-        section = self.configs.get_section(Replicator.SECTION, defaults={})
-        configs = Configurations(f"{Replicator.SECTION}.conf", self.configs.dirs, defaults=section)
-        configs._load(require=False)
-        if not configs.enabled:
-            self._logger.error(f"Unable to replicate for disabled configuration section '{Replicator.SECTION}'")
-            return
-        kwargs["full"] = configs.pop("full", default=full)
-        kwargs["force"] = configs.pop("force", default=force)
-        kwargs.update({k: v for k, v in configs.items() if k not in configs.sections})
+    def rotate(
+        self,
+        channels: Optional[Channels] = None,
+        full: bool = False,
+        **kwargs,
+    ) -> None:
+        if channels is None:
+            channels = self.channels
 
-        databases = Databases(self, configs)
-        databases.replicate(self.channels, **kwargs)
-
-    def rotate(self, full: bool = False, **kwargs) -> None:
         section = self.configs.get_section(Retention.SECTION, defaults={})
         configs = Configurations(f"{Retention.SECTION}.conf", self.configs.dirs, defaults=section)
         configs._load(require=False)
         kwargs["full"] = configs.pop("full", default=full)
 
         databases = Databases(self, configs)
-        databases.rotate(self.channels, **kwargs)
+        databases.rotate(channels, **kwargs)
+
+    def replicate(
+        self,
+        channels: Optional[Channels] = None,
+        full: bool = False,
+        force: bool = False,
+        **kwargs,
+    ) -> None:
+        if channels is None:
+            channels = self.channels.filter(lambda c: self.__is_replicating(c))
+
+        section = self.configs.get_section(Replication.SECTION, defaults={})
+        configs = Configurations(f"{Replication.SECTION}.conf", self.configs.dirs, defaults=section)
+        configs._load(require=False)
+        if not configs.enabled:
+            self._logger.error(f"Unable to replicate for disabled configuration section '{Replication.SECTION}'")
+            return
+        kwargs["full"] = configs.pop("full", default=full)
+        kwargs["force"] = configs.pop("force", default=force)
+        kwargs.update({k: v for k, v in configs.items() if k not in configs.sections})
+
+        databases = Databases(self, configs)
+        databases.replicate(channels, **kwargs)
+
+    # noinspection PyMethodMayBeStatic
+    def __is_replicating(self, channel: Channel, timestamp: Optional[TimestampType] = None) -> bool:
+        replication = channel.get(Replication.SECTION, default=None)
+        if not (
+            replication is not None
+            and "database" in replication
+            and to_bool(replication.get("enabled", True))
+            and channel.logger.enabled
+            and isinstance(channel.logger._connector, Database)
+        ):
+            return False
+        if timestamp is None:
+            return True
+        return timestamp <= floor_date(timestamp, freq=replication.get("freq", Replication.freq))
 
 
 # noinspection PyShadowingBuiltins

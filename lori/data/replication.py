@@ -9,8 +9,8 @@ lori.data.replication
 from __future__ import annotations
 
 import logging
-from copy import deepcopy
-from typing import Any, Dict, Mapping, Optional
+from collections.abc import Sequence
+from typing import Any, Dict, Iterator, List, Mapping, Optional
 
 import tzlocal
 
@@ -28,7 +28,7 @@ except ImportError:
     from typing_extensions import Literal
 
 
-class Replicator:
+class Replication:
     SECTION: str = "replication"
 
     _enabled: bool = False
@@ -36,36 +36,9 @@ class Replicator:
     database: Database
 
     method: Literal["push", "pull"]
-    floor: Optional[str]
-    freq: str
-    slice: bool
+    slice: str = "D"
+    freq: str = "D"
     timezone: tz.BaseTzInfo
-
-    # noinspection PyShadowingNames
-    @classmethod
-    def build(cls, databases, resource: Resource, **configs) -> Replicator:
-        resource_configs = deepcopy(resource.get(cls.SECTION, None))
-        if resource_configs is None:
-            resource_configs = {"database": None}
-        if isinstance(resource_configs, str):
-            resource_configs = {"database": resource_configs}
-        elif not isinstance(resource_configs, Mapping):
-            raise ConfigurationException("Invalid resource replication database: " + str(resource_configs))
-        elif "database" not in resource_configs:
-            resource_configs["database"] = None
-
-        database = None
-        database_id = resource_configs.pop("database")
-        if database_id is not None:
-            database_path = resource.id.split(".")
-            for i in reversed(range(len(database_path))):
-                _database_id = ".".join([*database_path[:i], database_id])
-                if _database_id in databases.keys():
-                    database = databases.get(_database_id, None)
-                    break
-
-        configs.update(resource_configs)
-        return cls(database, **configs)
 
     # noinspection PyShadowingBuiltins
     def __init__(
@@ -73,9 +46,8 @@ class Replicator:
         database: Optional[Database],
         timezone: Optional[tz.BaseTzInfo] = None,
         method: Literal["push", "pull"] = "push",
-        floor: Optional[str] = None,
+        slice: str = "D",
         freq: str = "D",
-        slice: bool = True,
         enabled: bool = True,
     ) -> None:
         self._logger = logging.getLogger(self.__module__)
@@ -90,9 +62,8 @@ class Replicator:
         if method not in ["push", "pull"]:
             raise ConfigurationException(f"Invalid replication method '{method}'")
         self.method = method
-        self.floor = parse_freq(floor)
         self.freq = parse_freq(freq)
-        self.slice = to_bool(slice)
+        self.slice = parse_freq(slice)
 
     @classmethod
     def _assert_database(cls, database):
@@ -102,10 +73,34 @@ class Replicator:
             raise ResourceException(database, f"Invalid database: {None if database is None else type(database)}")
         return database
 
-    def __eq__(self, other: Any) -> bool:
+    # noinspection PyShadowingBuiltins
+    def _is_mapped(
+        self,
+        database: Optional[str],
+        timezone: Optional[tz.BaseTzInfo] = None,
+        method: Literal["push", "pull"] = "push",
+        slice: str = "D",
+        freq: str = "D",
+        enabled: bool = True,
+    ) -> bool:
         return (
-            isinstance(other, Replicator) and self._enabled == other._enabled and self._get_args() == other._get_args()
+            self.database.key == database
+            and self.timezone == to_timezone(timezone)
+            and self.method == method
+            and self.freq == parse_freq(freq)
+            and self.slice == parse_freq(slice)
+            and self._enabled == to_bool(enabled)
         )
+
+    def _is_equal(self, other: Replication) -> bool:
+        return (
+            self._enabled == other._enabled
+            and self.database.id == other.database.id
+            and self._get_args() == other._get_args()
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        return self._is_equal(other)
 
     def __hash__(self) -> int:
         return hash((self.database, self._enabled, *self._get_args()))
@@ -132,9 +127,8 @@ class Replicator:
     def _get_args(self) -> Dict[str, Any]:
         return {
             "method": self.method,
-            "floor": self.floor,
-            "freq": self.freq,
             "slice": self.slice,
+            "freq": self.freq,
             "timezone": self.timezone,
         }
 
@@ -172,22 +166,84 @@ class ReplicationException(ResourceException):
     """
 
 
+class Replications(Sequence[Replication]):
+    _replications: List[Replication]
+
+    # noinspection PyProtectedMember, PyShadowingNames
+    def build(self, databases, resource: Resource, **configs) -> Optional[Replication]:
+        resource_configs = resource.get(Replication.SECTION, default=None)
+        if resource_configs is None or "database" not in resource_configs:
+            return None
+        if isinstance(resource_configs, str):
+            resource_configs = {"database": resource_configs}
+        elif not isinstance(resource_configs, Mapping):
+            raise ConfigurationException("Invalid resource replication database: " + str(resource_configs))
+
+        replication = None
+        for _replication in self:
+            if _replication._is_mapped(**resource_configs):
+                replication = _replication
+                break
+        if replication is None:
+            database = None
+            database_id = resource_configs.pop("database")
+            if database_id is not None:
+                database_path = resource.id.split(".")
+                for i in reversed(range(len(database_path))):
+                    _database_id = ".".join([*database_path[:i], database_id])
+                    if _database_id in databases.keys():
+                        database = databases.get(_database_id, None)
+                        break
+
+            configs.update(resource_configs)
+            replication = Replication(database, **configs)
+
+            self._replications.append(replication)
+        return replication
+
+    def __init__(self, resources=()) -> None:
+        self._logger = logging.getLogger(type(self).__module__)
+        self._replications = [*resources]
+
+    # noinspection PyProtectedMember
+    def __contains__(self, _object: Mapping[str, Any] | Replication) -> bool:
+        if isinstance(_object, Replication):
+            return _object in self._replications
+        if isinstance(_object, Mapping):
+            return any(r._is_mapped(*_object) for r in self._replications)
+        return False
+
+    def __getitem__(self, _index: int):
+        return self._replications[_index]
+
+    def __iter__(self) -> Iterator[Replication]:
+        return iter(self._replications)
+
+    def __len__(self) -> int:
+        return len(self._replications)
+
+    def __add__(self, _object):
+        return type(self)([*self, *_object])
+
+    def append(self, replication: Replication) -> None:
+        self._replications.append(replication)
+
+
 # noinspection PyProtectedMember, PyUnresolvedReferences, PyTypeChecker, PyShadowingBuiltins
 def replicate(
     source: Database,
     target: Database,
     resources: Resources,
     timezone: Optional[tz.BaseTzInfo] = None,
-    floor: str = None,
+    slice: str = "D",
     freq: str = "D",
     full: bool = True,
     force: bool = False,
-    slice: str = True,
 ) -> None:
     if source is None or target is None or len(resources) == 0:
         return
 
-    logger = logging.getLogger(Replicator.__module__)
+    logger = logging.getLogger(Replication.__module__)
     logger.debug(
         f"Starting to replicate data of resource{'s' if len(resources) > 1 else ''} "
         + ", ".join([f"'{r.id}'" for r in resources])
@@ -200,15 +256,13 @@ def replicate(
     end = source.read_last_index(resources)
     if end is None:
         end = now
-    if floor is not None:
-        end = floor_date(end, freq=floor)
+    if not full:
+        end = floor_date(end, freq=freq)
 
     start = target.read_last_index(resources) if not full else None
     if start is None:
         start = source.read_first_index(resources)
         target_empty = True
-    # else:
-    #     start = floor_date(start, freq=freq) + pd.Timedelta(seconds=1)
 
     if any(t is None for t in [start, end]) or start >= end:
         logger.debug(
@@ -218,18 +272,14 @@ def replicate(
         )
         return
 
-    if slice and start + to_timedelta(freq) >= end:
-        slice = False
-
     if not target_empty:
         # Validate prior step, before continuing
-        prior_freq = freq if floor is None else floor
-        prior_end = floor_date(start if start <= now else now, timezone=timezone, freq=prior_freq)
-        prior_start = prior_end - to_timedelta(prior_freq) + pd.Timedelta(seconds=1)
+        prior_end = floor_date(start if start <= now else now, timezone=timezone, freq=freq)
+        prior_start = prior_end - to_timedelta(freq) + pd.Timedelta(seconds=1)
         replicate_range(source, target, resources, prior_start, prior_end, force=force)
 
-    if slice:
-        for slice_start, slice_end in slice_range(start, end, timezone=timezone, freq=freq):
+    if start + to_timedelta(slice) < end:
+        for slice_start, slice_end in slice_range(start, end, timezone=timezone, freq=slice):
             replicate_range(source, target, resources, slice_start, slice_end, force=force)
     else:
         replicate_range(source, target, resources, start, end, force=force)
@@ -243,7 +293,7 @@ def replicate_range(
     end: pd.Timestamp,
     force: bool = False,
 ) -> None:
-    logger = logging.getLogger(Replicator.__module__)
+    logger = logging.getLogger(Replication.__module__)
     logger.debug(
         f"Start copying data of resource{'s' if len(resources) > 1 else ''} "
         + ", ".join([f"'{r.id}'" for r in resources])
