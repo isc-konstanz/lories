@@ -6,6 +6,12 @@ lori.data
 
 """
 
+from . import converters  # noqa: F401
+from .converters import (  # noqa: F401
+    Converter,
+    ConversionException,
+)
+
 from . import channels  # noqa: F401
 from .channels import (  # noqa: F401
     ChannelState,

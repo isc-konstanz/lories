@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.converters.io.analog
-~~~~~~~~~~~~~~~~~~~~~~~~~
+lori.data.converters.io.analog
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -11,8 +11,8 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from lori import ConfigurationException, Configurations
-from lori.converters import ConversionException, register_converter_type
-from lori.converters.converter import FloatConverter
+from lori.data.converters import ConversionException, register_converter_type
+from lori.data.converters.converter import FloatConverter
 
 
 @register_converter_type("analog_input")

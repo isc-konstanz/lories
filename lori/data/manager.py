@@ -26,12 +26,12 @@ from lori.components.context import ComponentContext
 from lori.connectors import Connector, ConnectorException
 from lori.connectors.context import ConnectorContext
 from lori.connectors.tasks import CheckTask, ConnectTask, LogTask, ReadTask, WriteTask
-from lori.converters.context import ConverterContext
 from lori.core import Activator, Context, Entity
 from lori.core.configs import ConfigurationException, Configurations
 from lori.core.register import Registrator, RegistratorContext
 from lori.data.channels import Channel, ChannelConnector, ChannelConverter, Channels, ChannelState
 from lori.data.context import DataContext
+from lori.data.converters.context import ConverterContext
 from lori.data.databases import Database, Databases
 from lori.data.listeners import ListenerContext
 from lori.data.replication import Replication

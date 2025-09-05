@@ -28,14 +28,10 @@ from .core import (  # noqa: F401
     ResourceUnavailableException,
 )
 
-from . import converters  # noqa: F401
-from .converters import (  # noqa: F401
-    Converter,
-    ConversionException,
-)
-
 from . import data  # noqa: F401
 from .data import (  # noqa: F401
+    Converter,
+    ConversionException,
     ChannelState,
     Channel,
     Channels,

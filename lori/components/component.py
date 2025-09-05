@@ -14,9 +14,9 @@ import pandas as pd
 from lori.components import ComponentAccess
 from lori.components.core import _Component
 from lori.connectors import ConnectorAccess
-from lori.converters import ConverterAccess
 from lori.core import Configurations, Context, Registrator
 from lori.data import DataAccess
+from lori.data.converters import ConverterAccess
 from lori.typing import TimestampType
 from lori.util import to_date
 

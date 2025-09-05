@@ -31,7 +31,7 @@ class ChannelConverter:
 
     # noinspection PyMethodMayBeStatic
     def _assert_converter(self, converter):
-        from lori.converters import Converter
+        from lori.data.converters import Converter
 
         if converter is None or not isinstance(converter, Converter):
             raise ResourceException(f"Invalid converter: {None if converter is None else type(converter)}")

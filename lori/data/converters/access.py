@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.converters.access
-~~~~~~~~~~~~~~~~~~~~~~
+lori.data.converters.access
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from typing import Any, Collection, Optional, TypeVar
 
-from lori.converters import Converter
 from lori.core import Configurations, Directory, Registrator, RegistratorAccess, RegistratorContext, ResourceException
+from lori.data.converters import Converter
 from lori.util import get_context
 
 C = TypeVar("C", bound=Converter)
