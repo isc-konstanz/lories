@@ -151,10 +151,14 @@ def slice_range(
 
     def _next(timestamp: pd.Timestamp) -> pd.Timestamp:
         _timestamp = floor_date(timestamp + freq_delta, freq=freq)
-        if _timestamp > timestamp:
-            return _timestamp
+        
         # Handle daylight savings
-        return floor_date(timestamp + freq_delta + pd.Timedelta(hours=1), freq=freq)
+        fail_index = 0
+        while _timestamp < timestamp:
+            fail_index += 1
+            floor_date(timestamp + freq_delta * (1 + fail_index), freq=freq)
+            
+        return _timestamp
 
     ranges = []
     range_start = start
