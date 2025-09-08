@@ -8,6 +8,7 @@ lori.connectors
 
 from .core import (  # noqa: F401
     _Connector,
+    ConnectType,
     ConnectorException,
     ConnectorUnavailableException,
     ConnectionException,

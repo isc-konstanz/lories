@@ -95,7 +95,10 @@ class Application(DataManager):
         super().__init__(settings, name=settings["name"], **kwargs)
         if not settings.has_section(Interface.SECTION):
             settings._add_section(Interface.SECTION, {"enabled": False})
-        self._interface = Interface(self, settings.get_section(Interface.SECTION))
+
+        # Check if the tasked action may be headless
+        if settings.get("action").lower() == "start":
+            self._interface = Interface(self, settings.get_section(Interface.SECTION))
 
     # noinspection PyProtectedMember, PyTypeChecker, PyMethodOverriding
     def configure(self, settings: Settings, factory: Type[System]) -> None:
@@ -120,7 +123,7 @@ class Application(DataManager):
 
         self._components.configure(components)
 
-        if self._interface.is_enabled():
+        if self._has_interface():
             self._interface.configure(settings.get_section(Interface.SECTION))
 
     # noinspection PyTypeChecker
@@ -131,6 +134,9 @@ class Application(DataManager):
     @property
     def interface(self) -> Interface:
         return self._interface
+
+    def _has_interface(self) -> bool:
+        return self._interface is not None and self._interface.is_enabled()
 
     def main(self) -> None:
         action = self.settings["action"]
@@ -163,12 +169,12 @@ class Application(DataManager):
             exit(1)
 
     def start(self, wait: bool = True) -> None:
-        has_interface = self._interface.is_enabled()
-        if has_interface:
+        _has_interface = self._has_interface()
+        if _has_interface:
             wait = False
         super().start(wait)
 
-        if has_interface:
+        if _has_interface:
             self._interface.start()
 
     # noinspection PyUnresolvedReferences, PyProtectedMember

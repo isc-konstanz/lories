@@ -9,7 +9,6 @@ lori.components.tariff.entsoe
 from __future__ import annotations
 
 import pandas as pd
-
 from lori import Channel, Configurations, Constant
 from lori.components.tariff import Tariff, TariffProvider, register_tariff_type
 from lori.connectors.entsoe import EntsoeConnector
@@ -25,12 +24,12 @@ class EntsoeProvider(TariffProvider):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
         self._offset = configs.get_float("offset", default=0)
-        
+
         entsoe_connector = EntsoeConnector(
-            self, 
-            key="entsoe_connector", 
+            self,
+            key="entsoe_connector",
             name="ENTSO-e Connector",
-            configs=configs
+            configs=configs,
         )
 
         self.connectors.add(entsoe_connector)

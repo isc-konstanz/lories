@@ -93,9 +93,13 @@ class ChannelConnector:
         return self._connector.is_connected() if self.enabled else False
 
     def is_database(self) -> bool:
+        return self._is_database(self._connector) if self.enabled else False
+
+    @staticmethod
+    def _is_database(connector) -> bool:
         from lori.connectors import Database
 
-        return isinstance(self._connector, Database) if self.enabled else False
+        return isinstance(connector, Database)
 
     def to_configs(self) -> Dict[str, Any]:
         configs = {
@@ -110,10 +114,15 @@ class ChannelConnector:
 
     # noinspection PyShadowingBuiltins
     def _get_vars(self) -> Dict[str, Any]:
-        vars = self._copy_configs()
+        vars = self._get_args()
         vars["timestamp"] = self.timestamp
-        vars["enabled"] = self.enabled
         return vars
+
+    # noinspection PyShadowingBuiltins
+    def _get_args(self) -> Dict[str, Any]:
+        args = self._copy_configs()
+        args["enabled"] = self.enabled
+        return args
 
     def _get_attrs(self) -> List[str]:
         return [*self._copy_configs().keys(), "timestamp", "enabled"]
@@ -147,6 +156,4 @@ class ChannelConnector:
         self.__update_configs(configs)
 
     def copy(self) -> ChannelConnector:
-        configs = self._copy_configs()
-        configs["enabled"] = self.enabled
-        return type(self)(self._connector, **configs)
+        return type(self)(self._connector, **self._get_args())
