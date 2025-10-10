@@ -17,12 +17,12 @@ import tzlocal
 
 import pandas as pd
 import pytz as tz
-from lori.connectors import ConnectionException, ConnectorException, ConnectorUnavailableException
 from lori.connectors.connector import Connector, ConnectorMeta
+from lori.connectors.errors import ConnectionError, ConnectorError
 from lori.core import Configurations, Resources
+from lori.core.typing import Timestamp
 from lori.data.util import hash_data
 from lori.data.validation import validate_index, validate_timezone
-from lori.typing import TimestampType
 from lori.util import convert_timezone, to_date, to_timezone
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -64,8 +64,8 @@ class Database(Connector, metaclass=DatabaseMeta):
     def hash(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
         method: Literal["MD5", "SHA1", "SHA256", "SHA512"] = "MD5",
         encoding: str = "UTF-8",
     ) -> Optional[str]:
@@ -82,8 +82,8 @@ class Database(Connector, metaclass=DatabaseMeta):
     def _do_hash(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
         method: Literal["MD5", "SHA1", "SHA256", "SHA512"] = "MD5",
         encoding: str = "UTF-8",
         *args,
@@ -91,15 +91,15 @@ class Database(Connector, metaclass=DatabaseMeta):
     ) -> Optional[str]:
         with self._lock:
             if not self._is_connected():
-                raise ConnectionException(self, f"Database '{self.id}' not connected")
+                raise ConnectionError(self, f"Database '{self.id}' not connected")
 
             return self._run_hash(resources, start=start, end=end, method=method, encoding=encoding, *args, **kwargs)
 
     def exists(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
     ) -> bool:
         # TODO: Replace this placeholder more resource efficient
         data = self._run_read(resources, start, end)
@@ -111,14 +111,14 @@ class Database(Connector, metaclass=DatabaseMeta):
     def _do_exists(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
         *args,
         **kwargs,
     ) -> bool:
         with self._lock:
             if not self._is_connected():
-                raise ConnectionException(self, f"Database '{self.id}' not connected")
+                raise ConnectionError(self, f"Database '{self.id}' not connected")
 
             return self._run_exists(resources, start=start, end=end, *args, **kwargs)
 
@@ -129,45 +129,43 @@ class Database(Connector, metaclass=DatabaseMeta):
     def read(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
     ) -> pd.DataFrame: ...
 
     @abstractmethod
     def read(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
-    ) -> pd.DataFrame:
-        pass
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
+    ) -> pd.DataFrame: ...
 
     @wraps(read, updated=())
     def _do_read(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
         *args,
         **kwargs,
     ) -> pd.DataFrame:
         with self._lock:
             if not self._is_connected():
-                raise ConnectionException(self, f"Database '{self.id}' not connected")
+                raise ConnectorError(self, f"Trying to read from unconnected {type(self).__name__}: {self.id}")
 
-            data = self._run_read(resources, start=start, end=end, *args, **kwargs)
+            data = self._run_read(resources, *args, **kwargs)
             data = self._validate(resources, data)
             return self._get_range(data, start, end)
 
     @abstractmethod
-    def read_first(self, resources: Resources) -> Optional[pd.DataFrame]:
-        pass
+    def read_first(self, resources: Resources) -> Optional[pd.DataFrame]: ...
 
     @wraps(read_first, updated=())
     def _do_read_first(self, resources: Resources, *args, **kwargs) -> Optional[pd.DataFrame]:
         with self._lock:
             if not self._is_connected():
-                raise ConnectionException(self, f"Database '{self.id}' not connected")
+                raise ConnectionError(self, f"Database '{self.id}' not connected")
 
             data = self._run_read_first(resources, *args, **kwargs)
             data = self._validate(resources, data)
@@ -184,7 +182,7 @@ class Database(Connector, metaclass=DatabaseMeta):
     def _do_read_first_index(self, resources: Resources, *args, **kwargs) -> Optional[Any]:
         with self._lock:
             if not self._is_connected():
-                raise ConnectionException(self, f"Database '{self.id}' not connected")
+                raise ConnectionError(self, f"Database '{self.id}' not connected")
 
             index = self._run_read_first_index(resources, *args, **kwargs)
             if isinstance(index, (pd.Timestamp, dt.datetime)):
@@ -192,14 +190,13 @@ class Database(Connector, metaclass=DatabaseMeta):
             return index
 
     @abstractmethod
-    def read_last(self, resources: Resources) -> Optional[pd.DataFrame]:
-        pass
+    def read_last(self, resources: Resources) -> Optional[pd.DataFrame]: ...
 
     @wraps(read_last, updated=())
     def _do_read_last(self, resources: Resources, *args, **kwargs) -> Optional[pd.DataFrame]:
         with self._lock:
             if not self._is_connected():
-                raise ConnectionException(self, f"Database '{self.id}' not connected")
+                raise ConnectionError(self, f"Database '{self.id}' not connected")
 
             data = self._run_read_last(resources, *args, **kwargs)
             data = self._validate(resources, data)
@@ -216,7 +213,7 @@ class Database(Connector, metaclass=DatabaseMeta):
     def _do_read_last_index(self, resources: Resources, *args, **kwargs) -> Optional[Any]:
         with self._lock:
             if not self._is_connected():
-                raise ConnectionException(self, f"Database '{self.id}' not connected")
+                raise ConnectionError(self, f"Database '{self.id}' not connected")
 
             index = self._run_read_last_index(resources, *args, **kwargs)
             if isinstance(index, (pd.Timestamp, dt.datetime)):
@@ -240,8 +237,8 @@ class Database(Connector, metaclass=DatabaseMeta):
     @staticmethod
     def _get_range(
         data: pd.DataFrame,
-        start: Optional[TimestampType | str] = None,
-        end: Optional[TimestampType | str] = None,
+        start: Optional[Timestamp | str] = None,
+        end: Optional[Timestamp | str] = None,
         **kwargs,
     ) -> pd.DataFrame:
         if data.empty:
@@ -261,15 +258,15 @@ class Database(Connector, metaclass=DatabaseMeta):
     def delete(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
     ) -> None: ...
 
     def delete(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
     ) -> None:
         raise NotImplementedError(f"Unable to delete values for database '{self.id}'")
 
@@ -277,27 +274,13 @@ class Database(Connector, metaclass=DatabaseMeta):
     def _do_delete(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
         *args,
         **kwargs,
     ) -> None:
         with self._lock:
             if not self._is_connected():
-                raise ConnectionException(self, f"Database '{self.id}' not connected")
+                raise ConnectionError(self, f"Database '{self.id}' not connected")
 
             self._run_delete(resources, start=start, end=end, *args, **kwargs)
-
-
-class DatabaseException(ConnectorException):
-    """
-    Raise if an error occurred accessing the database.
-
-    """
-
-
-class DatabaseUnavailableException(ConnectorUnavailableException):
-    """
-    Raise if an accessed database can not be found.
-
-    """

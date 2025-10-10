@@ -8,9 +8,9 @@ lori.application.view.pages.components.system
 
 from __future__ import annotations
 
-from lori import System
 from lori.application.view.pages import PageLayout, register_component_page
 from lori.application.view.pages.components import ComponentGroup
+from lori.system import System
 
 
 @register_component_page(System)

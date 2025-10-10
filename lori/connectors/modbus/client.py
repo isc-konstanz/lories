@@ -15,10 +15,11 @@ from pymodbus.client import ModbusBaseSyncClient, ModbusSerialClient, ModbusTcpC
 
 import pandas as pd
 import pytz as tz
-from lori.connectors import ConnectionException, Connector, ConnectorException, register_connector_type
+from lori._core import ChannelState  # noqa
+from lori.connectors import ConnectionError, Connector, ConnectorError, register_connector_type
 from lori.connectors.modbus import ModbusRegister
-from lori.core import ConfigurationException, Configurations, Resources
-from lori.data import ChannelState
+from lori.core.configs import ConfigurationError
+from lori.typing import Configurations, Resources
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
 try:
@@ -40,7 +41,7 @@ class ModbusClient(Connector):
         super().configure(configs)
         _endian = configs.get("endian", default="big").lower()
         if _endian not in ["big", "little"]:
-            raise ConnectorException(self, f"Invalid modbus word order '{_endian}'")
+            raise ConnectorError(self, f"Invalid modbus word order '{_endian}'")
         self._endian = _endian
 
         timeout = configs.get_int("timeout", default=3)
@@ -78,7 +79,7 @@ class ModbusClient(Connector):
                 # handle_local_echo=False,
             )
         else:
-            raise ConnectorException(self, f"Unknown modbus protocol type '{protocol}'")
+            raise ConnectorError(self, f"Unknown modbus protocol type '{protocol}'")
 
     # noinspection PyUnresolvedReferences
     def is_connected(self) -> bool:
@@ -93,9 +94,9 @@ class ModbusClient(Connector):
 
         except ModbusException as e:
             self._logger.warning(f"Error connecting to '{self.__client}': {e}")
-            raise ConnectionException(self, e)
+            raise ConnectionError(self, e)
         except IOError as e:
-            raise ConnectorException(self, e)
+            raise ConnectorError(self, e)
 
     def disconnect(self) -> None:
         super().disconnect()
@@ -128,7 +129,7 @@ class ModbusClient(Connector):
 
                         self._logger.debug(f"Read {register.type} value of register {register.address}: {value}")
 
-                    except ConfigurationException as e:
+                    except ConfigurationError as e:
                         data.at[timestamp, resource.id] = ChannelState.ARGUMENT_SYNTAX_ERROR
                         self._logger.warning(f"Invalid register configuration for resource '{resource.id}': {e}")
                         continue
@@ -138,9 +139,9 @@ class ModbusClient(Connector):
             return data
 
         except ModbusException as e:
-            raise ConnectionException(self, e)
+            raise ConnectionError(self, e)
         except IOError as e:
-            raise ConnectorException(self, e)
+            raise ConnectorError(self, e)
 
     def write(self, data: pd.DataFrame) -> None:
         try:
@@ -161,11 +162,11 @@ class ModbusClient(Connector):
                         )
                         self.__client.write_registers(register.address, values, slave=device)
 
-                    except ConfigurationException as e:
+                    except ConfigurationError as e:
                         self._logger.warning(f"Invalid register configuration for channel '{channel.id}': {e}")
                         continue
 
         except ModbusException as e:
-            raise ConnectionException(self, e)
+            raise ConnectionError(self, e)
         except IOError as e:
-            raise ConnectorException(self, e)
+            raise ConnectorError(self, e)

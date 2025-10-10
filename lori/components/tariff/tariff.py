@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.components.tariff.core
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lori.components.tariff.tariff
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -12,9 +12,10 @@ from collections.abc import Callable
 from typing import Optional, Type, TypeVar
 
 from lori.components import Component, register_component_type
-from lori.core import Configurations, Constant, Context, ResourceException, ResourceUnavailableException
+from lori.core import Constant, ResourceError
 from lori.core.activator import ActivatorMeta
-from lori.core.register import Registrator, Registry
+from lori.core.register import Registry
+from lori.typing import Configurations, ContextArgument
 from lori.util import validate_key
 
 
@@ -22,7 +23,7 @@ from lori.util import validate_key
 def register_tariff_type(
     type: str,
     *alias: str,
-    factory: Callable[[Context | Registrator, Optional[Configurations]], TariffType] = None,
+    factory: Callable[[ContextArgument, Optional[Configurations]], TariffType] = None,
     replace: bool = False,
 ) -> Callable[[Type[TariffType]], Type[TariffType]]:
     # noinspection PyShadowingNames
@@ -34,7 +35,7 @@ def register_tariff_type(
 
 
 class TariffMeta(ActivatorMeta):
-    def __call__(cls, context: Context | Component, configs: Configurations, **kwargs) -> Tariff:
+    def __call__(cls, context: ContextArgument, configs: Configurations, **kwargs) -> TariffType:
         _type = validate_key(configs.get("type", default="default"))
         _cls = cls._get_class(_type)
         if cls != _cls:
@@ -50,7 +51,7 @@ class TariffMeta(ActivatorMeta):
             registration = registry.from_type(type)
             return registration.type
 
-        raise TariffException(f"Unknown tariff type '{type}'")
+        raise ResourceError(f"Unknown tariff type '{type}'")
 
 
 # noinspection SpellCheckingInspection
@@ -58,20 +59,6 @@ class TariffMeta(ActivatorMeta):
 class Tariff(Component, metaclass=TariffMeta):
     PRICE_IMPORT = Constant(float, "price_import", name="Import Tariff Price", unit="ct/kWh")
     PRICE_EXPORT = Constant(float, "price_export", name="Export Tariff Price", unit="ct/kWh")
-
-
-class TariffException(ResourceException):
-    """
-    Raise if an error occurred accessing the tariff.
-
-    """
-
-
-class TariffUnavailableException(ResourceUnavailableException, TariffException):
-    """
-    Raise if a configured tariff can not be found.
-
-    """
 
 
 TariffType = TypeVar("TariffType", bound=Tariff)

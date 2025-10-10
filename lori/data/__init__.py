@@ -9,7 +9,7 @@ lori.data
 from . import converters  # noqa: F401
 from .converters import (  # noqa: F401
     Converter,
-    ConversionException,
+    ConversionError,
 )
 
 from . import channels  # noqa: F401
@@ -22,7 +22,7 @@ from .channels import (  # noqa: F401
 from . import listeners  # noqa: F401
 from .listeners import (  # noqa: F401
     Listener,
-    ListenerException,
+    ListenerError,
 )
 
 from .context import DataContext  # noqa: F401

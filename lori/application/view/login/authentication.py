@@ -30,7 +30,7 @@ UserGroups = Dict[str, List[str]]
 
 
 class Authentication(Configurator, Auth):
-    SECTION: str = "auth"
+    TYPE: str = "auth"
 
     __users: Dict[str, User]
     __groups: Optional[Union[UserGroups, Callable[[str], UserGroups]]] = None

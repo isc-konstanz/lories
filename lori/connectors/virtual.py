@@ -13,9 +13,9 @@ from typing import Optional
 
 import pandas as pd
 import pytz as tz
-from lori import Channel, ConfigurationException, Resource, Resources
-from lori.connectors import Connector, ConnectorException, register_connector_type
-from lori.typing import TimestampType
+from lori.connectors import Connector, ConnectorError, register_connector_type
+from lori.core.configs import ConfigurationError
+from lori.typing import Channel, Resource, Resources, Timestamp
 
 
 # noinspection PyShadowingBuiltins
@@ -37,13 +37,11 @@ class VirtualConnector(Connector):
             if generator == VirtualConnector.RANDOM:
                 for attr in ["min", "max"]:
                     if attr not in resource:
-                        raise ConfigurationException(
-                            f"Invalid dummy channel '{resource.id}', missing attribute: {attr}"
-                        )
+                        raise ConfigurationError(f"Invalid dummy channel '{resource.id}', missing attribute: {attr}")
                 data.append(float(random.randrange(int(resource.min * 100), int(resource.max * 100))) / 100.0)
 
             elif generator is not None:
-                raise ConfigurationException(f"Invalid dummy channel '{resource.id}' generator: {generator}")
+                raise ConfigurationError(f"Invalid dummy channel '{resource.id}' generator: {generator}")
             else:
                 data.append(resource.get("default", default=None))
         self._data = pd.Series(index=index, data=data)
@@ -51,8 +49,8 @@ class VirtualConnector(Connector):
     def read(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
     ) -> pd.DataFrame:
         for resource in resources:
             generator = resource.get("generator", default=VirtualConnector.VIRTUAL)
@@ -60,9 +58,7 @@ class VirtualConnector(Connector):
                 self._read_random(resource)
 
             elif generator != VirtualConnector.VIRTUAL:
-                raise ConnectorException(
-                    self, f"Trying to read dummy channel '{resource.id}' with generator: {generator}"
-                )
+                raise ConnectorError(self, f"Trying to read dummy channel '{resource.id}' with generator: {generator}")
         return self._data.to_frame(pd.Timestamp.now(tz.UTC).floor(freq="s")).T
 
     def _read_random(self, resource: Resource) -> None:
@@ -86,7 +82,7 @@ class VirtualConnector(Connector):
                     self._write_random(data, channel)
 
                 else:
-                    raise ConnectorException(
+                    raise ConnectorError(
                         self, f"Trying to write to dummy channel '{channel.id}' with generator: {generator}"
                     )
 

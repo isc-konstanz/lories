@@ -12,10 +12,10 @@ import os
 from typing import Mapping, Optional, Tuple
 
 import pandas as pd
-from lori.connectors import ConnectionException, Database, register_connector_type
-from lori.core import ConfigurationException, Configurations, Resources
+from lori.connectors import ConnectionError, Database, register_connector_type
+from lori.core.configs import ConfigurationError
 from lori.io import csv
-from lori.typing import TimestampType
+from lori.typing import Configurations, Resources, Timestamp
 from lori.util import ceil_date, floor_date, parse_freq
 
 
@@ -71,7 +71,7 @@ class CsvDatabase(Database):
         self.index_column = configs.get("index_column", default=CsvDatabase.index_column)
         self.index_type = configs.get("index_type", default=CsvDatabase.index_type).lower()
         if self.index_type not in ["timestamp", "unix", "none", None]:
-            raise ConfigurationException(f"Unknown index type: {self.index_type}")
+            raise ConfigurationError(f"Unknown index type: {self.index_type}")
 
         self.override = configs.get_bool("override", default=CsvDatabase.override)
         self.slice = configs.get_bool("slice", default=CsvDatabase.slice)
@@ -90,7 +90,7 @@ class CsvDatabase(Database):
         elif any([self.freq.endswith(s) for s in ["h", "min", "s"]]):
             self.format = "%Y%m%d_%H%M%S"
         else:
-            raise ConfigurationException(f"Invalid frequency: {self.freq}")
+            raise ConfigurationError(f"Invalid frequency: {self.freq}")
 
         self.suffix = configs.get("suffix", default=CsvDatabase.suffix)
         if self.suffix is not None:
@@ -129,7 +129,7 @@ class CsvDatabase(Database):
                     rename=self._build_columns(resources),
                 )
         except IOError as e:
-            raise ConnectionException(self, str(e))
+            raise ConnectionError(self, str(e))
 
     def disconnect(self) -> None:
         self._data = None
@@ -140,8 +140,8 @@ class CsvDatabase(Database):
     def read(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
     ) -> pd.DataFrame:
         def _infer_dates(s=start, e=end) -> Tuple[pd.Timestamp, pd.Timestamp]:
             if all(pd.isna(d) for d in [s, e]):
@@ -184,7 +184,7 @@ class CsvDatabase(Database):
             return pd.concat(results, axis="columns")
 
         except IOError as e:
-            raise ConnectionException(self, str(e))
+            raise ConnectionError(self, str(e))
 
     # noinspection PyTypeChecker
     def read_first(self, resources: Resources) -> Optional[pd.DataFrame]:
@@ -225,7 +225,7 @@ class CsvDatabase(Database):
             return pd.concat(results, axis="columns").head(1)
 
         except IOError as e:
-            raise ConnectionException(self, str(e))
+            raise ConnectionError(self, str(e))
 
     # noinspection PyTypeChecker
     def read_last(self, resources: Resources) -> Optional[pd.DataFrame]:
@@ -266,7 +266,7 @@ class CsvDatabase(Database):
             return pd.concat(results, axis="columns").tail(1)
 
         except IOError as e:
-            raise ConnectionException(self, str(e))
+            raise ConnectionError(self, str(e))
 
     def write(self, data: pd.DataFrame) -> None:
         columns = self._build_columns(self.resources)

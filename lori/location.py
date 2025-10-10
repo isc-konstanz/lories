@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Optional
 
 import pytz as tz
-from lori.core import ResourceException, ResourceUnavailableException
+from lori.core import ResourceError, ResourceUnavailableError  # noqa
 from lori.util import to_timezone
 
 
@@ -37,7 +37,7 @@ class Location:
         Altitude from sea level in meters.
     """
 
-    SECTION = "location"
+    TYPE = "location"
 
     def __init__(
         self,
@@ -77,14 +77,14 @@ class Location:
         return self._altitude
 
 
-class LocationException(ResourceException):
+class LocationException(ResourceError):
     """
     Raise if an error occurred accessing the location.
 
     """
 
 
-class LocationUnavailableException(ResourceUnavailableException, LocationException):
+class LocationUnavailableException(ResourceUnavailableError, LocationException):
     """
     Raise if a configured location access can not be found.
 

@@ -9,25 +9,20 @@ lori.application.view.pages.components.page
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Collection, Generic, Optional, TypeVar
+from typing import Collection, Generic, Optional
 
 import dash_bootstrap_components as dbc
 from dash import Input, Output, callback, html
 
 import pandas as pd
-from lori import Component, Configurations
 from lori.application.view.pages import Page, PageLayout
-from lori.components import ComponentAccess
-from lori.connectors import ConnectorAccess
-from lori.data import Channel, Channels, DataAccess
-
-C = TypeVar("C", bound=Component)
+from lori.typing import Channel, Channels, Component, Components, Connectors, Configurations, Data
 
 
-class ComponentPage(Page, Generic[C]):
-    _component: C
+class ComponentPage(Page, Generic[Component]):
+    _component: Component
 
-    def __init__(self, component: C, *args, **kwargs) -> None:
+    def __init__(self, component: Component, *args, **kwargs) -> None:
         super().__init__(
             id=component.id,
             key=component.key,
@@ -42,15 +37,15 @@ class ComponentPage(Page, Generic[C]):
         return self._component.configs
 
     @property
-    def connectors(self) -> ConnectorAccess:
+    def connectors(self) -> Connectors:
         return self._component.connectors
 
     @property
-    def components(self) -> ComponentAccess:
+    def components(self) -> Components:
         return self._component.components
 
     @property
-    def data(self) -> DataAccess:
+    def data(self) -> Data:
         return self._component.data
 
     def is_active(self) -> bool:

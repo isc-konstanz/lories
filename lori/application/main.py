@@ -18,7 +18,7 @@ from lori.application import Interface
 from lori.connectors import Database, DatabaseException
 from lori.data.manager import DataManager
 from lori.simulation import Results
-from lori.typing import TimestampType
+from lori.typing import Timestamp
 from lori.util import slice_range, to_timedelta
 
 
@@ -35,15 +35,15 @@ class Application(DataManager):
     # noinspection PyProtectedMember
     def __init__(self, settings: Settings, **kwargs) -> None:
         super().__init__(settings, name=settings["name"], **kwargs)
-        if not settings.has_section(Interface.SECTION):
-            settings._add_section(Interface.SECTION, {"enabled": False})
+        if not settings.has_section(Interface.TYPE):
+            settings._add_section(Interface.TYPE, {"enabled": False})
 
         # Check if the tasked action may be headless
         if settings.get("action").lower() == "start":
-            self._interface = Interface(self, settings.get_section(Interface.SECTION))
+            self._interface = Interface(self, settings.get_section(Interface.TYPE))
 
     # noinspection PyProtectedMember, PyTypeChecker, PyMethodOverriding
-    def configure(self, settings: Settings, factory: Type[System]) -> None:
+    def configure(self, settings: Settings, factory: Type[System] = System) -> None:
         super().configure(settings)
         self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
         components = []
@@ -66,7 +66,7 @@ class Application(DataManager):
         self._components.configure(components)
 
         if self._has_interface():
-            self._interface.configure(settings.get_section(Interface.SECTION))
+            self._interface.configure(settings.get_section(Interface.TYPE))
 
     # noinspection PyTypeChecker
     @property
@@ -123,8 +123,8 @@ class Application(DataManager):
     # noinspection PyUnresolvedReferences, PyProtectedMember, PyShadowingBuiltins
     def simulate(
         self,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
         **kwargs,
     ) -> None:
         simulation = self.settings.get_section("simulation", defaults={"data": {"include": True}})

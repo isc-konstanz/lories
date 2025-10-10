@@ -7,7 +7,6 @@ lori.connectors.tasks.log
 """
 
 from lori.connectors.tasks.write import WriteTask
-from lori.data.channels import Channels
 
 
 class LogTask(WriteTask):
@@ -16,6 +15,6 @@ class LogTask(WriteTask):
             f"Logging {len(self.channels)} channels of '{type(self.connector).__name__}': {self.connector.id}"
         )
         # Pass copied connectors instead of actual objects, including parsed logger specific connector configurations
-        channels = Channels(c.from_logger() for c in self.channels)
+        channels = self.channels.from_logger()
 
         self._run_write(channels)

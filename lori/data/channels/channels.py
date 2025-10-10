@@ -10,11 +10,14 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Callable
+from typing import Any, Iterator, Tuple
 
 import numpy as np
 import pandas as pd
+from lori._core._channel import Channel, ChannelState, _Channel  # noqa
+from lori._core._channels import Channels as ChannelsType  # noqa
+from lori._core._channels import _Channels  # noqa
 from lori.core import Resources
-from lori.data.channels import Channel, ChannelState
 from lori.data.validation import validate_index
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -25,9 +28,7 @@ except ImportError:
     from typing_extensions import Literal
 
 
-class Channels(Resources[Channel]):
-    SECTION: str = "channels"
-
+class Channels(_Channels, Resources[Channel]):
     def __str__(self) -> str:
         return str(self.to_frame(unique=True, states=True))
 
@@ -39,6 +40,20 @@ class Channels(Resources[Channel]):
     ) -> None:
         for channel in self:
             channel.register(function, how=how, unique=unique)
+
+    # noinspection PyTypeChecker
+    def apply(self, apply: Callable[[Channel], Channel], inplace: bool = False) -> ChannelsType:
+        return super().apply(apply, inplace=inplace)
+
+    def filter(self, *filters: Callable[[Channel], bool]) -> ChannelsType:
+        return super().filter(*filters)
+
+    # noinspection PyShadowingBuiltins, SpellCheckingInspection
+    def groupby(self, by: Callable[[Channel], Any] | str) -> Iterator[Tuple[Any, ChannelsType]]:
+        return super().groupby(by)
+
+    def from_logger(self) -> ChannelsType:
+        return type(self)([c.from_logger() for c in self if c.has_logger()])
 
     def to_frame(self, unique: bool = False, states: bool = False) -> pd.DataFrame:
         data = OrderedDict()
@@ -72,7 +87,7 @@ class Channels(Resources[Channel]):
         )
         data.dropna(axis="index", how="all", inplace=True)
         data = validate_index(data)
-        data.index.name = Channel.TIMESTAMP
+        data.index.name = _Channel.TIMESTAMP
         return data
 
     # noinspection PyProtectedMember

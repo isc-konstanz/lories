@@ -8,274 +8,55 @@ lori.core.register.context
 
 from __future__ import annotations
 
-import logging
 import os
 import re
 from abc import abstractmethod
-from copy import deepcopy
-from logging import Logger
-from typing import Any, Collection, Generic, Mapping, Optional, Type, TypeVar
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Collection, Generic, Optional, Sequence, Type
 
-from lori.core import Configurations, Configurator, Context, Directories, Directory, ResourceException
-from lori.core.register import RegistrationException, Registrator, Registry
-from lori.util import update_recursive, validate_key
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import get_args
-
-except ImportError:
-    from typing_extensions import get_args
-
-R = TypeVar("R", bound=Registrator)
-
-
-# noinspection SpellCheckingInspection, PyAbstractClass, PyProtectedMember
-class _RegistratorContext(Context[R], Generic[R]):
-    _section: str
-    _logger: Logger
-
-    def __init__(
-        self,
-        section: str,
-        logger: Optional[Logger] = None,
-        *args,
-        **kwargs,
-    ) -> None:
-        super().__init__(*args, **kwargs)
-        self._section = section
-        if logger is None:
-            logger = self._get_logger()
-        self._logger = logger
-
-    @classmethod
-    def _get_logger(cls) -> Logger:
-        return logging.getLogger(cls.__module__)
-
-    def _load(
-        self,
-        context: Context | Registrator,
-        configs: Configurations,
-        configs_file: Optional[str] = None,
-        configs_dir: Optional[str | Directory] = None,
-        includes: Optional[Collection[str]] = (),
-        defaults: Optional[Mapping[str, Any]] = None,
-        configure: bool = True,
-        sort: bool = True,
-        **kwargs: Any,
-    ) -> Collection[R]:
-        registrators = []
-        if defaults is None:
-            defaults = {}
-        update_recursive(defaults, Registrator._build_defaults(configs, includes))
-
-        configs_dirs = configs.dirs.copy()
-        if configs_dir is None:
-            configs_dir = configs.dirs.conf.joinpath(configs.name.replace(".conf", ".d"))
-        if isinstance(configs_dir, str) and not os.path.isabs(configs_dir):
-            configs_dir = configs_dirs.conf.joinpath(configs_dir)
-        configs_dirs.conf = configs_dir
-        configs_sections = configs.get_sections([s for s in configs.sections if s not in defaults])
-
-        if configs_file and configs_file != configs.name:
-            registrators.extend(self._load_from_file(context, configs_file, configs.dirs, defaults, **kwargs))
-
-        registrators.extend(self._load_from_sections(context, configs_sections, defaults, **kwargs))
-        registrators.extend(self._load_from_dir(context, configs_dirs, defaults, **kwargs))
-
-        if sort:
-            self.sort()
-        if configure:
-            self.configure(registrators)
-        return registrators
-
-    def _load_from_configs(
-        self,
-        context: Context | Registrator,
-        configs: Configurations,
-        **kwargs: Any,
-    ) -> R:
-        registrator_id = Registrator._build_id(context=context, configs=configs)
-        if self._contains(registrator_id):
-            registrator = self._update(registrator_id, configs)
-        else:
-            registrator = self._create(context, configs, **kwargs)
-            self._add(registrator)
-        return registrator
-
-    def _load_from_sections(
-        self,
-        context: Context | Registrator,
-        configs: Configurations,
-        includes: Optional[Collection[str]] = (),
-        defaults: Optional[Mapping[str, Any]] = None,
-        **kwargs: Any,
-    ) -> Collection[R]:
-        registrators = []
-        if defaults is None:
-            defaults = {}
-        update_recursive(defaults, Registrator._build_defaults(configs))
-
-        for section_name in configs.sections:
-            if section_name in includes:
-                continue
-            section_file = f"{section_name}.conf"
-            section_default = deepcopy(defaults)
-            update_recursive(section_default, configs.get(section_name))
-
-            section = Configurations.load(
-                section_file,
-                **configs.dirs.to_dict(),
-                **section_default,
-                require=False,
-            )
-            registrators.append(self._load_from_configs(context, section, **kwargs))
-        return registrators
-
-    def _load_from_file(
-        self,
-        context: Context | Registrator,
-        configs_file: str,
-        configs_dirs: Directories,
-        defaults: Optional[Mapping[str, Any]] = None,
-        **kwargs: Any,
-    ) -> Collection[R]:
-        registrators = []
-        if configs_dirs.conf.joinpath(configs_file).is_file():
-            # Do not call .load() function here, as configs_dirs._conf may be None and would otherwise be overridden
-            # with the data directory
-            configs = Configurations(configs_file, deepcopy(configs_dirs))
-            configs._load()
-            registrators.extend(self._load_from_sections(context, configs, defaults, **kwargs))
-        return registrators
-
-    def _load_from_dir(
-        self,
-        context: Registrator,
-        configs_dirs: Directories,
-        defaults: Optional[Mapping[str, Any]] = None,
-        **kwargs: Any,
-    ) -> Collection[R]:
-        registrators = []
-        if os.path.isdir(configs_dirs.conf):
-            for configs_entry in os.scandir(configs_dirs.conf):
-                if (
-                    configs_entry.is_file()
-                    and configs_entry.path.endswith(".conf")
-                    and not configs_entry.path.endswith("default.conf")
-                    and configs_entry.name
-                    not in [
-                        "settings.conf",
-                        "system.conf",
-                        "evaluations.conf",
-                        "replications.conf",
-                        "logging.conf",
-                    ]
-                ):
-                    configs = Configurations.load(
-                        configs_entry.name,
-                        **configs_dirs.to_dict(),
-                        **defaults,
-                    )
-                    try:
-                        registrators.append(self._load_from_configs(context, configs, **kwargs))
-
-                    except RegistrationException:
-                        # Skip files with missing or unknown type
-                        # TODO: Introduce debug logging here
-                        pass
-        return registrators
-
-    # noinspection PyUnresolvedReferences, PyTypeChecker
-    def configure(self, configurators: Optional[Collection[Configurator]] = None) -> None:
-        if configurators is None:
-            configurators = self.values()
-        for configurator in configurators:
-            configurations = configurator.configs
-            if configurations is None or not configurations.enabled:
-                self._logger.debug(f"Skipping configuring disabled {type(configurator).__name__}")
-                continue
-
-            self._logger.debug(f"Configuring {type(self).__name__}: {configurations.path}")
-            configurator.configure(configurations)
-
-            if self._logger.getEffectiveLevel() <= logging.DEBUG:
-                self._logger.debug(f"Configured {configurator}")
-
-    # noinspection PyUnresolvedReferences, PyArgumentList, PyShadowingBuiltins
-    def _update(self, id: str, configs: Configurations) -> R:
-        registrator = self._get(id)
-        if registrator.is_configured() and configs.enabled:
-            registrator_configs = registrator.configs.copy()
-            registrator_configs.update(configs)
-            registrator.update(registrator_configs)
-        else:
-            registrator.configs.update(configs)
-        return registrator
-
-    # noinspection PyUnresolvedReferences
-    def get_all(self, *types: Type) -> Collection[R]:
-        if len(types) == 0:
-            return self.values()
-        return self.filter(lambda r: any(isinstance(r, t) and r.is_enabled() for t in types))
-
-    def get_first(self, *types: Optional[str | Type]) -> Optional[R]:
-        registrators = self.get_all(*types)
-        return next(iter(registrators)) if len(registrators) > 0 else None
-
-    # noinspection PyTypeChecker
-    def get_last(self, *types: Optional[str | Type]) -> Optional[R]:
-        registrators = self.get_all(*types)
-        return next(reversed(registrators)) if len(registrators) > 0 else None
-
-    def has_type(self, *types: str | Type) -> bool:
-        if len(types) == 0:
-            raise ValueError("At least one type to look up required")
-        return len(self.get_all(*types)) > 0
-
-    @abstractmethod
-    def _get_registrator_section(self) -> Configurations:
-        pass
-
-    @abstractmethod
-    def load(self, **kwargs: Any) -> Collection[R]:
-        pass
+from lori._core._configurations import Configurations  # noqa
+from lori._core._data import DataContext, _DataContext, _DataManager  # noqa
+from lori._core._registrator import Registrator  # noqa
+from lori.core.errors import ResourceError
+from lori.core.register._load import _RegistratorLoader
+from lori.core.register.registry import Registry
+from lori.util import validate_key
 
 
 # noinspection SpellCheckingInspection, PyProtectedMember
-class RegistratorContext(_RegistratorContext[R], Generic[R]):
-    __context: Context
+class RegistratorContext(_RegistratorLoader[Registrator], Generic[Registrator]):
+    __context: _DataContext
 
-    def __init__(self, context: Context, section: str, **kwargs) -> None:
-        super().__init__(section, **kwargs)
-        self.__context = self._assert_context(context)
+    # noinspection PyUnresolvedReferences
+    def __init__(self, context: DataContext, **kwargs) -> None:
+        context = self._assert_context(context)
+        super().__init__(context._logger, **kwargs)
+        self.__context = context
 
     @classmethod
-    def _assert_context(cls, context: Context) -> Context:
-        from lori.data.manager import DataManager
-
-        if context is None or not isinstance(context, DataManager):
-            raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
+    def _assert_context(cls, context: DataContext) -> DataContext:
+        if context is None or not isinstance(context, _DataManager):
+            raise ResourceError(f"Invalid '{cls.__name__}' context: {type(context)}")
         return context
 
     @property
-    def context(self) -> Context:
+    def context(self) -> DataContext:
         return self.__context
+
+    # noinspection PyUnresolvedReferences
+    @property
+    def _executor(self) -> ThreadPoolExecutor:
+        return self.__context._executor
 
     @property
     @abstractmethod
-    def _registry(self) -> Registry[R]:
-        pass
-
-    # noinspection PyUnresolvedReferences
-    def _get_class(self) -> Type[R]:
-        return get_args(self._registry.__orig_class__)[0]
+    def _registry(self) -> Registry[Registrator]: ...
 
     # noinspection PyMethodMayBeStatic
     def get_types(self) -> Collection[str]:
         return self._registry.get_types()
 
-    def get_all(self, *types: str | Type) -> Collection[R]:
+    def get_all(self, *types: str | Type) -> Sequence[Registrator]:
         def _is_type(regitrator) -> bool:
             for _type in types:
                 if isinstance(_type, str) and self._registry.has_type(_type):
@@ -285,28 +66,24 @@ class RegistratorContext(_RegistratorContext[R], Generic[R]):
             return False
 
         if len(types) == 0:
-            return self.values()
+            return list(self.values())
         return self.filter(_is_type)
-
-    # noinspection PyUnresolvedReferences
-    def _get_registrator_section(self) -> Configurations:
-        return self.__context.configs.get_section(self._section, ensure_exists=True)
 
     def _create(
         self,
-        context: Context | Registrator,
+        context: RegistratorContext | Registrator,
         configs: Configurations,
         **kwargs: Any,
-    ) -> R:
-        registration_class = self._get_class()
-        registrator_section = configs.get_section(registration_class.SECTION, ensure_exists=True)
+    ) -> Registrator:
+        registration_class = self._get_registator_class()
+        registrator_section = configs.get_section(registration_class.TYPE, ensure_exists=True)
 
         if "key" not in registrator_section:
             if "key" in configs:
                 registration_key = configs.get("key")
                 del configs["key"]
             else:
-                registration_key = "_".join(os.path.splitext(configs.name)[:-1])
+                registration_key = "_".join(os.path.splitext(configs.key)[:-1])
             registrator_section["key"] = validate_key(registration_key)
             registrator_section.move_to_top("key")
 
@@ -316,7 +93,7 @@ class RegistratorContext(_RegistratorContext[R], Generic[R]):
             registrator_section.move_to_top("name")
             del configs["name"]
 
-        registration_type = re.split(r"[^a-zA-Z0-9_]", configs.name)[0]
+        registration_type = re.split(r"[^a-zA-Z0-9_]", configs.key)[0]
         if "type" in registrator_section:
             registration_type = validate_key(registrator_section.get("type"))
         elif "type" in configs:
@@ -331,6 +108,13 @@ class RegistratorContext(_RegistratorContext[R], Generic[R]):
             registrator_section.move_to_top("type")
         return registration.initialize(context, configs, **kwargs)
 
-    @abstractmethod
-    def load(self, configs: Configurations, **kwargs: Any) -> Collection[R]:
-        pass
+    # noinspection PyUnresolvedReferences
+    def _load_registrators_configs(self) -> Configurations:
+        section = self._get_registrators_type()
+        return self.__context.configs.get_section(section, ensure_exists=True)
+
+    def load(self, configs: Optional[Configurations] = None, **kwargs) -> Sequence[Registrator]:
+        _class = self._get_registator_class()
+        if configs is None:
+            configs = self._load_registrators_configs()
+        return self._load(self, configs, includes=_class.INCLUDES, **kwargs)

@@ -17,7 +17,7 @@ from sqlalchemy.types import BLOB, BOOLEAN, DATETIME, FLOAT, INTEGER, TIMESTAMP,
 
 import numpy as np
 import pandas as pd
-from lori.core import ConfigurationException, ResourceException
+from lori.core import ConfigurationError, ResourceError
 
 ColumnType = TypeVar("ColumnType", Type[TypeEngine], TypeEngine)
 
@@ -53,7 +53,7 @@ class Column(sql.Column):
 
     def validate(self, data: Any) -> Any:
         if data is None and not self.nullable:
-            raise ResourceException(f"None value for '{self.name}' NOT NULL")
+            raise ResourceError(f"None value for '{self.name}' NOT NULL")
         return data
 
 
@@ -76,7 +76,7 @@ def parse_type(type: Type | AnyStr, length: Optional[int] = None) -> Type[TypeEn
     if isinstance(type, str):
         type = type.upper()
     else:
-        raise ConfigurationException(f"Unknown SQL data type: {type}")
+        raise ConfigurationError(f"Unknown SQL data type: {type}")
 
     return to_type_engine(type, length)
 
@@ -97,9 +97,9 @@ def to_type_engine(type: Type | AnyStr, length: Optional[int] = None) -> Type[Ty
         return TIMESTAMP
     if type in ["VARCHAR", "STRING"]:
         if type == "VARCHAR" and length is None:
-            raise ConfigurationException(f"Invalid SQL data type '{type}' without configured length")
+            raise ConfigurationError(f"Invalid SQL data type '{type}' without configured length")
         if length is None:
             return String
         return String(length)
 
-    raise ConfigurationException(f"Unknown SQL data type: {type}")
+    raise ConfigurationError(f"Unknown SQL data type: {type}")

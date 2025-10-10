@@ -16,11 +16,11 @@ from sqlalchemy.exc import SQLAlchemyError
 
 import pandas as pd
 import pytz as tz
-from lori.connectors import ConnectionException, Database, DatabaseException, register_connector_type
+from lori.connectors import ConnectionError, Database, DatabaseException, register_connector_type
 from lori.connectors.sql import Schema, Table
-from lori.core import ConfigurationException, Configurations, Resources
+from lori.core.configs import ConfigurationError
 from lori.data.util import hash_value
-from lori.typing import TimestampType
+from lori.typing import Configurations, Resources, Timestamp
 from lori.util import to_timezone
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -51,7 +51,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
     @property
     def connection(self) -> Connection:
         if not self.is_connected():
-            raise ConnectionException(self, "SQL connection not open")
+            raise ConnectionError(self, "SQL connection not open")
         return self._connection
 
     def __init__(self, *args, **kwargs) -> None:
@@ -106,7 +106,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
         elif dialect == "postgresql":
             prefix = "postgresql+psycopg2://"
         else:
-            raise ConfigurationException(f"Unsupported database type: {dialect}")
+            raise ConfigurationError(f"Unsupported database type: {dialect}")
         try:
             self.engine = create_engine(
                 url=f"{prefix}{self.user}:{self.password}@{self.host}:{self.port}/{self.database}",
@@ -118,7 +118,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
             self._schema.configure(configs.get_section("tables", defaults={}))
 
         except SQLAlchemyError as e:
-            raise ConfigurationException(f"Unable to create database engine: {str(e)}")
+            raise ConfigurationError(f"Unable to create database engine: {str(e)}")
 
     def connect(self, resources: Resources) -> None:
         self._logger.debug(f"Connecting to {self.dialect.name} database {self.database}@{self.host}:{self.port}")
@@ -177,8 +177,8 @@ class SqlDatabase(Database, Mapping[str, Table]):
     def hash(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
         method: Literal["MD5", "SHA1", "SHA256", "SHA512"] = "MD5",
         encoding: str = "UTF-8",
     ) -> Optional[str]:
@@ -217,8 +217,8 @@ class SqlDatabase(Database, Mapping[str, Table]):
     def exists(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
     ) -> bool:
         try:
             for table_schema, schema_resources in resources.groupby("schema"):
@@ -244,8 +244,8 @@ class SqlDatabase(Database, Mapping[str, Table]):
     def read(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
     ) -> pd.DataFrame:
         results = []
         try:
@@ -346,8 +346,8 @@ class SqlDatabase(Database, Mapping[str, Table]):
     def delete(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
     ) -> None:
         try:
             for table_schema, schema_resources in resources.groupby("schema"):
@@ -374,4 +374,4 @@ class SqlDatabase(Database, Mapping[str, Table]):
         if "syntax" in str(e).lower():
             raise DatabaseException(self, str(e))
         else:
-            raise ConnectionException(self, str(e))
+            raise ConnectionError(self, str(e))

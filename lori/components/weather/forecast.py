@@ -13,16 +13,16 @@ from typing import Optional
 
 import pandas as pd
 import pytz as tz
-from lori.components import Component
 from lori.components.weather import Weather
-from lori.core import Configurations, ResourceException
+from lori.core.errors import ResourceError
+from lori.core.typing import Component, Configurations
 from lori.location import Location
 from lori.util import floor_date, to_date, to_timezone
 
 
 class WeatherForecast(Weather):
     TYPE: str = "weather_forecast"
-    SECTION: str = "forecast"
+    TYPE: str = "forecast"
 
     interval: int = 60
     offset: int = 0
@@ -32,7 +32,7 @@ class WeatherForecast(Weather):
         from lori.components.weather import WeatherProvider
 
         if context is None or not isinstance(context, WeatherProvider):
-            raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
+            raise ResourceError(f"Invalid '{cls.__name__}' context: {type(context)}")
         return super()._assert_context(context)
 
     def configure(self, configs: Configurations) -> None:

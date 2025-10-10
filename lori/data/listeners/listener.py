@@ -12,12 +12,14 @@ import logging
 from collections.abc import Callable
 from logging import Logger
 from threading import Lock
-from typing import Optional
+from typing import Optional, TypeVar
 
 import pandas as pd
 import pytz as tz
-from lori.core import Entity, ResourceException
-from lori.data import Channel, Channels
+from lori._core._channel import Channel  # noqa
+from lori._core._channels import Channels  # noqa
+from lori._core._listener import _Listener  # noqa
+from lori.core import ResourceError
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
 try:
@@ -28,7 +30,7 @@ except ImportError:
 
 
 # noinspection PyShadowingBuiltins
-class Listener(Entity):
+class Listener(_Listener):
     __lock: Lock
     _logger: Logger
 
@@ -66,7 +68,7 @@ class Listener(Entity):
             self.run()
 
         except Exception as e:
-            raise ListenerException(self, str(e))
+            raise ListenerError(self, str(e))
         finally:
             self.__complete = timestamp
             self.__lock.release()
@@ -101,13 +103,16 @@ class Listener(Entity):
         return False
 
 
-class ListenerException(ResourceException):
+class ListenerError(ResourceError):
     """
     Raise if an error occurred notifying the listener.
 
     """
 
     # noinspection PyArgumentList
-    def __init__(self, listener: Listener, *args, **kwargs) -> None:
+    def __init__(self, listener: ListenerType, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.listener = listener
+
+
+ListenerType = TypeVar("ListenerType", bound=Listener)

@@ -20,8 +20,9 @@ import tzlocal
 import numpy as np
 import pandas as pd
 import pytz as tz
-from lori.core import ResourceException
-from lori.typing import TimestampType, TimezoneType
+from lori._core._configurations import Configurations  # noqa
+from lori._core.typing import Timestamp, Timezone  # noqa
+from lori.core.errors import ResourceError
 
 # noinspection SpellCheckingInspection
 INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
@@ -39,7 +40,7 @@ def get_context(object: Any, type: Type[C] | Collection[Type[C]]) -> Optional[C]
         try:
             _context = _context.context
         except AttributeError:
-            raise ResourceException(f"Invalid context type: {object.__class__}")
+            raise TypeError(f"Invalid context type: {object.__class__}")
     return _context
 
 
@@ -86,7 +87,7 @@ def get_members(
             # Handle duplicate attr
             if attr in processed:
                 raise AttributeError
-        except (AttributeError, ResourceException):
+        except (AttributeError, ResourceError):
             continue
         if (
             (private or "__" not in attr)
@@ -98,7 +99,12 @@ def get_members(
     return dict(sorted(members.items()))
 
 
-def update_recursive(configs: Dict[str, Any], update: Mapping[str, Any], replace: bool = True) -> Dict[str, Any]:
+# noinspection PyTypeChecker
+def update_recursive(
+    configs: Dict[str, Any] | Configurations,
+    update: Mapping[str, Any] | Configurations,
+    replace: bool = True,
+) -> Dict[str, Any]:
     for key, update_value in update.items():
         if isinstance(update_value, Mapping):
             update_map = configs.get(key, {})
@@ -113,8 +119,8 @@ def update_recursive(configs: Dict[str, Any], update: Mapping[str, Any], replace
 
 
 def convert_timezone(
-    date: Optional[TimestampType | str],
-    timezone: Optional[TimezoneType] = None,
+    date: Optional[Timestamp | str],
+    timezone: Optional[Timezone] = None,
 ) -> Optional[pd.Timestamp]:
     if date is None:
         return None
@@ -135,9 +141,9 @@ def convert_timezone(
 
 
 def slice_range(
-    start: Optional[TimestampType | str],
-    end: Optional[TimestampType | str],
-    timezone: Optional[TimezoneType] = None,
+    start: Optional[Timestamp | str],
+    end: Optional[Timestamp | str],
+    timezone: Optional[Timezone] = None,
     freq: str = "D",
     **kwargs,
 ) -> List[Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp]]]:
@@ -171,12 +177,13 @@ def slice_range(
 
 
 def floor_date(
-    date: Optional[TimestampType | str],
-    timezone: Optional[TimezoneType] = None,
+    date: Optional[Timestamp | str],
+    timezone: Optional[Timezone] = None,
     freq: str = "D",
 ) -> Optional[pd.Timestamp]:
     if date is None:
         return None
+    date = to_date(date)
     if timezone is None:
         timezone = date.tzinfo
     date = convert_timezone(date, timezone)
@@ -189,22 +196,23 @@ def floor_date(
         raise ValueError(f"Invalid frequency: {freq}")
 
 
+# noinspection PyTypeChecker
 def ceil_date(
-    date: Optional[TimestampType | str],
-    timezone: Optional[TimezoneType] = None,
+    date: Optional[Timestamp | str],
+    timezone: Optional[Timezone] = None,
     freq: str = "D",
 ) -> Optional[pd.Timestamp]:
-    date = floor_date(date, timezone, freq)
     if date is None:
         return None
+    date = floor_date(date, timezone, freq)
 
     return date + to_timedelta(freq) - pd.Timedelta(microseconds=1)
 
 
 # noinspection PyShadowingBuiltins
 def to_date(
-    date: Optional[TimestampType | str | int],
-    timezone: Optional[TimezoneType] = None,
+    date: Optional[Timestamp | str | int],
+    timezone: Optional[Timezone] = None,
     format: Optional[str] = None,
 ) -> Optional[pd.Timestamp]:
     if date is None:
@@ -222,7 +230,7 @@ def to_date(
     raise TypeError(f"Invalid date type: {type(date)}")
 
 
-def to_timezone(timezone: Optional[TimezoneType | str | int | float]) -> Optional[TimezoneType]:
+def to_timezone(timezone: Optional[Timezone | str | int | float]) -> Optional[Timezone]:
     if timezone is None:
         return None
     if isinstance(timezone, (tz.BaseTzInfo, dt.tzinfo)):

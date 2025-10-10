@@ -6,11 +6,9 @@ lori.components.tariff
 
 """
 
-from . import core  # noqa: F401
-from .core import (  # noqa: F401
+from . import tariff  # noqa: F401
+from .tariff import (  # noqa: F401
     Tariff,
-    TariffException,
-    TariffUnavailableException,
     register_tariff_type,
     registry,
 )

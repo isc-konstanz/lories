@@ -12,35 +12,36 @@ from collections import OrderedDict
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
-from lori import ConfigurationException
-from lori.core import ResourceException
+from lori._core._connector import Connector, _Connector  # noqa
+from lori._core._database import _Database  # noqa
+from lori.core.configs import ConfigurationError
+from lori.core.errors import ResourceError
 from lori.util import to_bool, update_recursive
 
 
 class ChannelConnector:
     __configs: OrderedDict[str, Any]
+    _connector: Optional[Connector]
 
     enabled: bool = False
 
     timestamp: pd.Timestamp = pd.NaT
 
     # noinspection PyShadowingBuiltins
-    def __init__(self, connector, **configs: Any) -> None:
+    def __init__(self, connector: Optional[Connector] = None, **configs: Any) -> None:
         if "connector" in configs:
-            raise ConfigurationException("Invalid channel connector configuration 'connector'")
+            raise ConfigurationError("Invalid channel connector configuration 'connector'")
         self.__configs = OrderedDict(configs)
         self._connector = self._assert_connector(connector)
 
         self.enabled = to_bool(self.__configs.pop("enabled", connector is not None and connector.is_enabled()))
 
     @classmethod
-    def _assert_connector(cls, connector):
-        from lori.connectors import Connector
-
+    def _assert_connector(cls, connector: Connector) -> Optional[Connector]:
         if connector is None:
             return None
-        if not isinstance(connector, Connector):
-            raise ResourceException(f"Invalid connector: {None if connector is None else type(connector)}")
+        if not isinstance(connector, _Connector):
+            raise ResourceError(f"Invalid connector: {None if connector is None else type(connector)}")
         return connector
 
     def __eq__(self, other: Any) -> bool:
@@ -83,7 +84,7 @@ class ChannelConnector:
         return self._connector.id if self._connector is not None else None
 
     @property
-    def key(self) -> str:
+    def key(self) -> Optional[str]:
         return self._connector.key if self._connector is not None else None
 
     def is_configured(self) -> bool:
@@ -96,10 +97,8 @@ class ChannelConnector:
         return self._is_database(self._connector) if self.enabled else False
 
     @staticmethod
-    def _is_database(connector) -> bool:
-        from lori.connectors import Database
-
-        return isinstance(connector, Database)
+    def _is_database(connector: Connector) -> bool:
+        return isinstance(connector, _Database)
 
     def to_configs(self) -> Dict[str, Any]:
         configs = {
@@ -139,16 +138,16 @@ class ChannelConnector:
     # noinspection PyShadowingBuiltins
     def _update(
         self,
-        connector: Optional[str | ChannelConnector] = None,
+        connector: Optional[str | Connector] = None,
         enabled: Optional[str | bool] = None,
         **configs: Any,
     ) -> None:
         if connector is not None:
             if isinstance(connector, str):
                 if self._connector is None or self._connector.key != connector.split(".")[-1]:
-                    raise ConfigurationException(f"Unable to update channel connector from key '{connector}'")
-            elif not isinstance(connector, ChannelConnector):
-                raise ConfigurationException(f"Unable to update channel connector to invalid type '{type(connector)}'")
+                    raise ConfigurationError(f"Unable to update channel connector from key '{connector}'")
+            elif not isinstance(connector, _Connector):
+                raise ConfigurationError(f"Unable to update channel connector to invalid type '{type(connector)}'")
             else:
                 self._connector = connector
         if enabled is not None:

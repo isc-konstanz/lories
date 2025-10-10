@@ -9,9 +9,10 @@ lori.components.tariff.entsoe
 from __future__ import annotations
 
 import pandas as pd
-from lori import Channel, Configurations, Constant
+from lori import Constant
 from lori.components.tariff import Tariff, TariffProvider, register_tariff_type
 from lori.connectors.entsoe import EntsoeConnector
+from lori.typing import Configurations
 
 
 # noinspection SpellCheckingInspection
@@ -31,7 +32,6 @@ class EntsoeProvider(TariffProvider):
             name="ENTSO-e Connector",
             configs=configs,
         )
-
         self.connectors.add(entsoe_connector)
         self.data.add(
             EntsoeProvider.PRICE_DAY_AHEAD,
@@ -48,5 +48,5 @@ class EntsoeProvider(TariffProvider):
     def _on_tariff_received(self, data: pd.DataFrame) -> None:
         timestamp = data.index[0]
         import_data = data[EntsoeProvider.PRICE_DAY_AHEAD] / 10.0 + self._offset
-        import_channel: Channel = self.data.get(Tariff.PRICE_IMPORT)
+        import_channel = self.data.get(Tariff.PRICE_IMPORT)
         import_channel.set(timestamp, import_data)

@@ -19,10 +19,10 @@ import dash
 from dash import Dash, dcc, html
 from dash_bootstrap_components import themes
 
-from lori import Configurations
 from lori.application import Application
 from lori.application.interface import Interface, register_interface_type
 from lori.application.view import LoginPage, PageFooter, PageHeader, View
+from lori.typing import Configurations
 
 logging.getLogger("werkzeug").setLevel(logging.WARNING)
 

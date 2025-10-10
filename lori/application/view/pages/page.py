@@ -12,21 +12,17 @@ import logging
 import re
 from abc import ABC, ABCMeta, abstractmethod
 from functools import wraps
-from typing import Any, Optional, TypeVar
+from typing import Any, Optional
 
 import dash
-from dash.development.base_component import Component
 
 import pandas as pd
 from lori.application import InterfaceException
 from lori.application.view.pages.layout import PageLayout
 from lori.util import validate_key
 
-C = TypeVar("C", bound=Component)
-
 
 class PageMeta(ABCMeta):
-    # noinspection PyProtectedMember
     def __call__(cls, *args, **kwargs):
         page = super().__call__(*args, **kwargs)
         cls._wrap_method(page, "create_layout")
@@ -37,8 +33,10 @@ class PageMeta(ABCMeta):
     # noinspection PyShadowingBuiltins
     @staticmethod
     def _wrap_method(object: Any, method: str) -> None:
-        setattr(object, f"_run_{method}", getattr(object, method))
-        setattr(object, method, getattr(object, f"_do_{method}"))
+        _wrap_method = getattr(object, f"_do_{method}")
+        _run_method = getattr(object, method)
+        setattr(object, f"_run_{method}", _run_method)
+        setattr(object, method, _wrap_method)
 
 
 # noinspection PyShadowingBuiltins
@@ -95,8 +93,7 @@ class Page(ABC, metaclass=PageMeta):
         return self._created
 
     @abstractmethod
-    def create_layout(self, layout: PageLayout) -> None:
-        pass
+    def create_layout(self, layout: PageLayout) -> None: ...
 
     # noinspection PyUnresolvedReferences
     @wraps(create_layout, updated=())

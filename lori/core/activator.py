@@ -11,7 +11,9 @@ from __future__ import annotations
 from functools import wraps
 from typing import Callable, Dict
 
-from lori.core.configs import ConfigurationException
+from lori._core._activator import Activator as ActivatorType  # noqa
+from lori._core._activator import _Activator  # noqa
+from lori.core.configs import ConfigurationError
 from lori.core.configs.configurator import Configurator, ConfiguratorMeta
 
 
@@ -26,15 +28,15 @@ class ActivatorMeta(ConfiguratorMeta):
 
 
 # noinspection PyAbstractClass
-class Activator(Configurator, metaclass=ActivatorMeta):
+class Activator(_Activator, Configurator, metaclass=ActivatorMeta):
     _active: bool = False
 
-    def __enter__(self) -> Activator:
+    def __enter__(self) -> ActivatorType:
         self.activate()
         return self
 
     # noinspection PyShadowingBuiltins
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, type, value, traceback) -> None:
         self.deactivate()
 
     # noinspection PyShadowingBuiltins
@@ -53,9 +55,9 @@ class Activator(Configurator, metaclass=ActivatorMeta):
     @wraps(activate, updated=())
     def _do_activate(self, *args, **kwargs) -> None:
         if not self.is_enabled():
-            raise ConfigurationException(f"Trying to activate disabled '{type(self).__name__}': {self.id}")
+            raise ConfigurationError(f"Trying to activate disabled '{type(self).__name__}': {self.id}")
         if not self.is_configured():
-            raise ConfigurationException(f"Trying to activate unconfigured '{type(self).__name__}': {self.id}")
+            raise ConfigurationError(f"Trying to activate unconfigured '{type(self).__name__}': {self.id}")
         if self.is_active():
             self._logger.warning(f"Trying to activate already active '{type(self).__name__}': {self.id}")
             return

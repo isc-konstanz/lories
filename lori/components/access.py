@@ -11,61 +11,42 @@ from __future__ import annotations
 import glob
 import os.path
 from collections.abc import Callable
-from typing import Any, Collection, Mapping, Optional, Type, TypeVar
+from typing import Any, Collection, Mapping, Optional, Sequence, Type
 
-from lori import Context
-from lori.components.core import _Component
-from lori.core import Configurations, Directory, ResourceException
-from lori.core.register import Registrator, RegistratorAccess, RegistratorContext
+from lori._core._component import Component, _Component, _ComponentContext  # noqa
+from lori._core._data import _DataManager  # noqa
+from lori.core import Configurations, RegistratorAccess, ResourceError
 from lori.util import get_context, update_recursive
 
-C = TypeVar("C", bound=_Component)
 
-
-class ComponentAccess(RegistratorAccess[C]):
+# noinspection PyProtectedMember
+class ComponentAccess(_ComponentContext, RegistratorAccess[Component]):
     # noinspection PyUnresolvedReferences
-    def __init__(self, registrar: Registrator, **kwargs) -> None:
-        context = get_context(registrar, RegistratorContext).context.components
-        super().__init__(context, registrar, "components", **kwargs)
+    def __init__(self, registrar: Component, **kwargs) -> None:
+        context = get_context(registrar, _DataManager).components
+        super().__init__(context, registrar, **kwargs)
 
     # noinspection PyShadowingBuiltins
-    def _set(self, id: str, component: C) -> None:
+    def _set(self, id: str, component: Component) -> None:
         if not isinstance(component, _Component):
-            raise ResourceException(f"Invalid component type: {type(component)}")
+            raise ResourceError(f"Invalid component type: {type(component)}")
 
         super()._set(id, component)
 
-    # noinspection PyProtectedMember
     def load(
         self,
         configs: Optional[Configurations] = None,
         configs_file: Optional[str] = None,
-        configs_dir: Optional[str | Directory] = None,
+        configs_dir: Optional[str] = None,
         configure: bool = False,
         **kwargs: Any,
-    ) -> Collection[C]:
-        defaults = _Component._build_defaults(self._registrar.configs, strict=True)
-        if configs is None:
-            configs = self._get_registrator_section()
-        if configs_file is None:
-            configs_file = configs.name
-        if configs_dir is None:
-            configs_dir = configs.dirs.conf.joinpath(configs.name.replace(".conf", ".d"))
-        return self._load(
-            self._registrar,
-            configs=configs,
-            configs_file=configs_file,
-            configs_dir=configs_dir,
-            configure=configure,
-            includes=_Component.INCLUDES,
-            defaults=defaults,
-            **kwargs,
-        )
+    ) -> Sequence[Component]:
+        return super().load(configs, configs_file, configs_dir, configure, strict=True)
 
-    # noinspection PyShadowingBuiltins, PyProtectedMember
+    # noinspection PyUnresolvedReferences
     def load_from_type(
         self,
-        type: Type[C],
+        type: Type[Component],
         configs: Configurations,
         section: str,
         key: str,
@@ -75,11 +56,11 @@ class ComponentAccess(RegistratorAccess[C]):
         configure: bool = False,
         sort: bool = True,
         **kwargs,
-    ) -> Collection[C]:
+    ) -> Sequence[Component]:
         kwargs["factory"] = type
         components = []
         if defaults is None:
-            defaults = _Component._build_defaults(self._registrar.configs, strict=True)
+            defaults = self._load_registrator_defaults(strict=True)
         if any(i in configs.sections for i in includes):
             configs["key"] = key
             configs["name"] = name
@@ -115,11 +96,11 @@ class ComponentAccess(RegistratorAccess[C]):
 
     def _create(
         self,
-        context: Context | Registrator,
+        context: _ComponentContext | _Component,
         configs: Configurations,
-        factory: Optional[Callable[..., C]] = None,
+        factory: Optional[Callable[..., Component]] = None,
         **kwargs: Any,
-    ) -> C:
+    ) -> Component:
         if factory is None:
             factory = super()._create
         return factory(context, configs, **kwargs)

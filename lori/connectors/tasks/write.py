@@ -6,8 +6,8 @@ lori.connectors.tasks.write
 
 """
 
+from lori._core._channels import Channels  # noqa
 from lori.connectors.tasks.task import ConnectorTask
-from lori.data.channels import Channels
 
 
 class WriteTask(ConnectorTask):

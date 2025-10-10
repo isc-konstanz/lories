@@ -17,27 +17,25 @@ from concurrent import futures
 from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError
 from functools import partial
 from threading import Event, Thread
-from typing import Any, Dict, Mapping, Optional, Type, overload
+from typing import Any, Dict, Mapping, Optional, Type
 
 import pandas as pd
 import pytz as tz
-from lori.components.component import Component
-from lori.components.context import ComponentContext
-from lori.connectors import Connector, ConnectorException
-from lori.connectors.context import ConnectorContext
+from lori._core import _Context, _DataManager  # noqa
+from lori.components import Component, ComponentContext
+from lori.connectors import Connector, ConnectorContext, ConnectorError
 from lori.connectors.tasks import CheckTask, ConnectTask, LogTask, ReadTask, WriteTask
-from lori.core import Activator, Context, Entity
-from lori.core.configs import ConfigurationException, Configurations
+from lori.core.activator import Activator
+from lori.core.configs import ConfigurationError, Configurations
 from lori.core.register import Registrator, RegistratorContext
+from lori.core.typing import ChannelsArgument, Timestamp
 from lori.data.channels import Channel, ChannelConnector, ChannelConverter, Channels, ChannelState
 from lori.data.context import DataContext
-from lori.data.converters.context import ConverterContext
+from lori.data.converters import ConverterContext
 from lori.data.databases import Database, Databases
 from lori.data.listeners import ListenerContext
 from lori.data.replication import Replication
 from lori.data.retention import Retention
-from lori.data.typing import ChannelsType
-from lori.typing import TimestampType
 from lori.util import floor_date, parse_type, to_bool, to_timedelta, validate_key
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -49,7 +47,7 @@ except ImportError:
 
 
 # noinspection PyProtectedMember
-class DataManager(DataContext, Activator, Entity):
+class DataManager(_DataManager, DataContext, Activator):
     _converters: ConverterContext
     _connectors: ConnectorContext
     _components: ComponentContext
@@ -82,7 +80,7 @@ class DataManager(DataContext, Activator, Entity):
 
     # noinspection PyArgumentList
     def __contains__(self, item: str | Channel | Connector | Component) -> bool:
-        channels = Context.__getattribute__(self, f"_{Context.__name__}__map")
+        channels = _Context.__getattribute__(self, f"{_Context.__name__}__map")
         if isinstance(item, str):
             return item in channels.keys()
         if isinstance(item, Channel):
@@ -109,7 +107,7 @@ class DataManager(DataContext, Activator, Entity):
             if isinstance(registrator_section, str):
                 registrator_section = {registrator_type: registrator_section}
             elif not isinstance(registrator_section, Mapping):
-                raise ConfigurationException(f"Invalid channel {name} type: " + str(registrator_section))
+                raise ConfigurationError(f"Invalid channel {name} type: " + str(registrator_section))
             elif registrator_type not in registrator_section:
                 return {registrator_type: None}
 
@@ -250,7 +248,7 @@ class DataManager(DataContext, Activator, Entity):
             connector = future.result()
             self._logger.info(f"Connected {type(connector).__name__} '{connector.name}': {connector.id}")
 
-        except ConnectorException as e:
+        except ConnectorError as e:
             self._logger.warning(f"Failed opening connector '{e.connector.id}': {str(e)}")
             if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(e)
@@ -356,7 +354,7 @@ class DataManager(DataContext, Activator, Entity):
     def register(
         self,
         function: Callable[[pd.DataFrame], None],
-        channels: Optional[ChannelsType] = None,
+        channels: Optional[ChannelsArgument] = None,
         how: Literal["any", "all"] = "any",
         unique: bool = False,
     ) -> None:
@@ -380,7 +378,7 @@ class DataManager(DataContext, Activator, Entity):
 
     def notify(
         self,
-        channels: Optional[Channels] = None,
+        channels: Optional[ChannelsArgument] = None,
         timeout: Optional[float] = None,
     ) -> None:
         channels = self._filter_by_args(channels)
@@ -450,27 +448,12 @@ class DataManager(DataContext, Activator, Entity):
         self.notify()
         self.log()
 
-    @overload
-    def has_logged(
-        self,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
-    ) -> bool: ...
-
-    @overload
-    def has_logged(
-        self,
-        channels: ChannelsType,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
-    ) -> bool: ...
-
     # noinspection PyShadowingBuiltins
     def has_logged(
         self,
-        channels: Optional[ChannelsType] = None,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        channels: Optional[ChannelsArgument] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
         timeout: Optional[float] = None,
     ) -> bool:
         channels = self._filter_by_args(channels)
@@ -499,7 +482,7 @@ class DataManager(DataContext, Activator, Entity):
                     check_exists = check_future.result()
                     check_results.append(check_exists)
 
-                except ConnectorException as e:
+                except ConnectorError as e:
                     self._logger.warning(f"Failed checking connector '{check_task.connector.id}': {str(e)}")
                     if self._logger.getEffectiveLevel() <= logging.DEBUG:
                         self._logger.exception(e)
@@ -518,29 +501,12 @@ class DataManager(DataContext, Activator, Entity):
             return False
         return all(check_results)
 
-    @overload
-    def read_logged(
-        self,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
-        timeout: Optional[float] = None,
-    ) -> pd.DataFrame: ...
-
-    @overload
-    def read_logged(
-        self,
-        channels: ChannelsType,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
-        timeout: Optional[float] = None,
-    ) -> pd.DataFrame: ...
-
     # noinspection PyShadowingBuiltins
     def read_logged(
         self,
-        channels: Optional[Channels] = None,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        channels: Optional[ChannelsArgument] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
         timeout: Optional[float] = None,
     ) -> pd.DataFrame:
         channels = self._filter_by_args(channels)
@@ -566,7 +532,7 @@ class DataManager(DataContext, Activator, Entity):
     # noinspection PyShadowingBuiltins, PyTypeChecker
     def read(
         self,
-        channels: Optional[Channels] = None,
+        channels: Optional[ChannelsArgument] = None,
         timeout: Optional[float] = None,
         inplace: bool = False,
         **kwargs,
@@ -625,7 +591,7 @@ class DataManager(DataContext, Activator, Entity):
         try:
             return future.result()
 
-        except ConnectorException as e:
+        except ConnectorError as e:
             self._logger.warning(f"Failed reading connector '{task.connector.id}': {str(e)}")
             if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(e)
@@ -636,7 +602,7 @@ class DataManager(DataContext, Activator, Entity):
     # noinspection PyShadowingBuiltins, PyTypeChecker
     def __read(
         self,
-        timestamp: TimestampType,
+        timestamp: Timestamp,
         timeout: Optional[float] = None,
         **kwargs,
     ) -> None:
@@ -684,7 +650,7 @@ class DataManager(DataContext, Activator, Entity):
     def write(
         self,
         data: pd.DataFrame,
-        channels: Optional[Channels] = None,
+        channels: Optional[ChannelsArgument] = None,
         timeout: Optional[float] = None,
         inplace: bool = False,
     ) -> None:
@@ -735,7 +701,7 @@ class DataManager(DataContext, Activator, Entity):
         try:
             future.result()
 
-        except ConnectorException as e:
+        except ConnectorError as e:
             self._logger.warning(f"Failed writing connector '{task.connector.id}': {str(e)}")
             if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(e)
@@ -745,7 +711,7 @@ class DataManager(DataContext, Activator, Entity):
     # noinspection PyShadowingBuiltins, PyTypeChecker
     def log(
         self,
-        channels: Optional[Channels] = None,
+        channels: Optional[ChannelsArgument] = None,
         timeout: Optional[float] = None,
         blocking: bool = False,
         force: bool = False,
@@ -798,8 +764,8 @@ class DataManager(DataContext, Activator, Entity):
         if channels is None:
             channels = self.channels
 
-        section = self.configs.get_section(Retention.SECTION, defaults={})
-        configs = Configurations(f"{Retention.SECTION}.conf", self.configs.dirs, defaults=section)
+        section = self.configs.get_section(Retention.TYPE, defaults={})
+        configs = Configurations(f"{Retention.TYPE}.conf", self.configs.dirs, defaults=section)
         configs._load(require=False)
         kwargs["full"] = configs.pop("full", default=full)
 
@@ -816,11 +782,11 @@ class DataManager(DataContext, Activator, Entity):
         if channels is None:
             channels = self.channels.filter(lambda c: self.__is_replicating(c))
 
-        section = self.configs.get_section(Replication.SECTION, defaults={})
-        configs = Configurations(f"{Replication.SECTION}.conf", self.configs.dirs, defaults=section)
+        section = self.configs.get_section(Replication.TYPE, defaults={})
+        configs = Configurations(f"{Replication.TYPE}.conf", self.configs.dirs, defaults=section)
         configs._load(require=False)
         if not configs.enabled:
-            self._logger.error(f"Unable to replicate for disabled configuration section '{Replication.SECTION}'")
+            self._logger.error(f"Unable to replicate for disabled configuration section '{Replication.TYPE}'")
             return
         kwargs["full"] = configs.pop("full", default=full)
         kwargs["force"] = configs.pop("force", default=force)
@@ -830,8 +796,8 @@ class DataManager(DataContext, Activator, Entity):
         databases.replicate(channels, **kwargs)
 
     # noinspection PyMethodMayBeStatic
-    def __is_replicating(self, channel: Channel, timestamp: Optional[TimestampType] = None) -> bool:
-        replication = channel.get(Replication.SECTION, default=None)
+    def __is_replicating(self, channel: Channel, timestamp: Optional[Timestamp] = None) -> bool:
+        replication = channel.get(Replication.TYPE, default=None)
         if not (
             replication is not None
             and "database" in replication

@@ -13,36 +13,34 @@ del _version
 
 
 from .core import (  # noqa: F401
+    Constant,
     Directory,
     Directories,
     Configurations,
-    ConfigurationException,
-    ConfigurationUnavailableException,
+    ConfigurationError,
+    ConfigurationUnavailableError,
     Configurator,
-    Constant,
-    Context,
-    Entity,
     Resource,
     Resources,
-    ResourceException,
-    ResourceUnavailableException,
+    ResourceError,
+    ResourceUnavailableError,
 )
 
 from . import data  # noqa: F401
 from .data import (  # noqa: F401
-    Converter,
-    ConversionException,
     ChannelState,
     Channel,
     Channels,
+    Converter,
+    ConversionError,
     Listener,
 )
 
 from . import connectors  # noqa: F401
 from .connectors import (  # noqa: F401
     Connector,
-    ConnectorException,
-    ConnectionException,
+    ConnectorError,
+    ConnectionError,
     Database,
     DatabaseException,
     DatabaseUnavailableException,
@@ -52,8 +50,8 @@ from .connectors import (  # noqa: F401
 from . import components  # noqa: F401
 from .components import (  # noqa: F401
     Component,
-    ComponentException,
-    ComponentUnavailableException,
+    ComponentError,
+    ComponentUnavailableError,
 )
 
 from . import location  # noqa: F401
@@ -64,9 +62,8 @@ from .location import (  # noqa: F401
 )
 
 from .components import (  # noqa: F401
+    Tariff,
     Weather,
-    WeatherException,
-    WeatherUnavailableException,
 )
 
 from .settings import Settings  # noqa: F401

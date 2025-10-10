@@ -8,7 +8,7 @@ lori.data.listeners
 
 from .listener import (  # noqa: F401
     Listener,
-    ListenerException,
+    ListenerError,
 )
 
 from .context import ListenerContext  # noqa: F401

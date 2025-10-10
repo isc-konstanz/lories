@@ -12,25 +12,23 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Collection, Dict, Generic, List, Optional, Type, TypeVar
 
 from lori.application.view.pages import Page, PageGroup
-from lori.core import ResourceException
+from lori.core.errors import ResourceError
 from lori.util import validate_key
 
-PageType = TypeVar("PageType", bound=Page)
-GroupType = TypeVar("GroupType", bound=PageGroup)
-
-ChildrenType = TypeVar("ChildrenType", bound=Dict[str, Type[Page]])
+P = TypeVar("P", bound=Page)
+G = TypeVar("G", bound=PageGroup)
 
 
 # noinspection PyShadowingBuiltins
-class _PageRegistration(ABC, Generic[PageType]):
-    _class: Type[PageType]
+class _PageRegistration(ABC, Generic[P]):
+    _class: Type[P]
     _factory: callable
 
     _kwargs: Dict[str, Any]
 
     def __init__(
         self,
-        cls: Type[PageType],
+        cls: Type[P],
         factory: Optional[Callable] = None,
         **kwargs,
     ):
@@ -42,23 +40,23 @@ class _PageRegistration(ABC, Generic[PageType]):
     def has_type(self, *args) -> bool:
         pass
 
-    def initialize(self, *args, **kwargs) -> PageType:
+    def initialize(self, *args, **kwargs) -> P:
         factory = self._factory
         if factory is None:
             factory = self._class
         elif not callable(factory):
-            raise ResourceException(f"Invalid registration initialization function: {factory}")
+            raise ResourceError(f"Invalid registration initialization function: {factory}")
 
         return factory(*args, **kwargs, **self._kwargs)
 
 
 # noinspection PyShadowingBuiltins
-class PageRegistration(_PageRegistration[PageType]):
+class PageRegistration(_PageRegistration[P]):
     type: Type
 
     def __init__(
         self,
-        cls: Type[PageType],
+        cls: Type[P],
         type: Type,
         factory: Optional[Callable] = None,
         **kwargs,
@@ -71,7 +69,7 @@ class PageRegistration(_PageRegistration[PageType]):
 
 
 # noinspection PyShadowingBuiltins
-class GroupRegistration(_PageRegistration[GroupType]):
+class GroupRegistration(_PageRegistration[G]):
     types: List[Type]
 
     key: str
@@ -79,7 +77,7 @@ class GroupRegistration(_PageRegistration[GroupType]):
 
     def __init__(
         self,
-        cls: Type[GroupType],
+        cls: Type[G],
         *types: Type,
         key: Optional[str] = None,
         name: Optional[str] = None,
@@ -118,7 +116,7 @@ class PageRegistry:
     # noinspection PyTypeChecker, PyProtectedMember
     def register_page(
         self,
-        cls: Type[GroupType],
+        cls: Type[G],
         type: Type,
         factory: Optional[Callable] = None,
         replace: bool = False,
@@ -131,7 +129,7 @@ class PageRegistry:
                 for page in existing:
                     self.pages.remove(page)
             else:
-                raise ResourceException(
+                raise ResourceError(
                     f"Registration for '{type}' does already exist: " ", ".join(p._class.__name__ for p in existing)
                 )
         self.pages.append(PageRegistration(cls, type, factory=factory))
@@ -139,7 +137,7 @@ class PageRegistry:
     # noinspection PyTypeChecker, PyProtectedMember, PyUnresolvedReferences
     def register_group(
         self,
-        cls: Type[GroupType],
+        cls: Type[G],
         *types: Type,
         key: Optional[str] = None,
         name: Optional[str] = None,
@@ -154,7 +152,7 @@ class PageRegistry:
                 for group in existing:
                     self.groups.remove(group)
             else:
-                raise ResourceException(
+                raise ResourceError(
                     f"Registration for types "
                     f"'{', '.join(t.__name__ for t in types)}' does already exist: "
                     ", ".join(p._class.__name__ for p in existing)

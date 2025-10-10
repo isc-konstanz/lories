@@ -14,8 +14,8 @@ from typing import List, Mapping, Optional
 
 import pandas as pd
 import pytz as tz
-from lori.core import ResourceException
-from lori.typing import TimestampType, TimezoneType
+from lori.core.errors import ResourceError
+from lori.typing import Timestamp, Timezone
 from lori.util import ceil_date, floor_date, to_date, to_timedelta
 
 
@@ -24,8 +24,8 @@ def has_range(
     path: str,
     freq: str,
     format: str,
-    start: TimestampType | str,
-    end: TimestampType | str,
+    start: Timestamp | str,
+    end: Timestamp | str,
     timezone: tz.tzinfo = tz.UTC,
 ):
     files = get_files(path, freq, format, start, end, timezone)
@@ -37,9 +37,9 @@ def read_files(
     path: str,
     freq: str,
     format: str,
-    start: Optional[TimestampType | str] = None,
-    end: Optional[TimestampType | str] = None,
-    timezone: Optional[TimezoneType] = None,
+    start: Optional[Timestamp | str] = None,
+    end: Optional[Timestamp | str] = None,
+    timezone: Optional[Timezone] = None,
     **kwargs,
 ) -> pd.DataFrame:
     data = pd.DataFrame()
@@ -259,8 +259,8 @@ def get_files(
     path: str,
     freq: str,
     format: str,
-    start: Optional[TimestampType | str] = None,
-    end: Optional[TimestampType | str] = None,
+    start: Optional[Timestamp | str] = None,
+    end: Optional[Timestamp | str] = None,
     timezone: tz.tzinfo = tz.UTC,
     exists_only: bool = True,
 ) -> List[str]:
@@ -301,7 +301,7 @@ def get_files(
             if next_offset.seconds > 0:
                 next_date = floor_date(next_date + next_offset, timezone=timezone, freq=freq)
             else:
-                ResourceException(f"Unable to increment date for freq '{freq}'")
+                ResourceError(f"Unable to increment date for freq '{freq}'")
         return next_date
 
     files = []

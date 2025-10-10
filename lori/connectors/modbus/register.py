@@ -10,7 +10,8 @@ from __future__ import annotations
 
 from pymodbus.client import ModbusBaseClient
 
-from lori.core import ConfigurationException, Resource
+from lori.core.configs import ConfigurationError
+from lori.typing import Resource
 from lori.util import to_int
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -71,7 +72,7 @@ class ModbusRegister:
                 return DataType.FLOAT32
             if issubclass(_type, str):
                 return DataType.STRING
-        raise ConfigurationException(f"Invalid data type '{_type}'")
+        raise ConfigurationError(f"Invalid data type '{_type}'")
 
     # noinspection PyShadowingBuiltins
     def __init__(self, address: int, function: FunctionType, type: DataType) -> None:
@@ -79,11 +80,11 @@ class ModbusRegister:
         self.address = address
 
         if function not in ["holding_register", "input_register", "coil"]:
-            raise ConfigurationException(f"Invalid register function '{function}'")
+            raise ConfigurationError(f"Invalid register function '{function}'")
         self.function = function
 
         if not isinstance(type, DataType):
-            raise ConfigurationException(f"Invalid register data type '{type}'")
+            raise ConfigurationError(f"Invalid register data type '{type}'")
         self.type = type
 
     @property

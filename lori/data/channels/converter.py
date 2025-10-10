@@ -12,29 +12,29 @@ from collections import OrderedDict
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
-from lori import ConfigurationException
-from lori.core import ResourceException
+from lori._core._converter import Converter, _Converter  # noqa
+from lori.core.configs import ConfigurationError
+from lori.core.errors import ResourceError
 from lori.util import to_bool, update_recursive
 
 
 class ChannelConverter:
     __configs: OrderedDict[str, Any]
+    _connector: Converter
 
     # noinspection PyShadowingBuiltins
     def __init__(self, converter, **configs: Any) -> None:
         if "converter" in configs:
-            raise ConfigurationException("Invalid channel converter configuration 'converter'")
+            raise ConfigurationError("Invalid channel converter configuration 'converter'")
         self.__configs = OrderedDict(configs)
         self._converter = self._assert_converter(converter)
 
         self.enabled = self.__configs.pop("enabled", converter is not None)
 
     # noinspection PyMethodMayBeStatic
-    def _assert_converter(self, converter):
-        from lori.data.converters import Converter
-
-        if converter is None or not isinstance(converter, Converter):
-            raise ResourceException(f"Invalid converter: {None if converter is None else type(converter)}")
+    def _assert_converter(self, converter) -> Converter:
+        if converter is None or not isinstance(converter, _Converter):
+            raise ResourceError(f"Invalid converter: {None if converter is None else type(converter)}")
         return converter
 
     def __eq__(self, other: Any) -> bool:
@@ -79,10 +79,12 @@ class ChannelConverter:
             return converted_data.apply(self._converter.to_dtype, **converter_args)
         return self._converter.to_dtype(data, **converter_args)
 
+    # noinspection PyTypeChecker
     @property
     def id(self) -> str:
         return self._converter.id
 
+    # noinspection PyTypeChecker
     @property
     def key(self) -> str:
         return self._converter.key
@@ -128,16 +130,16 @@ class ChannelConverter:
     # noinspection PyShadowingBuiltins
     def _update(
         self,
-        converter: Optional[str | ChannelConverter] = None,
+        converter: Optional[str | Converter] = None,
         enabled: Optional[str | bool] = None,
         **configs: Any,
     ) -> None:
         if converter is not None:
             if isinstance(converter, str):
                 if self._converter.key != converter.split(".")[-1]:
-                    raise ConfigurationException(f"Unable to update channel converter from key '{converter}'")
-            elif not isinstance(converter, ChannelConverter):
-                raise ConfigurationException(f"Unable to update channel converter to invalid type '{type(converter)}'")
+                    raise ConfigurationError(f"Unable to update channel converter from key '{converter}'")
+            elif not isinstance(converter, _Converter):
+                raise ConfigurationError(f"Unable to update channel converter to invalid type '{type(converter)}'")
             else:
                 self._converter = converter
         if enabled is not None:

@@ -11,18 +11,20 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 import pandas as pd
-from lori.components import ComponentAccess
-from lori.components.core import _Component
-from lori.connectors import ConnectorAccess
-from lori.core import Configurations, Context, Registrator
-from lori.data import DataAccess
+from lori._core._component import _Component  # noqa
+from lori._core._configurations import Configurations  # noqa
+from lori._core._registrator import RegistratorContext  # noqa
+from lori._core.typing import Timestamp  # noqa
+from lori.components.access import ComponentAccess
+from lori.connectors.access import ConnectorAccess
+from lori.core.activator import Activator
+from lori.core.register import Registrator
+from lori.data.access import DataAccess
 from lori.data.converters import ConverterAccess
-from lori.typing import TimestampType
 from lori.util import to_date
 
 
-# noinspection PyAbstractClass
-class Component(_Component):
+class Component(_Component, Registrator, Activator):
     __converters: ConverterAccess
     __connectors: ConnectorAccess
     __components: ComponentAccess
@@ -30,7 +32,7 @@ class Component(_Component):
 
     def __init__(
         self,
-        context: Context | Registrator,
+        context: RegistratorContext,
         configs: Optional[Configurations] = None,
         **kwargs,
     ) -> None:
@@ -41,11 +43,9 @@ class Component(_Component):
         self.__data = DataAccess(self)
 
     def _at_configure(self, configs: Configurations) -> None:
-        super()._at_configure(configs)
-        self.__data.configure(configs.get_section(DataAccess.SECTION, ensure_exists=True))
+        self.__data.configure(configs.get_section(DataAccess.TYPE, ensure_exists=True))
 
     def _on_configure(self, configs: Configurations) -> None:
-        super()._on_configure(configs)
         self.__converters.load(configure=False, sort=False)
         self.__converters.sort()
         self.__converters.configure()
@@ -61,10 +61,9 @@ class Component(_Component):
         self.__data.load()
 
     def _at_duplicate(self, **changes) -> None:
-        super()._at_duplicate(**changes)
-        self.converters.duplicate(**changes)
-        self.connectors.duplicate(**changes)
-        self.components.duplicate(**changes)
+        self.__converters.duplicate(**changes)
+        self.__connectors.duplicate(**changes)
+        self.__components.duplicate(**changes)
 
     @property
     def components(self) -> ComponentAccess:
@@ -79,17 +78,20 @@ class Component(_Component):
         return self.__connectors
 
     @property
-    def data(self):
+    def data(self) -> DataAccess:
         return self.__data
 
     def get(
         self,
-        start: Optional[TimestampType | str] = None,
-        end: Optional[TimestampType | str] = None,
+        start: Optional[Timestamp | str] = None,
+        end: Optional[Timestamp | str] = None,
         **kwargs,
     ) -> pd.DataFrame:
+        start = to_date(start)
+        end = to_date(end)
+
         data = self.__data.to_frame(unique=False)
-        if data.empty or start < data.index[0] or end > data.index[-1]:
+        if data.empty or (start is not None and start < data.index[0]) or (end is not None and end > data.index[-1]):
             logged = self.__data.from_logger(start=start, end=end, unique=False)
             if not logged.empty:
                 data = logged if data.empty else data.combine_first(logged)
@@ -98,8 +100,8 @@ class Component(_Component):
     @staticmethod
     def _get_range(
         data: pd.DataFrame,
-        start: Optional[TimestampType | str] = None,
-        end: Optional[TimestampType | str] = None,
+        start: Optional[Timestamp | str] = None,
+        end: Optional[Timestamp | str] = None,
         **kwargs,
     ) -> pd.DataFrame:
         if data.empty:

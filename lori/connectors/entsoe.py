@@ -18,9 +18,9 @@ from urllib3.exceptions import MaxRetryError
 
 import pandas as pd
 import pytz as tz
-from lori.connectors import ConnectionException, Connector, ConnectorException
-from lori.core import ConfigurationException, Configurations, Resources
-from lori.typing import TimestampType
+from lori.connectors import ConnectionError, Connector, ConnectorError
+from lori.core.configs import ConfigurationError
+from lori.typing import Configurations, Resources, Timestamp
 from lori.util import parse_freq
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -49,21 +49,21 @@ class EntsoeConnector(Connector):
         self.country_code = self._validate_country_code(configs.get("country_code").upper())
         self._api_key = configs.get("api_key")
         if self._api_key is None:
-            raise ConfigurationException("Missing security token")
+            raise ConfigurationError("Missing security token")
 
     # noinspection PyTypeChecker
     def _validate_resolution(self, resolution: str) -> Literal["60min", "30min", "15min"]:
         resolution = parse_freq(resolution)
         if resolution not in ["60min", "30min", "15min"]:
-            raise ConnectorException(self, f"Invalid resolution: {resolution}.")
+            raise ConnectorError(self, f"Invalid resolution: {resolution}.")
         return resolution
 
     def _validate_country_code(self, country_code) -> str:
         """Validate the country code against the Entsoe mappings."""
         if country_code is None:
-            raise ConfigurationException(self, "Missing country code")
+            raise ConfigurationError(self, "Missing country code")
         elif not (EntsoeArea.has_code(country_code) or country_code == "DE"):
-            raise ConfigurationException(self, f"Invalid country code: {country_code}.")
+            raise ConfigurationError(self, f"Invalid country code: {country_code}.")
         return country_code
 
     def connect(self, resources: Resources) -> None:
@@ -79,8 +79,8 @@ class EntsoeConnector(Connector):
     def read(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
     ) -> pd.DataFrame:
         if start is None:
             start = pd.Timestamp.now(tz=tz.UTC).floor(self.resolution)
@@ -91,7 +91,7 @@ class EntsoeConnector(Connector):
         country_code = self._get_country_code(self.country_code, start, end)
         for method, method_resources in resources.groupby("method"):
             if method not in self.METHODS:
-                raise ConnectorException(self, f"Unsupported method: {method}. Supported methods: {self.METHODS}")
+                raise ConnectorError(self, f"Unsupported method: {method}. Supported methods: {self.METHODS}")
 
             if method.lower() == EntsoeConnector.DAY_AHEAD:
                 # TODO: Exception handling
@@ -100,10 +100,10 @@ class EntsoeConnector(Connector):
 
                 except (MaxRetryError, HTTPError) as e:
                     if isinstance(e, MaxRetryError):
-                        raise ConnectionException(self, str(e))
+                        raise ConnectionError(self, str(e))
                     elif isinstance(e, HTTPError) and "Unauthorized" in str(e):
-                        raise ConnectorException(self, "Unauthorized access. Check your API key.")
-                    raise ConnectorException(self, str(e))
+                        raise ConnectorError(self, "Unauthorized access. Check your API key.")
+                    raise ConnectorError(self, str(e))
 
                 result = pd.DataFrame()
                 for resource in method_resources:
@@ -120,7 +120,7 @@ class EntsoeConnector(Connector):
     def write(self, data: pd.DataFrame) -> None:
         raise NotImplementedError("EntsoeConnector does not support writing data")
 
-    def _get_country_code(self, county_code: str, start: TimestampType, end: TimestampType) -> str:
+    def _get_country_code(self, county_code: str, start: Timestamp, end: Timestamp) -> str:
         """
         Returns the country code for Germany based on the start and end dates.
         """
@@ -140,7 +140,7 @@ class EntsoeConnector(Connector):
                 else:
                     return "AT"
             elif start.year < 2018 and 2018 < end.year:
-                raise ConnectorException(self, "Cannot determine country code for Germany over the given time range.")
+                raise ConnectorError(self, "Cannot determine country code for Germany over the given time range.")
 
             if county_code in ["DE", "LU"]:
                 return "DE_LU"

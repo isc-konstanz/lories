@@ -10,50 +10,26 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-from abc import abstractmethod
-from typing import Any, Generic, List, Optional, Type, TypeVar, overload
+from typing import Any, Generic, List, Optional, Type, TypeVar
 
 import pandas as pd
 import pytz as tz
-from lori.core import Registrator, ResourceException
-from lori.data.channels import Channel, Channels
+from lori._core import _Channel, _Channels, _Converter  # noqa
+from lori.core import Registrator
+from lori.data.converters.errors import ConversionError
 from lori.data.validation import validate_index
 from lori.util import is_bool, is_float, is_int, to_bool, to_date, to_float, to_int
 
 T = TypeVar("T", bound=Any)
 
 
-class Converter(Registrator, Generic[T]):
-    SECTION: str = "converter"
+# noinspection PyAbstractClass
+class Converter(_Converter, Registrator, Generic[T]):
+    TYPE: str = "converter"
     INCLUDES: List[str] = []
-
-    @property
-    @abstractmethod
-    def dtype(self) -> Type[T]: ...
-
-    @abstractmethod
-    def is_dtype(self, value: Any) -> bool: ...
-
-    @abstractmethod
-    def to_dtype(self, value: Any, **kwargs) -> Optional[T]: ...
-
-    @overload
-    def to_str(self, value: T) -> str: ...
-
-    @overload
-    def to_str(self, value: pd.Series) -> str: ...
 
     def to_str(self, value: T | pd.Series) -> str:
         return self.to_json(value)
-
-    @overload
-    def to_json(self, value: T) -> str: ...
-
-    @overload
-    def to_json(self, value: pd.Series) -> str: ...
-
-    @overload
-    def to_json(self, value: pd.DataFrame) -> str: ...
 
     # noinspection PyMethodMayBeStatic
     def to_json(self, data: T | pd.Series | pd.DataFrame) -> str:
@@ -61,8 +37,8 @@ class Converter(Registrator, Generic[T]):
             if issubclass(type(data), pd.Series):
                 data = data.to_frame()
             columns = data.columns
-            data[Channel.TIMESTAMP] = data.index
-            return data[[Channel.TIMESTAMP, *columns]].to_json(orient="records")
+            data[_Channel.TIMESTAMP] = data.index
+            return data[[_Channel.TIMESTAMP, *columns]].to_json(orient="records")
         return json.dumps(data)
 
     # noinspection PyMethodMayBeStatic
@@ -76,7 +52,7 @@ class Converter(Registrator, Generic[T]):
             series = pd.Series(index=[timestamp], data=[value], name=name)
 
         series = validate_index(series)
-        series.index.name = Channel.TIMESTAMP
+        series.index.name = _Channel.TIMESTAMP
         if series.index.tzinfo is None:
             self._logger.warning(
                 f"UTC will be presumed for timestamps, as DatetimeIndex are expected to be tz-aware: {series}"
@@ -85,7 +61,7 @@ class Converter(Registrator, Generic[T]):
         return series
 
     # noinspection PyProtectedMember
-    def from_frame(self, data: pd.DataFrame, channels: Channels) -> pd.DataFrame:
+    def from_frame(self, data: pd.DataFrame, channels: _Channels) -> pd.DataFrame:
         converted_data = []
         for channel in channels:
             channel_data = data[channel.id].dropna() if channel.id in data.columns else None
@@ -99,29 +75,23 @@ class Converter(Registrator, Generic[T]):
             try:
                 converted_data.append(self.from_series(channel_data, channel))
             except TypeError:
-                raise ConversionException(f"Expected str or {self.dtype}, not: {type(data)}")
+                raise ConversionError(f"Expected str or {self.dtype}, not: {type(data)}")
         if len(converted_data) == 0:
             return pd.DataFrame(columns=[c.id for c in channels])
         return pd.concat(converted_data, axis="columns")
 
-    # noinspection PyProtectedMember
-    def from_series(self, data: pd.Series, channel: Channel) -> pd.Series:
+    # noinspection PyProtectedMember, PyUnresolvedReferences
+    def from_series(self, data: pd.Series, channel: _Channel) -> pd.Series:
         try:
             converter_args = channel.converter._get_configs()
             converted_data = data.apply(self.convert, **converter_args)
             return converted_data.apply(self.to_dtype, **converter_args)
         except TypeError:
-            raise ConversionException(f"Expected str or {self.dtype}, not: {type(data)}")
+            raise ConversionError(f"Expected str or {self.dtype}, not: {type(data)}")
 
     # noinspection PyMethodMayBeStatic, PyUnusedLocal
     def convert(self, value: Any, **kwargs) -> Optional[T]:
         return value
-
-
-class ConversionException(ResourceException, TypeError):
-    """
-    Raise if a conversion failed
-    """
 
 
 # noinspection PyAbstractClass, PyMethodMayBeStatic
@@ -134,15 +104,15 @@ class _NumberConverter(Converter[T]):
                 value *= factor
         return self.to_dtype(value, **kwargs)
 
-    # noinspection PyProtectedMember
-    def from_series(self, data: pd.Series, channel: Channel) -> pd.Series:
+    # noinspection PyProtectedMember, PyUnresolvedReferences
+    def from_series(self, data: pd.Series, channel: _Channel) -> pd.Series:
         try:
             converter_args = channel.converter._get_configs()
             converter_args["factor"] = to_float(channel.get("scale", default=None))
             converted_data = data.apply(self.convert, **converter_args)
             return converted_data.apply(self.scale, **converter_args)
         except TypeError:
-            raise ConversionException(f"Expected str or {self.dtype}, not: {type(data)}")
+            raise ConversionError(f"Expected str or {self.dtype}, not: {type(data)}")
 
 
 # noinspection PyMethodMayBeStatic

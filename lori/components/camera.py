@@ -7,8 +7,10 @@ lori.components.camera
 
 from __future__ import annotations
 
-from lori import Configurations
+from typing import TypeVar
+
 from lori.components import Component, register_component_type
+from lori.core import Configurations
 
 
 # noinspection SpellCheckingInspection
@@ -35,3 +37,6 @@ class Camera(Component):
     #
     # def _on_frame(self, data: pd.DataFrame) -> None:
     #     pass
+
+
+CameraType = TypeVar("CameraType", bound=Camera)

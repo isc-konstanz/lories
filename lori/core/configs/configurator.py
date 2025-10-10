@@ -9,14 +9,17 @@ lori.core.configs.configurator
 from __future__ import annotations
 
 import logging
-from abc import ABC, ABCMeta
+from abc import ABCMeta
 from collections import OrderedDict
 from functools import wraps
 from logging import Logger
 from typing import Any, Dict, Optional
 
-from lori.core import Context, Entity
-from lori.core.configs import ConfigurationException, Configurations
+from lori._core import _Context, _Entity  # noqa
+from lori._core._configurations import Configurations, _Configurations  # noqa
+from lori._core._configurator import Configurator as ConfiguratorType  # noqa
+from lori._core._configurator import _Configurator  # noqa
+from lori.core.configs.errors import ConfigurationError
 from lori.util import get_members
 
 
@@ -32,12 +35,14 @@ class ConfiguratorMeta(ABCMeta):
     # noinspection PyShadowingBuiltins
     @staticmethod
     def _wrap_method(object: Any, method: str) -> None:
-        setattr(object, f"_run_{method}", getattr(object, method))
-        setattr(object, method, getattr(object, f"_do_{method}"))
+        _wrap_method = getattr(object, f"_do_{method}")
+        _run_method = getattr(object, method)
+        setattr(object, f"_run_{method}", _run_method)
+        setattr(object, method, _wrap_method)
 
 
-class Configurator(ABC, object, metaclass=ConfiguratorMeta):
-    __configs: Configurations
+class Configurator(_Configurator, metaclass=ConfiguratorMeta):
+    __configs: _Configurations
 
     _configured: bool = False
     _logger: Logger
@@ -50,7 +55,7 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
     ) -> None:
         super().__init__(**kwargs)
         if logger is None:
-            logger = self._get_logger()
+            logger = self._build_logger()
         self._logger = logger
         self.__configs = self._assert_configs(configs)
 
@@ -60,22 +65,22 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
     def __hash__(self) -> int:
         return hash(id(self))
 
-    def __copy__(self):
+    def __copy__(self) -> ConfiguratorType:
         return self.copy()
 
-    def __replace__(self, **changes):
+    def __replace__(self, **changes) -> ConfiguratorType:
         return self.duplicate(**changes)
 
     @classmethod
     def _assert_configs(cls, configs: Optional[Configurations]) -> Optional[Configurations]:
         if configs is None:
             return None
-        if not isinstance(configs, Configurations):
-            raise ConfigurationException(f"Invalid '{cls.__name__}' configurations: {type(configs)}")
+        if not isinstance(configs, _Configurations):
+            raise ConfigurationError(f"Invalid '{cls.__name__}' configurations: {type(configs)}")
         return configs
 
     @classmethod
-    def _get_logger(cls) -> Logger:
+    def _build_logger(cls) -> Logger:
         return logging.getLogger(cls.__module__)
 
     def _get_vars(self) -> Dict[str, Any]:
@@ -84,8 +89,8 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
                 attr.startswith("_")
                 or attr.isupper()
                 or callable(var)
-                or isinstance(var, Context)
-                or isinstance(var, Configurations)
+                or isinstance(var, _Context)
+                or isinstance(var, _Configurations)
             )
 
         return get_members(self, filter=_is_var)
@@ -93,7 +98,7 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
     # noinspection PyShadowingBuiltins
     def _convert_vars(self, convert: callable = str) -> Dict[str, str]:
         def _convert(var: Any) -> str:
-            return str(var) if not isinstance(var, (Context, Configurator, Entity)) else convert(var)
+            return str(var) if not isinstance(var, (_Context, _Configurator, _Entity)) else convert(var)
 
         vars = self._get_vars()
         values = OrderedDict([(k, _convert(v)) for k, v in vars.items()])
@@ -123,16 +128,13 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
     def configs(self) -> Optional[Configurations]:
         return self.__configs
 
-    def configure(self, configs: Configurations) -> None:
-        pass
-
     # noinspection PyUnresolvedReferences
-    @wraps(configure, updated=())
+    @wraps(_Configurator.configure, updated=())
     def _do_configure(self, configs: Configurations, *args, **kwargs) -> None:
         if configs is None:
-            raise ConfigurationException(f"Invalid NoneType configuration for {type(self).__name__}: {self.name}")
+            raise ConfigurationError(f"Invalid NoneType configuration for {type(self).__name__}: {self.name}")
         if not configs.enabled:
-            raise ConfigurationException(f"Trying to configure disabled {type(self).__name__}: {configs.name}")
+            raise ConfigurationError(f"Trying to configure disabled {type(self).__name__}: {configs.name}")
         if self.is_configured():
             self._logger.warning(f"{type(self).__name__} '{configs.path}' already configured")
             return
@@ -155,12 +157,12 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
         self._run_configure(configs)
 
     # noinspection PyUnresolvedReferences
-    @wraps(update, updated=())
+    @wraps(_Configurator.update, updated=())
     def _do_update(self, configs: Configurations, *args, **kwargs) -> None:
         if configs is None:
-            raise ConfigurationException(f"Invalid NoneType configuration for {type(self).__name__}: {self.name}")
+            raise ConfigurationError(f"Invalid NoneType configuration for {type(self).__name__}: {self.name}")
         if not configs.enabled:
-            raise ConfigurationException(f"Trying to update disabled {type(self).__name__}: {configs.name}")
+            raise ConfigurationError(f"Trying to update disabled {type(self).__name__}: {configs.name}")
         if not self.is_configured():
             self._logger.warning(f"Trying to update unconfigured {type(self).__name__}: '{configs.path}'")
             return
@@ -178,7 +180,7 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
         pass
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
-    def copy(self):
+    def copy(self) -> ConfiguratorType:
         try:
             copier = super().copy
         except AttributeError:
@@ -186,7 +188,7 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
         return copier()
 
     # noinspection PyUnresolvedReferences
-    def duplicate(self, configs: Optional[Configurations] = None, **changes):
+    def duplicate(self, configs: Optional[Configurations] = None, **changes) -> ConfiguratorType:
         if configs is None:
             configs = self.__configs.copy()
         try:
@@ -196,8 +198,8 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
         return duplicator(configs=configs, **changes)
 
     # noinspection PyUnresolvedReferences
-    @wraps(duplicate, updated=())
-    def _do_duplicate(self, configs: Configurations, **changes):
+    @wraps(_Configurator.duplicate, updated=())
+    def _do_duplicate(self, configs: Configurations, **changes) -> ConfiguratorType:
         if configs is None:
             configs = self.__configs.copy()
         self._at_duplicate(configs=configs, **changes)
@@ -208,6 +210,8 @@ class Configurator(ABC, object, metaclass=ConfiguratorMeta):
         self._on_duplicate(duplicate)
         return duplicate
 
-    def _at_duplicate(self, **changes) -> None: ...
+    def _at_duplicate(self, **changes) -> None:
+        pass
 
-    def _on_duplicate(self, configurator: Configurator) -> None: ...
+    def _on_duplicate(self, configurator: Configurator) -> None:
+        pass

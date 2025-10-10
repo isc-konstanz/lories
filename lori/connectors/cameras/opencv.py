@@ -9,9 +9,9 @@ import os
 
 import cv2
 
-from lori.connectors import ConnectionException, ConnectorException, register_connector_type
+from lori.connectors import ConnectionError, ConnectorError, register_connector_type
 from lori.connectors.cameras import CameraConnector
-from lori.core import Configurations, Resources
+from lori.typing import Configurations, Resources
 
 
 @register_connector_type("opencv")
@@ -51,7 +51,7 @@ class OpenCV(CameraConnector):
 
     def connect(self, resources: Resources) -> None:
         super().connect(resources)
-        # Validate connection only to throw ConnectionException when connect is called by the manager
+        # Validate connection only to throw ConnectionError when connect is called by the manager
         self._connect()
         self._disconnect()
 
@@ -61,13 +61,13 @@ class OpenCV(CameraConnector):
 
         self._capture.open(f"rtsp://{auth}@{address}", apiPreference=cv2.CAP_FFMPEG)
         if not self._capture.isOpened():
-            raise ConnectionException(self, f"Cannot open RTSP stream: 'rtsp://#:#@{address}'")
+            raise ConnectionError(self, f"Cannot open RTSP stream: 'rtsp://#:#@{address}'")
 
         status = False
         for _ in range(3):  # flush stale frames
             status = self._capture.grab()
         if not status:
-            raise ConnectionException(self, "Failed to grab frame")
+            raise ConnectionError(self, "Failed to grab frame")
 
         self._logger.debug(f"Opened VideoCapture to RTSP URL 'rtsp://#:#@{address}'")
 
@@ -85,19 +85,19 @@ class OpenCV(CameraConnector):
 
             status = self._capture.read()
             if not status:
-                raise ConnectionException(self, "Failed to grab frame")
+                raise ConnectionError(self, "Failed to grab frame")
 
             status, frame = self._capture.retrieve()
             if not status or frame is None:
-                raise ConnectionException(self, "Failed to retrieve frame")
+                raise ConnectionError(self, "Failed to retrieve frame")
 
             status, buffer = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
             if not status:
-                raise ConnectionException(self, "Failed to encode JPEG")
+                raise ConnectionError(self, "Failed to encode JPEG")
 
             return buffer.tobytes()
 
         except cv2.error as e:
-            raise ConnectorException(self, f"OpenCV error: {e}")
+            raise ConnectorError(self, f"OpenCV error: {e}")
         finally:
             self._disconnect()

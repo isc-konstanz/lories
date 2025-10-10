@@ -22,7 +22,7 @@ except ImportError:
 
 
 class Directories:
-    SECTION = "directories"
+    TYPE = "directories"
 
     LIB = "lib_dir"
     LOG = "log_dir"
@@ -53,7 +53,7 @@ class Directories:
 
     def __str__(self) -> str:
         attrs = ["conf", "data", "tmp", "log", "lib"]
-        return f"[{self.SECTION}]\n" + "\n".join(f'{attr} = "{str(getattr(self, attr))}"' for attr in attrs)
+        return f"[{self.TYPE}]\n" + "\n".join(f'{attr} = "{str(getattr(self, attr))}"' for attr in attrs)
 
     def __copy__(self) -> Directories:
         return self.copy()

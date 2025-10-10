@@ -8,11 +8,11 @@ lori.data.converters.context
 
 from __future__ import annotations
 
-from typing import Any, Callable, Collection, List, Optional, Type, TypeVar
+from typing import Callable, Collection, List, Optional, Type
 
-from lori import ResourceException
-from lori.core import Context, Registrator, RegistratorContext, Registry
-from lori.core.configs import Configurations
+from lori._core._converter import _ConverterContext  # noqa
+from lori.core import Configurations, ResourceError
+from lori.core.register import RegistratorContext, Registry
 from lori.data.converters.converter import (
     BoolConverter,
     BytesConverter,
@@ -23,8 +23,6 @@ from lori.data.converters.converter import (
     StringConverter,
     TimestampConverter,
 )
-
-C = TypeVar("C", bound=Converter)
 
 CONVERTERS_BUILTINS = [
     DatetimeConverter,
@@ -49,29 +47,31 @@ registry.register(BytesConverter, "byte", "bytes")
 def register_converter_type(
     key: str,
     *alias: str,
-    factory: Callable[[Context | Registrator, Optional[Configurations]], C] = None,
+    factory: Callable[[ConverterContext, Optional[Configurations]], Converter] = None,
     replace: bool = False,
-) -> Callable[[Type[C]], Type[C]]:
+) -> Callable[[Type[Converter]], Type[Converter]]:
     # noinspection PyShadowingNames
-    def _register(cls: Type[C]) -> Type[C]:
+    def _register(cls: Type[Converter]) -> Type[Converter]:
         registry.register(cls, key, *alias, factory=factory, replace=replace)
         return cls
 
     return _register
 
 
-class ConverterContext(RegistratorContext[Converter]):
-    def __init__(self, context: Context, **kwargs) -> None:
-        super().__init__(context, "converters", **kwargs)
-
+class ConverterContext(_ConverterContext, RegistratorContext[Converter]):
     @property
     def _registry(self) -> Registry[Converter]:
         return registry
 
     # noinspection PyProtectedMember
-    def load(self, configs: Optional[Configurations] = None, configure: bool = True, **kwargs: Any) -> Collection[C]:
+    def load(
+        self,
+        configs: Optional[Configurations] = None,
+        configure: bool = True,
+        **kwargs,
+    ) -> Collection[Converter]:
         if configs is None:
-            configs = self._get_registrator_section()
+            configs = self._load_registrators_configs()
         defaults = Converter._build_defaults(configs)
 
         converters = []
@@ -101,7 +101,7 @@ class ConverterContext(RegistratorContext[Converter]):
     def get_by_dtype(self, dtype: Type) -> Converter:
         converters = self._get_by_dtypes(dtype)
         if len(converters) == 0:
-            raise ResourceException(f"Converter instance for '{dtype}' does not exist")
+            raise ResourceError(f"Converter instance for '{dtype}' does not exist")
         return converters[0]
 
     def _get_by_dtypes(self, dtype: Type) -> List[Converter]:

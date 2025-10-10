@@ -9,7 +9,6 @@ lori.connectors.connector
 from __future__ import annotations
 
 import datetime as dt
-from abc import abstractmethod
 from collections import OrderedDict
 from functools import wraps
 from threading import Lock
@@ -17,10 +16,15 @@ from typing import Any, Dict, Optional
 
 import pandas as pd
 import pytz as tz
-from lori.connectors.core import ConnectorException, ConnectType, _Connector
-from lori.core import Context, Registrator, Resource, ResourceException, Resources
-from lori.core.configs import ConfigurationException, Configurations
+from lori._core._configurations import Configurations  # noqa
+from lori._core._connector import ConnectType, _Connector  # noqa
+from lori._core._context import _Context  # noqa
+from lori._core._registrator import RegistratorContext  # noqa
+from lori.connectors.errors import ConnectorError
+from lori.core import Resource, ResourceError, Resources
 from lori.core.configs.configurator import Configurator, ConfiguratorMeta
+from lori.core.configs.errors import ConfigurationError
+from lori.core.register.registrator import Registrator
 from lori.data.channels import Channel, Channels, ChannelState
 from lori.data.validation import validate_index
 
@@ -37,7 +41,8 @@ class ConnectorMeta(ConfiguratorMeta):
         return connector
 
 
-class Connector(_Connector, metaclass=ConnectorMeta):
+# noinspection PyAbstractClass
+class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
     _connected: bool = False
     _connect_type: ConnectType = ConnectType.AUTO
 
@@ -51,7 +56,7 @@ class Connector(_Connector, metaclass=ConnectorMeta):
 
     def __init__(
         self,
-        context: Context | Registrator,
+        context: RegistratorContext,
         configs: Optional[Configurations] = None,
         **kwargs,
     ) -> None:
@@ -68,9 +73,9 @@ class Connector(_Connector, metaclass=ConnectorMeta):
         self.disconnect()
 
     @classmethod
-    def _assert_context(cls, context: Context | Registrator) -> Context:
+    def _assert_context(cls, context: RegistratorContext) -> RegistratorContext:
         if context is None:
-            raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
+            raise TypeError(f"Invalid '{cls.__name__}' context: {type(context)}")
         return super()._assert_context(context)
 
     # noinspection PyShadowingBuiltins, PyProtectedMember
@@ -91,7 +96,7 @@ class Connector(_Connector, metaclass=ConnectorMeta):
             if id != key:
                 values["id"] = id
             values["key"] = key
-        except (ResourceException, AttributeError):
+        except (ResourceError, AttributeError):
             # Abstract properties are not yet instanced
             pass
 
@@ -100,7 +105,7 @@ class Connector(_Connector, metaclass=ConnectorMeta):
 
         values.update(
             {
-                k: str(v) if not isinstance(v, (Resource, Resources, Configurator, Context)) else convert(v)
+                k: str(v) if not isinstance(v, (_Context, Configurator, Resource, Resources)) else convert(v)
                 for k, v in vars.items()
             }
         )
@@ -151,17 +156,14 @@ class Connector(_Connector, metaclass=ConnectorMeta):
     def is_connected(self) -> bool:
         return True
 
-    def connect(self, resources: Resources) -> None:
-        pass
-
     # noinspection PyUnresolvedReferences, PyTypeChecker
-    @wraps(connect, updated=())
+    @wraps(_Connector.connect, updated=())
     def _do_connect(self, resources: Resources, *args, **kwargs) -> None:
         with self._lock:
             if not self.is_enabled():
-                raise ConfigurationException(f"Trying to connect disabled {type(self).__name__}: {self.id}")
+                raise ConfigurationError(f"Trying to connect disabled {type(self).__name__}: {self.id}")
             if not self.is_configured():
-                raise ConfigurationException(f"Trying to connect unconfigured {type(self).__name__}: {self.id}")
+                raise ConfigurationError(f"Trying to connect unconfigured {type(self).__name__}: {self.id}")
 
             self._timestamp_connect = pd.Timestamp.now(tz.UTC)
             self._timestamp_disconnect = pd.NaT
@@ -182,11 +184,8 @@ class Connector(_Connector, metaclass=ConnectorMeta):
     def _on_connect(self, resources: Resources) -> None:
         pass
 
-    def disconnect(self) -> None:
-        pass
-
     # noinspection PyUnresolvedReferences, PyTypeChecker
-    @wraps(disconnect, updated=())
+    @wraps(_Connector.disconnect, updated=())
     def _do_disconnect(self) -> None:
         with self._lock:
             self._timestamp_connect = pd.NaT
@@ -205,16 +204,12 @@ class Connector(_Connector, metaclass=ConnectorMeta):
     def _on_disconnect(self) -> None:
         pass
 
-    @abstractmethod
-    def read(self, resources: Resources) -> pd.DataFrame:
-        pass
-
     # noinspection PyUnresolvedReferences, PyTypeChecker
-    @wraps(read, updated=())
+    @wraps(_Connector.read, updated=())
     def _do_read(self, resources: Resources, *args, **kwargs) -> pd.DataFrame:
         with self._lock:
             if not self._is_connected():
-                raise ConnectorException(self, f"Trying to read from unconnected {type(self).__name__}: {self.id}")
+                raise ConnectorError(self, f"Trying to read from unconnected {type(self).__name__}: {self.id}")
 
             data = self._run_read(resources, *args, **kwargs)
             data = self._validate(resources, data)
@@ -233,19 +228,15 @@ class Connector(_Connector, metaclass=ConnectorMeta):
                         data[resource.id] = pd.to_datetime(resource_data)
         return data
 
-    @abstractmethod
-    def write(self, data: pd.DataFrame) -> None:
-        pass
-
     # noinspection PyUnresolvedReferences, PyTypeChecker
-    @wraps(write, updated=())
+    @wraps(_Connector.write, updated=())
     def _do_write(self, data: pd.DataFrame, *args, **kwargs) -> None:
         with self._lock:
             if not self._is_connected():
-                raise ConnectorException(self, f"Trying to write to unconnected {type(self).__name__}: {self.id}")
+                raise ConnectorError(self, f"Trying to write to unconnected {type(self).__name__}: {self.id}")
             unknown = [c for c in data.columns if c not in self.resources]
             if len(unknown) > 0:
-                raise ConnectorException(
+                raise ConnectorError(
                     self,
                     f"Trying to write unknown resource{'s' if len(unknown) > 0 else ''} '{', '.join(unknown)}' for "
                     f"{type(self).__name__}: {self.id}",

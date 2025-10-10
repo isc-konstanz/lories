@@ -8,7 +8,7 @@ lori.data.converters.io.voltage
 
 from __future__ import annotations
 
-from lori import Configurations
+from lori.core.typing import Configurations
 from lori.data.converters import register_converter_type
 from lori.data.converters.io.analog import AnalogInput
 

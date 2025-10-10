@@ -15,7 +15,7 @@ import tzlocal
 
 import pandas as pd
 from lori.connectors import ConnectorContext, ConnectType, Database
-from lori.core import Configurations, Configurator, ResourceException
+from lori.core import Configurations, Configurator, ResourceError
 from lori.data.channels import Channel, Channels
 from lori.data.context import DataContext
 from lori.data.replication import Replications
@@ -24,11 +24,11 @@ from lori.util import floor_date, parse_freq, to_bool, to_timedelta, to_timezone
 
 
 class Databases(ConnectorContext, Configurator):
-    SECTION: str = "databases"
+    TYPE: str = "databases"
 
     # noinspection PyProtectedMember, PyUnresolvedReferences
     def __init__(self, context: DataContext, configs: Configurations) -> None:
-        super().__init__(context, configs=configs.get_section(Databases.SECTION, defaults={}))
+        super().__init__(context, configs=configs.get_section(Databases.TYPE, defaults={}))
         self.load(configure=False, sort=False)
         self.configure()
 
@@ -36,10 +36,11 @@ class Databases(ConnectorContext, Configurator):
             self._add(database)
         self.sort()
 
+    # noinspection PyProtectedMember
     @classmethod
     def _assert_configs(cls, configs: Configurations) -> Configurations:
         if configs is None:
-            raise ResourceException(f"Invalid '{cls.__name__}' NoneType configurations")
+            raise ResourceError(f"Invalid '{cls.__name__}' NoneType configurations")
         return super()._assert_configs(configs)
 
     def load(self, **kwargs: Any) -> Collection[Database]:
@@ -107,7 +108,7 @@ class Databases(ConnectorContext, Configurator):
                         for replication, replication_channels in logger_channels.groupby(lambda c: c.replication):
                             replication.replicate(replication_channels, full=to_bool(full), force=to_bool(force))
 
-                    except ResourceException as e:
+                    except ResourceError as e:
                         self._logger.warning(f"Error replicating database '{database.id}': {str(e)}")
                         if self._logger.getEffectiveLevel() <= logging.DEBUG:
                             self._logger.exception(e)
@@ -175,7 +176,7 @@ class Databases(ConnectorContext, Configurator):
 
                         retention.aggregate(database_channels.filter(has_retention), full=to_bool(full))
 
-                    except ResourceException as e:
+                    except ResourceError as e:
                         self._logger.warning(
                             f"Error aggregating '{retention.method}' retaining {retention.keep}: {str(e)}"
                         )

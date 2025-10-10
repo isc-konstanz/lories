@@ -16,7 +16,7 @@ import tzlocal
 
 import pandas as pd
 import pytz as tz
-from lori import ConfigurationException, Resource, ResourceException, Resources
+from lori import ConfigurationError, Resource, ResourceError, Resources
 from lori.connectors import Database
 from lori.util import floor_date, parse_freq, slice_range, to_bool, to_timedelta, to_timezone
 
@@ -29,7 +29,7 @@ except ImportError:
 
 
 class Replication:
-    SECTION: str = "replication"
+    TYPE: str = "replication"
 
     _enabled: bool = False
 
@@ -60,7 +60,7 @@ class Replication:
         self.timezone = timezone
 
         if method not in ["push", "pull"]:
-            raise ConfigurationException(f"Invalid replication method '{method}'")
+            raise ConfigurationError(f"Invalid replication method '{method}'")
         self.method = method
         self.freq = parse_freq(freq)
         self.slice = parse_freq(slice)
@@ -70,7 +70,7 @@ class Replication:
         if database is None:
             return None
         if not isinstance(database, Database):
-            raise ResourceException(database, f"Invalid database: {None if database is None else type(database)}")
+            raise ResourceError(database, f"Invalid database: {None if database is None else type(database)}")
         return database
 
     # noinspection PyShadowingBuiltins
@@ -159,7 +159,7 @@ class Replication:
                     self._logger.error(f"Replication failed because: {e}")
 
 
-class ReplicationException(ResourceException):
+class ReplicationException(ResourceError):
     """
     Raise if an error occurred while replicating.
 
@@ -171,13 +171,13 @@ class Replications(Sequence[Replication]):
 
     # noinspection PyProtectedMember, PyShadowingNames
     def build(self, databases, resource: Resource, **configs) -> Optional[Replication]:
-        resource_configs = resource.get(Replication.SECTION, default=None)
+        resource_configs = resource.get(Replication.TYPE, default=None)
         if resource_configs is None or "database" not in resource_configs:
             return None
         if isinstance(resource_configs, str):
             resource_configs = {"database": resource_configs}
         elif not isinstance(resource_configs, Mapping):
-            raise ConfigurationException("Invalid resource replication database: " + str(resource_configs))
+            raise ConfigurationError("Invalid resource replication database: " + str(resource_configs))
 
         replication = None
         for _replication in self:

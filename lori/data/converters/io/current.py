@@ -8,7 +8,8 @@ lori.data.converters.io.current
 
 from __future__ import annotations
 
-from lori import ConfigurationException, Configurations
+from lori.core import ConfigurationError
+from lori.core.typing import Configurations
 from lori.data.converters import register_converter_type
 from lori.data.converters.io.analog import AnalogInput
 
@@ -34,6 +35,6 @@ class CurrentLoopInput(AnalogInput):
     def _assert_input(self, min: float, max: float, zero: float) -> None:
         super()._assert_input(min, max, zero)
         if min < 0.004:
-            raise ConfigurationException(f"Invalid current minimum for '{self.id}' 4-20mA input: {min}")
+            raise ConfigurationError(f"Invalid current minimum for '{self.id}' 4-20mA input: {min}")
         if max > 0.02:
-            raise ConfigurationException(f"Invalid current maximum for '{self.id}' 4-20mA input: {max}")
+            raise ConfigurationError(f"Invalid current maximum for '{self.id}' 4-20mA input: {max}")

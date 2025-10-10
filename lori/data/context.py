@@ -8,34 +8,25 @@ lori.data.context
 
 from __future__ import annotations
 
-from abc import abstractmethod
 from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any, Callable, Collection, Iterable, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from lori import ConfigurationException
-from lori.core import Configurations, Context, Directories, Registrator, ResourceException
+from lori._core import _DataContext  # noqa
+from lori.core.configs import ConfigurationError, Configurations, Directories
+from lori.core.errors import ResourceError
+from lori.core.typing import ChannelsArgument, ContextArgument
 from lori.data.channels import Channel, Channels
-from lori.data.typing import ChannelsType
 from lori.util import update_recursive, validate_key
 
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
 
-except ImportError:
-    from typing_extensions import Literal
-
-
-class DataContext(Context[Channel]):
-    SECTION: str = "data"
-
-    # noinspection PyProtectedMember
+# noinspection PyAbstractClass, PyProtectedMember
+class DataContext(_DataContext):
     def _load(
         self,
-        context: Context | Registrator,
+        context: ContextArgument,
         configs: Configurations,
         sort: bool = True,
     ) -> Collection[Channel]:
@@ -43,27 +34,27 @@ class DataContext(Context[Channel]):
 
         defaults = {}
         configs = configs.copy()
-        if configs.has_section(self.SECTION):
-            data = configs.get_section(self.SECTION)
+        if configs.has_section(self.TYPE):
+            data = configs.get_section(self.TYPE)
             update_recursive(defaults, Channel._build_defaults(configs))
-            if data.has_section(Channels.SECTION):
-                channels.extend(self._load_from_sections(context, data.get_section(Channels.SECTION), defaults))
-        channels.extend(self._load_from_file(context, configs.dirs, f"{Channels.SECTION}.conf", defaults=defaults))
+            if data.has_section(Channels.TYPE):
+                channels.extend(self._load_from_sections(context, data.get_section(Channels.TYPE), defaults))
+        channels.extend(self._load_from_file(context, configs.dirs, f"{Channels.TYPE}.conf", defaults=defaults))
 
         if sort:
             self.sort()
         return channels
 
-    # noinspection PyProtectedMember, PyShadowingBuiltins
+    # noinspection PyShadowingBuiltins
     def _load_from_configs(
         self,
-        context: Context | Registrator,
+        context: ContextArgument,
         key: str,
         **configs: Any,
     ) -> Channel:
         id = Channel._build_id(key=key, context=context)
         if "type" not in configs:
-            raise ConfigurationException("Missing 'type' for channel: " + id)
+            raise ConfigurationError("Missing 'type' for channel: " + id)
 
         if self._contains(id):
             self._update(id=id, key=key, **configs)
@@ -73,10 +64,9 @@ class DataContext(Context[Channel]):
         self._add(channel)
         return channel
 
-    # noinspection PyProtectedMember
     def _load_from_sections(
         self,
-        context: Context | Registrator,
+        context: ContextArgument,
         configs: Configurations,
         defaults: Optional[Mapping[str, Any]] = None,
     ) -> Collection[Channel]:
@@ -93,7 +83,7 @@ class DataContext(Context[Channel]):
 
     def _load_from_file(
         self,
-        context: Context | Registrator,
+        context: ContextArgument,
         configs_dirs: Directories,
         configs_file: str,
         defaults: Optional[Mapping[str, Any]] = None,
@@ -107,7 +97,7 @@ class DataContext(Context[Channel]):
     # noinspection PyShadowingBuiltins
     def _set(self, id: str, channel: Channel) -> None:
         if not isinstance(channel, Channel):
-            raise ResourceException(f"Invalid channel type: {type(channel)}")
+            raise ResourceError(f"Invalid channel type: {type(channel)}")
 
         # TODO: connector sanity check
         super()._set(id, channel)
@@ -121,7 +111,7 @@ class DataContext(Context[Channel]):
     def channels(self) -> Channels:
         return Channels(self.values())
 
-    def _filter_by_args(self, channels: Optional[ChannelsType]) -> Channels:
+    def _filter_by_args(self, channels: Optional[ChannelsArgument]) -> Channels:
         if channels is None:
             return self.channels
         _channels = []
@@ -133,7 +123,7 @@ class DataContext(Context[Channel]):
             elif isinstance(_channel, Channel):
                 _channels.append(_channel)
             else:
-                raise ResourceException(f"Invalid '{type(_channel)}' channel: {_channel}")
+                raise ResourceError(f"Invalid '{type(_channel)}' channel: {_channel}")
 
         if isinstance(channels, str) or isinstance(channels, Channel):
             append(channels)
@@ -141,13 +131,13 @@ class DataContext(Context[Channel]):
             for channel in channels:
                 append(channel)
         else:
-            raise ResourceException(f"Invalid '{type(channels)}' channels: {channels}")
+            raise ResourceError(f"Invalid '{type(channels)}' channels: {channels}")
 
         return Channels(_channels)
 
     # noinspection PyShadowingBuiltins
-    def filter(self, filter: Callable[[Channel], bool]) -> Channels:
-        return Channels(super().filter(filter))
+    def filter(self, *filters: Optional[Callable[[Channel], bool]]) -> Channels:
+        return Channels(super().filter(*filters))
 
     # noinspection SpellCheckingInspection
     def groupby(self, by: str) -> List[Tuple[Any, Channels]]:
@@ -155,28 +145,6 @@ class DataContext(Context[Channel]):
         for group_by in np.unique([getattr(c, by) for c in self.values()]):
             groups.append((group_by, self.filter(lambda c: getattr(c, by) == group_by)))
         return groups
-
-    @abstractmethod
-    def register(
-        self,
-        function: Callable[[pd.DataFrame], None],
-        channels: Optional[ChannelsType] = None,
-        how: Literal["any", "all"] = "any",
-        unique: bool = False,
-    ) -> None:
-        pass
-
-    @abstractmethod
-    def read(
-        self,
-        channels: Optional[ChannelsType] = None,
-        **kwargs,
-    ) -> pd.DataFrame:
-        pass
-
-    @abstractmethod
-    def write(self, data: pd.DataFrame, channels: Optional[ChannelsType] = None) -> None:
-        pass
 
     def to_frame(self, **kwargs) -> pd.DataFrame:
         return self.channels.to_frame(**kwargs)

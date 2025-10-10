@@ -11,9 +11,9 @@ from __future__ import annotations
 from typing import Optional
 
 import pandas as pd
-from lori import Configurations
-from lori.components.tariff import Tariff, TariffException, register_tariff_type
-from lori.typing import TimestampType
+from lori.components import ComponentError
+from lori.components.tariff import Tariff, register_tariff_type
+from lori.typing import Configurations, Timestamp
 
 
 # noinspection SpellCheckingInspection
@@ -29,13 +29,13 @@ class StaticTariff(Tariff):
 
     def get(
         self,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
         freq: str = "15min",
         **kwargs,
     ) -> pd.DataFrame:
         if any(t is None for t in [start, end]):
-            raise TariffException("Unable to generate static tariff for incomplete or missing time range")
+            raise ComponentError(self, "Unable to generate static tariff for incomplete or missing time range")
         return pd.DataFrame(
             index=pd.date_range(start=start, end=end, freq=freq),
             data={

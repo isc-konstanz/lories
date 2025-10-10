@@ -10,15 +10,15 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Callable
-from copy import deepcopy
-from typing import Any, Collection, Dict, List, Mapping, Optional, Type
+from typing import Any, Collection, Dict, List, Optional, Type
 
 import pandas as pd
 import pytz as tz
-from lori.core import Context, Entity, Resource, ResourceException
-from lori.core.configs import ConfigurationException, Configurations
-from lori.data.channels import ChannelConnector, ChannelConverter, ChannelState
-from lori.typing import TimestampType
+from lori._core._channel import ChannelState, _Channel  # noqa
+from lori._core._data import DataContext, DataManager, _DataManager  # noqa
+from lori._core.typing import Timestamp  # noqa
+from lori.core import Resource, ResourceError
+from lori.data.channels import ChannelConnector, ChannelConverter, Channels
 from lori.util import parse_freq, to_timedelta
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -29,19 +29,8 @@ except ImportError:
     from typing_extensions import Literal
 
 
-class Channel(Resource):
-    INCLUDES: Collection[str] = [
-        "logger",
-        "connector",
-        "converter",
-        "replicator",
-        "replication",
-        "retention",
-        "rotate",
-    ]
-    TIMESTAMP: str = "timestamp"
-
-    __context: Context
+class Channel(_Channel, Resource):
+    __context: DataContext
 
     _timestamp: pd.Timestamp = pd.NaT
     _value: Optional[Any] = None
@@ -58,7 +47,7 @@ class Channel(Resource):
         key: str = None,
         name: str = None,
         type: str | Type = None,
-        context: Context = None,
+        context: DataManager = None,
         converter: ChannelConverter = None,
         connector: Optional[ChannelConnector] = None,
         logger: Optional[ChannelConnector] = None,
@@ -71,25 +60,23 @@ class Channel(Resource):
         self.logger = self._assert_connector(logger)
 
     @classmethod
-    def _assert_context(cls, context: Context) -> Context:
-        from lori.data.manager import DataManager
-
-        if context is None or not isinstance(context, DataManager):
-            raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
+    def _assert_context(cls, context: DataManager) -> DataManager:
+        if context is None or not isinstance(context, _DataManager):
+            raise ResourceError(f"Invalid '{cls.__name__}' context: {type(context)}")
         return context
 
     @classmethod
     def _assert_converter(cls, converter: Optional[ChannelConverter]) -> ChannelConverter:
         if converter is None or not isinstance(converter, ChannelConverter):
-            raise ResourceException(f"Invalid channel converter: {type(converter)}")
+            raise ResourceError(f"Invalid channel converter: {type(converter)}")
         return converter
 
     @classmethod
     def _assert_connector(cls, connector: Optional[ChannelConnector]) -> ChannelConnector:
         if connector is None:
-            connector = ChannelConnector(None)
+            connector = ChannelConnector()
         elif not isinstance(connector, ChannelConnector):
-            raise ResourceException(f"Invalid channel connector: {type(connector)}")
+            raise ResourceError(f"Invalid channel connector: {type(connector)}")
         return connector
 
     def _get_attrs(self) -> List[str]:
@@ -181,11 +168,11 @@ class Channel(Resource):
         state: str | ChannelState,
     ) -> None:
         if not isinstance(timestamp, pd.Timestamp):
-            raise ResourceException(f"Expected pandas Timestamp for '{self.id}', not: {type(value)}")
+            raise ResourceError(f"Expected pandas Timestamp for '{self.id}', not: {type(value)}")
         self._timestamp = timestamp
 
         if self._is_empty(value) and state == ChannelState.VALID:
-            raise ResourceException(f"Invalid value for valid state '{self.id}': {value}")
+            raise ResourceError(f"Invalid value for valid state '{self.id}': {value}")
         self._value = value
         self._state = state
 
@@ -198,62 +185,15 @@ class Channel(Resource):
         **configs: Any,
     ) -> None:
         if converter is not None:
-            converter = Channel._build_section(converter, "converter")
+            converter = Channel._build_member(converter, "converter")
             self.converter._update(**converter)
         if connector is not None:
-            connector = Channel._build_section(connector, "connector")
+            connector = Channel._build_member(connector, "connector")
             self.connector._update(**connector)
         if logger is not None:
-            logger = Channel._build_section(logger, "connector")
+            logger = Channel._build_member(logger, "connector")
             self.logger._update(**logger)
         super()._update(**configs)
-
-    # noinspection PyShadowingBuiltins
-    @classmethod
-    def _build_id(
-        cls,
-        id: Optional[str] = None,
-        key: Optional[str] = None,
-        context: Optional[Context | Entity] = None,
-    ) -> str:
-        if id is None:
-            if key is None:
-                raise ResourceException(f"Unable to build '{cls.__name__}' ID")
-            if id is None and context is not None and isinstance(context, Entity):
-                id = f"{context.id}.{key}"
-            else:
-                id = key
-        return id
-
-    @staticmethod
-    def _build_defaults(configs: Configurations) -> Dict[str, Any]:
-        return Channel._build_configs(
-            {k: deepcopy(v) for k, v in configs.items() if not isinstance(v, Mapping) or k in Channel.INCLUDES}
-        )
-
-    @staticmethod
-    # noinspection PyShadowingNames
-    def _build_configs(configs: Dict[str, Any]) -> Dict[str, Any]:
-        def _build_wrapper(key: str, section: Optional[str] = None) -> None:
-            if section is None:
-                section = key
-            if section not in configs:
-                return
-            configs[section] = Channel._build_section(configs[section], key)
-
-        _build_wrapper("converter")
-        _build_wrapper("connector")
-        _build_wrapper("connector", "logger")
-        return configs
-
-    @staticmethod
-    # noinspection PyShadowingNames
-    def _build_section(section: Optional[Dict[str, Any] | str], key: str) -> Optional[Dict[str, Any]]:
-        if isinstance(section, str) or section is None:
-            return {key: section}
-        elif not isinstance(section, Mapping):
-            raise ConfigurationException(f"Invalid channel {key} type: " + str(section))
-        return dict(section)
 
     def _copy_args(self) -> Dict[str, Any]:
         arguments = super()._copy_args()
@@ -272,9 +212,7 @@ class Channel(Resource):
         channel._state = self._state
         return channel
 
-    def to_list(self):
-        from lori.data import Channels
-
+    def to_list(self) -> Channels:
         return Channels([self])
 
     def to_configs(self) -> Dict[str, Any]:
@@ -316,15 +254,15 @@ class Channel(Resource):
     # noinspection PyUnresolvedReferences
     def read(
         self,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
     ) -> pd.DataFrame:
         return self.__context.read(self.to_list(), start, end)
 
     # noinspection PyUnresolvedReferences
     def write(self, data: pd.DataFrame | pd.Series | Any) -> None:
         if data is None:
-            raise ResourceException(f"Invalid data to write '{self.id}': {data}")
+            raise ResourceError(f"Invalid data to write '{self.id}': {data}")
         if isinstance(data, pd.Series):
             data.name = self.id
             data = data.to_frame()

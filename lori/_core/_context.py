@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.core.context
-~~~~~~~~~~~~~~~~~
+lori._core._context
+~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -13,17 +13,15 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Callable, MutableMapping
 from itertools import chain
-from typing import Any, Collection, Generic, Iterable, Iterator, Tuple, TypeVar
+from typing import Any, Collection, Generic, Iterable, Iterator, Optional, Sequence, Tuple, TypeVar, overload
 
 import pandas as pd
-from lori.core import Entity, ResourceException
-
-E = TypeVar("E", bound=Entity)
+from lori._core._entity import Entity, _Entity
 
 
 # noinspection PyAbstractClass
-class Context(ABC, MutableMapping[str, E], Generic[E]):
-    __map: OrderedDict[str, E]
+class _Context(ABC, Generic[Entity], MutableMapping[str, Entity]):
+    __map: OrderedDict[str, Entity]
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -41,53 +39,53 @@ class Context(ABC, MutableMapping[str, E], Generic[E]):
     def __len__(self) -> int:
         return len(self.__map)
 
-    def __contains__(self, __object: str | E) -> bool:
+    def __contains__(self, __object: str | Entity) -> bool:
         return self._contains(__object)
 
-    def __getitem__(self, __uid: Iterable[str] | str) -> E | Collection[E]:
+    def __getitem__(self, __uid: Iterable[str] | str) -> Entity | Collection[Entity]:
         if isinstance(__uid, str):
             return self._get(__uid)
         if isinstance(__uid, Iterable):
             return [self._get(i) for i in __uid]
         raise KeyError(__uid)
 
-    def __setitem__(self, __uid: str, __object: E) -> None:
+    def __setitem__(self, __uid: str, __object: Entity) -> None:
         self._set(__uid, __object)
 
     def __delitem__(self, __uid: str) -> None:
         self._remove(__uid)
 
-    def _contains(self, __object: str | E) -> bool:
+    def _contains(self, __object: str | Entity) -> bool:
         if isinstance(__object, str):
             return __object in self.__map.keys()
-        if isinstance(__object, Entity):
+        if isinstance(__object, _Entity):
             return __object in self.__map.values()
         return False
 
-    def _get(self, __uid: str) -> E:
+    def _get(self, __uid: str) -> Entity:
         return self.__map[__uid]
 
-    def _set(self, __uid: str, __object: E) -> None:
-        if id in self.keys():
-            raise ResourceException(f'Entity with ID "{__uid}" already exists')
+    def _set(self, __uid: str, __object: Entity) -> None:
+        if __uid in self.keys():
+            raise ValueError(f'Entity with ID "{__uid}" already exists')
 
         self.__map[__uid] = __object
 
-    def _add(self, *__objects: E) -> None:
+    def _add(self, *__objects: Entity) -> None:
         for __object in __objects:
             self._set(str(__object.id), __object)
 
     @abstractmethod
-    def _create(self, *args, **kwargs) -> E: ...
+    def _create(self, *args, **kwargs) -> Entity: ...
 
     @abstractmethod
     def _update(self, *args, **kwargs) -> None: ...
 
-    def _remove(self, *__objects: str | E) -> None:
+    def _remove(self, *__objects: str | Entity) -> None:
         for __object in __objects:
             if isinstance(__object, str):
                 del self.__map[__object]
-            elif isinstance(__object, Entity):
+            elif isinstance(__object, _Entity):
                 del self.__map[__object.id]
 
     def sort(self):
@@ -100,5 +98,17 @@ class Context(ABC, MutableMapping[str, E], Generic[E]):
         self.__map = OrderedDict(sorted(self.__map.items(), key=lambda e: order(e[0])))
 
     # noinspection PyShadowingBuiltins
-    def filter(self, filter: Callable[[E], bool]) -> Collection[E]:
-        return [c for c in self.__map.values() if filter(c)]
+    @overload
+    def filter(self, filter: Optional[Callable[[Entity], bool]]) -> Sequence[Entity]: ...
+
+    def filter(self, *filters: Optional[Callable[[Entity], bool]]) -> Sequence[Entity]:
+        def _filters(__object: Entity) -> bool:
+            for _filter in filters:
+                if _filter is not None and not _filter(__object):
+                    return False
+            return True
+
+        return [c for c in self.__map.values() if _filters(c)]
+
+
+Context = TypeVar("Context", bound=_Context)

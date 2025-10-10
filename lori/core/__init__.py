@@ -6,29 +6,26 @@ lori.core
 
 """
 
-from .exceptions import (  # noqa: F401
-    ResourceException,
-    ResourceUnavailableException,
+from .errors import (  # noqa: F401
+    ResourceError,
+    ResourceUnavailableError,
 )
 
-from .entity import Entity  # noqa: F401
-from .context import Context  # noqa: F401
+from .constants import Constants  # noqa: F401
+from .constant import Constant, CONSTANTS  # noqa: F401
+
+from .resource import Resource  # noqa: F401
+
+from .resources import Resources  # noqa: F401
 
 from .configs import (  # noqa: F401
     Directory,
     Directories,
     Configurations,
-    ConfigurationException,
-    ConfigurationUnavailableException,
     Configurator,
+    ConfigurationError,
+    ConfigurationUnavailableError,
 )
-
-from .constant import Constant  # noqa: F401
-from .constants import CONSTANTS  # noqa: F401
-
-from .resource import Resource  # noqa: F401
-
-from .resources import Resources  # noqa: F401
 
 from .register import (  # noqa: F401
     Registry,

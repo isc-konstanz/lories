@@ -11,8 +11,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Optional, Type, TypeVar
 
-from lori.core import Context, Registry, ResourceException
-from lori.core.configs import ConfigurationException, Configurations
+from lori._core._configurations import Configurations  # noqa
+from lori._core._data import DataContext, _DataContext, _DataManager  # noqa
+from lori.core import ConfigurationError, Registry, ResourceError
 from lori.core.configs.configurator import Configurator, ConfiguratorMeta
 
 
@@ -20,7 +21,7 @@ from lori.core.configs.configurator import Configurator, ConfiguratorMeta
 def register_interface_type(
     type: str,
     *alias: str,
-    factory: Callable[[Context, Configurations], InterfaceType] = None,
+    factory: Callable[[DataContext, Configurations], InterfaceType] = None,
     replace: bool = False,
 ) -> Callable[[Type[InterfaceType]], Type[InterfaceType]]:
     # noinspection PyShadowingNames
@@ -32,7 +33,7 @@ def register_interface_type(
 
 
 class InterfaceMeta(ConfiguratorMeta):
-    def __call__(cls, context: Context, configs: Configurations, **kwargs) -> InterfaceType:
+    def __call__(cls, context: DataContext, configs: Configurations, **kwargs) -> InterfaceType:
         global _instance
 
         _type = configs.get("type", default="default").lower()
@@ -55,38 +56,36 @@ class InterfaceMeta(ConfiguratorMeta):
 
 
 class Interface(Configurator, metaclass=InterfaceMeta):
-    SECTION: str = "interface"
+    TYPE: str = "interface"
 
-    __context: Context
+    __context: _DataContext
 
     # noinspection PyUnresolvedReferences
-    def __init__(self, context: Context, configs: Configurations, **kwargs) -> None:
+    def __init__(self, context: DataContext, configs: Configurations, **kwargs) -> None:
         super().__init__(configs, **kwargs)
         self.__context = self._assert_context(context)
 
     @classmethod
-    def _assert_context(cls, context: Context) -> Context:
-        from lori.application import Application
-
-        if context is None or not isinstance(context, Application):
-            raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
+    def _assert_context(cls, context: DataContext) -> DataContext:
+        if context is None or not isinstance(context, _DataManager):
+            raise ResourceError(f"Invalid '{cls.__name__}' context: {type(context)}")
         return context
 
     @classmethod
     def _assert_configs(cls, configs: Optional[Configurations]) -> Optional[Configurations]:
         if configs is None:
-            raise ConfigurationException(f"Invalid '{cls.__name__}' configurations: {type(configs)}")
+            raise ConfigurationError(f"Invalid '{cls.__name__}' configurations: {type(configs)}")
         return super()._assert_configs(configs)
 
     @property
-    def context(self) -> Context:
+    def context(self) -> DataContext:
         return self.__context
 
     def start(self, *args, **kwargs) -> None:
         pass
 
 
-class InterfaceException(ResourceException):
+class InterfaceException(ResourceError):
     """
     Raise if an error occurred accessing the interface.
 

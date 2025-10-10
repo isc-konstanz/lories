@@ -14,10 +14,9 @@ from revpimodio2 import EventCallback, RevPiModIO, io
 
 import pandas as pd
 import pytz as tz
-from lori import Configurations
 from lori.connectors import Connector, register_connector_type
-from lori.core import Resources
-from lori.data import Channel
+from lori.data.channels import Channel
+from lori.typing import Configurations, Resources
 from lori.util import to_bool
 
 

@@ -12,8 +12,8 @@ import inspect
 from typing import Optional
 
 import pandas as pd
+from lori._core._channel import ChannelState  # noqa
 from lori.connectors.tasks.task import ConnectorTask
-from lori.data.channels import ChannelState
 
 
 class ReadTask(ConnectorTask):

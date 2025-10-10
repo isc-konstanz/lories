@@ -11,18 +11,19 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Optional, Type, TypeVar
 
-from lori.components import Component, register_component_type
-from lori.core import Configurations, Constant, Context, ResourceException, ResourceUnavailableException
+from lori.components import Component, ComponentError, register_component_type
+from lori.core import Constant, ResourceError
 from lori.core.activator import ActivatorMeta
-from lori.core.register import Registrator, Registry
+from lori.core.register import Registry
 from lori.location import Location, LocationUnavailableException
+from lori.typing import Configurations, ContextArgument
 
 
 # noinspection PyShadowingBuiltins
 def register_weather_type(
     type: str,
     *alias: str,
-    factory: Callable[[Context | Registrator, Optional[Configurations]], WeatherType] = None,
+    factory: Callable[[ContextArgument, Optional[Configurations]], WeatherType] = None,
     replace: bool = False,
 ) -> Callable[[Type[WeatherType]], Type[WeatherType]]:
     # noinspection PyShadowingNames
@@ -34,7 +35,7 @@ def register_weather_type(
 
 
 class WeatherMeta(ActivatorMeta):
-    def __call__(cls, context: Context | Component, configs: Configurations, **kwargs) -> WeatherType:
+    def __call__(cls, context: ContextArgument, configs: Configurations, **kwargs) -> WeatherType:
         _type = configs.get("type", default="default").lower()
         _cls = cls._get_class(_type)
         if cls != _cls:
@@ -50,7 +51,7 @@ class WeatherMeta(ActivatorMeta):
             registration = registry.from_type(type)
             return registration.type
 
-        raise WeatherException(f"Unknown weather type '{type}'")
+        raise ResourceError(f"Unknown weather type '{type}'")
 
 
 # noinspection SpellCheckingInspection
@@ -85,7 +86,7 @@ class Weather(Component, metaclass=WeatherMeta):
     # noinspection PyProtectedMember
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self.localize(configs.get_section(Location.SECTION, defaults={}))
+        self.localize(configs.get_section(Location.TYPE, defaults={}))
 
     # noinspection PyUnresolvedReferences
     def localize(self, configs: Configurations) -> None:
@@ -102,23 +103,9 @@ class Weather(Component, metaclass=WeatherMeta):
             try:
                 self.location = self.context.location
                 if not isinstance(self.location, Location):
-                    raise WeatherException(f"Invalid location type for weather '{self.id}': {type(self.location)}")
+                    raise ComponentError(self, f"Invalid location type '{type(self.location)}'")
             except (LocationUnavailableException, AttributeError):
-                raise WeatherException(f"Missing location for weather '{self.id}'")
-
-
-class WeatherException(ResourceException):
-    """
-    Raise if an error occurred accessing the weather.
-
-    """
-
-
-class WeatherUnavailableException(ResourceUnavailableException, WeatherException):
-    """
-    Raise if a configured weather access can not be found.
-
-    """
+                raise ComponentError(self, "Missing location")
 
 
 WeatherType = TypeVar("WeatherType", bound=Weather)

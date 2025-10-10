@@ -18,10 +18,10 @@ import pandas as pd
 from lori.components import Component
 from lori.connectors import Database
 from lori.connectors.tables import HDFDatabase
-from lori.core import CONSTANTS, Configurations, Configurator, Constant, Directories, ResourceException, Resources
+from lori.core import CONSTANTS, Configurator, Constant, Directories, ResourceError, Resources
+from lori.core.typing import Configurations, Timestamp
 from lori.data.util import resample, scale_energy, scale_power
 from lori.simulation import Durations, Progress, Result
-from lori.typing import TimestampType
 from lori.util import parse_freq
 
 
@@ -96,13 +96,13 @@ class Results(Configurator, Sequence[Result]):
     @classmethod
     def _assert_database(cls, database: Database) -> Database:
         if database is None or not isinstance(database, Database):
-            raise ResourceException(f"Invalid '{cls.__name__}' database: {type(database)}")
+            raise ResourceError(f"Invalid '{cls.__name__}' database: {type(database)}")
         return database
 
     @classmethod
     def _assert_component(cls, component: Component) -> Component:
         if component is None or not isinstance(component, Component):
-            raise ResourceException(f"Invalid '{cls.__name__}' component: {type(component)}")
+            raise ResourceError(f"Invalid '{cls.__name__}' component: {type(component)}")
         return component
 
     @staticmethod
@@ -253,8 +253,8 @@ class Results(Configurator, Sequence[Result]):
     def submit(
         self,
         function: Callable[..., pd.DataFrame],
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
         *args,
         **kwargs,
     ) -> None:

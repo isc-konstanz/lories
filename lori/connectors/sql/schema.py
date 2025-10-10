@@ -22,7 +22,8 @@ from lori.connectors.sql.columns import (
 from lori.connectors.sql.columns.datetime import is_datetime
 from lori.connectors.sql.index import DatetimeIndexType
 from lori.connectors.sql.table import Table
-from lori.core import ConfigurationException, Configurations, Configurator, Resource, ResourceException, Resources
+from lori.core import ConfigurationError, Configurator, ResourceError
+from lori.typing import Configurations, Resource, Resources
 from lori.util import to_bool, to_timezone
 
 
@@ -59,7 +60,7 @@ class Schema(Configurator, MetaData):
         for schema, schema_resources in resources.groupby("schema"):
             for name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
                 if name is None:
-                    raise ConfigurationException(
+                    raise ConfigurationError(
                         "Missing 'table' configuration for resources: " + ", ".join([r.id for r in table_resources])
                     )
                 if name in self.tables:
@@ -87,7 +88,7 @@ class Schema(Configurator, MetaData):
                 # which will have duplicate resource configurations.
                 for duplicate in _filter_duplicates():
                     if not any(self._validate_column(column, duplicate) for column in columns):
-                        raise ConfigurationException(f"Duplicate column for table '{name}': {duplicate}")
+                        raise ConfigurationError(f"Duplicate column for table '{name}': {duplicate}")
                     columns.remove(duplicate)
 
                 table = Table(name, self, *columns, schema=schema, quote=True, quote_schema=True)
@@ -153,9 +154,9 @@ class Schema(Configurator, MetaData):
                     # TODO: Implement column validation
                 else:
                     if self.configs.get_bool("create", default=True):
-                        raise ResourceException(f"Not yet implemented to create missing column: {column.name}")
+                        raise ResourceError(f"Not yet implemented to create missing column: {column.name}")
                     else:
-                        raise ResourceException(f"Unable to find configured column: {column.name}")
+                        raise ResourceError(f"Unable to find configured column: {column.name}")
 
     @staticmethod
     def _validate_column(column: Column, other: Column) -> bool:

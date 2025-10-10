@@ -12,7 +12,7 @@ from abc import ABCMeta
 from collections.abc import Callable
 from typing import Iterable, Iterator, List, MutableSequence
 
-from lori.core.constant import Constant
+from lori._core import _Constant  # noqa
 
 
 class _ConstantsMeta(ABCMeta):
@@ -25,8 +25,8 @@ class _ConstantsMeta(ABCMeta):
 
 
 # noinspection PyShadowingNames
-class _Constants(MutableSequence[Constant], metaclass=_ConstantsMeta):
-    _constants: List[Constant]
+class Constants(MutableSequence[_Constant], metaclass=_ConstantsMeta):
+    _constants: List[_Constant]
 
     def __init__(self, constants=()) -> None:
         self._constants = [*constants]
@@ -37,7 +37,7 @@ class _Constants(MutableSequence[Constant], metaclass=_ConstantsMeta):
     def __str__(self) -> str:
         return f"{type(self).__name__}:\n\t" + "\n\t".join(f"{c.key} = {repr(c)}" for c in self._constants)
 
-    def __contains__(self, constant: str | Constant) -> bool:
+    def __contains__(self, constant: str | _Constant) -> bool:
         if isinstance(constant, str):
             return any(constant == r.key for r in self._constants)
         return constant in self._constants
@@ -51,13 +51,13 @@ class _Constants(MutableSequence[Constant], metaclass=_ConstantsMeta):
             return type(self)([r for r in self._constants if r.key == index])
         raise KeyError(index)
 
-    def __setitem__(self, index: int, constant: Constant) -> None:
+    def __setitem__(self, index: int, constant: _Constant) -> None:
         self._constants[index] = constant
 
     def __delitem__(self, index: int) -> None:
         del self._constants[index]
 
-    def __iter__(self) -> Iterator[Constant]:
+    def __iter__(self) -> Iterator[_Constant]:
         return iter(self._constants)
 
     def __len__(self) -> int:
@@ -66,23 +66,12 @@ class _Constants(MutableSequence[Constant], metaclass=_ConstantsMeta):
     def __add__(self, other):
         return type(self)([*self, *other])
 
-    def insert(self, index: int, constant: Constant):
+    def insert(self, index: int, constant: _Constant):
         self._constants.insert(index, constant)
 
-    def extend(self, constants: Iterable[Constant]) -> None:
+    def extend(self, constants: Iterable[_Constant]) -> None:
         self._constants.extend(constants)
 
     # noinspection PyShadowingBuiltins
-    def filter(self, filter: Callable[[Constant], bool]):
+    def filter(self, filter: Callable[[_Constant], bool]):
         return type(self)([constant for constant in self._constants if filter(constant)])
-
-
-CONSTANTS = _Constants()
-
-SECOND = Constant(int, "second", "Second")
-MINUTE = Constant(int, "minute", "Minute")
-HOUR = Constant(int, "hour", "Hour")
-DAY_OF_WEEK = Constant(int, "day_of_week", "Day of the Week")
-DAY_OF_YEAR = Constant(int, "day_of_year", "Day of the Year")
-MONTH = Constant(int, "month", "Month")
-YEAR = Constant(int, "year", "Year")

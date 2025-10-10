@@ -8,45 +8,49 @@ lori.core.register.access
 
 from __future__ import annotations
 
-from typing import Any, Generic, TypeVar, overload
+from typing import Any, Generic, Optional, Sequence, overload
 
-from lori.core import Configurations, Context, ResourceException
-from lori.core.register import Registrator
-from lori.core.register.context import RegistratorContext, _RegistratorContext
+from lori._core._context import Context, _Context  # noqa
+from lori._core._registrator import (  # noqa
+    Registrator,
+    RegistratorContext,
+    _Registrator,
+    _RegistratorContext,
+)
+from lori.core.configs import Configurations
+from lori.core.errors import ResourceError
+from lori.core.register._load import _RegistratorLoader
 from lori.util import update_recursive
 
-R = TypeVar("R", bound=Registrator)
 
-
-# noinspection SpellCheckingInspection, PyAbstractClass, PyShadowingBuiltins
-class RegistratorAccess(_RegistratorContext[R], Generic[R]):
+# noinspection SpellCheckingInspection, PyProtectedMember, PyAbstractClass, PyShadowingBuiltins
+class RegistratorAccess(_RegistratorLoader[Registrator], Generic[Registrator]):
     _registrar: Registrator
-    __context: Context
+    __context: RegistratorContext
 
-    # noinspection PyProtectedMember
+    # noinspection PyUnresolvedReferences
     def __init__(
         self,
         context: RegistratorContext,
         registrar: Registrator,
-        section: str,
         **kwargs,
     ) -> None:
         context = self._assert_context(context)
         registrar = self._assert_registrar(registrar)
-        super().__init__(section, logger=registrar._logger, **kwargs)
+        super().__init__(logger=registrar._logger, **kwargs)
         self.__context = context
         self._registrar = registrar
 
     @classmethod
     def _assert_registrar(cls, registrar: Registrator):
-        if registrar is None or not isinstance(registrar, Registrator):
-            raise ResourceException(f"Invalid '{cls.__name__}' registrator: {type(registrar)}")
+        if registrar is None or not isinstance(registrar, _Registrator):
+            raise ResourceError(f"Invalid '{cls.__name__}' registrator: {type(registrar)}")
         return registrar
 
     @classmethod
     def _assert_context(cls, context: RegistratorContext):
-        if context is None or not isinstance(context, RegistratorContext):
-            raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
+        if context is None or not isinstance(context, _RegistratorContext):
+            raise ResourceError(f"Invalid '{cls.__name__}' context: {type(context)}")
         return context
 
     def __repr__(self) -> str:
@@ -57,40 +61,38 @@ class RegistratorAccess(_RegistratorContext[R], Generic[R]):
 
     # noinspection PyArgumentList
     def __getattr__(self, attr):
-        registrators = Context.__getattribute__(self, f"_{Context.__name__}__map")
+        registrators = _Context.__getattribute__(self, f"{_Context.__name__}__map")
         registrators_by_key = {c.key: c for c in registrators.values()}
         if attr in registrators_by_key:
             return registrators_by_key[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{attr}'")
 
     @property
-    def context(self) -> Context:
+    def context(self) -> RegistratorContext:
         return self.__context
-
-    def _get_registrator_section(self) -> Configurations:
-        return self._registrar.configs.get_section(self._section, ensure_exists=True)
 
     def __validate_id(self, id: str) -> str:
         if not len(id.split(".")) > 1:
             id = f"{self._registrar.id}.{id}"
         return id
 
-    def _contains(self, __registrator: str | R) -> bool:
-        registrators = Context.__getattribute__(self, f"_{Context.__name__}__map")
+    # noinspection PyArgumentList
+    def _contains(self, __registrator: str | Registrator) -> bool:
+        registrators = _Context.__getattribute__(self, f"{_Context.__name__}__map")
         if isinstance(__registrator, str):
             __registrator = self.__validate_id(__registrator)
             return __registrator in registrators.keys()
-        if isinstance(__registrator, Registrator):
+        if isinstance(__registrator, _Registrator):
             return __registrator in registrators.values()
         return False
 
-    def _get(self, id: str) -> R:
+    def _get(self, id: str) -> Registrator:
         return super()._get(self.__validate_id(id))
 
-    def _set(self, id: str, registrator: R) -> None:
+    def _set(self, id: str, registrator: Registrator) -> None:
         id = self.__validate_id(id)
 
-        self.context._set(id, registrator)
+        self.__context._set(id, registrator)
         super()._set(id, registrator)
 
     def _create(
@@ -98,15 +100,15 @@ class RegistratorAccess(_RegistratorContext[R], Generic[R]):
         context: Context | Registrator,
         configs: Configurations,
         **kwargs: Any,
-    ) -> R:
+    ) -> Registrator:
         return self.context._create(context, configs, **kwargs)
 
-    def _remove(self, *__registrators: str | R) -> None:
+    def _remove(self, *__registrators: str | Registrator) -> None:
         for __registrator in __registrators:
             if isinstance(__registrator, str):
                 __registrator = self.__validate_id(__registrator)
 
-            self.context._remove(__registrator)
+            self.__context._remove(__registrator)
             super()._remove(__registrator)
 
     @overload
@@ -115,9 +117,9 @@ class RegistratorAccess(_RegistratorContext[R], Generic[R]):
     @overload
     def add(self, registrator: Registrator) -> None: ...
 
-    # noinspection PyProtectedMember, PyTypeChecker
-    def add(self, __registrator: str | R, **configs: Any) -> None:
-        if isinstance(__registrator, Registrator):
+    # noinspection PyUnresolvedReferences, PyTypeChecker
+    def add(self, __registrator: str | Registrator, **configs: Any) -> None:
+        if isinstance(__registrator, _Registrator):
             self._add(__registrator)
             return
 
@@ -151,3 +153,42 @@ class RegistratorAccess(_RegistratorContext[R], Generic[R]):
             registrator_dirs = configs.dirs.copy()
             registrator_dirs.conf = registrator_dirs.conf.joinpath(relative_dir)
             registrator.configs.copy(registrator_dirs)
+
+    def _load_registrator_defaults(self, configs: Optional[Configurations] = None, **kwargs) -> Configurations:
+        _class = self._get_registator_class()
+        if configs is None:
+            configs = self._registrar.configs
+        return _class._build_defaults(configs, **kwargs)
+
+    # noinspection PyUnresolvedReferences
+    def _load_registrators_configs(self) -> Configurations:
+        _section = self._get_registrators_type()
+        return self._registrar.configs.get_section(_section, ensure_exists=True)
+
+    # noinspection PyUnresolvedReferences, PyProtectedMember
+    def load(
+        self,
+        configs: Optional[Configurations] = None,
+        configs_file: Optional[str] = None,
+        configs_dir: Optional[str] = None,
+        configure: bool = False,
+        **kwargs: Any,
+    ) -> Sequence[Registrator]:
+        _class = self._get_registator_class()
+
+        defaults = self._load_registrator_defaults(**kwargs)
+        if configs is None:
+            configs = self._load_registrators_configs()
+        if configs_file is None:
+            configs_file = configs.name
+        if configs_dir is None:
+            configs_dir = configs.dirs.conf.joinpath(f"{configs.key}.d")
+        return self._load(
+            self._registrar,
+            configs=configs,
+            configs_file=configs_file,
+            configs_dir=configs_dir,
+            configure=configure,
+            includes=_class.INCLUDES,
+            defaults=defaults,
+        )

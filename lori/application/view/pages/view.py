@@ -18,22 +18,20 @@ from lori.components import Component, ComponentContext
 from lori.system import System
 from lori.util import validate_key
 
-PageType = TypeVar("PageType", bound=Page)
-
-ComponentType = TypeVar("ComponentType", bound=Component)
-ChildrenType = TypeVar("ChildrenType", bound=Dict[str, Type[Page]])
+P = TypeVar("P", bound=Page)
+C = TypeVar("C", bound=Component)
 
 registry = PageRegistry()
 
 
 # noinspection PyShadowingBuiltins
 def register_component_page(
-    *types: Type[ComponentType],
+    *types: Type[C],
     factory: Optional[Callable] = None,
     replace: bool = False,
-) -> Callable[[Type[PageType]], Type[PageType]]:
+) -> Callable[[Type[P]], Type[P]]:
     # noinspection PyShadowingNames
-    def _register(cls: Type[PageType]) -> Type[PageType]:
+    def _register(cls: Type[P]) -> Type[P]:
         registry.register_page(cls, *types, factory=factory, replace=replace)
         return cls
 
@@ -41,20 +39,20 @@ def register_component_page(
 
 
 def register_component_group(
-    *types: Type[ComponentType],
+    *types: Type[C],
     key: Optional[str] = None,
     name: Optional[str] = None,
     factory: Optional[Callable] = None,
     custom: bool = False,
     replace: bool = False,
-) -> Callable[[Type[PageType]], Type[PageType]]:
+) -> Callable[[Type[P]], Type[P]]:
     if name is None:
         name = types[0].__name__
     if key is None:
         key = validate_key(name)
 
     # noinspection PyShadowingBuiltins
-    def _register(cls: Type[PageType]) -> Type[PageType]:
+    def _register(cls: Type[P]) -> Type[P]:
         if custom:
             if not issubclass(cls, PageGroup):
                 raise ValueError(f"Unknown page group type: {cls.__name__}")

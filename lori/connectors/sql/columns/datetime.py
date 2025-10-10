@@ -17,7 +17,7 @@ from sqlalchemy.types import DATE, DATETIME, TIME, TIMESTAMP
 import pandas as pd
 import pytz as tz
 from lori.connectors.sql.columns import Column, ColumnType
-from lori.core import ResourceException
+from lori.core.errors import ResourceError
 
 DatetimeType = TypeVar("DatetimeType", pd.DatetimeIndex, pd.Series, pd.Timestamp, dt.datetime, dt.date, dt.time)
 
@@ -39,7 +39,7 @@ class DatetimeColumn(Column):
         **kwargs,
     ) -> None:
         if not is_datetime(type):
-            raise ResourceException(f"Invalid data type for DatetimeColumn: {type}")
+            raise ResourceError(f"Invalid data type for DatetimeColumn: {type}")
 
         if default is None and not nullable:
             if type == TIMESTAMP:
@@ -72,7 +72,7 @@ class DatetimeColumn(Column):
                 and not data.map(lambda i: isinstance(i, (dt.datetime, dt.date, dt.time))).all()
             )
         ):
-            raise ResourceException(f"Unable to prepare datetime index from '{type(data)}' data: {data}")
+            raise ResourceError(f"Unable to prepare datetime index from '{type(data)}' data: {data}")
 
         if isinstance(data, (pd.DatetimeIndex, pd.Timestamp)):
             data = data.tz_convert(self.timezone).tz_localize(None)

@@ -11,7 +11,8 @@ from __future__ import annotations
 import datetime as dt
 
 import pandas as pd
-from lori import ResourceException
+from lori._core.typing import Timezone  # noqa
+from lori.core.errors import ResourceError  # noqa
 
 
 def validate_index(data: pd.DataFrame | pd.Series) -> pd.DataFrame | pd.Series:
@@ -19,13 +20,13 @@ def validate_index(data: pd.DataFrame | pd.Series) -> pd.DataFrame | pd.Series:
         try:
             data.index = pd.to_datetime(data.index)
         except (pd.errors.ParserError, ValueError) as e:
-            raise ResourceException(f"Invalid series, without valid DatetimeIndex: {str(e)}")
+            raise ResourceError(f"Invalid series, without valid DatetimeIndex: {str(e)}")
     if not data.index.is_unique:
-        raise ResourceException(f"Invalid series with non unique index: {data[data.index.duplicated()]}")
+        raise ResourceError(f"Invalid series with non unique index: {data[data.index.duplicated()]}")
     return data
 
 
-def validate_timezone(data: pd.DataFrame | pd.Series, timezone: dt.tzinfo) -> pd.DataFrame | pd.Series:
+def validate_timezone(data: pd.DataFrame | pd.Series, timezone: Timezone) -> pd.DataFrame | pd.Series:
     if isinstance(data, pd.DatetimeIndex):
         data = data.tz_convert(timezone)
     elif pd.api.types.is_datetime64_dtype(data.values):

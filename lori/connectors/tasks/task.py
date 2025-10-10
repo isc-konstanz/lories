@@ -13,8 +13,10 @@ from abc import ABC, abstractmethod
 from threading import Thread
 from typing import Any
 
-from lori.connectors import ConnectionException, Connector, ConnectorException
-from lori.data.channels import Channels, ChannelState
+from lori._core._channel import ChannelState  # noqa
+from lori._core._channels import Channels  # noqa
+from lori._core._connector import Connector  # noqa
+from lori.connectors.errors import ConnectionError, ConnectorError
 
 
 class ConnectorTask(ABC, Thread):
@@ -27,21 +29,22 @@ class ConnectorTask(ABC, Thread):
         self.connector = connector
         self.channels = channels
 
+    # noinspection PyUnresolvedReferences
     def __call__(self, **kwargs) -> Any:
         try:
             return self.run(**kwargs)
 
-        except ConnectionException as e:
+        except ConnectionError as e:
             try:
                 self.connector.set_channels(ChannelState.DISCONNECTING)
                 self.connector.disconnect()
             finally:
                 self.connector.set_channels(ChannelState.DISCONNECTED)
                 raise e
-        except ConnectorException as e:
+        except ConnectorError as e:
             raise e
         except Exception as e:
-            raise ConnectorException(self.connector, str(e))
+            raise ConnectorError(self.connector, str(e))
 
     @abstractmethod
     def run(self, **kwargs) -> Any:

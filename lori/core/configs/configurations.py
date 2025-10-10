@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.core.configurations
-~~~~~~~~~~~~~~~~~~~~~~~~
+lori.core.configs.configurations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -15,16 +15,17 @@ import tempfile
 from collections import OrderedDict
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Collection, Iterable, Iterator, List, Mapping, MutableMapping, Optional
+from typing import Any, Collection, Iterable, Iterator, List, Mapping, Optional
 
 import pandas as pd
-from lori.core import ResourceException, ResourceUnavailableException
-from lori.core.configs import Directories, Directory
-from lori.typing import TimestampType
+from lori._core import _Configurations  # noqa
+from lori._core.typing import Timestamp  # noqa
+from lori.core.configs.directories import Directories, Directory
+from lori.core.configs.errors import ConfigurationError, ConfigurationUnavailableError
 from lori.util import is_bool, to_bool, to_date, to_float, to_int, update_recursive
 
 
-class Configurations(MutableMapping[str, Any]):
+class Configurations(_Configurations):
     @classmethod
     def load(
         cls,
@@ -50,7 +51,7 @@ class Configurations(MutableMapping[str, Any]):
                 if os.path.isfile(config_default):
                     shutil.copy(config_default, conf_path)
         elif require:
-            raise ConfigurationUnavailableException(f"Invalid configuration directory: {conf_dirs.conf}")
+            raise ConfigurationUnavailableError(f"Invalid configuration directory: {conf_dirs.conf}")
 
         configs = cls(conf_file, conf_dirs, defaults)
         configs._load(require)
@@ -63,13 +64,13 @@ class Configurations(MutableMapping[str, Any]):
                 # TODO: Implement other configuration parsers
                 self._load_toml(str(self.__path))
             except Exception as e:
-                raise ConfigurationUnavailableException(f"Error loading configuration file '{self.__path}': {str(e)}")
+                raise ConfigurationUnavailableError(f"Error loading configuration file '{self.__path}': {str(e)}")
 
         elif require:
-            raise ConfigurationUnavailableException(f"Invalid configuration file '{self.__path}'")
+            raise ConfigurationUnavailableError(f"Invalid configuration file '{self.__path}'")
 
-        if Directories.SECTION in self.__configs:
-            self.__dirs.update(self.__configs[Directories.SECTION])
+        if Directories.TYPE in self.__configs:
+            self.__dirs.update(self.__configs[Directories.TYPE])
 
     def _load_toml(self, config_path: str) -> None:
         from .toml import load_toml
@@ -165,7 +166,7 @@ class Configurations(MutableMapping[str, Any]):
     def get_float(self, key: str, default: float = None) -> float:
         return to_float(self._get(key, default))
 
-    def get_date(self, key: str, default: TimestampType = None, **kwargs) -> pd.Timestamp:
+    def get_date(self, key: str, default: Timestamp = None, **kwargs) -> pd.Timestamp:
         return to_date(self._get(key, default), **kwargs)
 
     def __contains__(self, key: str) -> bool:
@@ -342,16 +343,16 @@ class Configurations(MutableMapping[str, Any]):
         elif defaults is not None:
             return self._create_section(section, defaults)
         else:
-            raise ConfigurationUnavailableException(f"Unknown configuration section: {section}")
+            raise ConfigurationUnavailableError(f"Unknown configuration section: {section}")
 
     def _add_section(self, section, configs: Mapping[str, Any]) -> None:
         if self.has_section(section):
-            raise ConfigurationUnavailableException(f"Unable to add existing configuration section: {section}")
+            raise ConfigurationUnavailableError(f"Unable to add existing configuration section: {section}")
         self[section] = self._create_section(section, configs)
 
     def _create_section(self, section, configs: Mapping[str, Any]) -> Configurations:
         if not isinstance(configs, Mapping):
-            raise ConfigurationException(f"Invalid configuration '{section}': {type(configs)}")
+            raise ConfigurationError(f"Invalid configuration '{section}': {type(configs)}")
         section_name = f"{section}.conf"
         section_dirs = self.__dirs.copy()
         section_dirs.conf = self._sections_dir
@@ -372,20 +373,6 @@ class Configurations(MutableMapping[str, Any]):
     # noinspection PyTypeChecker
     def update(self, update: Mapping[str, Any], replace: bool = True) -> None:
         update_recursive(self, update, replace=replace)
-
-
-class ConfigurationException(ResourceException):
-    """
-    Raise if a configuration is invalid.
-
-    """
-
-
-class ConfigurationUnavailableException(ResourceUnavailableException, ConfigurationException):
-    """
-    Raise if a configuration file can not be found.
-
-    """
 
 
 def _include(pattern):

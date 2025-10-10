@@ -35,7 +35,7 @@ class Settings(Configurations):
         override_path = os.path.join(self.dirs.data, self.name)
         if os.path.isfile(override_path):
             self._load_toml(override_path)
-            self.dirs.update(self.get_section(Directories.SECTION, defaults={}))
+            self.dirs.update(self.get_section(Directories.TYPE, defaults={}))
         if self.dirs.conf._dir is None:
             self.dirs._conf = Directory(os.path.dirname(self.path), default="conf")
 

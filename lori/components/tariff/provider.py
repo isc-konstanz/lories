@@ -9,7 +9,7 @@ lori.components.tariff.provider
 from __future__ import annotations
 
 from lori.components.tariff import Tariff
-from lori.core import Configurations
+from lori.typing import Configurations
 
 
 # noinspection SpellCheckingInspection

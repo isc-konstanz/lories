@@ -1,20 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-lori.exceptions
-~~~~~~~~~~~~~~~
+lori.core.errors
+~~~~~~~~~~~~~~~~
 
 
 """
 
 
-class ResourceException(Exception):
+class ResourceError(Exception):
     """
     Raise if an error occurred accessing a local resource.
 
     """
 
 
-class ResourceUnavailableException(ResourceException):
+class ResourceUnavailableError(ResourceError):
     """
     Raise if an accessed local resource can not be found.
 

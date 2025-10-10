@@ -14,9 +14,8 @@ from __future__ import annotations
 
 from typing import Optional
 
-from lori.components import Component
 from lori.components.weather import Weather, WeatherForecast
-from lori.core import Configurations, Context
+from lori.typing import Configurations, ContextArgument
 
 
 # noinspection SpellCheckingInspection
@@ -26,19 +25,19 @@ class WeatherProvider(Weather):
     # noinspection PyTypeChecker
     def __init__(
         self,
-        context: Context | Component,
+        context: ContextArgument,
         configs: Optional[Configurations] = None,
         **kwargs,
     ) -> None:
         super().__init__(context=context, configs=configs, **kwargs)
-        forecast_configs = configs.get_section(WeatherForecast.SECTION, ensure_exists=True)
+        forecast_configs = configs.get_section(WeatherForecast.TYPE, ensure_exists=True)
         forecast_configs.set("key", "forecast", replace=False)
         self.__forecast = WeatherForecast(self, forecast_configs)
 
     def _at_configure(self, configs: Configurations) -> None:
         super()._at_configure(configs)
         if self.__forecast.is_enabled():
-            self.__forecast.configure(configs.get_section(WeatherForecast.SECTION, ensure_exists=True))
+            self.__forecast.configure(configs.get_section(WeatherForecast.TYPE, ensure_exists=True))
 
     def _on_configure(self, configs: Configurations) -> None:
         super()._on_configure(configs)

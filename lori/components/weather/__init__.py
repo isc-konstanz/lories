@@ -6,11 +6,9 @@ lori.components.weather
 
 """
 
-from . import core  # noqa: F401
-from .core import (  # noqa: F401
+from . import weather  # noqa: F401
+from .weather import (  # noqa: F401
     Weather,
-    WeatherException,
-    WeatherUnavailableException,
     register_weather_type,
     registry,
 )

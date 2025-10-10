@@ -6,9 +6,9 @@ lori.connectors.tasks.connect
 
 """
 
-from lori.connectors import Connector
+from lori._core._channel import ChannelState  # noqa
+from lori._core._connector import Connector  # noqa
 from lori.connectors.tasks.task import ConnectorTask
-from lori.data.channels import ChannelState
 
 
 class ConnectTask(ConnectorTask):

@@ -10,8 +10,8 @@ from time import sleep, time
 from typing import Iterable
 
 import pandas as pd
-from lori.connectors import ConnectionException, Connector
-from lori.core import Resources
+from lori.connectors import ConnectionError, Connector
+from lori.typing import Resources
 
 
 class CameraConnector(Connector):
@@ -39,7 +39,7 @@ class CameraConnector(Connector):
 
             except KeyboardInterrupt:
                 pass
-            except ConnectionException as e:
+            except ConnectionError as e:
                 self._logger.error(f"Unexpected error '{e}' while streaming")
                 self.disconnect()
 

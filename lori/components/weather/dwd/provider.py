@@ -11,9 +11,10 @@ from __future__ import annotations
 from typing import Any, Collection, Dict
 
 import pandas as pd
-from lori import Configurations, Constant
+from lori import Constant
 from lori.components.weather import Weather, WeatherForecast, WeatherProvider, register_weather_type
 from lori.components.weather.dwd import Brightsky
+from lori.typing import Configurations
 
 CHANNELS = [
     Weather.GHI,

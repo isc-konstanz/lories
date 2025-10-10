@@ -18,10 +18,10 @@ from influxdb_client.rest import ApiException
 from urllib3.exceptions import HTTPError, NewConnectionError
 
 import pandas as pd
-from lori.connectors import ConnectionException, Database, DatabaseException, register_connector_type
-from lori.core import ConfigurationException, Configurations, Resource, Resources
+from lori.connectors import ConnectionError, Database, DatabaseException, register_connector_type
+from lori.core.configs import ConfigurationError
 from lori.data.util import hash_value
-from lori.typing import TimestampType
+from lori.typing import Configurations, Resource, Resources, Timestamp
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
 try:
@@ -68,15 +68,15 @@ class InfluxDatabase(Database):
 
         self.org = configs.get("org")
         if self.org is None:
-            raise ConfigurationException("Missing 'org' for InfluxDB connector")
+            raise ConfigurationError("Missing 'org' for InfluxDB connector")
 
         self.bucket = configs.get("bucket")
         if self.bucket is None:
-            raise ConfigurationException("Missing 'bucket' for InfluxDB connector")
+            raise ConfigurationError("Missing 'bucket' for InfluxDB connector")
 
         self.token = configs.get("token")
         if self.token is None:
-            raise ConfigurationException("Missing 'token' for InfluxDB connector")
+            raise ConfigurationError("Missing 'token' for InfluxDB connector")
 
         # In seconds
         self.timeout = int(configs.get_float("timeout", default=10) * 1000)
@@ -123,8 +123,8 @@ class InfluxDatabase(Database):
     def hash(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
         method: Literal["MD5", "SHA1", "SHA256", "SHA512"] = "MD5",
         encoding: str = "UTF-8",
     ) -> Optional[str]:
@@ -219,8 +219,8 @@ class InfluxDatabase(Database):
     def exists(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
     ) -> bool:
         query_api = self._client.query_api()
         for measurement, measurement_resources in resources.groupby(lambda r: r.get("measurement", default=r.group)):
@@ -244,8 +244,8 @@ class InfluxDatabase(Database):
     def read(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
     ) -> pd.DataFrame:
         return self._read(resources, start, end)
 
@@ -298,8 +298,8 @@ class InfluxDatabase(Database):
     def _read(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
     ) -> pd.DataFrame:
         results = []
 
@@ -362,8 +362,8 @@ class InfluxDatabase(Database):
     def delete(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
     ) -> None:
         start, end = _to_isoformat(start, end)
         delete_api = self._client.delete_api()
@@ -424,13 +424,13 @@ class InfluxDatabase(Database):
         elif isinstance(e, NewConnectionError):
             raise DatabaseException(self, str(e))
         else:
-            raise ConnectionException(self, str(e))
+            raise ConnectionError(self, str(e))
 
 
 # noinspection SpellCheckingInspection
 def _to_isoformat(
-    start: Optional[TimestampType] = None,
-    end: Optional[TimestampType] = None,
+    start: Optional[Timestamp] = None,
+    end: Optional[Timestamp] = None,
 ) -> Tuple[str, str]:
     if start is None:
         start = "0"

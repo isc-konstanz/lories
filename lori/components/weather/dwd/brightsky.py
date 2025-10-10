@@ -15,11 +15,11 @@ import requests
 
 import numpy as np
 import pandas as pd
-from lori import ConfigurationException, Configurations, Resources
+from lori import ConfigurationError
 from lori.components.weather import Weather
 from lori.connectors import Connector
 from lori.location import Location
-from lori.typing import TimestampType
+from lori.typing import Configurations, Resources, Timestamp
 
 
 class Brightsky(Connector):
@@ -37,13 +37,13 @@ class Brightsky(Connector):
         self.address = configs.get("address", default=Brightsky.address)
         self.horizon = configs.get_int("horizon", default=Brightsky.horizon)
         if -1 > self.horizon > 10:
-            raise ConfigurationException(f"Invalid forecast horizon: {self.horizon}")
+            raise ConfigurationError(f"Invalid forecast horizon: {self.horizon}")
 
     def read(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
     ) -> pd.DataFrame:
         response, sources = self._request(start, end)
         response_sources = sources.loc[response["source_id"], ["observation_type", "first_record", "last_record"]]
@@ -85,8 +85,8 @@ class Brightsky(Connector):
     # noinspection PyPackageRequirements
     def _request(
         self,
-        date: Optional[TimestampType] = None,
-        date_last: Optional[TimestampType] = None,
+        date: Optional[Timestamp] = None,
+        date_last: Optional[Timestamp] = None,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         if date is None:
             date = pd.Timestamp.now(tz=self.location.timezone)

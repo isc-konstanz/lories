@@ -13,11 +13,15 @@ from collections import OrderedDict
 from logging import Logger
 from typing import Any, Dict, List, Optional, Type
 
-from lori.core import ConfigurationException, Entity, ResourceException
+from lori._core._resource import Resource as ResourceType  # noqa
+from lori._core._resource import _Resource  # noqa
+from lori.core.configs import ConfigurationError
+from lori.core.errors import ResourceError
+from lori.core.resources import Resources
 from lori.util import parse_type, update_recursive, validate_key
 
 
-class Resource(Entity):
+class Resource(_Resource):
     __configs: OrderedDict[str, Any]
 
     _group: str
@@ -50,10 +54,10 @@ class Resource(Entity):
     @classmethod
     def _assert_group(cls, __group: str) -> str:
         if __group is None:
-            raise ResourceException(f"Invalid {cls.__name__}, missing specified 'group'")
+            raise ResourceError(f"Invalid {cls.__name__}, missing specified 'group'")
         _group = validate_key(__group)
         if _group != __group:
-            raise ResourceException(f"Invalid characters in '{cls.__name__}' group: " + __group)
+            raise ResourceError(f"Invalid characters in '{cls.__name__}' group: " + __group)
         return _group
 
     @classmethod
@@ -66,7 +70,7 @@ class Resource(Entity):
     def _assert_type(cls, __type: Type[Any]) -> Type[Any]:
         # TODO: Validate type to be valid pandas dtypes
         if not isinstance(__type, type):
-            raise ResourceException(f"Invalid {cls.__name__}, with type '{__type}' being not allowed.")
+            raise ResourceError(f"Invalid {cls.__name__}, with type '{__type}' being not allowed.")
         return __type
 
     def __contains__(self, attr: str) -> bool:
@@ -139,9 +143,9 @@ class Resource(Entity):
         **configs: Any,
     ) -> None:
         if id is not None and id != self.id:
-            raise ConfigurationException(f"Invalid channel update, trying to change ID from '{self.id}' to '{id}'")
+            raise ConfigurationError(f"Invalid channel update, trying to change ID from '{self.id}' to '{id}'")
         if key is not None and key != self.key:
-            raise ConfigurationException(f"Invalid channel update, trying to change Key from '{self.key}' to '{key}'")
+            raise ConfigurationError(f"Invalid channel update, trying to change Key from '{self.key}' to '{key}'")
         if name is not None:
             self._name = name
         if group is not None:
@@ -163,17 +167,15 @@ class Resource(Entity):
             **self.to_configs(),
         }
 
-    def copy(self):
+    def copy(self) -> ResourceType:
         return self.duplicate()
 
-    def duplicate(self, **changes):
+    def duplicate(self, **changes) -> ResourceType:
         arguments = self._copy_args()
         arguments.update(changes)
         return super().duplicate(**arguments)
 
-    def to_list(self):
-        from lori.core import Resources
-
+    def to_list(self) -> Resources:
         return Resources([self])
 
     def to_configs(self) -> Dict[str, Any]:

@@ -13,9 +13,10 @@ from typing import Collection, Dict, Generic, Optional, Type, TypeVar
 import dash_bootstrap_components as dbc
 from dash import html
 
-from lori import Channels, Component
 from lori.application.view.pages import PageGroup, PageLayout
 from lori.application.view.pages.components import ComponentPage
+from lori.components import Component
+from lori.core.typing import Channels
 
 ComponentType = TypeVar("ComponentType", bound=Component)
 ChildrenType = TypeVar("ChildrenType", bound=Dict[str, Type[ComponentPage]])

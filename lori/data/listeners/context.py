@@ -15,8 +15,11 @@ from threading import Lock
 from typing import Collection, Optional
 
 import pandas as pd
-from lori.core import Context, ResourceException
-from lori.data import Channel, Channels
+from lori._core._channel import Channel  # noqa
+from lori._core._channels import Channels  # noqa
+from lori._core._context import _Context  # noqa
+from lori._core._data import DataContext, _DataContext, _DataManager  # noqa
+from lori.core import ResourceError
 from lori.data.listeners import Listener
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -28,11 +31,11 @@ except ImportError:
 
 
 # noinspection PyShadowingBuiltins
-class ListenerContext(Context[Listener]):
-    __context: Context
+class ListenerContext(_Context[Listener]):
+    __context: _DataContext
     __lock: Lock
 
-    def __init__(self, context: Context, *args, **kwargs) -> None:
+    def __init__(self, context: DataContext, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.__context = self._assert_context(context)
         self._logger = logging.getLogger(self.__module__)
@@ -47,17 +50,16 @@ class ListenerContext(Context[Listener]):
         self.__lock.release()
 
     @classmethod
-    def _assert_context(cls, context: Context) -> Context:
-        from lori.data.manager import DataManager
-
-        if context is None or not isinstance(context, DataManager):
-            raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
+    def _assert_context(cls, context: DataContext) -> DataContext:
+        if context is None or not isinstance(context, _DataManager):
+            raise ResourceError(f"Invalid '{cls.__name__}' context: {type(context)}")
         return context
 
     @property
-    def context(self) -> Context:
+    def context(self) -> DataContext:
         return self.__context
 
+    # noinspection PyMethodMayBeStatic
     def _create(
         self,
         id: str,
@@ -79,11 +81,9 @@ class ListenerContext(Context[Listener]):
     ) -> None:
         listener = self._get(id)
         if listener._how != how:
-            raise ResourceException(
-                f"Trying to register '{how}' updated listener to existing '{listener._how}' instance"
-            )
+            raise ResourceError(f"Trying to register '{how}' updated listener to existing '{listener._how}' instance")
         if listener._unique != unique:
-            raise ResourceException(
+            raise ResourceError(
                 f"Trying to register '{unique}' processed listener to existing '{listener._unique}' instance"
             )
         listener.channels.extend(channels)

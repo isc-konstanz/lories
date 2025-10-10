@@ -9,27 +9,24 @@ lori.core.register.registrator
 from __future__ import annotations
 
 import inspect
-import os
 import sys
 from collections import OrderedDict
 from collections.abc import Callable
-from copy import deepcopy
-from typing import Any, Collection, Dict, List, Optional
+from typing import Any, Dict, Optional, TypeVar
 
-from lori.core import Configurations, Configurator, Context, Entity, ResourceException
-from lori.util import validate_key
+from lori._core import _Context, _Entity, _Resource, _Resources  # noqa
+from lori._core._registrator import RegistratorContext, _Registrator, _RegistratorContext  # noqa
+from lori.core.configs import Configurations, Configurator
+from lori.core.errors import ResourceError
 
 
-class Registrator(Configurator, Entity):
-    SECTION: str = "registration"
-    INCLUDES: List[str] = []
-
-    __context: Context
+class Registrator(_Registrator, Configurator):
+    __context: RegistratorContext
 
     # noinspection PyShadowingBuiltins, PyProtectedMember, PyUnresolvedReferences, PyUnusedLocal
     def __init__(
         self,
-        context: Context | Registrator,
+        context: RegistratorContext,
         configs: Optional[Configurations] = None,
         id: Optional[str] = None,
         key: Optional[str] = None,
@@ -54,73 +51,13 @@ class Registrator(Configurator, Entity):
         self.__context = context
 
     @classmethod
-    def _assert_context(cls, context: Context | Registrator) -> Context | Registrator:
-        from lori.core.register import RegistratorContext
-
-        if context is None or not isinstance(context, (RegistratorContext, Registrator)):
-            raise ResourceException(f"Invalid '{cls.__name__}' context: {type(context)}")
-        return context
-
-    # noinspection PyShadowingBuiltins
-    @classmethod
-    def _build_id(
+    def _assert_context(
         cls,
-        id: Optional[str] = None,
-        key: Optional[str] = None,
-        context: Optional[Context | Registrator] = None,
-        configs: Optional[Configurations] = None,
-    ) -> str:
-        if configs is not None:
-            if id is None:
-                if configs.has_section(cls.SECTION) and "id" in configs[cls.SECTION]:
-                    id = configs[cls.SECTION]["id"]
-                elif "id" in configs:
-                    id = configs["id"]
-            if key is None:
-                if configs.has_section(cls.SECTION) and "key" in configs[cls.SECTION]:
-                    key = configs[cls.SECTION]["key"]
-                elif "key" in configs:
-                    key = configs["key"]
-                else:
-                    key = validate_key("_".join(os.path.splitext(configs.name)[:-1]))
-        if key is None:
-            raise ResourceException(f"Unable to build '{cls.__name__}' ID")
-        if id is None and context is not None and isinstance(context, Registrator):
-            id = f"{context.id}.{key}"
-        else:
-            id = key
-        return id
-
-    @classmethod
-    def _build_key(cls, key: Optional[str], configs: Optional[Configurations]) -> str:
-        if configs is not None:
-            if configs.has_section(cls.SECTION) and "key" in configs[cls.SECTION]:
-                key = configs[cls.SECTION]["key"]
-            elif "key" in configs:
-                key = configs["key"]
-            else:
-                if configs.has_section(cls.SECTION) and "name" in configs[cls.SECTION]:
-                    key = validate_key(configs[cls.SECTION]["name"])
-                elif "name" in configs:
-                    key = validate_key(configs["name"])
-                elif key is None:
-                    key = validate_key("_".join(os.path.splitext(configs.name)[:-1]))
-        if key is None:
-            raise ResourceException(f"Unable to build '{cls.__name__}' Key")
-        return key
-
-    @classmethod
-    def _build_name(cls, name: Optional[str], configs: Optional[Configurations]) -> str:
-        if configs is not None:
-            if configs.has_section(cls.SECTION) and "name" in configs[cls.SECTION]:
-                name = configs[cls.SECTION]["name"]
-            elif "name" in configs:
-                name = configs["name"]
-        return name
-
-    @classmethod
-    def _build_defaults(cls, configs: Configurations, includes: Optional[Collection[str]] = ()) -> Dict[str, Any]:
-        return {k: deepcopy(v) for k, v in configs.items() if k in cls.INCLUDES or k in includes}
+        context: RegistratorContext,
+    ) -> RegistratorContext:
+        if context is None or not isinstance(context, (_RegistratorContext, _Registrator)):
+            raise ResourceError(f"Invalid '{cls.__name__}' context: {type(context)}")
+        return context
 
     # noinspection PyShadowingBuiltins
     def _convert_vars(self, convert: Callable[[Any], str] = str) -> Dict[str, str]:
@@ -133,14 +70,12 @@ class Registrator(Configurator, Entity):
                 values["key"] = id
             values["key"] = key
             values["name"] = vars.pop("name", self.name)
-        except (ResourceException, AttributeError):
+        except (ResourceError, AttributeError):
             # Abstract properties are not yet instanced
             pass
 
         def is_from_framework(value: Any) -> bool:
-            from lori.core import Configurator, Context, Resource, Resources
-
-            if isinstance(value, (Context, Resource, Resources, Configurator, Entity)):
+            if isinstance(value, (Configurator, _Context, _Entity, _Resource, _Resources)):
                 return True
             module = inspect.getmodule(value)
             if module is None:
@@ -156,11 +91,14 @@ class Registrator(Configurator, Entity):
         return values
 
     @property
-    def context(self) -> Context:
+    def context(self) -> RegistratorContext:
         return self.__context
 
     # noinspection PyProtectedMember, PyTypeChecker, PyShadowingBuiltins
-    def duplicate(self, context: Optional[Context | Registrator] = None, **changes):
+    def duplicate(self, context: Optional[RegistratorContext] = None, **changes):
         if context is None:
             context = self.__context
         return super().duplicate(context=context, **changes)
+
+
+RegistratorType = TypeVar("RegistratorType", bound=Registrator)

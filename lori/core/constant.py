@@ -10,17 +10,18 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, Type
 
-from lori.core import ResourceException
+from lori._core import _Constant  # noqa
+from lori.core.constants import Constants
+from lori.core.errors import ResourceError
 from lori.util import parse_type
 
 
 # noinspection PyPep8Naming, PyShadowingBuiltins
-class Constant(str):
+class Constant(_Constant):
+    # noinspection PyTypeChecker
     def __new__(cls, type: Type, key: str, name: Optional[str] = None, unit: Optional[str] = None):
-        from lori.core.constants import CONSTANTS
-
         if key in CONSTANTS:
-            raise ResourceException(f"Constant '{key}' already exists.")
+            raise ResourceError(f"Constant '{key}' already exists.")
         constant = str.__new__(cls, key)
         CONSTANTS.append(constant)
         return constant
@@ -65,3 +66,14 @@ class Constant(str):
         if self.__unit is not None:
             dict["unit"] = self.__unit
         return dict
+
+
+CONSTANTS = Constants()
+
+SECOND = Constant(int, "second", "Second")
+MINUTE = Constant(int, "minute", "Minute")
+HOUR = Constant(int, "hour", "Hour")
+DAY_OF_WEEK = Constant(int, "day_of_week", "Day of the Week")
+DAY_OF_YEAR = Constant(int, "day_of_year", "Day of the Year")
+MONTH = Constant(int, "month", "Month")
+YEAR = Constant(int, "year", "Year")

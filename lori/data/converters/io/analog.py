@@ -10,8 +10,9 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from lori import ConfigurationException, Configurations
-from lori.data.converters import ConversionException, register_converter_type
+from lori.core import ConfigurationError
+from lori.core.typing import Configurations
+from lori.data.converters import ConversionError, register_converter_type
 from lori.data.converters.converter import FloatConverter
 
 
@@ -35,7 +36,7 @@ class AnalogInput(FloatConverter):
         self.min = configs.get_float("value_min", default=0.0)
         self.max = configs.get_float("value_max")
         if self.max <= self.min:
-            raise ConfigurationException(
+            raise ConfigurationError(
                 f"Invalid value boundaries for '{self.id}' with min ({self.min}) > max ({self.max})"
             )
         self._configure_input(configs)
@@ -58,20 +59,20 @@ class AnalogInput(FloatConverter):
     # noinspection PyShadowingBuiltins
     def _assert_input(self, min: float, max: float, zero: float) -> None:
         if min is None:
-            raise ConfigurationException(f"Missing input minimum for '{self.id}'")
+            raise ConfigurationError(f"Missing input minimum for '{self.id}'")
         if max is None:
-            raise ConfigurationException(f"Missing input maximum for '{self.id}'")
+            raise ConfigurationError(f"Missing input maximum for '{self.id}'")
         if max <= min:
-            raise ConfigurationException(f"Invalid input boundaries for '{self.id}' with min ({min}) > max ({max})")
+            raise ConfigurationError(f"Invalid input boundaries for '{self.id}' with min ({min}) > max ({max})")
 
         if zero is None:
-            raise ConfigurationException(f"Missing input zero point for '{self.id}'")
+            raise ConfigurationError(f"Missing input zero point for '{self.id}'")
         if min > zero > max:
-            raise ConfigurationException(f"Invalid input zero point for '{self.id}': {zero}")
+            raise ConfigurationError(f"Invalid input zero point for '{self.id}': {zero}")
 
     def convert(self, value: Any, **kwargs) -> Optional[float]:
         if self._input_min > value > self._input_max:
-            raise ConversionException(
+            raise ConversionError(
                 f"Invalid input signal out of limit ({self._input_min} to {self._input_max}): " + str(value)
             )
         _value = (value * self._factor - self._input_zero) / self._divisor

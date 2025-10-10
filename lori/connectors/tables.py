@@ -13,9 +13,8 @@ import re
 from typing import Optional, Sequence
 
 import pandas as pd
-from lori.connectors import ConnectionException, Database, register_connector_type
-from lori.core import Configurations, Resources
-from lori.typing import TimestampType
+from lori.connectors import ConnectionError, Database, register_connector_type
+from lori.typing import Configurations, Resources, Timestamp
 from pandas import HDFStore
 
 
@@ -80,7 +79,7 @@ class HDFDatabase(Database):
             self.__store.open()
 
         except IOError as e:
-            raise ConnectionException(self, str(e))
+            raise ConnectionError(self, str(e))
 
     def disconnect(self) -> None:
         super().disconnect()
@@ -91,8 +90,8 @@ class HDFDatabase(Database):
     def read(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
     ) -> pd.DataFrame:
         data = []
         try:
@@ -110,7 +109,7 @@ class HDFDatabase(Database):
                 if not group_data.empty:
                     data.append(group_data)
         except IOError as e:
-            raise ConnectionException(self, str(e))
+            raise ConnectionError(self, str(e))
 
         if len(data) == 0:
             return pd.DataFrame()
@@ -131,7 +130,7 @@ class HDFDatabase(Database):
                 if not group_data.empty:
                     data.append(group_data)
         except IOError as e:
-            raise ConnectionException(self, str(e))
+            raise ConnectionError(self, str(e))
 
         if len(data) == 0:
             return pd.DataFrame()
@@ -152,7 +151,7 @@ class HDFDatabase(Database):
                 if not group_data.empty:
                     data.append(group_data)
         except IOError as e:
-            raise ConnectionException(self, str(e))
+            raise ConnectionError(self, str(e))
 
         if len(data) == 0:
             return pd.DataFrame()
@@ -162,8 +161,8 @@ class HDFDatabase(Database):
     def delete(
         self,
         resources: Resources,
-        start: Optional[TimestampType] = None,
-        end: Optional[TimestampType] = None,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
     ) -> None:
         try:
             for group, group_resources in resources.groupby("group"):
@@ -174,7 +173,7 @@ class HDFDatabase(Database):
                 self.__store.remove(group_key)
 
         except IOError as e:
-            raise ConnectionException(self, str(e))
+            raise ConnectionError(self, str(e))
 
     def write(self, data: pd.DataFrame) -> None:
         try:
@@ -193,7 +192,7 @@ class HDFDatabase(Database):
                     self.__store.append(group_key, group_data, format="table", encoding="UTF-8")
 
         except IOError as e:
-            raise ConnectionException(self, str(e))
+            raise ConnectionError(self, str(e))
 
     def __build_columns(self, resources: Resources) -> Sequence[str]:
         if self._columns_unique:
@@ -213,8 +212,8 @@ def _format_key(key: str) -> str:
 
 
 def _build_where(
-    start: Optional[TimestampType] = None,
-    end: Optional[TimestampType] = None,
+    start: Optional[Timestamp] = None,
+    end: Optional[Timestamp] = None,
 ) -> Optional[str]:
     where = []
     if start is not None:

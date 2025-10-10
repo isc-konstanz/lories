@@ -15,7 +15,7 @@ import tzlocal
 
 import pandas as pd
 import pytz as tz
-from lori import ConfigurationException, Configurations, Resource, ResourceException, Resources
+from lori import ConfigurationError, Configurations, Resource, ResourceError, Resources
 from lori.data.util import hash_data, resample
 from lori.util import floor_date, parse_freq, slice_range, to_bool, to_timedelta, to_timezone
 
@@ -28,7 +28,7 @@ except ImportError:
 
 
 class Retention:
-    SECTION: str = "retention"
+    TYPE: str = "retention"
 
     _enabled: bool = False
 
@@ -41,13 +41,13 @@ class Retention:
     # noinspection PyShadowingNames
     @classmethod
     def build(cls, configs: Configurations, resource: Resource) -> Retentions:
-        resource_configs = resource.get(cls.SECTION, default={})
+        resource_configs = resource.get(cls.TYPE, default={})
         if isinstance(resource_configs, str):
             resource_configs = {"aggregate": resource_configs}
         elif isinstance(resource_configs, Dict):
             resource_configs["aggregate"] = resource.get("aggregate", default=None)
         else:
-            raise ConfigurationException("Invalid retention method: " + str(resource_configs))
+            raise ConfigurationError("Invalid retention method: " + str(resource_configs))
 
         configs = configs.copy()
         configs.update(resource_configs)
@@ -87,7 +87,7 @@ class Retention:
         if aggregate is not None:
             aggregate = aggregate.lower()
             if aggregate not in ["sum", "mean", "min", "max", "last"]:
-                raise ConfigurationException(f"Invalid retention aggregation '{aggregate}'")
+                raise ConfigurationError(f"Invalid retention aggregation '{aggregate}'")
         self.method = aggregate
 
     def __eq__(self, other: Any) -> bool:
@@ -304,7 +304,7 @@ class Retentions(MutableSequence[Retention]):
         self.__retentions = sorted(self.__retentions, key=lambda r: order(r.keep))
 
 
-class RetentionException(ResourceException):
+class RetentionException(ResourceError):
     """
     Raise if an error occurred while processing retention policy.
 

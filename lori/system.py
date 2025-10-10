@@ -13,14 +13,14 @@ from typing import Any, List, Optional
 
 import pandas as pd
 from lori import Configurations
-from lori.components import Component, ComponentContext, Weather, WeatherUnavailableException
+from lori.components import Component, ComponentContext, ComponentUnavailableError, Weather
+from lori.core.typing import Timestamp
 from lori.location import Location, LocationUnavailableException
 from lori.simulation import Results
-from lori.typing import TimestampType
 
 
 class System(Component):
-    SECTION: str = "system"
+    TYPE: str = "system"
 
     _location: Optional[Location] = None
 
@@ -70,7 +70,7 @@ class System(Component):
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self.localize(configs.get_section(Location.SECTION, defaults={}))
+        self.localize(configs.get_section(Location.TYPE, defaults={}))
         self.components.load(configs_dir=self.configs.dirs.conf)
 
     def localize(self, configs: Configurations) -> None:
@@ -103,13 +103,13 @@ class System(Component):
     def weather(self) -> Weather:
         weather = self.components.get_first(Weather)
         if weather is None:
-            raise WeatherUnavailableException(f"System '{self.name}' has no weather configured")
+            raise ComponentUnavailableError(f"System '{self.name}' has no weather configured")
         return weather
 
     def simulate(
         self,
-        start: TimestampType,
-        end: TimestampType,
+        start: Timestamp,
+        end: Timestamp,
         prior: Optional[pd.DataFrame] = None,
         **kwargs: Any,
     ) -> pd.DataFrame:
