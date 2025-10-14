@@ -51,11 +51,11 @@ class Retention:
 
         configs = configs.copy()
         configs.update(resource_configs)
-        defaults = {k: configs.pop(k) for k in list(configs.keys()) if k not in configs.sections}
+        defaults = {k: configs.pop(k) for k in list(configs.keys()) if k not in configs.members}
 
         retentions = Retentions()
-        for retain in [r for r in configs.sections if r not in ["databases"]]:
-            retention = configs.get_section(retain, defaults=defaults)
+        for retain in [r for r in configs.members if r not in ["databases"]]:
+            retention = configs.get_member(retain, defaults=defaults)
             retain = retention.pop("keep", default=retain)
             retention = cls(retain, **retention)
             if retention.enabled:

@@ -115,7 +115,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
             self.dialect = self.engine.dialect
 
             self._schema = Schema(self.dialect)
-            self._schema.configure(configs.get_section("tables", defaults={}))
+            self._schema.configure(configs.get_member("tables", defaults={}))
 
         except SQLAlchemyError as e:
             raise ConfigurationError(f"Unable to create database engine: {str(e)}")

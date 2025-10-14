@@ -87,14 +87,14 @@ class ViewInterface(Interface, Dash):
             "name": context.name,
             "logo": os.path.join(assets_path, "logo.png"),
         }
-        theme = configs.get_section("theme", defaults=theme_defaults)
+        theme = configs.get_member("theme", defaults=theme_defaults)
 
         header = PageHeader(**theme)
         footer = PageFooter()
 
         self.view = View(context.id, header, footer)
 
-        login = configs.get_section("login", defaults={"enabled": False})
+        login = configs.get_member("login", defaults={"enabled": False})
         if login.enabled:
             login_page = LoginPage(self, context, configs)
             self.view.append(login_page)

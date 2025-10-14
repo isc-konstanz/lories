@@ -28,7 +28,7 @@ class Databases(ConnectorContext, Configurator):
 
     # noinspection PyProtectedMember, PyUnresolvedReferences
     def __init__(self, context: DataContext, configs: Configurations) -> None:
-        super().__init__(context, configs=configs.get_section(Databases.TYPE, defaults={}))
+        super().__init__(context, configs=configs.get_member(Databases.TYPE, defaults={}))
         self.load(configure=False, sort=False)
         self.configure()
 

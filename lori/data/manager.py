@@ -101,17 +101,17 @@ class DataManager(_DataManager, DataContext, Activator):
         ) -> Dict[str, Any]:
             if name is None:
                 name = registrator_type
-            registrator_section = configs.pop(name, None)
-            if registrator_section is None:
+            registrator_configs = configs.pop(name, None)
+            if registrator_configs is None:
                 return {registrator_type: None}
-            if isinstance(registrator_section, str):
-                registrator_section = {registrator_type: registrator_section}
-            elif not isinstance(registrator_section, Mapping):
-                raise ConfigurationError(f"Invalid channel {name} type: " + str(registrator_section))
-            elif registrator_type not in registrator_section:
+            if isinstance(registrator_configs, str):
+                registrator_configs = {registrator_type: registrator_configs}
+            elif not isinstance(registrator_configs, Mapping):
+                raise ConfigurationError(f"Invalid channel {name} type: " + str(registrator_configs))
+            elif registrator_type not in registrator_configs:
                 return {registrator_type: None}
 
-            registrator_id = registrator_section.pop(registrator_type)
+            registrator_id = registrator_configs.pop(registrator_type)
             if registrator_id is not None and "." not in registrator_id:
                 registrator_path = id.split(".")
                 for i in reversed(range(1, len(registrator_path))):
@@ -120,7 +120,7 @@ class DataManager(_DataManager, DataContext, Activator):
                         registrator_id = _registrator_id
                         break
             registrator = registrator_context.get(registrator_id, None) if registrator_id else None
-            return {registrator_type: registrator, **registrator_section}
+            return {registrator_type: registrator, **registrator_configs}
 
         if "converter" not in configs:
             converter = ChannelConverter(self._converters.get_by_dtype(parse_type(type)))
@@ -764,8 +764,8 @@ class DataManager(_DataManager, DataContext, Activator):
         if channels is None:
             channels = self.channels
 
-        section = self.configs.get_section(Retention.TYPE, defaults={})
-        configs = Configurations(f"{Retention.TYPE}.conf", self.configs.dirs, defaults=section)
+        defaults = self.configs.get_member(Retention.TYPE, defaults={})
+        configs = Configurations(f"{Retention.TYPE}.conf", self.configs.dirs, defaults=defaults)
         configs._load(require=False)
         kwargs["full"] = configs.pop("full", default=full)
 
@@ -782,15 +782,15 @@ class DataManager(_DataManager, DataContext, Activator):
         if channels is None:
             channels = self.channels.filter(lambda c: self.__is_replicating(c))
 
-        section = self.configs.get_section(Replication.TYPE, defaults={})
-        configs = Configurations(f"{Replication.TYPE}.conf", self.configs.dirs, defaults=section)
+        defaults = self.configs.get_member(Replication.TYPE, defaults={})
+        configs = Configurations(f"{Replication.TYPE}.conf", self.configs.dirs, defaults=defaults)
         configs._load(require=False)
         if not configs.enabled:
-            self._logger.error(f"Unable to replicate for disabled configuration section '{Replication.TYPE}'")
+            self._logger.error(f"Unable to replicate for disabled configuration type '{Replication.TYPE}'")
             return
         kwargs["full"] = configs.pop("full", default=full)
         kwargs["force"] = configs.pop("force", default=force)
-        kwargs.update({k: v for k, v in configs.items() if k not in configs.sections})
+        kwargs.update({k: v for k, v in configs.items() if k not in configs.members})
 
         databases = Databases(self, configs)
         databases.replicate(channels, **kwargs)

@@ -62,30 +62,30 @@ class _Configurations(ABC, MutableMapping[str, Any]):
 
     @property
     @abstractmethod
-    def sections(self) -> Sequence[str]: ...
+    def members(self) -> Sequence[str]: ...
 
     @abstractmethod
-    def has_section(self, section: str, includes: bool = False) -> bool: ...
+    def has_member(self, key: str, includes: bool = False) -> bool: ...
 
     @abstractmethod
-    def get_sections(
+    def get_members(
         self,
-        sections: Collection[str],
+        keys: Collection[str],
         ensure_exists: bool = False,
     ) -> Configurations: ...
 
     @abstractmethod
-    def get_section(
+    def get_member(
         self,
-        section: str,
+        key: str,
         defaults: Optional[Mapping[str, Any]] = None,
         ensure_exists: bool = False,
     ) -> Configurations: ...
 
     @abstractmethod
-    def pop_section(
+    def pop_member(
         self,
-        section: str,
+        key: str,
         defaults: Optional[Mapping[str, Any]] = None,
     ) -> Configurations: ...
 

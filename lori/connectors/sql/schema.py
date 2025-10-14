@@ -56,7 +56,7 @@ class Schema(Configurator, MetaData):
     def _connect_tables(self, resources: Resources) -> Dict[str, Table]:
         tables = {}
 
-        defaults = self.configs.get_sections(["index", "columns"], ensure_exists=True)
+        defaults = self.configs.get_members(["index", "columns"], ensure_exists=True)
         for schema, schema_resources in resources.groupby("schema"):
             for name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
                 if name is None:
@@ -68,16 +68,16 @@ class Schema(Configurator, MetaData):
                     tables[table.key] = table
                     continue
 
-                configs = self.configs.get_section(name, defaults=defaults)
-                columns_configs = configs.get_section("columns")
-                column_configs = [columns_configs[s] for s in columns_configs.sections]
+                configs = self.configs.get_member(name, defaults=defaults)
+                columns_configs = configs.get_member("columns")
+                column_configs = [columns_configs[s] for s in columns_configs.members]
 
                 def _filter_primary(primary: bool) -> Collection[Resource | Configurations]:
                     _filter_columns = [*column_configs, *table_resources]
                     return [r for r in _filter_columns if r.get("primary", default=False) == primary]
 
                 columns = []
-                columns.extend(Schema._create_primary_key(configs.get_section("index"), *_filter_primary(True)))
+                columns.extend(Schema._create_primary_key(configs.get_member("index"), *_filter_primary(True)))
                 columns.extend(Schema._create_columns(*_filter_primary(False)))
 
                 def _filter_duplicates() -> Collection[Column]:

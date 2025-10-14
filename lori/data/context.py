@@ -34,11 +34,11 @@ class DataContext(_DataContext):
 
         defaults = {}
         configs = configs.copy()
-        if configs.has_section(self.TYPE):
-            data = configs.get_section(self.TYPE)
+        if configs.has_member(self.TYPE):
+            data = configs.get_member(self.TYPE)
             update_recursive(defaults, Channel._build_defaults(configs))
-            if data.has_section(Channels.TYPE):
-                channels.extend(self._load_from_sections(context, data.get_section(Channels.TYPE), defaults))
+            if data.has_member(Channels.TYPE):
+                channels.extend(self._load_from_members(context, data.get_member(Channels.TYPE), defaults))
         channels.extend(self._load_from_file(context, configs.dirs, f"{Channels.TYPE}.conf", defaults=defaults))
 
         if sort:
@@ -64,7 +64,7 @@ class DataContext(_DataContext):
         self._add(channel)
         return channel
 
-    def _load_from_sections(
+    def _load_from_members(
         self,
         context: ContextArgument,
         configs: Configurations,
@@ -76,7 +76,7 @@ class DataContext(_DataContext):
         update_recursive(defaults, Channel._build_defaults(configs))
 
         for channel_key in [i for i in configs.keys() if i not in defaults]:
-            channel_configs = update_recursive(deepcopy(defaults), configs.get_section(channel_key))
+            channel_configs = update_recursive(deepcopy(defaults), configs.get_member(channel_key))
             channel_key = validate_key(channel_configs.pop("key", channel_key))
             channels.append(self._load_from_configs(context, channel_key, **channel_configs))
         return channels
@@ -91,7 +91,7 @@ class DataContext(_DataContext):
         channels = []
         if configs_dirs.conf.joinpath(configs_file).is_file():
             configs = Configurations.load(configs_file, **configs_dirs.to_dict())
-            channels.extend(self._load_from_sections(context, configs, defaults))
+            channels.extend(self._load_from_members(context, configs, defaults))
         return channels
 
     # noinspection PyShadowingBuiltins

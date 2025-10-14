@@ -43,7 +43,7 @@ class Component(_Component, Registrator, Activator):
         self.__data = DataAccess(self)
 
     def _at_configure(self, configs: Configurations) -> None:
-        self.__data.configure(configs.get_section(DataAccess.TYPE, ensure_exists=True))
+        self.__data.configure(configs.get_member(DataAccess.TYPE, ensure_exists=True))
 
     def _on_configure(self, configs: Configurations) -> None:
         self.__converters.load(configure=False, sort=False)

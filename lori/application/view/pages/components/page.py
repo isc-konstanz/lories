@@ -16,7 +16,7 @@ from dash import Input, Output, callback, html
 
 import pandas as pd
 from lori.application.view.pages import Page, PageLayout
-from lori.typing import Channel, Channels, Component, Components, Connectors, Configurations, Data
+from lori.typing import Channel, Channels, Component, Components, Configurations, Connectors, Data
 
 
 class ComponentPage(Page, Generic[Component]):
@@ -52,9 +52,9 @@ class ComponentPage(Page, Generic[Component]):
         return self._component.is_active()
 
     def create_layout(self, layout: PageLayout) -> None:
-        layout.card.add_title(self.name)
+        layout.card.add_title(self.title)
         layout.card.add_footer(href=self.path)
-        layout.append(html.H4(f"{self.name}:"))
+        layout.append(html.H4(f"{self.title}:"))
 
     def _on_create_layout(self, layout: PageLayout) -> None:
         super()._on_create_layout(layout)

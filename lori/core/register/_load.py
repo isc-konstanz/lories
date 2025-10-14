@@ -116,12 +116,12 @@ class _RegistratorLoader(_RegistratorContext[Registrator], Generic[Registrator])
         if isinstance(configs_dir, str) and not os.path.isabs(configs_dir):
             configs_dir = configs_dirs.conf.joinpath(configs_dir)
         configs_dirs.conf = configs_dir
-        configs_sections = configs.get_sections([s for s in configs.sections if s not in defaults])
+        configs_members = configs.get_members([s for s in configs.members if s not in defaults])
 
         if configs_file and configs_file != configs.name:
             registrators.extend(self._load_from_file(context, configs_file, configs.dirs, defaults, **kwargs))
 
-        registrators.extend(self._load_from_sections(context, configs_sections, defaults, **kwargs))
+        registrators.extend(self._load_from_members(context, configs_members, defaults, **kwargs))
         registrators.extend(self._load_from_dir(context, configs_dirs, defaults, **kwargs))
 
         if sort:
@@ -145,7 +145,7 @@ class _RegistratorLoader(_RegistratorContext[Registrator], Generic[Registrator])
         return registrator
 
     # noinspection PyUnresolvedReferences
-    def _load_from_sections(
+    def _load_from_members(
         self,
         context: RegistratorContext,
         configs: Configurations,
@@ -158,20 +158,20 @@ class _RegistratorLoader(_RegistratorContext[Registrator], Generic[Registrator])
             defaults = {}
         update_recursive(defaults, self._build_registrator_defaults(configs))
 
-        for section_name in configs.sections:
-            if section_name in includes:
+        for member_name in configs.members:
+            if member_name in includes:
                 continue
-            section_file = f"{section_name}.conf"
-            section_default = deepcopy(defaults)
-            update_recursive(section_default, configs.get(section_name))
+            member_file = f"{member_name}.conf"
+            member_default = deepcopy(defaults)
+            update_recursive(member_default, configs.get(member_name))
 
-            section = Configurations.load(
-                section_file,
+            member = Configurations.load(
+                member_file,
                 **configs.dirs.to_dict(),
-                **section_default,
+                **member_default,
                 require=False,
             )
-            registrators.append(self._load_from_configs(context, section, **kwargs))
+            registrators.append(self._load_from_configs(context, member, **kwargs))
         return registrators
 
     def _load_from_file(
@@ -188,7 +188,7 @@ class _RegistratorLoader(_RegistratorContext[Registrator], Generic[Registrator])
             # with the data directory
             configs = Configurations(configs_file, deepcopy(configs_dirs))
             configs._load()
-            registrators.extend(self._load_from_sections(context, configs, defaults, **kwargs))
+            registrators.extend(self._load_from_members(context, configs, defaults, **kwargs))
         return registrators
 
     def _load_from_dir(

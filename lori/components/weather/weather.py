@@ -86,7 +86,7 @@ class Weather(Component, metaclass=WeatherMeta):
     # noinspection PyProtectedMember
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self.localize(configs.get_section(Location.TYPE, defaults={}))
+        self.localize(configs.get_member(Location.TYPE, defaults={}))
 
     # noinspection PyUnresolvedReferences
     def localize(self, configs: Configurations) -> None:

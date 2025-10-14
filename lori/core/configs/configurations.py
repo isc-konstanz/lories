@@ -100,8 +100,8 @@ class Configurations(_Configurations):
         # noinspection PyShadowingNames
         def parse_configs(header: str, configs: Configurations) -> str:
             configs = OrderedDict(configs)
-            for section in [s for s, c in configs.items() if isinstance(c, Mapping)]:
-                configs.move_to_end(section)
+            for k in [k for k, c in configs.items() if isinstance(c, Mapping)]:
+                configs.move_to_end(k)
 
             string = f"[{header}]\n"
             for k, v in configs.items():
@@ -133,11 +133,11 @@ class Configurations(_Configurations):
     def set(self, key: str, value: Any, replace: bool = True) -> None:
         if isinstance(value, Mapping):
             if key not in self.__configs.keys():
-                value = self._create_section(key, value)
+                value = self._create_member(key, value)
             else:
-                section = self.__configs[key]
-                if isinstance(section, Mapping) and not replace:
-                    value = update_recursive(section, value, replace=False)
+                _key = self.__configs[key]
+                if isinstance(_key, Mapping) and not replace:
+                    value = update_recursive(_key, value, replace=False)
             self.__configs[key] = value
         elif key not in self.__configs.keys() or replace:
             self.__configs[key] = value
@@ -185,7 +185,7 @@ class Configurations(_Configurations):
         self.__configs.move_to_end(key, True)
 
     def write(self) -> None:
-        configs = {k: v for k, v in self.__configs.items() if k not in self.sections}
+        configs = {k: v for k, v in self.__configs.items() if k not in self.members}
 
         if not self.__dirs.conf.exists():
             self.__dirs.conf.mkdir(parents=True, exist_ok=True)
@@ -193,7 +193,7 @@ class Configurations(_Configurations):
         file_desc, file_path = tempfile.mkstemp(prefix=self.name, dir=self.dirs.conf)
         with os.fdopen(file_desc, "w") as file:
             lines = self.__read_lines()
-            lines_section = len(lines) - 1
+            lines_member = len(lines) - 1
             for line_index, line in enumerate(lines):
                 if "=" in line:
                     line = line.rstrip()
@@ -206,18 +206,18 @@ class Configurations(_Configurations):
                             lines[line_index] = self.__parse_line(key, config_value)
 
                 if re.match(r"(#.*|;.*|)\[.*?]", line):
-                    lines_section = line_index - 1
+                    lines_member = line_index - 1
                     break
-            while lines_section > 0 and lines[lines_section - 1].strip() == "":
-                lines_section -= 1
+            while lines_member > 0 and lines[lines_member - 1].strip() == "":
+                lines_member -= 1
 
             if len(configs) > 0:
                 if len(lines) > 0:
-                    lines.insert(lines_section, "\n")
-                    lines_section += 1
+                    lines.insert(lines_member, "\n")
+                    lines_member += 1
                 for key, value in configs.items():
-                    lines.insert(lines_section, self.__parse_line(key, value))
-                    lines_section += 1
+                    lines.insert(lines_member, self.__parse_line(key, value))
+                    lines_member += 1
 
             file.writelines(lines)
 
@@ -250,9 +250,9 @@ class Configurations(_Configurations):
         elif dirs.conf != self.dirs.conf:
             self.__copy_path(self.__path.parents[0], dirs.conf, self.name)
             self.__copy_path(self.__path.parents[0], dirs.conf, self.name.replace(".conf", ".d"))
-            for section in self.sections:
-                section_dir = dirs.conf.joinpath(self.name.replace(".conf", ".d"))
-                self.__copy_path(self.__path.parents[0], section_dir, f"{section}.conf")
+            for member in self.members:
+                member_dir = dirs.conf.joinpath(self.name.replace(".conf", ".d"))
+                self.__copy_path(self.__path.parents[0], member_dir, f"{member}.conf")
 
         return Configurations(self.name, dirs, deepcopy(self.__configs))
 
@@ -294,81 +294,81 @@ class Configurations(_Configurations):
         self.set("enabled", enabled)
 
     @property
-    def sections(self) -> List[str]:
+    def members(self) -> List[str]:
         return [k for k, v in self.items() if isinstance(v, Configurations)]
 
     @property
-    def _sections_dir(self) -> Directory:
+    def _members_dir(self) -> Directory:
         return self.__dirs.conf.joinpath(self.__path.name.replace(".conf", ".d"))
 
-    def has_section(self, section: str, includes: bool = False) -> bool:
-        if section in self.sections:
+    def has_member(self, key: str, includes: bool = False) -> bool:
+        if key in self.members:
             return True
-        if includes and self._sections_dir.joinpath(f"{section}.conf").exists():
+        if includes and self._members_dir.joinpath(f"{key}.conf").exists():
             return True
         return False
 
-    def get_sections(
+    def get_members(
         self,
-        sections: Collection[str],
+        keys: Collection[str],
         ensure_exists: bool = False,
     ) -> Configurations:
-        sections = {
-            s: self.get_section(s, defaults={}, ensure_exists=ensure_exists)
-            for s in sections
-            if s in self.sections or ensure_exists
+        member = {
+            s: self.get_member(s, defaults={}, ensure_exists=ensure_exists)
+            for s in keys
+            if s in self.members or ensure_exists
         }
-        section_dirs = self.__dirs.copy()
-        section_dirs.conf = self._sections_dir
-        return Configurations(self.name, section_dirs, sections)
+        member_dirs = self.__dirs.copy()
+        member_dirs.conf = self._members_dir
+        return Configurations(self.name, member_dirs, member)
 
-    def get_section(
+    def get_member(
         self,
-        section: str,
+        key: str,
         defaults: Optional[Mapping[str, Any]] = None,
         ensure_exists: bool = False,
     ) -> Configurations:
-        if not self.has_section(section) and ensure_exists:
+        if not self.has_member(key) and ensure_exists:
             if defaults is None:
                 defaults = {}
-            self._add_section(section, defaults)
-            return self[section]
+            self._add_member(key, defaults)
+            return self[key]
 
-        elif self.has_section(section):
-            configs = self[section]
+        elif self.has_member(key):
+            configs = self[key]
             if defaults is not None:
                 configs.update(defaults, replace=False)
             return configs
 
         elif defaults is not None:
-            return self._create_section(section, defaults)
+            return self._create_member(key, defaults)
         else:
-            raise ConfigurationUnavailableError(f"Unknown configuration section: {section}")
+            raise ConfigurationUnavailableError(f"Unknown configuration type '{key}'")
 
-    def _add_section(self, section, configs: Mapping[str, Any]) -> None:
-        if self.has_section(section):
-            raise ConfigurationUnavailableError(f"Unable to add existing configuration section: {section}")
-        self[section] = self._create_section(section, configs)
+    def _add_member(self, key, configs: Mapping[str, Any]) -> None:
+        if self.has_member(key):
+            raise ConfigurationUnavailableError(f"Unable to add existing configuration type '{key}'")
+        self[key] = self._create_member(key, configs)
 
-    def _create_section(self, section, configs: Mapping[str, Any]) -> Configurations:
+    def _create_member(self, key, configs: Mapping[str, Any]) -> Configurations:
         if not isinstance(configs, Mapping):
-            raise ConfigurationError(f"Invalid configuration '{section}': {type(configs)}")
-        section_name = f"{section}.conf"
-        section_dirs = self.__dirs.copy()
-        section_dirs.conf = self._sections_dir
-        section_configs = Configurations(section_name, section_dirs, configs)
-        section_configs._load(require=False)
-        return section_configs
+            raise ConfigurationError(f"Invalid configuration type '{key}': {type(configs)}")
+        member_name = f"{key}.conf"
+        member_dirs = self.__dirs.copy()
+        member_dirs.conf = self._members_dir
+        member_configs = Configurations(member_name, member_dirs, configs)
+        member_configs._load(require=False)
+        return member_configs
 
-    def pop_section(
+    def pop_member(
         self,
-        section: str,
+        key: str,
         defaults: Optional[Mapping[str, Any]] = None,
     ) -> Configurations:
-        section_configs = self.get_section(section, defaults=defaults)
-        if section in self.__configs:
-            del self.__configs[section]
-        return section_configs
+        member_configs = self.get_member(key, defaults=defaults)
+        if key in self.__configs:
+            del self.__configs[key]
+        return member_configs
 
     # noinspection PyTypeChecker
     def update(self, update: Mapping[str, Any], replace: bool = True) -> None:

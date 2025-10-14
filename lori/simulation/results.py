@@ -51,11 +51,11 @@ class Results(Configurator, Sequence[Result]):
     ) -> None:
         super().__init__(configs)
         if database is None:
-            database_configs = component.configs.get_section(
-                section="connectors",
+            database_configs = component.configs.get_member(
+                key="connectors",
                 ensure_exists=True,
-            ).get_section(
-                section="results",
+            ).get_member(
+                key="results",
                 defaults={},
             )
             database_configs.update(

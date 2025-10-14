@@ -35,12 +35,12 @@ class Application(DataManager):
     # noinspection PyProtectedMember
     def __init__(self, settings: Settings, **kwargs) -> None:
         super().__init__(settings, name=settings["name"], **kwargs)
-        if not settings.has_section(Interface.TYPE):
-            settings._add_section(Interface.TYPE, {"enabled": False})
+        if not settings.has_member(Interface.TYPE):
+            settings._add_member(Interface.TYPE, {"enabled": False})
 
         # Check if the tasked action may be headless
         if settings.get("action").lower() == "start":
-            self._interface = Interface(self, settings.get_section(Interface.TYPE))
+            self._interface = Interface(self, settings.get_member(Interface.TYPE))
 
     # noinspection PyProtectedMember, PyTypeChecker, PyMethodOverriding
     def configure(self, settings: Settings, factory: Type[System] = System) -> None:
@@ -50,10 +50,10 @@ class Application(DataManager):
 
         system_dirs = settings.dirs.to_dict()
         system_dirs["conf_dir"] = None
-        systems_section = settings.get_section("systems")
-        systems_flat = systems_section.get_bool("flat")
-        if systems_section.get_bool("scan"):
-            if systems_section.get_bool("copy"):
+        systems_configs = settings.get_member("systems")
+        systems_flat = systems_configs.get_bool("flat")
+        if systems_configs.get_bool("scan"):
+            if systems_configs.get_bool("copy"):
                 factory.copy(self.settings)
             system_dirs["scan_dir"] = str(settings.dirs.data)
             components.extend(factory.scan(self._components, **system_dirs, flat=systems_flat))
@@ -66,7 +66,7 @@ class Application(DataManager):
         self._components.configure(components)
 
         if self._has_interface():
-            self._interface.configure(settings.get_section(Interface.TYPE))
+            self._interface.configure(settings.get_member(Interface.TYPE))
 
     # noinspection PyTypeChecker
     @property
@@ -127,7 +127,7 @@ class Application(DataManager):
         end: Optional[Timestamp] = None,
         **kwargs,
     ) -> None:
-        simulation = self.settings.get_section("simulation", defaults={"data": {"include": True}})
+        simulation = self.settings.get_member("simulation", defaults={"data": {"include": True}})
 
         timezone = simulation.get("timezone", None)
         if start is None:
@@ -143,15 +143,15 @@ class Application(DataManager):
         freq = simulation.get("freq", default=None)
 
         database_id = simulation.get("database", default="results")
-        database_section = simulation.get_section("databases", defaults={})
-        if database_id == "results" and "results" not in database_section:
-            database_section["results"] = {
+        database_configs = simulation.get_member("databases", defaults={})
+        if database_id == "results" and "results" not in database_configs:
+            database_configs["results"] = {
                 "type": "tables",
                 "file": ".results.h5",
                 "compression_level": 9,
                 "compression_lib": "zlib",
             }
-        self.connectors.load(database_section)
+        self.connectors.load(database_configs)
 
         database = self.connectors.get(database_id)
         if not isinstance(database, Database):
@@ -167,7 +167,7 @@ class Application(DataManager):
             else:
                 slices = [(start, end)]
 
-            with Results(system, database, simulation.get_section("data"), total=len(slices)) as results:
+            with Results(system, database, simulation.get_member("data"), total=len(slices)) as results:
                 results.durations.start("Simulation")
                 try:
                     for slice_start, slice_end in slices:
@@ -192,6 +192,8 @@ class Application(DataManager):
                     results.report()
 
                     # TODO: Call evaluations from configs
+                    if "errors" in results_data.columns.get_level_values(0):
+                        self._logger.debug(f"Starting evaluation of {len(results_data['errors'].columns)} errors")
 
                     results.durations.stop("Evaluation")
                     self._logger.debug(

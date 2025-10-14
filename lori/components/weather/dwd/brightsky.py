@@ -28,7 +28,7 @@ class Brightsky(Connector):
     horizon: int = 10
 
     def __init__(self, context: Weather, location: Location, **kwargs) -> None:
-        super().__init__(context, context.configs.get_section("brightsky", defaults={}), **kwargs)
+        super().__init__(context, context.configs.get_member("brightsky", defaults={}), **kwargs)
         self.location = location
 
     def configure(self, configs: Configurations) -> None:

@@ -38,17 +38,17 @@ class _Registrator(_Configurator, _Entity):
     ) -> str:
         if configs is not None:
             if id is None:
-                if configs.has_section(cls.TYPE) and "id" in configs[cls.TYPE]:
+                if configs.has_member(cls.TYPE) and "id" in configs[cls.TYPE]:
                     id = configs[cls.TYPE]["id"]
                 elif "id" in configs:
                     id = configs["id"]
             if key is None:
-                if configs.has_section(cls.TYPE) and "key" in configs[cls.TYPE]:
+                if configs.has_member(cls.TYPE) and "key" in configs[cls.TYPE]:
                     key = configs[cls.TYPE]["key"]
                 elif "key" in configs:
                     key = configs["key"]
                 else:
-                    key = validate_key("_".join(configs.key))
+                    key = configs.key
         if key is None:
             raise ValueError(f"Unable to build '{cls.__name__}' for missing ID")
         if id is None and context is not None and isinstance(context, _Registrator):
@@ -60,17 +60,17 @@ class _Registrator(_Configurator, _Entity):
     @classmethod
     def _build_key(cls, key: Optional[str], configs: Optional[Configurations]) -> str:
         if configs is not None:
-            if configs.has_section(cls.TYPE) and "key" in configs[cls.TYPE]:
+            if configs.has_member(cls.TYPE) and "key" in configs[cls.TYPE]:
                 key = configs[cls.TYPE]["key"]
             elif "key" in configs:
                 key = configs["key"]
             else:
-                if configs.has_section(cls.TYPE) and "name" in configs[cls.TYPE]:
+                if configs.has_member(cls.TYPE) and "name" in configs[cls.TYPE]:
                     key = validate_key(configs[cls.TYPE]["name"])
                 elif "name" in configs:
                     key = validate_key(configs["name"])
                 elif key is None:
-                    key = validate_key("_".join(configs.key))
+                    key = validate_key(configs.key)
         if key is None:
             raise ValueError(f"Unable to build '{cls.__name__}' for missing key")
         return key
@@ -78,7 +78,7 @@ class _Registrator(_Configurator, _Entity):
     @classmethod
     def _build_name(cls, name: Optional[str], configs: Optional[Configurations]) -> str:
         if configs is not None:
-            if configs.has_section(cls.TYPE) and "name" in configs[cls.TYPE]:
+            if configs.has_member(cls.TYPE) and "name" in configs[cls.TYPE]:
                 name = configs[cls.TYPE]["name"]
             elif "name" in configs:
                 name = configs["name"]

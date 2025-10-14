@@ -35,7 +35,7 @@ class Settings(Configurations):
         override_path = os.path.join(self.dirs.data, self.name)
         if os.path.isfile(override_path):
             self._load_toml(override_path)
-            self.dirs.update(self.get_section(Directories.TYPE, defaults={}))
+            self.dirs.update(self.get_member(Directories.TYPE, defaults={}))
         if self.dirs.conf._dir is None:
             self.dirs._conf = Directory(os.path.dirname(self.path), default="conf")
 
@@ -48,7 +48,7 @@ class Settings(Configurations):
         raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
 
     @property
-    def _sections_dir(self) -> Directory:
+    def _members_dir(self) -> Directory:
         return self.dirs.conf
 
     def _load_logging(self) -> None:

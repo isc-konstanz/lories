@@ -70,7 +70,7 @@ class System(Component):
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self.localize(configs.get_section(Location.TYPE, defaults={}))
+        self.localize(configs.get_member(Location.TYPE, defaults={}))
         self.components.load(configs_dir=self.configs.dirs.conf)
 
     def localize(self, configs: Configurations) -> None:

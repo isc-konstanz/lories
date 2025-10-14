@@ -12,11 +12,11 @@ from typing import Any, Callable, Collection, Iterable, Optional, Type, overload
 
 import pandas as pd
 from lori._core import _Context, _Registrator  # noqa
-from lori._core._data import _DataContext, _DataManager  # noqa
+from lori._core._data import DataContext, _DataContext, _DataManager  # noqa
 from lori.core import Configurator, Constant, ResourceError
 from lori.core.typing import ChannelsArgument, Registrator, Timestamp
 from lori.data.channels import Channel, Channels
-from lori.data.context import DataContext
+from lori.data.context import DataContext as _DataAccess
 from lori.util import get_context, update_recursive
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -28,7 +28,7 @@ except ImportError:
 
 
 # noinspection PyProtectedMember, PyShadowingBuiltins
-class DataAccess(DataContext, Configurator):
+class DataAccess(_DataAccess, Configurator):
     __registrar: _Registrator
     __context: _DataContext
 
@@ -117,10 +117,10 @@ class DataAccess(DataContext, Configurator):
     def load(self, sort: bool = True) -> Collection[Channel]:
         channels = []
         defaults = {}
-        if self.configs.has_section(Channels.TYPE):
-            section = self.configs.get_section(Channels.TYPE)
-            defaults = Channel._build_defaults(section)
-            channels.extend(self._load_from_sections(self.__registrar, section))
+        if self.configs.has_member(Channels.TYPE):
+            configs = self.configs.get_member(Channels.TYPE)
+            defaults = Channel._build_defaults(configs)
+            channels.extend(self._load_from_members(self.__registrar, configs))
         channels.extend(
             self._load_from_file(self.__registrar, self.configs.dirs, f"{Channels.TYPE}.conf", defaults=defaults)
         )
@@ -137,9 +137,9 @@ class DataAccess(DataContext, Configurator):
             }
             key = configs.pop("key")
         configs = Channel._build_configs(configs)
-        channels = self.configs.get_section(Channels.TYPE, ensure_exists=True)
-        if not channels.has_section(key):
-            channels._add_section(key, configs)
+        channels = self.configs.get_member(Channels.TYPE, ensure_exists=True)
+        if not channels.has_member(key):
+            channels._add_member(key, configs)
         else:
             channel_configs = Channel._build_configs(channels[key])
             channel_configs = update_recursive(channel_configs, configs, replace=False)

@@ -76,26 +76,26 @@ class RegistratorContext(_RegistratorLoader[Registrator], Generic[Registrator]):
         **kwargs: Any,
     ) -> Registrator:
         registration_class = self._get_registator_class()
-        registrator_section = configs.get_section(registration_class.TYPE, ensure_exists=True)
+        registrator_member = configs.get_member(registration_class.TYPE, ensure_exists=True)
 
-        if "key" not in registrator_section:
+        if "key" not in registrator_member:
             if "key" in configs:
                 registration_key = configs.get("key")
                 del configs["key"]
             else:
                 registration_key = "_".join(os.path.splitext(configs.key)[:-1])
-            registrator_section["key"] = validate_key(registration_key)
-            registrator_section.move_to_top("key")
+            registrator_member["key"] = validate_key(registration_key)
+            registrator_member.move_to_top("key")
 
-        if "name" not in registrator_section and "name" in configs:
+        if "name" not in registrator_member and "name" in configs:
             registration_name = configs.get("name")
-            registrator_section["name"] = registration_name
-            registrator_section.move_to_top("name")
+            registrator_member["name"] = registration_name
+            registrator_member.move_to_top("name")
             del configs["name"]
 
         registration_type = re.split(r"[^a-zA-Z0-9_]", configs.key)[0]
-        if "type" in registrator_section:
-            registration_type = validate_key(registrator_section.get("type"))
+        if "type" in registrator_member:
+            registration_type = validate_key(registrator_member.get("type"))
         elif "type" in configs:
             _registration_type = validate_key(configs.get("type"))
             if self._registry.has_type(_registration_type) or not self._registry.has_type(registration_type):
@@ -103,15 +103,15 @@ class RegistratorContext(_RegistratorLoader[Registrator], Generic[Registrator]):
                 del configs["type"]
 
         registration = self._registry.from_type(registration_type)
-        if "type" not in registrator_section:
-            registrator_section["type"] = registration.key
-            registrator_section.move_to_top("type")
+        if "type" not in registrator_member:
+            registrator_member["type"] = registration.key
+            registrator_member.move_to_top("type")
         return registration.initialize(context, configs, **kwargs)
 
     # noinspection PyUnresolvedReferences
     def _load_registrators_configs(self) -> Configurations:
-        section = self._get_registrators_type()
-        return self.__context.configs.get_section(section, ensure_exists=True)
+        _type = self._get_registrators_type()
+        return self.__context.configs.get_member(_type, ensure_exists=True)
 
     def load(self, configs: Optional[Configurations] = None, **kwargs) -> Sequence[Registrator]:
         _class = self._get_registator_class()

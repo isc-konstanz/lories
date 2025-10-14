@@ -8,14 +8,14 @@ lori.core.register.access
 
 from __future__ import annotations
 
-from typing import Any, Generic, Optional, Sequence, overload
+from typing import Any, Dict, Generic, Optional, Sequence, overload
 
 from lori._core._context import Context, _Context  # noqa
 from lori._core._registrator import (  # noqa
     Registrator,
     RegistratorContext,
-    _Registrator,
-    _RegistratorContext,
+    _Registrator,  # noqa
+    _RegistratorContext,  # noqa
 )
 from lori.core.configs import Configurations
 from lori.core.errors import ResourceError
@@ -123,9 +123,9 @@ class RegistratorAccess(_RegistratorLoader[Registrator], Generic[Registrator]):
             self._add(__registrator)
             return
 
-        registrators = self._get_registrator_section()
-        if not registrators.has_section(__registrator):
-            registrators._add_section(__registrator, configs)
+        registrators = self._load_registrators_configs()
+        if not registrators.has_member(__registrator):
+            registrators._add_member(__registrator, configs)
         else:
             registrator_configs = registrators[__registrator]
             registrator_configs = update_recursive(registrator_configs, configs, replace=False)
@@ -154,7 +154,7 @@ class RegistratorAccess(_RegistratorLoader[Registrator], Generic[Registrator]):
             registrator_dirs.conf = registrator_dirs.conf.joinpath(relative_dir)
             registrator.configs.copy(registrator_dirs)
 
-    def _load_registrator_defaults(self, configs: Optional[Configurations] = None, **kwargs) -> Configurations:
+    def _load_registrator_defaults(self, configs: Optional[Configurations] = None, **kwargs) -> Dict[str, Any]:
         _class = self._get_registator_class()
         if configs is None:
             configs = self._registrar.configs
@@ -162,8 +162,8 @@ class RegistratorAccess(_RegistratorLoader[Registrator], Generic[Registrator]):
 
     # noinspection PyUnresolvedReferences
     def _load_registrators_configs(self) -> Configurations:
-        _section = self._get_registrators_type()
-        return self._registrar.configs.get_section(_section, ensure_exists=True)
+        _type = self._get_registrators_type()
+        return self._registrar.configs.get_member(_type, ensure_exists=True)
 
     # noinspection PyUnresolvedReferences, PyProtectedMember
     def load(

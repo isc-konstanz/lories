@@ -43,12 +43,12 @@ class ComponentAccess(_ComponentContext, RegistratorAccess[Component]):
     ) -> Sequence[Component]:
         return super().load(configs, configs_file, configs_dir, configure, strict=True)
 
-    # noinspection PyUnresolvedReferences
+    # noinspection PyShadowingBuiltins, PyUnresolvedReferences
     def load_from_type(
         self,
-        type: Type[Component],
+        cls: Type[Component],
         configs: Configurations,
-        section: str,
+        type: str,
         key: str,
         name: Optional[str] = None,
         includes: Optional[Collection[str]] = (),
@@ -57,23 +57,23 @@ class ComponentAccess(_ComponentContext, RegistratorAccess[Component]):
         sort: bool = True,
         **kwargs,
     ) -> Sequence[Component]:
-        kwargs["factory"] = type
+        kwargs["factory"] = cls
         components = []
         if defaults is None:
             defaults = self._load_registrator_defaults(strict=True)
-        if any(i in configs.sections for i in includes):
+        if any(i in configs.members for i in includes):
             configs["key"] = key
             configs["name"] = name
-        configs = configs.get_section(section, defaults={**configs.get_sections(includes), **defaults})
-        if any(i in configs.sections for i in includes):
+        configs = configs.get_member(type, defaults={**configs.get_members(includes), **defaults})
+        if any(i in configs.members for i in includes):
             components.append(self._load_from_configs(self._registrar, configs, **kwargs))
 
         update_recursive(defaults, _Component._build_defaults(configs, includes))
 
         configs_dirs = configs.dirs.copy()
-        configs_sections = configs.get_sections([s for s in configs.sections if s not in defaults])
+        configs_members = configs.get_members([s for s in configs.members if s not in defaults])
 
-        components.extend(self._load_from_sections(self._registrar, configs_sections, defaults=defaults, **kwargs))
+        components.extend(self._load_from_members(self._registrar, configs_members, defaults=defaults, **kwargs))
 
         if "alias" in configs:
             key = configs.get("alias")

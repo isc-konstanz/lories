@@ -75,7 +75,7 @@ class _Component(_Registrator, _Activator):
         defaults = super()._build_defaults(configs, includes)
         if strict and _DataContext.TYPE in defaults:
             defaults[_DataContext.TYPE][_Channels.TYPE] = _Channel._build_defaults(
-                defaults[_DataContext.TYPE].get_section(_Channels.TYPE, defaults={})
+                defaults[_DataContext.TYPE].get_member(_Channels.TYPE, defaults={})
             )
         return defaults
 
