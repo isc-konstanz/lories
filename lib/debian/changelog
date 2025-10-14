@@ -1,5 +1,20 @@
 lori (<version>) stable; urgency=medium
 
+  * Major refactoring of inheritance and related typing
+  * Fix SQLAlchemy DatetimeColumn localization dtype warning
+  * Fix SQLAlchemy error for missing column data
+  * Fix SQLAlchemy surrogate key clause building for more multiple keys
+  * Fix OpenCV to avoid gray or green frames
+  * Add RevPi Connector listening
+  * Add ENTSO-e Tariff implementations
+  * Add wrapped Configurator.update method
+  * Allow ";" comments in config files
+  * Improve replication handling
+
+ -- Adrian Minde <adrian.minde@isc-konstanz.de>  Tue, 14 Oct 2025 11:30:00 +0200
+
+lori (0.14.3) stable; urgency=medium
+
   * Fix full database rotation being skipped
   * Fix bloating NaN values in database rotation
 

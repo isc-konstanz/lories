@@ -5,22 +5,7 @@ set -e
 
 case "$1" in
     remove | purge)
-        rm -rf /opt/lori
-
-        # Reset permissions of the framework directories
-        chown root:root -R /etc/lori /var/opt/lori /var/log/lori /var/tmp/lori 2>/dev/null
-
-        # Delete the Multi Utility Communication user, if it exists
-        if grep -E "^lori:" /etc/passwd > /dev/null 2>&1; then
-            userdel -f "lori"
-        fi
-        ;;
-    *)
-        ;;
-esac
-case "$1" in
-    purge)
-        rm -rf /etc/lori /var/opt/lori /var/log/lori /var/tmp/lori
+        rm -rf /usr/lib/lori
         ;;
     *)
         ;;

@@ -5,22 +5,15 @@ set -e
 
 case "$1" in
     install)
-        # Add the Multi Utility Communication user, if it does not exist
-        if ! grep -E "^lori:" /etc/passwd > /dev/null 2>&1; then
-            useradd --system --no-create-home --comment="Local Resource Integrator" "lori"
-        fi
         # Initiate the virtual environment, if it does not exist
-        python=/opt/lori/bin/python
+        python=/usr/lib/lori/bin/python
         if [ ! -e $python ]; then
-            python3 -m venv /opt/lori
-            $python -m pip install --upgrade pip
+            python3 -m venv /usr/lib/lori
         fi
+        $python -m pip install --upgrade pip
         ;;
     *)
         ;;
 esac
-
-# Make sure all framework related directories exist
-mkdir -p /var/opt/lori /var/log/lori /var/tmp/lori
 
 exit 0
