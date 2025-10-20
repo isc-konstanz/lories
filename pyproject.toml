@@ -20,21 +20,20 @@ urls.source = "https://github.com/isc-konstanz/lories/"
 urls.issues = "https://github.com/isc-konstanz/lories/issues"
 
 classifiers = [
-    "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Operating System :: OS Independent"
 ]
 
 readme = "README.md"
-requires-python = ">= 3.7"
-license.file = "LICENSE"
+requires-python = ">= 3.9"
+license = "GPL-3.0-or-later"
+license-files = ["LICEN[CS]E*"]
 dynamic = ["version"]
 
 dependencies = [
@@ -88,7 +87,6 @@ doc = [
     "myst-parser",
 ]
 dev = [
-    # "lories[sql, doc]",
     "pre-commit",
     "ruff",
 ]

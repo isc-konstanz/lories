@@ -33,8 +33,11 @@ chmod 755 "$build_dir/debian/pre*" 2>/dev/null
 chmod 755 "$build_dir/debian/post*" 2>/dev/null
 chmod 755 "$build_dir/debian/rules"
 
-version=$(cat "$build_dir/debian/version" | tr -d "\n")
-rm "$build_dir/debian/version"
+version=$(python "$lories_dir/setup.py" --version)
+if [ -z "$version" ] || echo "$version" | grep -q '\.dirty$'; then
+    echo "Could not determine version from setup.py" 1>&2
+    exit 1
+fi
 
 sed -i "s/<version>/$version/g" "$build_dir/debian/changelog"
 sed -i "s/<version>/$version/g" "$build_dir/debian/control"
