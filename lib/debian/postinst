@@ -2,7 +2,7 @@
 set -e
 
 # Install the current specific version package
-/usr/lib/lori/bin/pip install lori==<version>
+/usr/lib/lories/bin/pip install lories==<version>
 
 #DEBHELPER#
 

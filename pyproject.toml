@@ -3,7 +3,7 @@ build-backend = "setuptools.build_meta"
 requires = ['setuptools >= 61.0', 'versioneer[toml]']
 
 [project]
-name = "lori"
+name = "lories"
 description = """\
 This repository provides a set of core functions for \
 Local Resource Integration by ISC Konstanz e.V."""
@@ -16,8 +16,8 @@ maintainers = [
 ]
 
 urls.author = "https://isc-konstanz.de"
-urls.source = "https://github.com/isc-konstanz/lori/"
-urls.issues = "https://github.com/isc-konstanz/lori/issues"
+urls.source = "https://github.com/isc-konstanz/lories/"
+urls.issues = "https://github.com/isc-konstanz/lories/issues"
 
 classifiers = [
     "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
@@ -88,13 +88,13 @@ doc = [
     "myst-parser",
 ]
 dev = [
-    # "lori[sql, doc]",
+    # "lories[sql, doc]",
     "pre-commit",
     "ruff",
 ]
 
 [tool.setuptools.package-data]
-lori = [
+lories = [
     "application/view/assets/*.css",
     "application/view/assets/*.ico",
 	"application/view/assets/*.jpg",
@@ -111,19 +111,19 @@ exclude = [
 [tool.versioneer]
 VCS = "git"
 style = "pep440"
-versionfile_source = "lori/_version.py"
-versionfile_build = "lori/_version.py"
-parentdir_prefix = "lori-"
+versionfile_source = "lories/_version.py"
+versionfile_build = "lories/_version.py"
+parentdir_prefix = "lories-"
 tag_prefix = "v"
 
 [project.scripts]
-lori = "lori.__main__:main"
+lories = "lories.__main__:main"
 
 [tool.ruff]
 indent-width = 4
 line-length = 120
 target-version = "py37"
-exclude = ["lori/_version.py"]
+exclude = ["lories/_version.py"]
 
 [tool.ruff.lint]
 select = [
@@ -138,4 +138,4 @@ select = [
 
 [tool.ruff.lint.isort]
 extra-standard-library = ["dateutil"]
-known-first-party = ["lori", "numpy", "pandas", "pytz"]
+known-first-party = ["lories", "numpy", "pandas", "pytz"]

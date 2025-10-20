@@ -1,12 +1,12 @@
 (contributing)=
 # Contributing
 
-This section contains information on how to contribute to lori.
+This section contains information on how to contribute to lories.
 This might be reporting specific errors or bugs, or contributing directly to the source code.
 It also specifies the style in which documentation and code should be written.
 
 ```{seealso}
-If you have questions that the documentation cannot answer, you can [get in touch with the lori developers](../contact.md).
+If you have questions that the documentation cannot answer, you can [get in touch with the lories developers](../contact.md).
 ```
 
 ```{toctree}

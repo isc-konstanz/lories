@@ -7,7 +7,7 @@ We are sorry to find you on this page! But we are happy to help you with your pr
 
 ## Errors in the Documentation
 
-The underlying content of the lori documentation website is hosted in the [GitHub repository](https://github.com/isc-konstanz/lori).
+The underlying content of the lories documentation website is hosted in the [GitHub repository](https://github.com/isc-konstanz/lories).
 You can therefore:
 
 
@@ -18,7 +18,7 @@ You can therefore:
 1. A [GitHub account](https://github.com/signup)
 ```
 
-In order to report an error in the documentation, please [open a new issue](https://github.com/isc-konstanz/lori/issues) in this repository, describing the error and where you found it.
+In order to report an error in the documentation, please [open a new issue](https://github.com/isc-konstanz/lories/issues) in this repository, describing the error and where you found it.
 A member of the Brightway developer community will then take care of the issue.
 Please note that developments are often undertaken on a voluntary basis, so it may take some time for your issue to be resolved.
 
@@ -29,7 +29,7 @@ Please note that developments are often undertaken on a voluntary basis, so it m
 :class: important
 1. A [GitHub account](https://github.com/signup)
 2. Basic knowledge of [the GitHub contribution workflow (fork, branch, PR)](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests)
-3. A [fork](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/about-forks) of the [GitHub repository](https://github.com/isc-konstanz/lori)
+3. A [fork](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/about-forks) of the [GitHub repository](https://github.com/isc-konstanz/lories)
 4. Basic knowledge of [Markdown](https://www.markdownguide.org/basic-syntax/)
 ```
 
@@ -37,12 +37,12 @@ In order to fix an error in the documentation, you can make an edit of the under
 
 1. Use the `✏️ Edit on GitHub` button on the top right of the page to open the corresponding file in the GitHub repository. This shows you which file you need to edit.
 2. Edit the file in your fork of the repository. Finally, create a pull request.
-3. As soon as a member of the lori developer community has merged your pull request, the changes will be visible on the Brightway documentation website.
+3. As soon as a member of the lories developer community has merged your pull request, the changes will be visible on the Brightway documentation website.
 
 
 ## Bugs in the Code
 
-The underlying code of the lori framework is hosted in the [GitHub repository](https://github.com/isc-konstanz/lori).
+The underlying code of the lories framework is hosted in the [GitHub repository](https://github.com/isc-konstanz/lories).
 You can therefore:
 
 
@@ -54,7 +54,7 @@ You can therefore:
 2. Basic knowledge of the [Python Error Traceback](https://web.archive.org/web/20231127162411/https://realpython.com/python-traceback/)
 ```
 
-In order to report a bug in lori, please [open a new issue](https://github.com/isc-konstanz/lori/issues) in this repository, describing the bug and how you found it.
+In order to report a bug in lories, please [open a new issue](https://github.com/isc-konstanz/lories/issues) in this repository, describing the bug and how you found it.
 Your issue should include:
 
 1. The complete Python Traceback
@@ -62,7 +62,7 @@ Your issue should include:
 3. Information your operating system and Python version
 4. The steps required to reproduce the bug
 
-A member of the lori developer community will then take care of the issue.
+A member of the lories developer community will then take care of the issue.
 Please note that developments are mostly undertaken on a voluntary basis, so it may take some time for your issue to be resolved.
 
 
@@ -72,7 +72,7 @@ Please note that developments are mostly undertaken on a voluntary basis, so it 
 :class: important
 1. A [GitHub account](https://github.com/signup)
 2. Basic knowledge of [the GitHub contribution workflow (fork, branch, PR)](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests)
-3. A [fork](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/about-forks) of the [GitHub repository](https://github.com/isc-konstanz/lori)
+3. A [fork](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/about-forks) of the [GitHub repository](https://github.com/isc-konstanz/lories)
 ```
 
 Follow the usual GitHub contribution workflow and please take a look at how to [contribute to the code](code).

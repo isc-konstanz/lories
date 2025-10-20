@@ -11,7 +11,7 @@ on:
 jobs:
   build:
     name: Build wheel and sdist
-    if: github.repository == 'isc-konstanz/lori'
+    if: github.repository == 'isc-konstanz/lories'
     runs-on: ubuntu-latest
     steps:
     # Fetch all commits and tags so versioneer works
@@ -46,7 +46,7 @@ jobs:
         pip install $(find dist -type f -name "*.whl") --target=./tmp
 
     - name: List installed file sizes
-      run: du -h lori
+      run: du -h lories
       working-directory: ./tmp
 
     - name: Store the distribution packages

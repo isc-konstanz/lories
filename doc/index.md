@@ -1,15 +1,15 @@
-# Lori Software Framework
+# Lories Software Framework
 
-```{image} _images/lori-logo.svg
-:alt: Lori Logo
+```{image} _images/lories-logo.svg
+:alt: Lories Logo
 :width: 256px
 :align: center
 ```
 
 <div align="center">
-  <h1 align="center">Lori</h1>
+  <h1 align="center">Lories</h1>
   <p align="center">
-    Lori is an open-source software package for <em><b>Lo</b>cal <b>R</b>esource <b>I</b>ntegration</em> <br>powered by ISC Konstanz e.V.  
+    Lories is an open-source software package for <em><b>Lo</b>cal <b>R</b>esource <b>I</b>ntegration</em> & <b>E</b>stimation <b>S</b>ystems <br>powered by ISC Konstanz e.V.  
   </p>
 </div>
 

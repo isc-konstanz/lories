@@ -1,13 +1,13 @@
 #!/bin/sh
 #Scriptname: build.sh
-#Description: script to build lori debian packages with dpkg
+#Description: script to build lories debian packages with dpkg
 
 if [ $(id -u) != 0 ]; then
     echo "DPKG build process should be performed with root privileges." 1>&2
     exit 1
 fi
 
-# Attempt to set lori_dir
+# Attempt to set lories_dir
 # Resolve links: $0 may be a link
 dir="$0"
 # Need this for relative symlinks.
@@ -21,14 +21,14 @@ while [ -h "$dir" ] ; do
 	fi
 done
 cd "`dirname \"$dir\"`" >/dev/null
-lori_dir="`pwd -P`"
-build_dir="$lori_dir/build/dpkg/lori"
+lories_dir="`pwd -P`"
+build_dir="$lories_dir/build/dpkg/lories"
 
 rm -rf $build_dir
 mkdir -p $build_dir
 
 cd $build_dir
-cp -r "$lori_dir/lib/debian" "$build_dir/"
+cp -r "$lories_dir/lib/debian" "$build_dir/"
 chmod 755 "$build_dir/debian/pre*" 2>/dev/null
 chmod 755 "$build_dir/debian/post*" 2>/dev/null
 chmod 755 "$build_dir/debian/rules"

@@ -6,9 +6,9 @@ set -e
 case "$1" in
     install)
         # Initiate the virtual environment, if it does not exist
-        python=/usr/lib/lori/bin/python
+        python=/usr/lib/lories/bin/python
         if [ ! -e $python ]; then
-            python3 -m venv /usr/lib/lori
+            python3 -m venv /usr/lib/lories
         fi
         $python -m pip install --upgrade pip
         ;;

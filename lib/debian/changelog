@@ -1,4 +1,4 @@
-lori (<version>) stable; urgency=medium
+lories (<version>) stable; urgency=medium
 
   * Major refactoring of inheritance and related typing
   * Fix SQLAlchemy DatetimeColumn localization dtype warning
@@ -13,20 +13,20 @@ lori (<version>) stable; urgency=medium
 
  -- Adrian Minde <adrian.minde@isc-konstanz.de>  Tue, 14 Oct 2025 11:30:00 +0200
 
-lori (0.14.3) stable; urgency=medium
+lories (0.14.3) stable; urgency=medium
 
   * Fix full database rotation being skipped
   * Fix bloating NaN values in database rotation
 
  -- Adrian Minde <adrian.minde@isc-konstanz.de>  Tue, 10 Jun 2025 11:30:00 +0200
 
-lori (0.14.2) stable; urgency=medium
+lories (0.14.2) stable; urgency=medium
 
   * Fix global variable typing for Python < v3.9
 
  -- Adrian Minde <adrian.minde@isc-konstanz.de>  Tue, 10 Jun 2025 09:00:00 +0200
 
-lori (0.14.1) stable; urgency=medium
+lories (0.14.1) stable; urgency=medium
 
   * Add Modbus Connector
   * Add InfluxDB v2 Connector
@@ -44,23 +44,23 @@ lori (0.14.1) stable; urgency=medium
 
  -- Adrian Minde <adrian.minde@isc-konstanz.de>  Fri, 06 Jun 2025 10:30:00 +0200
 
-lori (0.12.5) stable; urgency=medium
+lories (0.12.5) stable; urgency=medium
 
   * Implement force replication
 
  -- Adrian Minde <adrian.minde@isc-konstanz.de>  Tue, 11 Mar 2025 10:30:00 +0100
 
-lori (0.12.4) stable; urgency=medium
+lories (0.12.4) stable; urgency=medium
 
   * Fix several replication related bugs
-  * Change debian /opt/lori dir to stay root
+  * Change debian /opt/lories dir to stay root
   * Enable backwards compatibility to Python 3.7
   * Implement replicator class structure
   * Implement data rotation with retention and aggregation
 
  -- Adrian Minde <adrian.minde@isc-konstanz.de>  Wed, 05 Mar 2025 14:00:00 +0100
 
-lori (0.12.3) stable; urgency=medium
+lories (0.12.3) stable; urgency=medium
 
   * Initial release
 

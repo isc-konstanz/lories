@@ -1,14 +1,14 @@
-Source: lori
+Source: lories
 Section: contrib/electronics
 Priority: optional
 Standards-Version: <version>
 Build-Depends: debhelper (>= 10)
 Maintainer: Adrian Minde <adrian.minde@isc-konstanz.de>
 Homepage: https://isc-konstanz.de
-Vcs-Browser: https://github.com/isc-konstanz/lori/
-Vcs-Git: https://github.com/isc-konstanz/lori.git
+Vcs-Browser: https://github.com/isc-konstanz/lories/
+Vcs-Git: https://github.com/isc-konstanz/lories.git
 
-Package: lori
+Package: lories
 Architecture: all
 Depends: ${misc:Depends}, python3, python3-venv
-Description: Debian package of the lori framework.
+Description: Debian package of the lories framework.

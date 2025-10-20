@@ -1,6 +1,6 @@
 # Connectors
 
-This section contains (or will contain) information available lori connectors.
+This section contains (or will contain) information available lories connectors.
 
 ```{toctree}
 ---
