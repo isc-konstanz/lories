@@ -197,3 +197,29 @@ class BytesConverter(Converter[bytes]):
         elif isinstance(value, str):
             return value.encode()
         return None
+
+
+# noinspection PyMethodMayBeStatic
+class JsonConverter(Converter[dict]):
+    dtype: Type[dict] = dict
+
+    def is_dtype(self, value: str | dict) -> bool:
+        if isinstance(value, dict):
+            return True
+        if isinstance(value, str):
+            try:
+                json.loads(value)
+                return True
+            except json.JSONDecodeError:
+                return False
+        return False
+
+    def to_dtype(self, value: str | dict, **_) -> Optional[dict]:
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                return None
+        return None
