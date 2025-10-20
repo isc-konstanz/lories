@@ -25,7 +25,7 @@
   </a>
   <h1 align="center">lories</h1>
   <p align="center">
-    Lories is an open-source software package for <em><b>Lo</b>cal <b>R</b>esource <b>I</b>ntegration</em> & <b>E</b>stimation <b>S</b>ystems <br>powered by ISC Konstanz e.V.  
+    Lories is an open-source software package for <em><b>Lo</b>cal <b>R</b>esource <b>I</b>ntegration & <b>E</b>xecution <b>S</b>ystems</em> <br>powered by ISC Konstanz e.V.  
     <br />
     <a href="https://lories.readthedocs.io"><strong>Explore the docs »</strong></a>
     <!--
