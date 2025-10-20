@@ -32,7 +32,7 @@ classifiers = [
 
 readme = "README.md"
 requires-python = ">= 3.9"
-license = "GPL-3.0-or-later"
+license = "LGPL-3.0-or-later"
 license-files = ["LICEN[CS]E*"]
 dynamic = ["version"]
 
