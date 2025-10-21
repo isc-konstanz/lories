@@ -2,7 +2,7 @@
 #Scriptname: build.sh
 #Description: script to build lories debian packages with dpkg
 
-if [ $(id -u) != 0 ]; then
+if [ "$(id -u)" != 0 ]; then
     echo "DPKG build process should be performed with root privileges." 1>&2
     exit 1
 fi
