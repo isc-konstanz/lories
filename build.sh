@@ -39,7 +39,7 @@ fi
 rm -rf "$build_dir"
 mkdir -p "$build_dir/lories"
 
-cd "$build_dir" || exit 1 >/dev/null
+cd "$build_dir/lories" || exit 1 >/dev/null
 cp -r "$lories_dir/lib/debian" "$build_dir/lories/"
 chmod 755 "$build_dir/lories/debian/pre*" 2>/dev/null
 chmod 755 "$build_dir/lories/debian/post*" 2>/dev/null

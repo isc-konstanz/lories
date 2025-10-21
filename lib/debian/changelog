@@ -11,7 +11,7 @@ lories (<version>) stable; urgency=medium
   * Allow ";" comments in config files
   * Improve replication handling
 
- -- Adrian Minde <adrian.minde@isc-konstanz.de>  Tue, 14 Oct 2025 11:30:00 +0200
+ -- Adrian Minde <adrian.minde@isc-konstanz.de>  Tue, 21 Oct 2025 10:30:00 +0200
 
 lories (0.14.3) stable; urgency=medium
 
