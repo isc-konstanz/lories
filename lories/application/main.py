@@ -13,7 +13,7 @@ import traceback
 from typing import Optional, Type
 
 import pandas as pd
-from lories import Settings, System
+from lories import ConfigurationUnavailableError, Settings, System
 from lories.application import Interface
 from lories.connectors import Database, DatabaseException
 from lories.data.manager import DataManager
@@ -47,24 +47,27 @@ class Application(DataManager):
         super().configure(settings)
         self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
         components = []
+        try:
+            system_dirs = settings.dirs.to_dict()
+            system_dirs["conf_dir"] = None
+            systems_configs = settings.get_member("systems")
+            systems_flat = systems_configs.get_bool("flat")
+            if systems_configs.get_bool("scan"):
+                if systems_configs.get_bool("copy"):
+                    factory.copy(self.settings)
+                system_dirs["scan_dir"] = str(settings.dirs.data)
+                components.extend(factory.scan(self._components, **system_dirs, flat=systems_flat))
+            else:
+                components.append(factory.load(self._components, **system_dirs, flat=systems_flat))
 
-        system_dirs = settings.dirs.to_dict()
-        system_dirs["conf_dir"] = None
-        systems_configs = settings.get_member("systems")
-        systems_flat = systems_configs.get_bool("flat")
-        if systems_configs.get_bool("scan"):
-            if systems_configs.get_bool("copy"):
-                factory.copy(self.settings)
-            system_dirs["scan_dir"] = str(settings.dirs.data)
-            components.extend(factory.scan(self._components, **system_dirs, flat=systems_flat))
-        else:
-            components.append(factory.load(self._components, **system_dirs, flat=systems_flat))
+        except ConfigurationUnavailableError as e:
+            self._logger.warning(str(e))
 
         if not self._components.has_type(System) and settings.dirs.data.is_default():
             components += self._components.load(configs_dir=settings.dirs.conf, configure=False, sort=False)
 
-        self._components.configure(components)
-
+        if len(components) > 0:
+            self._components.configure(components)
         if self._has_interface():
             self._interface.configure(settings.get_member(Interface.TYPE))
 
