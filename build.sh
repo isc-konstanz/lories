@@ -31,7 +31,7 @@ else
 	python="/usr/bin/python"
 fi
 if [ ! -x "$python" ] ; then
-	die "ERROR: Python is set to an invalid entry point: $python
+    die "ERROR: Python is set to an invalid entry point: $python
 
 Please setup a local virtual environment '.venv' or Python 3 to be available as '/usr/bin/python'."
 fi
@@ -52,6 +52,8 @@ if [ -z "$version" ]; then
 elif echo "$version" | grep -q '\.dirty$'; then
 	echo "Invalid determined dirty version from setup.py: $version" 1>&2
 	exit 1
+elif echo "$version" | grep -q '\+'; then
+    version=$(echo $version | sed "s/[+].*//")
 fi
 
 sed -i "s/<version>/$version/g" "$build_dir/lories/debian/changelog"
