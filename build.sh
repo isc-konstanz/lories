@@ -55,7 +55,6 @@ elif echo "$version" | grep -q '\.dirty$'; then
 elif echo "$version" | grep -q '\+'; then
     version=$(echo $version | sed "s/[+].*//")
 fi
-
 sed -i "s/<version>/$version/g" "$build_dir/lories/debian/changelog"
 sed -i "s/<version>/$version/g" "$build_dir/lories/debian/control"
 sed -i "s/<version>/$version/g" "$build_dir/lories/debian/postinst"
