@@ -12,36 +12,51 @@ fi
 dir="$0"
 # Need this for relative symlinks.
 while [ -h "$dir" ] ; do
-	ls=`ls -ld "$dir"`
-	link=`expr "$ls" : '.*-> \(.*\)$'`
+	ls=$(ls -ld "$dir")
+	link=$(expr "$ls" : '.*-> \(.*\)$')
 	if expr "$link" : '/.*' > /dev/null; then
 		dir="$link"
 	else
-		dir=`dirname "$dir"`"/$link"
+		dir=$(dirname "$dir")"/$link"
 	fi
 done
-cd "`dirname \"$dir\"`" >/dev/null
-lories_dir="`pwd -P`"
-build_dir="$lories_dir/build/dpkg/lories"
+cd "$(dirname "$dir")" || exit 1 >/dev/null
+lories_dir="$(pwd -P)"
+build_dir="$lories_dir/build/dpkg"
 
-rm -rf $build_dir
-mkdir -p $build_dir
+# Attempt to determine the Python command
+if [ -x "$lories_dir/.venv/bin/python" ] ; then
+	python="$lories_dir/.venv/bin/python"
+else
+	python="/usr/bin/python"
+fi
+if [ ! -x "$python" ] ; then
+	die "ERROR: Python is set to an invalid entry point: $python
 
-cd $build_dir
-cp -r "$lories_dir/lib/debian" "$build_dir/"
-chmod 755 "$build_dir/debian/pre*" 2>/dev/null
-chmod 755 "$build_dir/debian/post*" 2>/dev/null
-chmod 755 "$build_dir/debian/rules"
-
-version=$(python "$lories_dir/setup.py" --version)
-if [ -z "$version" ] || echo "$version" | grep -q '\.dirty$'; then
-    echo "Could not determine version from setup.py" 1>&2
-    exit 1
+Please setup a local virtual environment '.venv' or Python 3 to be available as '/usr/bin/python'."
 fi
 
-sed -i "s/<version>/$version/g" "$build_dir/debian/changelog"
-sed -i "s/<version>/$version/g" "$build_dir/debian/control"
-sed -i "s/<version>/$version/g" "$build_dir/debian/postinst"
+rm -rf "$build_dir"
+mkdir -p "$build_dir/lories"
+
+cd "$build_dir" || exit 1 >/dev/null
+cp -r "$lories_dir/lib/debian" "$build_dir/lories/"
+chmod 755 "$build_dir/lories/debian/pre*" 2>/dev/null
+chmod 755 "$build_dir/lories/debian/post*" 2>/dev/null
+chmod 755 "$build_dir/lories/debian/rules"
+
+version=$($python "$lories_dir/setup.py" --version)
+if [ -z "$version" ]; then
+    echo "Could not determine version from setup.py" 1>&2
+    exit 1
+elif echo "$version" | grep -q '\.dirty$'; then
+	echo "Invalid determined dirty version from setup.py: $version" 1>&2
+	exit 1
+fi
+
+sed -i "s/<version>/$version/g" "$build_dir/lories/debian/changelog"
+sed -i "s/<version>/$version/g" "$build_dir/lories/debian/control"
+sed -i "s/<version>/$version/g" "$build_dir/lories/debian/postinst"
 
 dpkg-buildpackage -us -uc
 exit 0
