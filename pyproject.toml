@@ -5,8 +5,9 @@ requires = ['setuptools >= 61.0', 'versioneer[toml]']
 [project]
 name = "lories"
 description = """\
-This repository provides a set of core functions for \
-Local Resource Integration by ISC Konstanz e.V."""
+This project provides a set of core functions and framework for \
+Local Resource Integration and Execution Systems \
+by ISC Konstanz e.V."""
 
 authors = [
     {name = "ISC Konstanz e.V."}
