@@ -61,6 +61,10 @@ mysql = [
 influx = [
     "influxdb-client",
 ]
+mqtt = [
+    "paho-mqtt",
+    "jsonpath_ng",
+]
 modbus = [
     "pymodbus <= 3.9",
 ]

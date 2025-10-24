@@ -39,7 +39,20 @@ from ..data.databases import Databases  # noqa: F401
 
 import importlib
 
-for import_connector in ["virtual", "csv", "sql", "influx", "tables", "cameras", "modbus", "revpi", "entsoe", "mqtt"]:
+CONNECTORS = [
+    "virtual",
+    "csv",
+    "sql",
+    "influx",
+    "tables",
+    "cameras",
+    "modbus",
+    "mqtt",
+    "revpi",
+    "entsoe",
+]
+
+for import_connector in CONNECTORS:
     try:
         importlib.import_module(f".{import_connector}", "lories.connectors")
 
