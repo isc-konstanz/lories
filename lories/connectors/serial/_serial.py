@@ -24,7 +24,6 @@ class _SerialConnector(Connector):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
         self._serial = serial.Serial(
-            port=configs.get("port"),
             baudrate=configs.get_int("baudrate", default=9600),
             bytesize=configs.get_int("bytesize", default=serial.EIGHTBITS),
             parity=configs.get("parity", default=serial.PARITY_NONE),
@@ -34,6 +33,7 @@ class _SerialConnector(Connector):
             rtscts=configs.get_bool("rtscts", default=False),
             dsrdtr=configs.get_bool("dsrdtr", default=False),
         )
+        self._serial.port = configs.get("port")
 
     def connect(self, resources: Resources) -> None:
         try:
