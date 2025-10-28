@@ -12,10 +12,12 @@ import json
 import jsonpath_ng as jsonpath
 from typing import Any, AnyStr, Optional, Sequence
 
+from lories.data.converters.context import register_converter_type
 from lories.data.converters.converter import StringConverter, ConversionError
 
 
 # noinspection PyMethodMayBeStatic
+@register_converter_type("jsonpath", "json")
 class JsonConverter(StringConverter):
     def convert(self, value: Any, path: str = "$.value", **kwargs) -> Optional[AnyStr | Sequence[AnyStr]]:
         if isinstance(value, str):
@@ -26,7 +28,7 @@ class JsonConverter(StringConverter):
 
                 if len(json_match) == 1:
                     return json_match[0].value
-                else:
+                elif len(json_match) > 1:
                     return [match.value for match in json_match]
 
             except json.JSONDecodeError as e:
