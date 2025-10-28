@@ -31,7 +31,7 @@ class Sdi12Connector(_SerialConnector):
             if not is_int(sensor_address):
                 self._logger.warning(f"Invalid SDI12 sensor address: {sensor_address}")
                 continue
-            sensor_data = self._read_sensor(str(sensor_resources), sensor_address)
+            sensor_data = self._read_sensor(sensor_resources, str(sensor_address))
             if sensor_data is not None:
                 results.update(sensor_data)
 
