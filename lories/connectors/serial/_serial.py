@@ -53,4 +53,4 @@ class _SerialConnector(Connector):
         self._serial.write(data.encode(encode))
 
     def _read_line(self, decode="ascii") -> AnyStr:
-        return self._serial.readline().decode(decode, errors="ignore").strip()
+        return self._serial.readline().decode(decode, errors="ignore").replace('\x00', '').strip()

@@ -13,24 +13,25 @@ from typing import AnyStr, Dict, Optional
 
 import pandas as pd
 import pytz as tz
-from lories.connectors import ConnectionError, register_connector_type
+from lories.connectors import register_connector_type
 from lories.connectors.serial._serial import _SerialConnector
 from lories.data import ChannelState
 from lories.typing import Resources
+from lories.util import is_int
 
 
 @register_connector_type("sdi12")
 class Sdi12Connector(_SerialConnector):
     def read(self, resources: Resources) -> pd.DataFrame:
-        """
-        Read all sensors.
-        Performs: break → aM! → wait → aD0! … Dn!
-        """
+        """Read all sensors."""
         timestamp = pd.Timestamp.now(tz=tz.UTC).floor(freq="s")
 
         results = {}
         for sensor_address, sensor_resources in resources.groupby("sensor"):
-            sensor_data = self._read_sensor(sensor_resources, sensor_address)
+            if not is_int(sensor_address):
+                self._logger.warning(f"Invalid SDI12 sensor address: {sensor_address}")
+                continue
+            sensor_data = self._read_sensor(str(sensor_resources), sensor_address)
             if sensor_data is not None:
                 results.update(sensor_data)
 
@@ -45,16 +46,17 @@ class Sdi12Connector(_SerialConnector):
     ) -> Optional[Dict[str, float]]:
         """
         Perform a full measurement cycle:
-        aM! → parse tttn → wait/service → aD0! … Dn!
+        aM! → parse atttn → wait ttt → aD0! … aDn! → parse values
         """
         self._break()
         self._write_string(f"{address}M!\r\n")
         response = self._read_line()
         if not response.startswith(address):
-            raise ConnectionError(f"Invalid response to M!: {response}")
+            self._logger.warning(f"Invalid SDI12 response to M!: {response}")
+            return None
 
         # Extract the time to wait in seconds
-        ttt = int(response[1:4])
+        ttt = int(response[len(address):len(address) + 3])
         if ttt > 0:
             time.sleep(ttt)
 
@@ -81,9 +83,9 @@ class Sdi12Connector(_SerialConnector):
                         self._logger.warning(
                             f"Failed to parse SDI12 value for sensor {address} from response: {response}"
                         )
-        if len(results) > 0:
-            return results
-        return None
+        if len(results) == 0:
+            return None
+        return results
 
     def _break(self) -> None:
         """Issue SDI-12 break (≥12 ms of spacing, i.e. logic 0)."""
