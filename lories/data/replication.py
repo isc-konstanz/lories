@@ -320,8 +320,8 @@ def replicate_range(
     data = source.read(resources, start=start, end=end)
     if data is None or data.empty:  # not source.exists(resources, start=start, end=end):
         logger.debug(
-            f"Skipping time slice without new data for resource{'s' if len(resources) > 1 else ''} ",
-            ", ".join([f"'{r.id}'" for r in resources]),
+            f"Skipping time slice without new data for resource{'s' if len(resources) > 1 else ''} "
+            + ", ".join([f"'{r.id}'" for r in resources]),
         )
         return
 
