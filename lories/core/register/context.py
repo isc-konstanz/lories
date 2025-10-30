@@ -83,7 +83,7 @@ class RegistratorContext(_RegistratorLoader[Registrator], Generic[Registrator]):
                 registration_key = configs.get("key")
                 del configs["key"]
             else:
-                registration_key = "_".join(os.path.splitext(configs.key)[:-1])
+                registration_key = "_".join(re.split(r"[^\w-]", configs.key))
             registrator_member["key"] = validate_key(registration_key)
             registrator_member.move_to_top("key")
 
@@ -93,7 +93,7 @@ class RegistratorContext(_RegistratorLoader[Registrator], Generic[Registrator]):
             registrator_member.move_to_top("name")
             del configs["name"]
 
-        registration_type = re.split(r"[^a-zA-Z0-9_]", configs.key)[0]
+        registration_type = re.split(r"[^\w_-]", configs.key)[0]
         if "type" in registrator_member:
             registration_type = validate_key(registrator_member.get("type"))
         elif "type" in configs:

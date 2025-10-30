@@ -71,7 +71,7 @@ class _Registrator(_Configurator, _Entity):
                 elif "name" in configs:
                     key = validate_key(configs["name"])
                 elif key is None:
-                    key = validate_key(configs.key)
+                    key = validate_key("_".join(re.split(r"[^\w-]", configs.key)))
         if key is None:
             raise ValueError(f"Unable to build '{cls.__name__}' for missing key")
         return key
