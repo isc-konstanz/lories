@@ -8,6 +8,7 @@ lories._core._registrator
 
 from __future__ import annotations
 
+import re
 from abc import abstractmethod
 from copy import deepcopy
 from typing import Any, Collection, Dict, Generic, Optional, Type, TypeVar, Union, overload
@@ -48,7 +49,7 @@ class _Registrator(_Configurator, _Entity):
                 elif "key" in configs:
                     key = configs["key"]
                 else:
-                    key = configs.key
+                    key = validate_key("_".join(re.split(r"[^\w-]", configs.key)))
         if key is None:
             raise ValueError(f"Unable to build '{cls.__name__}' for missing ID")
         if id is None and context is not None and isinstance(context, _Registrator):
