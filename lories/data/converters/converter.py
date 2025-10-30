@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-from typing import Any, Generic, List, Optional, Type, TypeVar
+from typing import Any, Generic, Optional, Type, TypeVar
 
 import pandas as pd
 import pytz as tz
@@ -25,9 +25,6 @@ T = TypeVar("T", bound=Any)
 
 # noinspection PyAbstractClass
 class Converter(_Converter, Registrator, Generic[T]):
-    TYPE: str = "converter"
-    INCLUDES: List[str] = []
-
     def to_str(self, value: T | pd.Series) -> str:
         return self.to_json(value)
 

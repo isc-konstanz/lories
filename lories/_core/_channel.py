@@ -74,7 +74,7 @@ class _Channel(_Resource):
 
     @property
     @abstractmethod
-    def timestamp(self) -> pd.Timestamp | pd.NaT: ...
+    def timestamp(self) -> pd.Timestamp: ...
 
     @property
     @abstractmethod
@@ -100,6 +100,14 @@ class _Channel(_Resource):
         self,
         timestamp: pd.Timestamp,
         value: Any,
+    ) -> None: ...
+
+    @overload
+    def set(
+        self,
+        timestamp: pd.Timestamp,
+        value: Any,
+        state: Optional[str | ChannelState] = ChannelState.VALID,
     ) -> None: ...
 
     @abstractmethod

@@ -90,6 +90,6 @@ class _ComponentContext(_RegistratorContext[Component]):
 
 ComponentContext = TypeVar(
     name="ComponentContext",
-    bound=_ComponentContext[_Component],
+    bound=_ComponentContext,
 )
 Components: TypeAlias = ComponentContext
