@@ -1,5 +1,15 @@
 lories (<version>) stable; urgency=medium
 
+  * Fix registrator id and key parsing
+  * Fix replication logging for unavailable source data
+  * Update default settings dirs
+  * Increase stability of dpkg scripts
+  * Add dpkg links
+
+ -- Adrian Minde <adrian.minde@isc-konstanz.de>  Fri, 31 Oct 2025 08:30:00 +0100
+
+lories (0.15.1) stable; urgency=medium
+
   * Major refactoring of inheritance and related typing
   * Fix SQLAlchemy DatetimeColumn localization dtype warning
   * Fix SQLAlchemy error for missing column data
