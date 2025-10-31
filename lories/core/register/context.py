@@ -8,7 +8,6 @@ lories.core.register.context
 
 from __future__ import annotations
 
-import os
 import re
 from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor
