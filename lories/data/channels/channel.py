@@ -15,7 +15,7 @@ from typing import Any, Collection, Dict, List, Optional, Type
 import pandas as pd
 import pytz as tz
 from lories._core._channel import ChannelState, _Channel  # noqa
-from lories._core._data import DataContext, DataManager, _DataManager  # noqa
+from lories._core._data import DataContext, DataManager, _DataContext, _DataManager  # noqa
 from lories._core.typing import Timestamp  # noqa
 from lories.core import Resource, ResourceError
 from lories.data.channels import ChannelConnector, ChannelConverter, Channels
