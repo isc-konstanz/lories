@@ -1,5 +1,12 @@
 lories (<version>) stable; urgency=medium
 
+  * Fix Database range reading
+  * Add SDI12 Connector
+
+ -- Adrian Minde <adrian.minde@isc-konstanz.de>  Fri, 03 Nov 2025 12:00:00 +0100
+
+lories (0.15.2) stable; urgency=medium
+
   * Fix registrator id and key parsing
   * Fix replication logging for unavailable source data
   * Update default settings dirs
