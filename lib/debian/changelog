@@ -1,5 +1,11 @@
 lories (<version>) stable; urgency=medium
 
+  * Fix Convertors being called twice
+
+ -- Adrian Minde <adrian.minde@isc-konstanz.de>  Fri, 03 Nov 2025 17:30:00 +0100
+
+lories (0.15.3) stable; urgency=medium
+
   * Fix Database range reading
   * Add SDI12 Connector
 
