@@ -104,7 +104,7 @@ class Channels(_Channels, Resources[Channel]):
                 timestamp = channel_data.index[0]
                 if len(channel_data.index) == 1:
                     channel_data = channel_data.values[0]
-                channel.set(timestamp, channel_data)
+                channel._set(timestamp, channel_data, ChannelState.VALID)
 
     def set_state(self, state: ChannelState) -> None:
         def _set_state(channel: Channel) -> Channel:

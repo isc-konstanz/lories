@@ -104,10 +104,10 @@ class _NumberConverter(Converter[T]):
     # noinspection PyProtectedMember, PyUnresolvedReferences
     def from_series(self, data: pd.Series, channel: _Channel) -> pd.Series:
         try:
+            factor = to_float(channel.get("scale", default=None))
             converter_args = channel.converter._get_configs()
-            converter_args["factor"] = to_float(channel.get("scale", default=None))
             converted_data = data.apply(self.convert, **converter_args)
-            return converted_data.apply(self.scale, **converter_args)
+            return converted_data.apply(self.scale, args=(factor,), **converter_args)
         except TypeError:
             raise ConversionError(f"Expected str or {self.dtype}, not: {type(data)}")
 
@@ -152,7 +152,7 @@ class FloatConverter(_NumberConverter[float]):
     def is_dtype(self, value: str | float) -> bool:
         return is_float(value)
 
-    def to_dtype(self, value: str | float, decimals: Optional[int] = None) -> Optional[float]:
+    def to_dtype(self, value: str | float, decimals: Optional[int] = None, **_) -> Optional[float]:
         value = to_float(value)
         if decimals is not None:
             value = round(value, decimals)
