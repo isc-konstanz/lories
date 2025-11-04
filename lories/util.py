@@ -159,7 +159,12 @@ def slice_range(
         _timestamp = floor_date(timestamp + freq_delta, freq=freq)
         if _timestamp > timestamp:
             return _timestamp
+        
         # Handle daylight savings
+        fails = 0
+        while _timestamp <= timestamp:
+            fails += 1
+            _timestamp = floor_date(timestamp + freq_delta * (fails + 1), freq=freq)
         return floor_date(timestamp + freq_delta * 2, freq=freq)
 
     ranges = []
