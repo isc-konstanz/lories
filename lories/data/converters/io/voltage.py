@@ -24,4 +24,5 @@ class VoltageInput(AnalogInput):
         default_max: float = None,
         default_min: float = 0.0,
     ) -> None:
-        super()._configure_input(configs, configs.get_float("voltage", default=default_max), default_min)
+        default_max = configs.get_float("voltage", default=default_max)
+        super()._configure_input(configs, default_max, default_min)

@@ -20,7 +20,7 @@ from lories.util import to_bool, update_recursive
 
 class ChannelConverter:
     __configs: OrderedDict[str, Any]
-    _connector: Converter
+    _connector: _Converter
 
     # noinspection PyShadowingBuiltins
     def __init__(self, converter, **configs: Any) -> None:
@@ -77,7 +77,8 @@ class ChannelConverter:
         if isinstance(data, pd.Series):
             converted_data = data.apply(self._converter.convert, **converter_args)
             return converted_data.apply(self._converter.to_dtype, **converter_args)
-        return self._converter.to_dtype(data, **converter_args)
+        converted_data = self._converter.convert(data, **converter_args)
+        return self._converter.to_dtype(converted_data, **converter_args)
 
     # noinspection PyTypeChecker
     @property

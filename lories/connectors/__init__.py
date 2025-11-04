@@ -46,11 +46,11 @@ CONNECTORS = [
     "influx",
     "tables",
     "cameras",
+    "serial",
     "modbus",
-    "mqtt",
     "revpi",
     "entsoe",
-    "opcua",
+    "opcua"
 ]
 
 for import_connector in CONNECTORS:

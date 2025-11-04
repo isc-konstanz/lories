@@ -79,6 +79,6 @@ class _ConnectorContext(_RegistratorContext[Connector]):
 
 ConnectorContext = TypeVar(
     name="ConnectorContext",
-    bound=_ConnectorContext[_Connector],
+    bound=_ConnectorContext,
 )
 Connectors: TypeAlias = ConnectorContext
