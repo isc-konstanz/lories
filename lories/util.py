@@ -163,10 +163,16 @@ def slice_range(
         return floor_date(timestamp + freq_delta * 2, freq=freq)
 
     ranges = []
+    # range_start = start
+    # if floor_date(start, freq=freq) == start:
+    #     range_start += pd.Timedelta(seconds=1)
+    # range_end = min(_next(start), end)
+    # ranges.append((range_start, range_end))
+
     range_start = start
-    if floor_date(start, freq=freq) == start:
-        range_start += pd.Timedelta(seconds=1)
     range_end = min(_next(start), end)
+    if floor_date(end, freq=freq) == end:
+        range_end -= pd.Timedelta(seconds=1)
     ranges.append((range_start, range_end))
 
     while range_end < end:
