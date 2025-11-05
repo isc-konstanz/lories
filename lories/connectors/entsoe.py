@@ -41,10 +41,11 @@ class EntsoeConnector(Connector):
     country_code: str
     _api_key: str
 
-    _client: Optional[EntsoePandasClient] = None
+    _client: Optional[EntsoePandasClient]
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
+
         self.resolution = self._validate_resolution(configs.get("resolution", default=EntsoeConnector.resolution))
         self.country_code = self._validate_country_code(configs.get("country_code").upper())
         self._api_key = configs.get("api_key")
@@ -123,13 +124,14 @@ class EntsoeConnector(Connector):
     def _get_country_code(self, county_code: str, start: Timestamp, end: Timestamp) -> str:
         """
         Returns the country code for Germany based on the start and end dates.
+
+        https://github.com/EnergieID/entsoe-py?tab=readme-ov-file
+                  2015    2016    2017    2018    2019    2020    2021
+        DE        no      no      no      no      no      no      no
+        DE_AT_LU  yes     yes     yes     yes     no      no      no
+        DE_LU     no      no      no      yes     yes     yes     yes
+        AT        no      no      no      yes     yes     yes     yes
         """
-        # https://github.com/EnergieID/entsoe-py?tab=readme-ov-file
-        #       	2015	2016	2017	2018	2019	2020	2021
-        # DE	    no	    no  	no  	no  	no  	no  	no
-        # DE_AT_LU	yes	    yes	    yes	    yes	    no	    no	    no
-        # DE_LU	    no	    no  	no  	yes 	yes 	yes 	yes
-        # AT	    no	    no  	no  	yes 	yes 	yes 	yes
 
         if county_code in ["DE", "AT", "LU"]:
             if end.year < 2019:
