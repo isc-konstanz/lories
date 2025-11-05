@@ -154,7 +154,7 @@ class Database(Connector, metaclass=DatabaseMeta):
             if not self._is_connected():
                 raise ConnectorError(self, f"Trying to read from unconnected {type(self).__name__}: {self.id}")
 
-            data = self._run_read(resources, *args, **kwargs)
+            data = self._run_read(resources, start=start, end=end, *args, **kwargs)
             data = self._validate(resources, data)
             return self._get_range(data, start, end)
 

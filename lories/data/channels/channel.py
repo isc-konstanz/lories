@@ -15,7 +15,7 @@ from typing import Any, Collection, Dict, List, Optional, Type
 import pandas as pd
 import pytz as tz
 from lories._core._channel import ChannelState, _Channel  # noqa
-from lories._core._data import DataContext, DataManager, _DataManager  # noqa
+from lories._core._data import DataContext, DataManager, _DataContext, _DataManager  # noqa
 from lories._core.typing import Timestamp  # noqa
 from lories.core import Resource, ResourceError
 from lories.data.channels import ChannelConnector, ChannelConverter, Channels
@@ -30,7 +30,7 @@ except ImportError:
 
 
 class Channel(_Channel, Resource):
-    __context: DataContext
+    __context: _DataContext
 
     _timestamp: pd.Timestamp = pd.NaT
     _value: Optional[Any] = None
@@ -120,7 +120,7 @@ class Channel(_Channel, Resource):
         return to_timedelta(self.freq)
 
     @property
-    def timestamp(self) -> pd.Timestamp | pd.NaT:
+    def timestamp(self) -> pd.Timestamp:
         return self._timestamp
 
     @property
@@ -158,6 +158,7 @@ class Channel(_Channel, Resource):
         value: Any,
         state: Optional[str | ChannelState] = ChannelState.VALID,
     ) -> None:
+        value = self.converter(value)
         self._set(timestamp, value, state)
 
     # noinspection PyUnresolvedReferences

@@ -24,6 +24,13 @@ from lories._core._configurations import Configurations  # noqa
 from lories._core.typing import Timestamp, Timezone  # noqa
 from lories.core.errors import ResourceError
 
+# FIXME: Remove this once Python >= 3.9 is a requirement
+try:
+    from typing import Literal
+
+except ImportError:
+    from typing_extensions import Literal
+
 # noinspection SpellCheckingInspection
 INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
 
@@ -145,6 +152,7 @@ def slice_range(
     end: Optional[Timestamp | str],
     timezone: Optional[Timezone] = None,
     freq: str = "D",
+    closing: Literal["left", "right"] = "right",
     **kwargs,
 ) -> List[Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp]]]:
     start = to_date(start, timezone, **kwargs)
@@ -157,18 +165,28 @@ def slice_range(
 
     def _next(timestamp: pd.Timestamp) -> pd.Timestamp:
         _timestamp = floor_date(timestamp + freq_delta, freq=freq)
-        if _timestamp > timestamp:
-            return _timestamp
-        # Handle daylight savings
-        return floor_date(timestamp + freq_delta * 2, freq=freq)
+
+        _daylight_savings_fails = 0
+        while _timestamp <= timestamp:
+            _daylight_savings_fails += 1
+            _timestamp = floor_date(timestamp + freq_delta * (_daylight_savings_fails + 1), freq=freq)
+        return _timestamp
 
     ranges = []
-    range_start = start
-    if floor_date(start, freq=freq) == start:
-        range_start += pd.Timedelta(seconds=1)
-    range_end = min(_next(start), end)
-    ranges.append((range_start, range_end))
+    if closing == "left":
+        range_start = start
+        range_end = min(_next(start), end)
+        if floor_date(end, freq=freq) == end:
+            range_end -= pd.Timedelta(seconds=1)
+    elif closing == "right":
+        range_start = start
+        if floor_date(start, freq=freq) == start:
+            range_start += pd.Timedelta(seconds=1)
+        range_end = min(_next(start), end)
+    else:
+        raise ValueError(f"Invalid closing value: {closing}")
 
+    ranges.append((range_start, range_end))
     while range_end < end:
         range_start = _next(range_start)
         range_end = min(_next(range_start), end)
