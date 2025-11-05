@@ -13,7 +13,7 @@ import dateutil.parser
 import re
 from dateutil.relativedelta import relativedelta
 from pydoc import locate
-from typing import Any, Callable, Collection, Dict, List, Mapping, Optional, Tuple, Type, TypeVar, LiteralString
+from typing import Any, Callable, Collection, Dict, List, Mapping, Optional, Tuple, Type, TypeVar
 
 import tzlocal
 

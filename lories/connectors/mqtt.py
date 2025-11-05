@@ -8,11 +8,12 @@ lories.connectors.mqtt
 
 from __future__ import annotations
 
-from typing import Optional, Dict
-import pandas as pd
-import pytz as tz
+from typing import Dict, Optional
+
 from paho.mqtt.client import Client as MqttClient
 
+import pandas as pd
+import pytz as tz
 from lories.connectors import Connector, register_connector_type
 from lories.core import ConfigurationError
 from lories.data import Channel
@@ -45,8 +46,8 @@ class MqttConnector(Connector):
             client_id=self.id.replace(".", "_"),
             clean_session=configs.get_bool("clean_session", default=True),
             transport=transport,
-            #userdata=None,
-            #protocol=mqtt.MQTTv311,
+            # userdata=None,
+            # protocol=mqtt.MQTTv311,
         )
 
         self._host = configs.get("host", default="localhost")
@@ -54,10 +55,7 @@ class MqttConnector(Connector):
         self._timeout = configs.get_int("timeout", default=60)
 
         if "username" in configs and "password" in configs:
-            self._client.username_pw_set(
-                configs.get("username"),
-                configs.get("password")
-            )
+            self._client.username_pw_set(configs.get("username"), configs.get("password"))
         # elif ...
         #     self._client.tls_set(
         #         ca_certs=configs.get("ca_certs", default=None),
@@ -78,7 +76,6 @@ class MqttConnector(Connector):
 
     def connect(self, resources: Resources) -> None:
         self._client.connect(self._host, self._port, self._timeout)
-        # self._client.subscribe("#") # subscribe to all topics
 
         channels = resources.filter(lambda r: isinstance(r, Channel))
         for topic, topic_channels in channels.groupby("topic"):
@@ -111,7 +108,7 @@ class MqttConnector(Connector):
     def write(self, data: pd.DataFrame) -> None:
         for topic, topic_resources in self.resources.groupby("topic"):
             for resource in topic_resources:
-                #TODO: implement writing to MQTT topics
+                # TODO: implement writing to MQTT topics
                 pass
 
         raise NotImplementedError("Mqtt does not yet support writing data")
