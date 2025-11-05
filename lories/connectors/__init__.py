@@ -41,6 +41,7 @@ import importlib
 
 CONNECTORS = [
     "virtual",
+    "math",
     "csv",
     "sql",
     "influx",
