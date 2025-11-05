@@ -46,6 +46,7 @@ CONNECTORS = [
     "influx",
     "tables",
     "cameras",
+    "serial",
     "modbus",
     "mqtt",
     "revpi",

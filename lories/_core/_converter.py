@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-lories._data._converter
+lories._core._converter
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 
@@ -91,6 +91,6 @@ class _ConverterContext(_RegistratorContext[Converter]):
 
 ConverterContext = TypeVar(
     name="ConverterContext",
-    bound=_ConverterContext[_Converter],
+    bound=_ConverterContext,
 )
 Converters: TypeAlias = ConverterContext
