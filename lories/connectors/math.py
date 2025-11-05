@@ -81,7 +81,7 @@ class MathConnector(Connector):
             return component.data.get(channel_id)
 
     def _evaluate(self) -> None:
-        timestamp = pd.Timestamp.now(tz=tz.UTC)
+        timestamp = pd.Timestamp.now(tz=tz.UTC).floor(freq="s")
         local_dict = {symbol.name: symbol.value for symbol in self._symbols}
         if any(value is None for value in local_dict.values()):
             return
