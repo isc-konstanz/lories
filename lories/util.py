@@ -13,7 +13,7 @@ import dateutil.parser
 import re
 from dateutil.relativedelta import relativedelta
 from pydoc import locate
-from typing import Any, Callable, Collection, Dict, List, Mapping, Optional, Tuple, Type, TypeVar
+from typing import Any, Callable, Collection, Dict, List, Mapping, Optional, Tuple, Type, TypeVar, LiteralString
 
 import tzlocal
 
@@ -23,6 +23,13 @@ import pytz as tz
 from lories._core._configurations import Configurations  # noqa
 from lories._core.typing import Timestamp, Timezone  # noqa
 from lories.core.errors import ResourceError
+
+# FIXME: Remove this once Python >= 3.9 is a requirement
+try:
+    from typing import Literal
+
+except ImportError:
+    from typing_extensions import Literal
 
 # noinspection SpellCheckingInspection
 INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
@@ -145,6 +152,7 @@ def slice_range(
     end: Optional[Timestamp | str],
     timezone: Optional[Timezone] = None,
     freq: str = "D",
+    closing: Literal["left", "right"] = "right",
     **kwargs,
 ) -> List[Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp]]]:
     start = to_date(start, timezone, **kwargs)
@@ -165,18 +173,20 @@ def slice_range(
         return _timestamp
 
     ranges = []
-    # range_start = start
-    # if floor_date(start, freq=freq) == start:
-    #     range_start += pd.Timedelta(seconds=1)
-    # range_end = min(_next(start), end)
-    # ranges.append((range_start, range_end))
+    if closing == "left":
+        range_start = start
+        range_end = min(_next(start), end)
+        if floor_date(end, freq=freq) == end:
+            range_end -= pd.Timedelta(seconds=1)
+    elif closing == "right":
+        range_start = start
+        if floor_date(start, freq=freq) == start:
+            range_start += pd.Timedelta(seconds=1)
+        range_end = min(_next(start), end)
+    else:
+        raise ValueError(f"Invalid closing value: {closing}")
 
-    range_start = start
-    range_end = min(_next(start), end)
-    if floor_date(end, freq=freq) == end:
-        range_end -= pd.Timedelta(seconds=1)
     ranges.append((range_start, range_end))
-
     while range_end < end:
         range_start = _next(range_start)
         range_end = min(_next(range_start), end)
