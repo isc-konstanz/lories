@@ -36,7 +36,7 @@ class Sdi12Connector(_SerialConnector):
                 sensor_data = self._read_sensor(sensor_resources, str(sensor_address))
                 if sensor_data is not None:
                     results.update(sensor_data)
-            except [IOError] as e:
+            except IOError as e:
                 raise ConnectionError(f"Failed to read from SDI12 sensor at address {sensor_address}: {e}") from e
 
         if len(results) == 0:
