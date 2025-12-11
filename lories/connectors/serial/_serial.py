@@ -49,14 +49,14 @@ class _SerialConnector(Connector):
         try:
             self._serial.open()
         except SerialException as e:
-            raise ConnectionError(f"Failed to open serial port {self._serial.port}: {e}") from e
+            raise ConnectionError(self, f"Failed to open serial port {self._serial.port}: {e}")
 
     def disconnect(self) -> None:
         try:
             if self.is_connected():
                 self._serial.close()
         except SerialException as e:
-            raise ConnectionError(f"Failed to close serial port {self._serial.port}: {e}") from e
+            raise ConnectionError(self, f"Failed to close serial port {self._serial.port}: {e}")
 
     def is_connected(self) -> bool:
         return self._serial is not None and self._serial.is_open
@@ -65,10 +65,10 @@ class _SerialConnector(Connector):
         try:
             self._serial.write(data.encode(encode))
         except SerialException as e:
-            raise ConnectionError(f"Failed to write to serial port {self._serial.port}: {e}") from e
+            raise ConnectionError(self, f"Failed to write to serial port {self._serial.port}: {e}")
 
     def _read_line(self, decode="ascii") -> AnyStr:
         try:
             return self._serial.readline().decode(decode, errors="ignore").replace("\x00", "").strip()
         except SerialException as e:
-            raise ConnectionError(f"Failed to read from serial port {self._serial.port}: {e}") from e
+            raise ConnectionError(self, f"Failed to read from serial port {self._serial.port}: {e}")

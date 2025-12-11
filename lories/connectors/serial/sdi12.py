@@ -37,7 +37,7 @@ class Sdi12Connector(_SerialConnector):
                 if sensor_data is not None:
                     results.update(sensor_data)
             except IOError as e:
-                raise ConnectionError(f"Failed to read from SDI12 sensor at address {sensor_address}: {e}") from e
+                raise ConnectionError(self, f"Failed to read from SDI12 sensor at address {sensor_address}: {e}")
 
         if len(results) == 0:
             return pd.DataFrame()
