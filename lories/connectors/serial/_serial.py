@@ -12,9 +12,19 @@ from typing import AnyStr, Optional
 
 import serial
 from serial import SerialException
+from serial.tools import list_ports
+
 
 from lories.connectors import ConnectionError, Connector
 from lories.core import Configurations, Resources
+
+# sudo lsusb -v | grep 'idVendor\|idProduct\|iProduct\|iSerial'
+#   idVendor           0x10c4 Silicon Labs
+#   idProduct          0xea60 CP210x UART Bridge
+#   iProduct                2 CP2102 USB to UART Bridge Controller
+#   iSerial                 3 0001
+
+# "10c4:ea60"
 
 
 # noinspection PyAbstractClass, SpellCheckingInspection
@@ -33,24 +43,53 @@ class _SerialConnector(Connector):
             rtscts=configs.get_bool("rtscts", default=False),
             dsrdtr=configs.get_bool("dsrdtr", default=False),
         )
-        self._serial.port = configs.get("port")
+        
+        port = configs.get("port")
+        port_id = configs.get("port_id")
+        if port is not None and port_id is not None:
+            raise ValueError("Specify either 'port' or 'port_id', not both.")
+        
+        if port_id is not None:
+            port = self._find_port_by_id(port_id)
+            if port is None:
+                raise ValueError(f"Could not find serial port with id: {port_id}")
+            self._serial.port = port
+        elif port is not None:
+            self._logger.debug(f"Be aware: Ports may change between connections!")
+            self._serial.port = port
+
+    def _find_port_by_id(self, identifier: AnyStr) -> Optional[AnyStr]:
+        candidates = list(list_ports.grep(identifier))
+        if not candidates:
+            raise ValueError(f'No device with signature {identifier} found')
+        if len(candidates) > 1:
+            raise ValueError(f'More than one device with signature {identifier} found')
+        return candidates[0].device
 
     def connect(self, resources: Resources) -> None:
         try:
             self._serial.open()
-
-        except SerialException as e:
+        except [SerialException, IOError] as e:
             raise ConnectionError(f"Failed to open serial port {self._serial.port}: {e}") from e
 
     def disconnect(self) -> None:
-        if self.is_connected():
-            self._serial.close()
+        try:
+            if self.is_connected():
+                self._serial.close()
+        except [SerialException, IOError] as e:
+            raise ConnectionError(f"Failed to close serial port {self._serial.port}: {e}") from e
 
     def is_connected(self) -> bool:
         return self._serial is not None and self._serial.is_open
 
     def _write_string(self, data: AnyStr, encode="ascii") -> None:
-        self._serial.write(data.encode(encode))
+        try:
+            self._serial.write(data.encode(encode))
+        except [SerialException, IOError] as e:
+            raise ConnectionError(f"Failed to write to serial port {self._serial.port}: {e}") from e
 
     def _read_line(self, decode="ascii") -> AnyStr:
-        return self._serial.readline().decode(decode, errors="ignore").replace("\x00", "").strip()
+        try:
+            return self._serial.readline().decode(decode, errors="ignore").replace("\x00", "").strip()
+        except [SerialException, IOError] as e:
+            raise ConnectionError(f"Failed to read from serial port {self._serial.port}: {e}") from e

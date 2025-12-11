@@ -31,9 +31,15 @@ class Sdi12Connector(_SerialConnector):
             if not is_int(sensor_address):
                 self._logger.warning(f"Invalid SDI12 sensor address: {sensor_address}")
                 continue
-            sensor_data = self._read_sensor(sensor_resources, str(sensor_address))
-            if sensor_data is not None:
-                results.update(sensor_data)
+
+            try:
+                sensor_data = self._read_sensor(sensor_resources, str(sensor_address))
+                if sensor_data is not None:
+                    results.update(sensor_data)
+            except [IOError] as e:
+                self._logger.warning(
+                    f"Failed to read SDI12 sensor at address {sensor_address}: {e}, {type(e)}"
+                )
 
         if len(results) == 0:
             return pd.DataFrame()
@@ -56,7 +62,7 @@ class Sdi12Connector(_SerialConnector):
             return None
 
         # Extract the time to wait in seconds
-        ttt = int(response[len(address) : len(address) + 3])
+        ttt = int(response[len(address):len(address) + 3])
         if ttt > 0:
             time.sleep(ttt)
 
