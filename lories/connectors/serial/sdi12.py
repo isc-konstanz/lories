@@ -56,12 +56,16 @@ class Sdi12Connector(_SerialConnector):
             return None
 
         # Extract the time to wait in seconds
-        ttt = int(response[len(address):len(address) + 3])
+        ttt = int(response[len(address) : len(address) + 3])
         if ttt > 0:
             time.sleep(ttt)
 
         results = {}
         for data, data_resources in resources.groupby("data"):
+            if not is_int(data):
+                self._logger.warning(f"Invalid SDI12 sensor data: {data}")
+                continue
+
             self._break()
             self._write_string(f"{address}D{data}!\r\n")
 
@@ -74,11 +78,11 @@ class Sdi12Connector(_SerialConnector):
             for index, index_resources in data_resources.groupby("index"):
                 if index is None:
                     index = 0
-                elif not is_int(index):
+                if not is_int(index):
                     self._logger.warning(f"Invalid SDI12 data index: {index}")
                     continue
                 index = int(index)
-                
+
                 for resource in index_resources:
                     try:
                         results[resource.id] = float(response_parts[index])

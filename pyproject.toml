@@ -67,6 +67,10 @@ serial = [
 modbus = [
     "pymodbus <= 3.9",
 ]
+mqtt = [
+    "paho-mqtt",
+    "jsonpath_ng",
+]
 revpi = [
     "revpimodio2",
 ]

@@ -48,6 +48,7 @@ CONNECTORS = [
     "cameras",
     "serial",
     "modbus",
+    "mqtt",
     "revpi",
     "entsoe",
     "opcua"

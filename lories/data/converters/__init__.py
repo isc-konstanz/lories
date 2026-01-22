@@ -21,3 +21,19 @@ from .context import (  # noqa: F401
 )
 
 from . import io  # noqa: F401
+
+import importlib
+
+CONVERTERS = [
+    "json",
+]
+
+for import_converter in CONVERTERS:
+    try:
+        importlib.import_module(f".{import_converter}", "lories.data.converters")
+
+    except ModuleNotFoundError:
+        # TODO: Implement meaningful logging here
+        pass
+
+del importlib
