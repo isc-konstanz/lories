@@ -31,8 +31,8 @@ except ImportError:
     from typing_extensions import Literal
 
 
-@register_connector_type("influx", "influxdb")
-class InfluxDatabase(Database):
+@register_connector_type("influxdb2", "influx_v2")
+class InfluxDB2(Database):
     host: str
     port: int
 
