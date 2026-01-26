@@ -126,7 +126,7 @@ class InfluxDB1(Database):
                     select_parts.append(f'COUNT("{field}") AS "{alias}"')
                     aliases.append(alias)
 
-                query = self._build_query(
+                query = _build_query(
                     resources=tagged_resources,
                     measurement=measurement,
                     tag=tag,
@@ -226,7 +226,7 @@ class InfluxDB1(Database):
         client = self._client
         for measurement, measurement_resources in resources.groupby(lambda r: r.get("measurement", default=r.group)):
             for tag, tagged_resources in measurement_resources.groupby("tag"):
-                query = self._build_query(
+                query = _build_query(
                     resources=tagged_resources,
                     measurement=measurement,
                     tag=tag,
