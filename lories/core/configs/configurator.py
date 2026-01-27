@@ -20,10 +20,25 @@ from lories._core._configurations import Configurations, _Configurations  # noqa
 from lories._core._configurator import Configurator as ConfiguratorType  # noqa
 from lories._core._configurator import _Configurator  # noqa
 from lories.core.configs.errors import ConfigurationError
+from lories.core.configs.parameter import Parameter
 from lories.util import get_members
 
 
 class ConfiguratorMeta(ABCMeta):
+    def __new__(mcls, name, bases, namespace):
+        params = {}
+        for base in bases:
+            parent_params = getattr(base, "__config_parameters__", {})
+            params.update(parent_params)
+
+        for attr, value in namespace.items():
+            if isinstance(value, Parameter):
+                value.name = attr
+                params[attr] = value
+
+        namespace["__config_parameters__"] = params
+        return super().__new__(mcls, name, bases, namespace)
+
     def __call__(cls, *args, **kwargs):
         configurator = super().__call__(*args, **kwargs)
         cls._wrap_method(configurator, "duplicate")
@@ -59,6 +74,14 @@ class Configurator(_Configurator, metaclass=ConfiguratorMeta):
         self._logger = logger
         self.__configs = self._assert_configs(configs)
 
+        # TODO: Set real value in _assert_config, currently sets default values for parameters
+        if getattr(self.__class__, '__config_parameters__', None):
+            for key, param in self.__class__.__config_parameters__.items():
+                if hasattr(self, key):
+                    print(f"Warning: Parameter '{key}' already set in '{type(self).__name__}'")
+                else:
+                    setattr(self, key, param)
+
     def __eq__(self, other: Any) -> bool:
         return self is other
 
@@ -73,6 +96,7 @@ class Configurator(_Configurator, metaclass=ConfiguratorMeta):
 
     @classmethod
     def _assert_configs(cls, configs: Optional[Configurations]) -> Optional[Configurations]:
+        # TODO: parse and validate parameters here
         if configs is None:
             return None
         if not isinstance(configs, _Configurations):
