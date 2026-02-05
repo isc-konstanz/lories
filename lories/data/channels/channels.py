@@ -32,15 +32,6 @@ class Channels(_Channels, Resources[Channel]):
     def __str__(self) -> str:
         return str(self.to_frame(unique=True, states=True))
 
-    def register(
-        self,
-        function: Callable[[pd.DataFrame], None],
-        how: Literal["any", "all"] = "any",
-        unique: bool = False,
-    ) -> None:
-        for channel in self:
-            channel.register(function, how=how, unique=unique)
-
     # noinspection PyTypeChecker
     def apply(self, apply: Callable[[Channel], Channel], inplace: bool = False) -> ChannelsType:
         return super().apply(apply, inplace=inplace)

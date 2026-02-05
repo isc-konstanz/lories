@@ -28,14 +28,6 @@ class _Channels(_Resources[_Channel]):
     TYPE: str = "channels"
 
     @abstractmethod
-    def register(
-        self,
-        function: Callable[[pd.DataFrame], None],
-        how: Literal["any", "all"] = "any",
-        unique: bool = False,
-    ) -> None: ...
-
-    @abstractmethod
     def from_logger(self) -> Channels: ...
 
     @abstractmethod

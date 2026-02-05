@@ -17,8 +17,9 @@ from typing import Collection, Optional
 import pandas as pd
 from lories._core._channel import Channel  # noqa
 from lories._core._channels import Channels  # noqa
-from lories._core._context import _Context  # noqa
-from lories._core._data import DataContext, _DataContext, _DataManager  # noqa
+from lories._core._data import DataContext, _DataContext  # noqa
+from lories._core._listener import _ListenerContext  # noqa
+from lories._core._manager import _DataManager  # noqa
 from lories.core import ResourceError
 from lories.data.listeners import Listener
 
@@ -31,7 +32,7 @@ except ImportError:
 
 
 # noinspection PyShadowingBuiltins
-class ListenerContext(_Context[Listener]):
+class ListenerContext(_ListenerContext):
     __context: _DataContext
     __lock: Lock
 

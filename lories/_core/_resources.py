@@ -15,6 +15,13 @@ from lories._core._resource import Resource, _Resource
 
 
 class _Resources(ABC, Generic[Resource], Sequence[Resource]):
+
+    def __copy__(self) -> Resources:
+        return self.copy()
+
+    def __replace__(self, **changes) -> Resources:
+        return self.duplicate(**changes)
+
     @abstractmethod
     def append(self, resource: Resource) -> None: ...
 
@@ -34,11 +41,18 @@ class _Resources(ABC, Generic[Resource], Sequence[Resource]):
     def copy(self) -> Resources: ...
 
     @abstractmethod
+    def duplicate(self, **changes) -> Resources: ...
+
+    @abstractmethod
     def apply(self, apply: Callable[[Resource], Resource], inplace: bool = False): ...
 
     # noinspection PyShadowingBuiltins
     @overload
     def filter(self, filter: Callable[[Resource], bool]): ...
+
+    # noinspection PyShadowingBuiltins
+    @overload
+    def filter(self, *filter: Callable[[Resource], bool]): ...
 
     @abstractmethod
     def filter(self, *filters: Callable[[Resource], bool]): ...

@@ -9,7 +9,7 @@ lories._core._entity
 from __future__ import annotations
 
 from abc import ABC
-from typing import Any, Optional, TypeVar
+from typing import Any, Optional, Sequence, TypeVar
 
 from lories.util import parse_name, validate_key
 
@@ -76,6 +76,10 @@ class _Entity(ABC):
         if __name is None:
             __name = parse_name(__key)
         return __name
+
+    @property
+    def path(self) -> Sequence[str]:
+        return self._id.split(".")
 
     @property
     def id(self) -> str:

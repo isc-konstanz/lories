@@ -9,14 +9,13 @@ lories.data.channels.channel
 from __future__ import annotations
 
 from collections import OrderedDict
-from collections.abc import Callable
 from typing import Any, Collection, Dict, List, Optional, Type
 
 import pandas as pd
 import pytz as tz
 from lories._core._channel import ChannelState, _Channel  # noqa
-from lories._core._data import DataContext, DataManager, _DataContext, _DataManager  # noqa
 from lories._core.typing import Timestamp  # noqa
+from lories._core._tasks import TaskContext, _TaskContext  # noqa
 from lories.core import Resource, ResourceError
 from lories.data.channels import ChannelConnector, ChannelConverter, Channels
 from lories.util import parse_freq, to_timedelta
@@ -30,7 +29,7 @@ except ImportError:
 
 
 class Channel(_Channel, Resource):
-    __context: _DataContext
+    _context: _TaskContext
 
     _timestamp: pd.Timestamp = pd.NaT
     _value: Optional[Any] = None
@@ -43,41 +42,27 @@ class Channel(_Channel, Resource):
     # noinspection PyShadowingBuiltins
     def __init__(
         self,
-        id: str = None,
+        context: TaskContext,
+        id: str,
         key: str = None,
         name: str = None,
         type: str | Type = None,
-        context: DataManager = None,
-        converter: ChannelConverter = None,
-        connector: Optional[ChannelConnector] = None,
-        logger: Optional[ChannelConnector] = None,
+        converter: Optional[Dict[str, Any] | str] = None,
+        connector: Optional[Dict[str, Any] | str] = None,
+        logger: Optional[Dict[str, Any] | str] = None,
         **configs: Any,
     ) -> None:
         super().__init__(id=id, key=key, name=name, type=type, **configs)
-        self.__context = self._assert_context(context)
-        self.converter = self._assert_converter(converter)
-        self.connector = self._assert_connector(connector)
-        self.logger = self._assert_connector(logger)
+        self._context = self._assert_context(context)
+        self.converter = ChannelConverter.build(self, **Channel._build_member(converter, "converter"))
+        self.connector = ChannelConnector.build(self, **Channel._build_member(connector, "connector"))
+        self.logger = ChannelConnector.build(self, **Channel._build_member(logger, "connector"))
 
     @classmethod
-    def _assert_context(cls, context: DataManager) -> DataManager:
-        if context is None or not isinstance(context, _DataManager):
+    def _assert_context(cls, context: TaskContext) -> TaskContext:
+        if context is None or not isinstance(context, _TaskContext):
             raise ResourceError(f"Invalid '{cls.__name__}' context: {type(context)}")
         return context
-
-    @classmethod
-    def _assert_converter(cls, converter: Optional[ChannelConverter]) -> ChannelConverter:
-        if converter is None or not isinstance(converter, ChannelConverter):
-            raise ResourceError(f"Invalid channel converter: {type(converter)}")
-        return converter
-
-    @classmethod
-    def _assert_connector(cls, connector: Optional[ChannelConnector]) -> ChannelConnector:
-        if connector is None:
-            connector = ChannelConnector()
-        elif not isinstance(connector, ChannelConnector):
-            raise ResourceError(f"Invalid channel connector: {type(connector)}")
-        return connector
 
     def _get_attrs(self) -> List[str]:
         return [
@@ -186,25 +171,23 @@ class Channel(_Channel, Resource):
         **configs: Any,
     ) -> None:
         if converter is not None:
-            converter = Channel._build_member(converter, "converter")
-            self.converter._update(**converter)
+            self.converter._update(**Channel._build_member(converter, "converter"))
         if connector is not None:
-            connector = Channel._build_member(connector, "connector")
-            self.connector._update(**connector)
+            self.connector._update(**Channel._build_member(connector, "connector"))
         if logger is not None:
-            logger = Channel._build_member(logger, "connector")
-            self.logger._update(**logger)
+            self.logger._update(**Channel._build_member(logger, "connector"))
         super()._update(**configs)
 
     def _copy_args(self) -> Dict[str, Any]:
-        arguments = super()._copy_args()
-        arguments["context"] = self.__context
-        # arguments["processors"] = self.processors.copy()
-        arguments["converter"] = self.converter.copy()
-        arguments["connector"] = self.connector.copy()
-        arguments["logger"] = self.logger.copy()
-
-        return arguments
+        return {
+            "id": self._id,
+            **self.to_configs(),
+            "context": self._context,
+            # "processors": self.processors.to_configs()
+            "converter": self.converter.to_configs(),
+            "connector": self.connector.to_configs(),
+            "logger": self.logger.to_configs(),
+        }
 
     def copy(self) -> Channel:
         channel = super().copy()
@@ -218,6 +201,7 @@ class Channel(_Channel, Resource):
 
     def to_configs(self) -> Dict[str, Any]:
         configs = super().to_configs()
+        # configs["processors"] = self.processors.to_configs()
         configs["converter"] = self.converter.to_configs()
         configs["connector"] = self.connector.to_configs()
         configs["logger"] = self.logger.to_configs()
@@ -244,21 +228,12 @@ class Channel(_Channel, Resource):
         return self.connector.enabled and (self.connector.id == id if id is not None else True)
 
     # noinspection PyUnresolvedReferences
-    def register(
-        self,
-        function: Callable[[pd.DataFrame], None],
-        how: Literal["any", "all"] = "any",
-        unique: bool = False,
-    ) -> None:
-        self.__context.register(function, self, how=how, unique=unique)
-
-    # noinspection PyUnresolvedReferences
     def read(
         self,
         start: Optional[Timestamp] = None,
         end: Optional[Timestamp] = None,
     ) -> pd.DataFrame:
-        return self.__context.read(self.to_list(), start, end)
+        return self._context.read(self.to_list(), start, end)
 
     # noinspection PyUnresolvedReferences
     def write(self, data: pd.DataFrame | pd.Series | Any) -> None:
@@ -270,4 +245,4 @@ class Channel(_Channel, Resource):
         elif not isinstance(data, pd.DataFrame):
             data = pd.DataFrame(index=[pd.Timestamp.now(tz.UTC).floor(freq="s")], data=[data], columns=[self.id])
 
-        self.__context.write(data, self.to_list())
+        self._context.write(data, self.to_list())

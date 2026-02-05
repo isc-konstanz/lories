@@ -10,16 +10,16 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Callable, Collection, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Collection, Dict, Iterable, List, Optional, Tuple, Type
 
 import numpy as np
 import pandas as pd
-from lories._core import _DataContext  # noqa
+from lories._core import _DataContext, _TaskContext  # noqa
 from lories.core.configs import ConfigurationError, Configurations, Directories
 from lories.core.errors import ResourceError
 from lories.core.typing import ChannelsArgument, ContextArgument
 from lories.data.channels import Channel, Channels
-from lories.util import update_recursive, validate_key
+from lories.util import get_context, update_recursive, validate_key
 
 
 # noinspection PyAbstractClass, PyProtectedMember
@@ -102,6 +102,10 @@ class DataContext(_DataContext):
         # TODO: connector sanity check
         super()._set(id, channel)
 
+    # noinspection PyShadowingBuiltins
+    def _create(self, id: str, key: str, type: Type, **configs: Any) -> Channel:
+        return Channel(context=get_context(self, _TaskContext), id=id, key=key, type=type, **configs)
+
     # noinspection PyShadowingBuiltins, PyProtectedMember, PyArgumentList
     def _update(self, id: str, key: str, **configs: Any) -> None:
         channel = self._get(id)
@@ -137,7 +141,7 @@ class DataContext(_DataContext):
 
     # noinspection PyShadowingBuiltins
     def filter(self, *filters: Optional[Callable[[Channel], bool]]) -> Channels:
-        return Channels(super().filter(*filters))
+        return Channels(self._filter(*filters))
 
     # noinspection SpellCheckingInspection
     def groupby(self, by: str) -> List[Tuple[Any, Channels]]:

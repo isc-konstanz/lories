@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from threading import Thread
-from typing import Any
+from typing import Any, Optional
 
 from lories._core._channel import ChannelState  # noqa
 from lories._core._channels import Channels  # noqa
@@ -23,8 +23,8 @@ class ConnectorTask(ABC, Thread):
     connector: Connector
     channels: Channels
 
-    def __init__(self, connector: Connector, channels: Channels, name: str = None, **kwargs):
-        super().__init__(name=name, target=self.__call__, **kwargs)
+    def __init__(self, connector: Connector, channels: Channels, name: Optional[str] = None, **kwargs):
+        super().__init__(name=name, target=self.__call__, daemon=True, **kwargs)
         self._logger = logging.getLogger(self.__module__)
         self.connector = connector
         self.channels = channels

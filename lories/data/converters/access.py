@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from lories._core._component import Component  # noqa
 from lories._core._converter import Converter, _Converter, _ConverterContext  # noqa
-from lories._core._data import _DataManager  # noqa
+from lories._core._manager import _DataManager  # noqa
 from lories.core import RegistratorAccess, ResourceError
 from lories.util import get_context
 

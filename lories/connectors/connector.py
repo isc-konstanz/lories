@@ -64,6 +64,15 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
         self.__resources = Resources()
         self._lock = Lock()
 
+    def __getstate__(self) -> Dict[str, Any]:
+        state = super().__getstate__()
+        state.pop("_lock", None)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        state["_lock"] = Lock()
+        super().__setstate__(state)
+
     def __enter__(self) -> Connector:
         self.connect(self.__resources)
         return self

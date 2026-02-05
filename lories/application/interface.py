@@ -12,7 +12,8 @@ from collections.abc import Callable
 from typing import Optional, Type, TypeVar
 
 from lories._core._configurations import Configurations  # noqa
-from lories._core._data import DataContext, _DataContext, _DataManager  # noqa
+from lories._core._data import DataContext, _DataContext  # noqa
+from lories._core._manager import _DataManager  # noqa
 from lories.core import ConfigurationError, Registry, ResourceError
 from lories.core.configs.configurator import Configurator, ConfiguratorMeta
 
