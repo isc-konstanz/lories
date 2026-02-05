@@ -15,11 +15,11 @@ from threading import Lock
 from typing import Collection, Optional
 
 import pandas as pd
+from lories._core._application import _Application  # noqa
 from lories._core._channel import Channel  # noqa
 from lories._core._channels import Channels  # noqa
 from lories._core._data import DataContext, _DataContext  # noqa
 from lories._core._listener import _ListenerContext  # noqa
-from lories._core._manager import _DataManager  # noqa
 from lories.core import ResourceError
 from lories.data.listeners import Listener
 
@@ -52,7 +52,7 @@ class ListenerContext(_ListenerContext):
 
     @classmethod
     def _assert_context(cls, context: DataContext) -> DataContext:
-        if context is None or not isinstance(context, _DataManager):
+        if context is None or not isinstance(context, _Application):
             raise ResourceError(f"Invalid '{cls.__name__}' context: {type(context)}")
         return context
 

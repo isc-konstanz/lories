@@ -13,7 +13,7 @@ from typing import Optional
 
 from lories._core._component import Component  # noqa
 from lories._core._connector import Connector, _Connector, _ConnectorContext  # noqa
-from lories._core._manager import _DataManager  # noqa
+from lories._core._tasks import _TaskContext  # noqa
 from lories.core import RegistratorAccess, ResourceError
 from lories.core.typing import ChannelsArgument
 from lories.util import get_context
@@ -23,7 +23,7 @@ from lories.util import get_context
 class ConnectorAccess(_ConnectorContext, RegistratorAccess[Connector]):
     # noinspection PyUnresolvedReferences
     def __init__(self, registrar: Component, **kwargs) -> None:
-        context = get_context(registrar, _DataManager).connectors
+        context = get_context(registrar, _TaskContext).connectors
         super().__init__(context, registrar, **kwargs)
 
     def _set(self, id: str, connector: Connector) -> None:

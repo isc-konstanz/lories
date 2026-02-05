@@ -14,8 +14,8 @@ from .errors import (  # noqa: F401
     ConnectorError,
     ConnectorUnavailableError,
     ConnectionError,
-    DatabaseException,
-    DatabaseUnavailableException,
+    DatabaseError,
+    DatabaseUnavailableError,
 )
 
 from . import access  # noqa: F401

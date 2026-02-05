@@ -13,8 +13,8 @@ import os.path
 from collections.abc import Callable
 from typing import Any, Collection, Mapping, Optional, Sequence, Type
 
+from lories._core._application import _Application  # noqa
 from lories._core._component import Component, _Component, _ComponentContext  # noqa
-from lories._core._manager import _DataManager  # noqa
 from lories.core import Configurations, RegistratorAccess, ResourceError
 from lories.util import get_context, update_recursive
 
@@ -23,7 +23,7 @@ from lories.util import get_context, update_recursive
 class ComponentAccess(_ComponentContext, RegistratorAccess[Component]):
     # noinspection PyUnresolvedReferences
     def __init__(self, registrar: Component, **kwargs) -> None:
-        context = get_context(registrar, _DataManager).components
+        context = get_context(registrar, _Application).components
         super().__init__(context, registrar, **kwargs)
 
     def _set(self, id: str, component: Component) -> None:

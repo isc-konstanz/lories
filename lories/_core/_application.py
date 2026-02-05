@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lories._core._manager
-~~~~~~~~~~~~~~~~~~~~~
+lories._core._application
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -9,7 +9,6 @@ lories._core._manager
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Optional, TypeVar, overload
 
 from lories._core._component import Components
 from lories._core._listener import Listeners
@@ -25,7 +24,7 @@ except ImportError:
     from typing_extensions import Literal
 
 
-class _DataManager(_DataContext, _TaskContext, _Entity):
+class _Application(_DataContext, _TaskContext, _Entity):
 
     @property
     @abstractmethod
@@ -34,6 +33,3 @@ class _DataManager(_DataContext, _TaskContext, _Entity):
     @property
     @abstractmethod
     def listeners(self) -> Listeners: ...
-
-
-DataManager = TypeVar("DataManager", bound=_DataManager)
