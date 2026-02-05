@@ -11,19 +11,17 @@ from __future__ import annotations
 from typing import Any, Optional
 
 import pandas as pd
-
 from lories._core._channel import Channel  # noqa
 from lories._core._converter import Converter, _Converter  # noqa
 from lories.core.errors import ResourceError, ResourceUnavailableError
-from lories.data.channels._wrapper import _ChannelWrapper
+from lories.data.channels._core import _ChannelWrapper
 
 
 class ChannelConverter(_ChannelWrapper[Converter]):
-
     # noinspection PyProtectedMember, PyUnresolvedReferences, PyTypeChecker
     @classmethod
     def build(cls, channel: Channel, **configs) -> ChannelConverter:
-        converter_context =  channel._context._converters
+        converter_context = channel._context._converters
         if converter_context is None:
             raise ResourceUnavailableError(f"Missing converter context for channel '{channel.id}'")
         converter_id = configs.pop(_Converter.TYPE, None)

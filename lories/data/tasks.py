@@ -8,8 +8,8 @@ lories.data.futures
 
 from __future__ import annotations
 
-import os
 import logging
+import os
 from abc import abstractmethod
 from collections.abc import Callable
 from concurrent import futures
@@ -22,8 +22,8 @@ from lories.connectors import Connector, ConnectorError
 from lories.connectors.tasks import CheckTask, LogTask, ReadTask, WriteTask
 from lories.core.activator import Activator
 from lories.core.errors import ResourceError, ResourceUnavailableError
-from lories.data.channels import ChannelState
 from lories.core.typing import Channel, Channels, Configurations, Registrator, Timestamp
+from lories.data.channels import ChannelState
 
 
 # noinspection PyShadowingBuiltins
@@ -58,7 +58,7 @@ class TaskContext(_TaskContext, Activator):
     def _build(self, configs: Configurations) -> Executor:
         return ThreadPoolExecutor(
             thread_name_prefix=self._task_prefix,
-            max_workers=configs.get_int("workers_max", default=min(32, (os.process_cpu_count() or 1) + 4))
+            max_workers=configs.get_int("workers_max", default=min(32, (os.process_cpu_count() or 1) + 4)),
         )
 
     def activate(self) -> None:

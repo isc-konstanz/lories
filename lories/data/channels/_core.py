@@ -17,7 +17,7 @@ from lories._core._connector import Connector, _Connector  # noqa
 from lories._core._database import _Database  # noqa
 from lories._core._registrator import Registrator, _Registrator, _RegistratorContext  # noqa
 from lories._core._tasks import TaskContext, _TaskContext  # noqa
-from lories.core.errors import ResourceError
+from lories.core.errors import ResourceError, ResourceUnavailableError
 from lories.util import to_bool, update_recursive
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -95,10 +95,7 @@ class _ChannelWrapper(ABC, Generic[Registrator]):
 
     def __init__(self, __class: Type[Registrator], registrator: Optional[Registrator], **configs) -> None:
         registrator = self._assert_registrator(registrator)
-        self.enabled = to_bool(configs.pop(
-            "enabled",
-            registrator is not None and registrator.is_enabled())
-        )
+        self.enabled = to_bool(configs.pop("enabled", registrator is not None and registrator.is_enabled()))
         self.__registrator_class = __class
         self.__registrator = registrator
         self.__configs = OrderedDict(configs)
@@ -107,16 +104,12 @@ class _ChannelWrapper(ABC, Generic[Registrator]):
     def _assert_registrator(cls, registrator: Registrator) -> Registrator:
         if not isinstance(registrator, _Registrator):
             raise ResourceError(
-                f"Invalid '{cls.__name__}' registrator: "
-                f"{None if registrator is None else type(registrator)}"
+                f"Invalid '{cls.__name__}' registrator: " f"{None if registrator is None else type(registrator)}"
             )
         return registrator
 
     def __eq__(self, other: Any) -> bool:
-        return (
-            isinstance(other, _ChannelWrapper)
-            and self._get_vars() == other._get_vars()
-        )
+        return isinstance(other, _ChannelWrapper) and self._get_vars() == other._get_vars()
 
     def __hash__(self) -> int:
         return hash(*self._get_vars().values())

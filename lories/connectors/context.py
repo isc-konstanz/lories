@@ -93,7 +93,8 @@ class ConnectorContext(_ConnectorContext, RegistratorContext[Connector]):
                 )
             if len(connect_channels) == 0:
                 self._logger.debug(
-                    f"Skipping to connect {type(connector).__name__} '{connector.name}': {connector.id} without channels"
+                    f"Skipping to connect {type(connector).__name__} '{connector.name}': "
+                    f"{connector.id} missing channels"
                 )
                 continue
 

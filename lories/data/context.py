@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Callable, Collection, Dict, Iterable, List, Optional, Tuple, Type
+from typing import Any, Callable, Collection, Iterable, List, Optional, Tuple, Type
 
 import numpy as np
 import pandas as pd

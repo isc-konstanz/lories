@@ -15,7 +15,6 @@ from lories._core._resource import Resource, _Resource
 
 
 class _Resources(ABC, Generic[Resource], Sequence[Resource]):
-
     def __copy__(self) -> Resources:
         return self.copy()
 

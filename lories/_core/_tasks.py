@@ -18,16 +18,8 @@ from lories._core._connector import Connectors
 from lories._core._converter import Converters
 from lories._core.typing import Timestamp
 
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
-
 
 class _TaskContext(_Activator):
-
     @property
     @abstractmethod
     def converters(self) -> Converters: ...

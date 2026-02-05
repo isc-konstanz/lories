@@ -35,6 +35,7 @@ class JsonConverter(StringConverter):
                 raise ConversionError(e) from e
         return None
 
+
 def _fix_path(path: str) -> str:
     """
     Fix JSONPath to handle keys with colon (:)

@@ -38,9 +38,10 @@ class Constant(_Constant):
     def __init__(
         self,
         type: Type | str,
-        key: str, name: Optional[str] = None,
+        key: str,
+        name: Optional[str] = None,
         unit: Optional[str] = None,
-        **configs
+        **configs,
     ) -> None:
         self.__type = parse_type(type)
         self.__key = key

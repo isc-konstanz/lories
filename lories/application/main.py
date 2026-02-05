@@ -11,8 +11,8 @@ from __future__ import annotations
 import logging
 import signal
 import sys
-import traceback
 import time
+import traceback
 from collections.abc import Callable
 from concurrent import futures
 from concurrent.futures import Future
@@ -22,7 +22,7 @@ from typing import Optional, Sequence, Type
 
 import pandas as pd
 import pytz as tz
-from lories._core import _Context, _Application  # noqa
+from lories._core import _Application, _Context  # noqa
 from lories.application import Interface, Settings
 from lories.components import Component, ComponentContext
 from lories.connectors import Connector, ConnectorContext, Database, DatabaseError
@@ -134,7 +134,6 @@ class Application(_Application, DataContext, TaskContext):
             self._components.configure(components)
         if self._has_interface():
             self._interface.configure(settings.get_member(Interface.TYPE))
-
 
     def _at_configure(self, configs: Configurations) -> None:
         super()._at_configure(configs)

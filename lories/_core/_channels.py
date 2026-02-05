@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-lories._data._channels
+lories._core._channels
 ~~~~~~~~~~~~~~~~~~~~~~
 
 
@@ -9,19 +9,11 @@ lories._data._channels
 from __future__ import annotations
 
 from abc import abstractmethod
-from collections.abc import Callable
 from typing import Iterable, TypeVar, Union
 
 import pandas as pd
 from lories._core._channel import ChannelState, _Channel
 from lories._core._resources import _Resources
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 class _Channels(_Resources[_Channel]):

@@ -14,7 +14,7 @@ import pandas as pd
 from lories._core._connector import Connector, _Connector  # noqa
 from lories._core._database import _Database  # noqa
 from lories.core.errors import ResourceError
-from lories.data.channels._wrapper import _ChannelWrapper
+from lories.data.channels._core import _ChannelWrapper
 
 
 class ChannelConnector(_ChannelWrapper[Connector]):

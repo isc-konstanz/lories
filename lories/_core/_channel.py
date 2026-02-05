@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lories.data.channels.channel
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lories._core._channel
+~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -19,13 +19,6 @@ from lories._core._context import Context
 from lories._core._entity import Entity, _Entity
 from lories._core._resource import _Resource
 from lories._core.typing import Timestamp
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 class ChannelState(Enum):

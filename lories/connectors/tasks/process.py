@@ -8,8 +8,8 @@ lories.data.manager
 
 from __future__ import annotations
 
-import os
 import multiprocessing as mp
+import os
 from collections.abc import Callable
 from concurrent.futures import Executor, ProcessPoolExecutor
 from typing import Collection, Optional, Sequence
@@ -19,16 +19,9 @@ from lories._core._channels import ChannelsArgument  # noqa
 from lories._core._connector import Connector  # noqa
 from lories._core._registrator import Registrator  # noqa
 from lories.connectors import ConnectorContext
+from lories.core.typing import Configurations
 from lories.data.converters import ConverterContext
 from lories.data.tasks import TaskContext
-from lories.core.typing import Configurations
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 # noinspection PyProtectedMember
