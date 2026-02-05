@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 from collections import OrderedDict
+from collections.abc import Callable
 from functools import wraps
 from threading import Lock
 from typing import Any, Dict, Optional
@@ -20,7 +21,7 @@ from lories._core._configurations import Configurations  # noqa
 from lories._core._connector import ConnectType, _Connector  # noqa
 from lories._core._context import _Context  # noqa
 from lories._core._registrator import RegistratorContext  # noqa
-from lories.connectors.errors import ConnectorError
+from lories.connectors.errors import ConnectionError, ConnectorError
 from lories.core import Resource, ResourceError, Resources
 from lories.core.configs.configurator import Configurator, ConfiguratorMeta
 from lories.core.configs.errors import ConfigurationError
@@ -52,6 +53,7 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
 
     __resources: Resources
 
+    _lock_timeout: int = 60
     _lock: Lock
 
     def __init__(
@@ -96,7 +98,7 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
         return vars
 
     # noinspection PyShadowingBuiltins
-    def _convert_vars(self, convert: callable = str) -> Dict[str, str]:
+    def _convert_vars(self, convert: Callable = str) -> Dict[str, str]:
         vars = self._get_vars()
         values = OrderedDict()
         try:
@@ -167,8 +169,10 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
     @wraps(_Connector.connect, updated=())
-    def _do_connect(self, resources: Resources, *args, **kwargs) -> None:
-        with self._lock:
+    def _do_connect(self, resources: Resources, locking: bool = True, *args, **kwargs) -> None:
+        try:
+            if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
+                raise ConnectorError(self, f"Timeout acquiring lock for connecting {type(self).__name__}: {self.id}")
             if not self.is_enabled():
                 raise ConfigurationError(f"Trying to connect disabled {type(self).__name__}: {self.id}")
             if not self.is_configured():
@@ -186,6 +190,8 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
                 self._logger.warning(f"{type(self).__name__} '{self.id}' already connected")
 
             self._connected = True
+        finally:
+            self._lock.release()
 
     def _at_connect(self, resources: Resources) -> None:
         pass
@@ -195,8 +201,11 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
     @wraps(_Connector.disconnect, updated=())
-    def _do_disconnect(self) -> None:
-        with self._lock:
+    def _do_disconnect(self, locking: bool = True) -> None:
+        try:
+            if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
+                raise ConnectorError(self, f"Timeout acquiring lock for disconnecting {type(self).__name__}: {self.id}")
+
             self._timestamp_connect = pd.NaT
             self._timestamp_disconnect = pd.Timestamp.now(tz.UTC)
 
@@ -206,6 +215,8 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
                 self._on_disconnect()
 
             self._connected = False
+        finally:
+            self._lock.release()
 
     def _at_disconnect(self) -> None:
         pass
@@ -215,14 +226,19 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
     @wraps(_Connector.read, updated=())
-    def _do_read(self, resources: Resources, *args, **kwargs) -> pd.DataFrame:
-        with self._lock:
+    def _do_read(self, resources: Resources, locking: bool = True, *args, **kwargs) -> pd.DataFrame:
+        try:
+            if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
+                raise ConnectorError(self, f"Timeout acquiring lock for reading {type(self).__name__}: {self.id}")
             if not self._is_connected():
-                raise ConnectorError(self, f"Trying to read from unconnected {type(self).__name__}: {self.id}")
+                raise ConnectionError(self, f"Trying to read from unconnected {type(self).__name__}: {self.id}")
 
             data = self._run_read(resources, *args, **kwargs)
             data = self._validate(resources, data)
             return data
+
+        finally:
+            self._lock.release()
 
     # noinspection PyMethodMayBeStatic
     def _validate(self, resources: Resources, data: pd.DataFrame) -> pd.DataFrame:
@@ -239,10 +255,12 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
     @wraps(_Connector.write, updated=())
-    def _do_write(self, data: pd.DataFrame, *args, **kwargs) -> None:
-        with self._lock:
+    def _do_write(self, data: pd.DataFrame, locking: bool = True, *args, **kwargs) -> None:
+        try:
+            if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
+                raise ConnectorError(self, f"Timeout acquiring lock for writing {type(self).__name__}: {self.id}")
             if not self._is_connected():
-                raise ConnectorError(self, f"Trying to write to unconnected {type(self).__name__}: {self.id}")
+                raise ConnectionError(self, f"Trying to write to unconnected {type(self).__name__}: {self.id}")
             unknown = [c for c in data.columns if c not in self.resources]
             if len(unknown) > 0:
                 raise ConnectorError(
@@ -252,3 +270,5 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
                 )
 
             self._run_write(data, *args, **kwargs)
+        finally:
+            self._lock.release()
