@@ -158,6 +158,8 @@ class ComponentPage(Page, Generic[Component]):
         if not pd.isna(value):
             if channel.type == float:
                 value = round(channel.value, 2)
+            if channel.type == bytes:
+                value = None
         return html.Span(value, className="mb-1", style={"margin-right": "0.2rem"})
 
     # noinspection PyMethodMayBeStatic

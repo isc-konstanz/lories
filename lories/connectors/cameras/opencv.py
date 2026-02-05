@@ -53,7 +53,8 @@ class OpenCV(CameraConnector):
         super().connect(resources)
         # Validate connection only to throw ConnectionError when connect is called by the manager
         self._connect()
-        self._disconnect()
+        if not self.is_streaming():
+            self._disconnect()
 
     def _connect(self) -> None:
         auth = f"{self._username}:{self._password}"
