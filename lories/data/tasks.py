@@ -56,9 +56,11 @@ class TaskContext(_TaskContext, Activator):
         return self.__executor.submit(fn, *args, **kwargs)
 
     def _build(self, configs: Configurations) -> Executor:
+        cpu_fn = getattr(os, "process_cpu_count", os.cpu_count)
+        max_workers_default = min(32, (cpu_fn() or 1) + 4)
         return ThreadPoolExecutor(
             thread_name_prefix=self._task_prefix,
-            max_workers=configs.get_int("workers_max", default=min(32, (os.process_cpu_count() or 1) + 4)),
+            max_workers=configs.get_int("workers_max", default=max_workers_default),
         )
 
     def activate(self) -> None:
