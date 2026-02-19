@@ -73,6 +73,15 @@ class Resource(_Resource):
             raise ResourceError(f"Invalid {cls.__name__}, with type '{__type}' being not allowed.")
         return __type
 
+    def __getstate__(self) -> Dict[str, Any]:
+        state = self.__dict__.copy()
+        state.pop("_logger", None)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        self.__dict__.update(state)
+        self._logger = logging.getLogger(type(self).__module__)
+
     def __contains__(self, attr: str) -> bool:
         return attr in self._get_attrs()
 

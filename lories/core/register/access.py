@@ -10,28 +10,24 @@ from __future__ import annotations
 
 from typing import Any, Dict, Generic, Optional, Sequence, overload
 
-from lories._core._context import Context, _Context  # noqa
-from lories._core._registrator import (  # noqa
-    Registrator,
-    RegistratorContext,
-    _Registrator,  # noqa
-    _RegistratorContext,  # noqa
-)
+from lories._core._context import _Context  # noqa
+from lories._core._registrator import Registrator, _Registrator  # noqa
+from lories._core._registrator import _RegistratorContext as Context  # noqa
 from lories.core.configs import Configurations
 from lories.core.errors import ResourceError
-from lories.core.register._load import _RegistratorLoader
+from lories.core.register._core import _RegistratorContext
 from lories.util import update_recursive
 
 
 # noinspection SpellCheckingInspection, PyProtectedMember, PyAbstractClass, PyShadowingBuiltins
-class RegistratorAccess(_RegistratorLoader[Registrator], Generic[Registrator]):
+class RegistratorAccess(_RegistratorContext[Registrator], Generic[Registrator]):
     _registrar: Registrator
-    __context: RegistratorContext
+    __context: Context
 
     # noinspection PyUnresolvedReferences
     def __init__(
         self,
-        context: RegistratorContext,
+        context: Context,
         registrar: Registrator,
         **kwargs,
     ) -> None:
@@ -48,8 +44,8 @@ class RegistratorAccess(_RegistratorLoader[Registrator], Generic[Registrator]):
         return registrar
 
     @classmethod
-    def _assert_context(cls, context: RegistratorContext):
-        if context is None or not isinstance(context, _RegistratorContext):
+    def _assert_context(cls, context: Context):
+        if context is None or not isinstance(context, Context):
             raise ResourceError(f"Invalid '{cls.__name__}' context: {type(context)}")
         return context
 
@@ -68,7 +64,7 @@ class RegistratorAccess(_RegistratorLoader[Registrator], Generic[Registrator]):
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{attr}'")
 
     @property
-    def context(self) -> RegistratorContext:
+    def context(self) -> Context:
         return self.__context
 
     def __validate_id(self, id: str) -> str:
@@ -101,7 +97,7 @@ class RegistratorAccess(_RegistratorLoader[Registrator], Generic[Registrator]):
         configs: Configurations,
         **kwargs: Any,
     ) -> Registrator:
-        return self.context._create(context, configs, **kwargs)
+        return self.__context._create(context, configs, **kwargs)
 
     def _remove(self, *__registrators: str | Registrator) -> None:
         for __registrator in __registrators:

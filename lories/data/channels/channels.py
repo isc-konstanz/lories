@@ -20,26 +20,10 @@ from lories._core._channels import _Channels  # noqa
 from lories.core import Resources
 from lories.data.validation import validate_index
 
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
-
 
 class Channels(_Channels, Resources[Channel]):
     def __str__(self) -> str:
         return str(self.to_frame(unique=True, states=True))
-
-    def register(
-        self,
-        function: Callable[[pd.DataFrame], None],
-        how: Literal["any", "all"] = "any",
-        unique: bool = False,
-    ) -> None:
-        for channel in self:
-            channel.register(function, how=how, unique=unique)
 
     # noinspection PyTypeChecker
     def apply(self, apply: Callable[[Channel], Channel], inplace: bool = False) -> ChannelsType:

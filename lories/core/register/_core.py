@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-lories.core.register._load
+lories.core.register._core
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
@@ -16,11 +16,8 @@ from logging import Logger
 from typing import Any, Collection, Dict, Generic, Mapping, Optional, Sequence, Type
 
 from lories._core._configurator import Configurator  # noqa
-from lories._core._registrator import (  # noqa
-    Registrator,
-    RegistratorContext,
-    _RegistratorContext,  # noqa
-)
+from lories._core._registrator import Registrator  # noqa
+from lories._core._registrator import _RegistratorContext as Context  # noqa
 from lories.core.configs import Configurations, Directories, Directory
 from lories.core.errors import ResourceError
 from lories.util import update_recursive
@@ -43,7 +40,7 @@ except ImportError:
 
 
 # noinspection SpellCheckingInspection, PyAbstractClass, PyProtectedMember
-class _RegistratorLoader(_RegistratorContext[Registrator], Generic[Registrator]):
+class _RegistratorContext(Context[Registrator], Generic[Registrator]):
     __registrator_class: Type[Registrator]
     _logger: Logger
 
@@ -69,7 +66,7 @@ class _RegistratorLoader(_RegistratorContext[Registrator], Generic[Registrator])
             for _base in getattr(_cls, "__orig_bases__", ()):
                 if isinstance(_base, type):
                     continue
-                if issubclass(get_origin(_base), _RegistratorContext):
+                if issubclass(get_origin(_base), Context):
                     (_arg,) = get_args(_base)
                     if not isinstance(_arg, type):
                         _arg = get_bound(_arg)
@@ -79,7 +76,7 @@ class _RegistratorLoader(_RegistratorContext[Registrator], Generic[Registrator])
     # noinspection PyUnresolvedReferences
     def _build_registrator_id(
         self,
-        context: RegistratorContext,
+        context: Context,
         configs: Configurations,
     ) -> str:
         return self._get_registator_class()._build_id(context=context, configs=configs)
@@ -95,7 +92,7 @@ class _RegistratorLoader(_RegistratorContext[Registrator], Generic[Registrator])
     # noinspection PyUnresolvedReferences
     def _load(
         self,
-        context: RegistratorContext,
+        context: Context,
         configs: Configurations,
         configs_file: Optional[str] = None,
         configs_dir: Optional[str | Directory] = None,
@@ -132,7 +129,7 @@ class _RegistratorLoader(_RegistratorContext[Registrator], Generic[Registrator])
 
     def _load_from_configs(
         self,
-        context: RegistratorContext,
+        context: Context,
         configs: Configurations,
         **kwargs: Any,
     ) -> Registrator:
@@ -147,7 +144,7 @@ class _RegistratorLoader(_RegistratorContext[Registrator], Generic[Registrator])
     # noinspection PyUnresolvedReferences
     def _load_from_members(
         self,
-        context: RegistratorContext,
+        context: Context,
         configs: Configurations,
         includes: Optional[Collection[str]] = (),
         defaults: Optional[Mapping[str, Any]] = None,
@@ -176,7 +173,7 @@ class _RegistratorLoader(_RegistratorContext[Registrator], Generic[Registrator])
 
     def _load_from_file(
         self,
-        context: RegistratorContext,
+        context: Context,
         configs_file: str,
         configs_dirs: Directories,
         defaults: Optional[Mapping[str, Any]] = None,
@@ -193,7 +190,7 @@ class _RegistratorLoader(_RegistratorContext[Registrator], Generic[Registrator])
 
     def _load_from_dir(
         self,
-        context: RegistratorContext,
+        context: Context,
         configs_dirs: Directories,
         defaults: Optional[Mapping[str, Any]] = None,
         **kwargs: Any,

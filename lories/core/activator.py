@@ -40,7 +40,7 @@ class Activator(_Activator, Configurator, metaclass=ActivatorMeta):
         self.deactivate()
 
     # noinspection PyShadowingBuiltins
-    def _convert_vars(self, convert: callable = str) -> Dict[str, str]:
+    def _convert_vars(self, convert: Callable = str) -> Dict[str, str]:
         values = super()._convert_vars(convert)
         values["active"] = str(self.is_active())
         return values
@@ -55,11 +55,11 @@ class Activator(_Activator, Configurator, metaclass=ActivatorMeta):
     @wraps(activate, updated=())
     def _do_activate(self, *args, **kwargs) -> None:
         if not self.is_enabled():
-            raise ConfigurationError(f"Trying to activate disabled '{type(self).__name__}': {self.id}")
+            raise ConfigurationError(f"Trying to activate disabled '{type(self).__name__}'")
         if not self.is_configured():
-            raise ConfigurationError(f"Trying to activate unconfigured '{type(self).__name__}': {self.id}")
+            raise ConfigurationError(f"Trying to activate unconfigured '{type(self).__name__}'")
         if self.is_active():
-            self._logger.warning(f"Trying to activate already active '{type(self).__name__}': {self.id}")
+            self._logger.warning(f"Trying to activate already active '{type(self).__name__}'")
             return
 
         self._at_activate()

@@ -40,7 +40,9 @@ class ComponentContext(_ComponentContext, RegistratorContext[Component]):
 
     # noinspection PyShadowingBuiltins
     def activate(self, filter: Optional[Callable[[Component], bool]] = None) -> None:
-        self._activate(*self.filter(filter))
+        _components = self.filter(filter)
+        if len(_components) > 0:
+            self._activate(*_components)
 
     def _activate(self, *component: Component) -> None:
         for component in component:
@@ -59,7 +61,9 @@ class ComponentContext(_ComponentContext, RegistratorContext[Component]):
 
     # noinspection PyShadowingBuiltins
     def deactivate(self, filter: Optional[Callable[[Component], bool]] = None) -> None:
-        self._deactivate(*self.filter(filter))
+        _components = self.filter(filter)
+        if len(_components) > 0:
+            self._deactivate(*_components)
 
     def _deactivate(self, *components: Component) -> None:
         for component in reversed(list(components)):

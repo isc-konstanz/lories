@@ -44,12 +44,12 @@ from ._connector import (  # noqa: F401
 )
 from ._database import _Database  # noqa: F401
 
-from ._data import (  # noqa: F401
-    _DataContext,
-    _DataManager,
-)
+from ._tasks import _TaskContext  # noqa: F401
+from ._data import _DataContext  # noqa: F401
 
 from ._component import (  # noqa: F401
     _Component,
     _ComponentContext,
 )
+
+from ._application import _Application  # noqa: F401

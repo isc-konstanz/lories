@@ -18,7 +18,7 @@ from influxdb_client.rest import ApiException
 from urllib3.exceptions import HTTPError, NewConnectionError
 
 import pandas as pd
-from lories.connectors import ConnectionError, Database, DatabaseException, register_connector_type
+from lories.connectors import ConnectionError, Database, DatabaseError, register_connector_type
 from lories.core.configs import ConfigurationError
 from lories.data.util import hash_value
 from lories.typing import Configurations, Resource, Resources, Timestamp
@@ -393,7 +393,7 @@ class InfluxDatabase(Database):
         end: str = "now()",
     ) -> str:
         if measurement is None:
-            raise DatabaseException(self, f"Measurement is None for following resources: {resources}")
+            raise DatabaseError(self, f"Measurement is None for following resources: {resources}")
         query = f"""
             from(bucket: "{self.bucket}")
                 |> range(start: {start}, stop: {end})
@@ -418,11 +418,11 @@ class InfluxDatabase(Database):
 
     def _raise(self, e: Exception):
         if isinstance(e, ApiException):
-            raise DatabaseException(self, str(e))
+            raise DatabaseError(self, str(e))
         elif isinstance(e, InfluxDBError):
-            raise DatabaseException(self, str(e))
+            raise DatabaseError(self, str(e))
         elif isinstance(e, NewConnectionError):
-            raise DatabaseException(self, str(e))
+            raise DatabaseError(self, str(e))
         else:
             raise ConnectionError(self, str(e))
 
