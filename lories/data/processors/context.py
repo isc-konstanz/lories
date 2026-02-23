@@ -36,7 +36,6 @@ def register_processor_type(
 
 # noinspection PyShadowingBuiltins
 class ProcessorContext(_ProcessorContext):
-
     # noinspection PyMethodMayBeStatic
     def _create(
         self,

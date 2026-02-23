@@ -14,8 +14,8 @@ from functools import wraps
 from typing import Any, Dict, List, Optional
 
 from lories._core import _Processor  # noqa
-from lories.util import to_bool, update_recursive
 from lories.core.typing import Timestamp
+from lories.util import to_bool, update_recursive
 
 
 class ProcessorMeta(ABCMeta):
@@ -41,12 +41,13 @@ class Processor(_Processor, metaclass=ProcessorMeta):
     enabled: bool = False
 
     # noinspection PyShadowingBuiltins
-    def __init__(self,
+    def __init__(
+        self,
         id: Optional[str] = None,
         key: Optional[str] = None,
         name: Optional[str] = None,
         enabled: bool = True,
-        **configs
+        **configs,
     ) -> None:
         super().__init__(id, key, name)
         self.enabled = to_bool(enabled)
