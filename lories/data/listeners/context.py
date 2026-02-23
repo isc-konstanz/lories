@@ -18,8 +18,8 @@ import pandas as pd
 from lories._core._application import _Application  # noqa
 from lories._core._channel import Channel  # noqa
 from lories._core._channels import Channels  # noqa
-from lories._core._data import DataContext, _DataContext  # noqa
 from lories._core._listener import _ListenerContext  # noqa
+from lories._core._tasks import TaskContext, _TaskContext  # noqa
 from lories.core import ResourceError
 from lories.data.listeners import Listener
 
@@ -33,10 +33,10 @@ except ImportError:
 
 # noinspection PyShadowingBuiltins
 class ListenerContext(_ListenerContext):
-    __context: _DataContext
+    __context: _TaskContext
     __lock: Lock
 
-    def __init__(self, context: DataContext, *args, **kwargs) -> None:
+    def __init__(self, context: TaskContext, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.__context = self._assert_context(context)
         self._logger = logging.getLogger(self.__module__)
@@ -51,13 +51,13 @@ class ListenerContext(_ListenerContext):
         self.__lock.release()
 
     @classmethod
-    def _assert_context(cls, context: DataContext) -> DataContext:
-        if context is None or not isinstance(context, _Application):
+    def _assert_context(cls, context: TaskContext) -> TaskContext:
+        if context is None or not isinstance(context, _TaskContext):
             raise ResourceError(f"Invalid '{cls.__name__}' context: {type(context)}")
         return context
 
     @property
-    def context(self) -> DataContext:
+    def context(self) -> TaskContext:
         return self.__context
 
     # noinspection PyMethodMayBeStatic

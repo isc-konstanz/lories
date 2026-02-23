@@ -21,6 +21,7 @@ from lories._core._registrator import Registrator  # noqa
 from lories.connectors import ConnectorContext
 from lories.core.typing import Configurations
 from lories.data.converters import ConverterContext
+from lories.data.processors import ProcessorContext
 from lories.data.tasks import TaskContext
 
 
@@ -39,6 +40,7 @@ class ProcessContext(TaskContext):
     ) -> None:
         super().__init__(configs=configs, *args, **kwargs)
         self._context = mp.get_context("spawn")
+        self._processors = ProcessorContext()
         self._converters = ConverterContext(self)
         self._connectors = ConnectorContext(self)
         self._connectors._add(*(connector.duplicate(context=self._connectors) for connector in connectors))
@@ -63,6 +65,10 @@ class ProcessContext(TaskContext):
     def deactivate(self) -> None:
         super().deactivate()
         self._connectors.disconnect()
+
+    @property
+    def processors(self) -> ProcessorContext:
+        return self._processors
 
     @property
     def converters(self) -> ConverterContext:
