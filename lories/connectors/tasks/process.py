@@ -21,6 +21,7 @@ from lories._core._registrator import Registrator  # noqa
 from lories.connectors import ConnectorContext
 from lories.core.typing import Configurations
 from lories.data.converters import ConverterContext
+from lories.data.processors import ProcessorContext
 from lories.data.tasks import TaskContext
 
 
@@ -39,13 +40,16 @@ class ProcessContext(TaskContext):
     ) -> None:
         super().__init__(configs=configs, *args, **kwargs)
         self._context = mp.get_context("spawn")
+        self._processors = ProcessorContext()
         self._converters = ConverterContext(self)
         self._connectors = ConnectorContext(self)
         self._connectors._add(*(connector.duplicate(context=self._connectors) for connector in connectors))
 
     def _build(self, configs: Configurations) -> Executor:
+        get_cpu_count = getattr(os, "process_cpu_count", os.cpu_count)
+        max_workers_default = max(int((get_cpu_count() or 1) / 2), 1)
         return ProcessPoolExecutor(
-            max_workers=configs.get_int("workers_max", default=max(int((os.cpu_count() or 1) / 2), 1)),
+            max_workers=configs.get_int("workers_max", default=max_workers_default),
             mp_context=self._context,
         )
 
@@ -63,6 +67,10 @@ class ProcessContext(TaskContext):
     def deactivate(self) -> None:
         super().deactivate()
         self._connectors.disconnect()
+
+    @property
+    def processors(self) -> ProcessorContext:
+        return self._processors
 
     @property
     def converters(self) -> ConverterContext:

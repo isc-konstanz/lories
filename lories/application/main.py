@@ -35,6 +35,7 @@ from lories.data.context import DataContext
 from lories.data.converters import ConverterContext
 from lories.data.databases import Databases
 from lories.data.listeners import ListenerContext
+from lories.data.processors import ProcessorContext
 from lories.data.replication import Replication
 from lories.data.retention import Retention
 from lories.data.tasks import TaskContext, chain_filters
@@ -51,6 +52,7 @@ except ImportError:
 
 
 class Application(_Application, DataContext, TaskContext):
+    _processors: ProcessorContext
     _converters: ConverterContext
     _connectors: ConnectorContext
     _components: ComponentContext
@@ -78,6 +80,7 @@ class Application(_Application, DataContext, TaskContext):
         self.__interrupt = Event()
         self.__interrupt.set()
 
+        self._processors = ProcessorContext()
         self._converters = ConverterContext(self)
         self._connectors = ConnectorContext(self)
         self._components = ComponentContext(self)
@@ -186,6 +189,10 @@ class Application(_Application, DataContext, TaskContext):
     @property
     def settings(self) -> Settings:
         return self.configs
+
+    @property
+    def processors(self) -> ProcessorContext:
+        return self._processors
 
     @property
     def converters(self) -> ConverterContext:
