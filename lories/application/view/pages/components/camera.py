@@ -71,7 +71,7 @@ class CameraPage(ComponentPage[Camera]):
 
         return html.Div(
             [
-                html.H5("State"),
+                html.H5("Protection"),
                 dbc.Switch(
                     id=id,
                     # label="State",
