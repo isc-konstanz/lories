@@ -45,7 +45,7 @@ class ProcessorContext(_ProcessorContext):
         **configs: Any,
     ) -> Processor:
         registration = registry.from_type(processor)
-        return registration.initialize(id=id, key=key, **configs)
+        return registration.initialize(id=id, key=key, _type=registration.key, **configs)
 
     # noinspection PyProtectedMember
     def _update(
