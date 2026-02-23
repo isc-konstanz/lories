@@ -37,12 +37,14 @@ class ProcessorMeta(ABCMeta):
 # noinspection PyAbstractClass
 class Processor(_Processor, metaclass=ProcessorMeta):
     __configs: OrderedDict[str, Any]
+    __type: str
 
     enabled: bool = False
 
     # noinspection PyShadowingBuiltins
     def __init__(
         self,
+        _type: str,
         id: Optional[str] = None,
         key: Optional[str] = None,
         name: Optional[str] = None,
@@ -52,6 +54,7 @@ class Processor(_Processor, metaclass=ProcessorMeta):
         super().__init__(id, key, name)
         self.enabled = to_bool(enabled)
         self.__configs = OrderedDict(configs)
+        self.__type = _type
 
     def __eq__(self, other: Any) -> bool:
         return isinstance(other, Processor) and self._get_vars() == other._get_vars()
@@ -110,8 +113,9 @@ class Processor(_Processor, metaclass=ProcessorMeta):
     # noinspection PyShadowingBuiltins
     def _get_vars(self) -> Dict[str, Any]:
         return {
-            **self.__configs,
+            "processor": self.__type,
             "enabled": self.enabled,
+            **self.__configs,
         }
 
     def _get_attrs(self) -> List[str]:
@@ -137,6 +141,7 @@ class Processor(_Processor, metaclass=ProcessorMeta):
 
     def to_configs(self) -> Dict[str, Any]:
         return {
-            **self.__configs,
+            "processor": self.__type,
             "enabled": self.enabled,
+            **self.__configs,
         }
