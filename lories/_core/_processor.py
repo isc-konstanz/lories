@@ -11,8 +11,8 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import Any, Collection, Dict, TypeAlias, TypeVar
 
-from lories._core._entity import _Entity
 from lories._core._context import _Context
+from lories._core._entity import _Entity
 from lories._core.typing import Timestamp
 
 

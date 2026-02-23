@@ -10,11 +10,9 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence
 
-from entsoe.parsers import parse_installed_capacity_per_plant
-
 from lories._core._channel import Channel, _Channel  # noqa
 from lories._core._processor import Processor, _Processor  # noqa
-from lories.core.errors import ResourceError
+from lories.core.errors import ResourceError, ResourceUnavailableError
 from lories.core.typing import Timestamp
 
 
@@ -50,10 +48,7 @@ class ChannelProcessors(Sequence[Processor]):
         return processor
 
     def __eq__(self, other: Any) -> bool:
-        return (
-            isinstance(other, ChannelProcessors)
-            and self._processors == other._processors
-        )
+        return isinstance(other, ChannelProcessors) and self._processors == other._processors
 
     def __hash__(self) -> int:
         return hash(self._processors)
@@ -96,7 +91,7 @@ class ChannelProcessors(Sequence[Processor]):
         return [str(processor.key) for processor in self._processors]
 
     def to_configs(self) -> Dict[str, Any]:
-        return { p.key: dict(p.to_configs()) for p in self._processors }
+        return {p.key: dict(p.to_configs()) for p in self._processors}
 
     def append(self, processor: Processor) -> None:
         self._processors.append(processor)
