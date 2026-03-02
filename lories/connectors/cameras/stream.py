@@ -122,7 +122,7 @@ def _stream(
                 interrupt.set()
                 return
 
-            payload = camera.read_frame()
+            payload = camera.read_frame(*channels)
             length = len(payload)
             buffer[0:4] = length.to_bytes(4, "little")
             buffer[4 : 4 + length] = payload
