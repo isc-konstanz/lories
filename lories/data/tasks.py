@@ -63,10 +63,13 @@ class TaskContext(_TaskContext, Activator):
             max_workers=configs.get_int("workers_max", default=max_workers_default),
         )
 
+    def configure(self, configs: Configurations) -> None:
+        super().configure(configs)
+        if self.is_enabled():
+            self.__executor = self._build(configs.get_member(TaskContext.TYPE, defaults={}))
+
     def activate(self) -> None:
         super().activate()
-        if self.is_enabled():
-            self.__executor = self._build(self.configs.get_member(TaskContext.TYPE, defaults={}))
 
     def deactivate(self, *_) -> None:
         self.interrupt()

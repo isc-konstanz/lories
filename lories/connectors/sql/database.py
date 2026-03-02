@@ -121,6 +121,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
             raise ConfigurationError(f"Unable to create database engine: {str(e)}")
 
     def connect(self, resources: Resources) -> None:
+        super().connect(resources)
         self._logger.debug(f"Connecting to {self.dialect.name} database {self.database}@{self.host}:{self.port}")
         try:
             self._connection = self.engine.connect()
@@ -137,6 +138,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
             self._raise(e)
 
     def disconnect(self) -> None:
+        super().disconnect()
         if self._connection is not None:
             self._connection.close()
             self._logger.debug("Disconnected from the database")

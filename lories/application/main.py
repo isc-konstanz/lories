@@ -51,6 +51,7 @@ except ImportError:
     from typing_extensions import Literal
 
 
+# noinspection PyProtectedMember
 class Application(_Application, DataContext, TaskContext):
     _processors: ProcessorContext
     _converters: ConverterContext
@@ -72,7 +73,6 @@ class Application(_Application, DataContext, TaskContext):
         app.configure(settings, factory)
         return app
 
-    # noinspection PyProtectedMember
     def __init__(self, settings: Settings, **kwargs) -> None:
         super().__init__(configs=settings, key=validate_key(settings["name"]), name=settings["name"], **kwargs)
         signal.signal(signal.SIGINT, self.interrupt)
@@ -108,7 +108,7 @@ class Application(_Application, DataContext, TaskContext):
             return item in self._components.values()
         return False
 
-    # noinspection PyProtectedMember, PyTypeChecker, PyMethodOverriding
+    # noinspection PyTypeChecker, PyMethodOverriding
     def configure(self, settings: Settings, factory: Type[System] = System) -> None:
         super().configure(settings)
         self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
@@ -297,7 +297,7 @@ class Application(_Application, DataContext, TaskContext):
         else:
             self.__runner.join()
 
-    # noinspection PyShadowingBuiltins, PyProtectedMember
+    # noinspection PyShadowingBuiltins
     def run(self, **kwargs) -> None:
         now = pd.Timestamp.now(tz.UTC)
 
@@ -514,7 +514,7 @@ class Application(_Application, DataContext, TaskContext):
             return True
         return timestamp <= floor_date(timestamp, freq=replication.get("freq", Replication.freq))
 
-    # noinspection PyUnresolvedReferences, PyProtectedMember, PyShadowingBuiltins
+    # noinspection PyUnresolvedReferences, PyShadowingBuiltins
     def simulate(
         self,
         start: Optional[Timestamp] = None,

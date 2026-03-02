@@ -9,6 +9,7 @@ lories.data.databases
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import Any, Collection, Optional
 
 import tzlocal
@@ -17,9 +18,9 @@ import pandas as pd
 from lories.connectors import ConnectorContext, ConnectType, Database
 from lories.core import Configurations, Configurator, ResourceError
 from lories.data.channels import Channel, Channels
-from lories.data.context import DataContext
 from lories.data.replication import Replications
 from lories.data.retention import Retention, Retentions
+from lories.data.tasks import TaskContext
 from lories.util import floor_date, parse_freq, to_bool, to_timedelta, to_timezone
 
 
@@ -27,7 +28,7 @@ class Databases(ConnectorContext, Configurator):
     TYPE: str = "databases"
 
     # noinspection PyProtectedMember, PyUnresolvedReferences
-    def __init__(self, context: DataContext, configs: Configurations) -> None:
+    def __init__(self, context: TaskContext, configs: Configurations) -> None:
         super().__init__(context, configs=configs.get_member(Databases.TYPE, defaults={}))
         self.load(configure=False, sort=False)
         self.configure()
@@ -56,28 +57,40 @@ class Databases(ConnectorContext, Configurator):
         #     database._connect_type = ConnectType.NONE
         return databases
 
-    # noinspection PyProtectedMember, PyUnresolvedReferences
-    def connect(self, channels: Optional[Channels] = None) -> None:
-        self.context._connect(*self.filter(self.__is_connectable), channels=channels, force=True)
+    # noinspection PyShadowingBuiltins
+    def connect(
+        self,
+        filter: Optional[Callable[[Database], bool]] = None,
+        channels: Optional[Channels] = None,
+        timeout: Optional[float] = None,
+    ) -> None:
+        _connectors = self.filter(self.__is_connectable, filter)
+        if len(_connectors) > 0:
+            self._connect(*_connectors, channels=channels, timeout=timeout, force=True)
 
     # noinspection PyProtectedMember, PyUnresolvedReferences
-    def _connect(self, database: Database, channels: Optional[Channels] = None) -> None:
+    def __connect(self, database: Database, channels: Optional[Channels] = None) -> None:
         if self.__is_connectable(database):
-            self.context._connect(database, channels=channels, force=True)
+            self._connect(database, channels=channels, force=True)
 
     # noinspection PyProtectedMember
     @staticmethod
     def __is_connectable(database: Database) -> bool:
         return database._connect_type == ConnectType.NONE or not database._is_connected()
 
-    # noinspection PyProtectedMember, PyUnresolvedReferences
-    def disconnect(self):
-        self.context._disconnect(*self.filter(self.__is_disconnectable))
+    # noinspection PyShadowingBuiltins
+    def disconnect(
+        self,
+        filter: Optional[Callable[[Database], bool]] = None,
+    ) -> None:
+        _connectors = self.filter(self.__is_disconnectable, filter)
+        if len(_connectors) > 0:
+            self._disconnect(*_connectors)
 
     # noinspection PyProtectedMember, PyUnresolvedReferences
-    def _disconnect(self, database: Database) -> None:
+    def __disconnect(self, database: Database) -> None:
         if self.__is_disconnectable(database):
-            self.context._disconnect(database)
+            self._disconnect(database)
 
     # noinspection PyProtectedMember
     @staticmethod
@@ -100,10 +113,17 @@ class Databases(ConnectorContext, Configurator):
             if len(database_channels) == 0:
                 continue
 
-            self._connect(database, channels=database_channels)
+            database_channels = database_channels.apply(
+                lambda c: c.duplicate(
+                    context=self.context,
+                    connector=database.id,
+                    replication=c.replication,
+                )
+            )
+            self.__connect(database, channels=database_channels)
             try:
                 for logger, logger_channels in database_channels.groupby(lambda c: c.logger._connector):
-                    self._connect(logger, channels=logger_channels)
+                    self.__connect(logger, channels=logger_channels)
                     try:
                         for replication, replication_channels in logger_channels.groupby(lambda c: c.replication):
                             replication.replicate(replication_channels, full=to_bool(full), force=to_bool(force))
@@ -113,9 +133,9 @@ class Databases(ConnectorContext, Configurator):
                         if self._logger.getEffectiveLevel() <= logging.DEBUG:
                             self._logger.exception(e)
                     finally:
-                        self._disconnect(logger)
+                        self.__disconnect(logger)
             finally:
-                self._disconnect(database)
+                self.__disconnect(database)
 
     # noinspection PyProtectedMember
     def rotate(self, channels: Channels, full: bool = False) -> None:
@@ -130,11 +150,18 @@ class Databases(ConnectorContext, Configurator):
 
         channels = channels.apply(build_rotation).filter(lambda c: c.rotate is not None or len(c.retentions) > 0)
         for database in self.values():
-            database_channels = channels.filter(lambda c: c.has_logger(database.id))
+            database_channels = channels.filter(lambda c: c.rotation.database.id == database.id)
             if len(database_channels) == 0:
                 continue
 
-            self._connect(database, channels=database_channels)
+            database_channels = database_channels.apply(
+                lambda c: c.duplicate(
+                    context=self.context,
+                    connector=database.id,
+                    rotation=c.rotation,
+                )
+            )
+            self.__connect(database, channels=database_channels)
             try:
                 for rotation, rotation_channels in database_channels.groupby(lambda c: c.rotate):
                     if rotation is None:
@@ -181,4 +208,4 @@ class Databases(ConnectorContext, Configurator):
                             f"Error aggregating '{retention.method}' retaining {retention.keep}: {str(e)}"
                         )
             finally:
-                self._disconnect(database)
+                self.__disconnect(database)
