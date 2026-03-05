@@ -12,7 +12,7 @@ import logging
 from collections.abc import Callable
 from logging import Logger
 from threading import Lock
-from typing import Optional, TypeVar
+from typing import Any, Dict, Optional, TypeVar
 
 import pandas as pd
 import pytz as tz
@@ -60,6 +60,15 @@ class Listener(_Listener):
         self._unique = unique
         self._function = function
         self.channels = channels
+
+    def __getstate__(self) -> Dict[str, Any]:
+        state = self.__dict__.copy()
+        state.pop("_logger", None)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        self.__dict__.update(state)
+        self._logger = logging.getLogger(self.__module__)
 
     def __call__(self, timestamp: pd.Timestamp) -> Listener:
         self.__start = pd.Timestamp.now(tz=tz.UTC)

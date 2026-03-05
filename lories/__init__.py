@@ -42,8 +42,8 @@ from .connectors import (  # noqa: F401
     ConnectorError,
     ConnectionError,
     Database,
-    DatabaseException,
-    DatabaseUnavailableException,
+    DatabaseError,
+    DatabaseUnavailableError,
     Databases,
 )
 
@@ -65,8 +65,6 @@ from .components import (  # noqa: F401
     Tariff,
     Weather,
 )
-
-from .settings import Settings  # noqa: F401
 
 from . import system  # noqa: F401
 from .system import System  # noqa: F401

@@ -12,7 +12,8 @@ from typing import Any, Callable, Collection, Iterable, Optional, Type, overload
 
 import pandas as pd
 from lories._core import _Context, _Registrator  # noqa
-from lories._core._data import DataContext, _DataContext, _DataManager  # noqa
+from lories._core._data import DataContext, _DataContext  # noqa
+from lories._core._tasks import TaskContext, _TaskContext  # noqa
 from lories.core import Configurator, Constant, ResourceError
 from lories.core.typing import ChannelsArgument, Registrator, Timestamp
 from lories.data.channels import Channel, Channels
@@ -30,13 +31,13 @@ except ImportError:
 # noinspection PyProtectedMember, PyShadowingBuiltins
 class DataAccess(_DataAccess, Configurator):
     __registrar: _Registrator
-    __context: _DataContext
+    __context: _TaskContext | _DataContext
 
     def __init__(self, registrar: Registrator, **kwargs: Any) -> None:
         registrar = self._assert_registrar(registrar)
         super().__init__(logger=registrar._logger, **kwargs)
         self.__registrar = registrar
-        self.__context = self._assert_context(get_context(registrar, _DataManager))
+        self.__context = self._assert_context(get_context(registrar, (_TaskContext, _DataContext)))
 
     @classmethod
     def _assert_registrar(cls, registrar: Registrator) -> Registrator:
@@ -45,8 +46,8 @@ class DataAccess(_DataAccess, Configurator):
         return registrar
 
     @classmethod
-    def _assert_context(cls, context: DataContext) -> DataContext:
-        if context is None or not isinstance(context, _DataManager):
+    def _assert_context(cls, context: TaskContext) -> TaskContext:
+        if context is None or not isinstance(context, _TaskContext) or not isinstance(context, _DataContext):
             raise TypeError(f"Invalid '{cls.__name__}' context: {type(context)}")
         return context
 
@@ -91,19 +92,22 @@ class DataAccess(_DataAccess, Configurator):
 
     def _set(self, id: str, channel: Channel) -> None:
         id = self.__validate_id(id)
-
-        self.context._set(id, channel)
+        if self.__context._contains(id):
+            if self.__context[id] != channel:
+                raise ValueError(f'Channel with ID "{id}" already exists')
+        else:
+            self.__context._set(id, channel)
         super()._set(id, channel)
 
     def _create(self, id: str, key: str, type: Type, **configs: Any) -> Channel:
-        return self.context._create(id=id, key=key, type=type, **configs)
+        return self.__context._create(id=id, key=key, type=type, **configs)
 
     def _remove(self, *__objects: str | Channel) -> None:
         for __object in __objects:
             if isinstance(__object, str):
                 __object = self.__validate_id(__object)
 
-            self.context._remove(__object)
+            self.__context._remove(__object)
             super()._remove(__object)
 
     @property
@@ -111,7 +115,7 @@ class DataAccess(_DataAccess, Configurator):
         return len(self.values()) == 0 or self.to_frame(states=False).dropna(axis="index", how="all").empty
 
     @property
-    def context(self) -> DataContext:
+    def context(self) -> TaskContext | DataContext:
         return self.__context
 
     def load(self, sort: bool = True) -> Collection[Channel]:
@@ -241,9 +245,10 @@ class DataAccess(_DataAccess, Configurator):
         data: pd.DataFrame,
         channels: Optional[ChannelsArgument] = None,
         timeout: Optional[float] = None,
+        **kwargs,
     ) -> None:
         if data is None:
             raise ResourceError(f"Invalid data to write '{self.id}': {data}")
         data.rename(columns={c.key: c.id for c in channels}, inplace=True)
         channels = self._filter_by_args(channels)
-        self.__context.write(data, channels=channels, timeout=timeout)
+        self.__context.write(data, channels=channels, timeout=timeout, **kwargs)

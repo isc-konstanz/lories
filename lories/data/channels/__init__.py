@@ -10,6 +10,7 @@ from ..._core import ChannelState  # noqa: F401
 
 from .connector import ChannelConnector  # noqa: F401
 from .converter import ChannelConverter  # noqa: F401
+from .processors import ChannelProcessors  # noqa: F401
 
 from .channels import Channels  # noqa: F401
 

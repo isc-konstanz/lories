@@ -12,6 +12,8 @@ from .interface import (  # noqa: F401
     register_interface_type,
 )
 
+from .settings import Settings  # noqa: F401
+
 from .main import Application  # noqa: F401
 
 import importlib

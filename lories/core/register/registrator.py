@@ -51,10 +51,7 @@ class Registrator(_Registrator, Configurator):
         self.__context = context
 
     @classmethod
-    def _assert_context(
-        cls,
-        context: RegistratorContext,
-    ) -> RegistratorContext:
+    def _assert_context(cls, context: RegistratorContext) -> RegistratorContext:
         if context is None or not isinstance(context, (_RegistratorContext, _Registrator)):
             raise ResourceError(f"Invalid '{cls.__name__}' context: {type(context)}")
         return context
