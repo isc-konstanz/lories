@@ -36,7 +36,7 @@ class TaskContext(_TaskContext, Activator):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._name_prefix = kwargs.get("name", "")
+        self._task_prefix = kwargs.get("name", "")
 
     def __eq__(self, other: Any) -> bool:
         return self is other

@@ -43,9 +43,9 @@ class CameraStream(Configurator, Thread):
         self,
         connector: CameraConnector,
         channels: Channels,
+        configs: Configurations,
         callbacks: List[Callable[[bytes],]] = (),
         motion: Optional[MotionDetector] = None,
-        configs: Optional[Configurations] = None,
     ):
         super().__init__(configs, name=f"{connector.id}.stream", target=self.__stream, args=(channels,), daemon=True)
         _process = ProcessContext(configs=configs)

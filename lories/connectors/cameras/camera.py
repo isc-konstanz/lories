@@ -63,7 +63,7 @@ class CameraConnector(_CameraConnector):
 
         self.__streaming = len(stream_channels) > 0
         if self.__streaming:
-            self._stream = CameraStream(self, stream_channels, stream_callbacks, motion)
+            self._stream = CameraStream(self, stream_channels, stream_configs, stream_callbacks, motion)
             self._stream.configure(stream_configs)
             self._stream.start()
 
