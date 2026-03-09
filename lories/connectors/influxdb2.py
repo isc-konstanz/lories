@@ -31,7 +31,7 @@ except ImportError:
     from typing_extensions import Literal
 
 
-@register_connector_type("influxdb2", "influx_v2")
+@register_connector_type("influxdb2", "influxdb_v2")
 class InfluxDB2(Database):
     host: str
     port: int
@@ -45,20 +45,6 @@ class InfluxDB2(Database):
     timeout: int
 
     _client: Optional[InfluxDBClient] = None
-
-    # noinspection PyShadowingBuiltins
-    def _get_vars(self) -> Dict[str, Any]:
-        vars = super()._get_vars()
-        if self.is_configured():
-            vars["host"] = self.host
-            vars["port"] = self.port
-            vars["org"] = self.org
-            vars["bucket"] = self.bucket
-            vars["token"] = f"...{self.token[-6:]}"
-            vars["ssl"] = self.ssl_verify
-            vars["ssl_verify"] = self.ssl_verify
-            vars["timeout"] = self.timeout
-        return vars
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
@@ -111,6 +97,7 @@ class InfluxDB2(Database):
                 # TODO: Configure retention from channel attributes
                 retention = BucketRetentionRules(every_seconds=0)  # 0 means infinite retention
                 buckets_api.create_bucket(bucket_name=self.bucket, retention_rules=retention)
+
         except (ApiException, InfluxDBError, HTTPError) as e:
             self._raise(e)
 
@@ -415,6 +402,20 @@ class InfluxDB2(Database):
         except (ApiException, InfluxDBError, HTTPError) as e:
             self._raise(e)
         return False
+
+    # noinspection PyShadowingBuiltins
+    def _get_vars(self) -> Dict[str, Any]:
+        vars = super()._get_vars()
+        if self.is_configured():
+            vars["host"] = self.host
+            vars["port"] = self.port
+            vars["org"] = self.org
+            vars["bucket"] = self.bucket
+            vars["token"] = f"...{self.token[-6:]}"
+            vars["ssl"] = self.ssl_verify
+            vars["ssl_verify"] = self.ssl_verify
+            vars["timeout"] = self.timeout
+        return vars
 
     def _raise(self, e: Exception):
         if isinstance(e, ApiException):
