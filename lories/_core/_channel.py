@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lories.data.channels.channel
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lories._core._channel
+~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -9,7 +9,6 @@ lories.data.channels.channel
 from __future__ import annotations
 
 from abc import abstractmethod
-from collections.abc import Callable
 from copy import deepcopy
 from enum import Enum
 from typing import Any, Collection, Dict, Mapping, Optional, TypeVar, overload
@@ -20,13 +19,6 @@ from lories._core._context import Context
 from lories._core._entity import Entity, _Entity
 from lories._core._resource import _Resource
 from lories._core.typing import Timestamp
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 class ChannelState(Enum):
@@ -132,14 +124,6 @@ class _Channel(_Resource):
     def has_connector(self, id: Optional[str] = None) -> bool: ...
 
     @abstractmethod
-    def register(
-        self,
-        function: Callable[[pd.DataFrame], None],
-        how: Literal["any", "all"] = "any",
-        unique: bool = False,
-    ) -> None: ...
-
-    @abstractmethod
     def read(
         self,
         start: Optional[Timestamp] = None,
@@ -188,7 +172,7 @@ class _Channel(_Resource):
                 _type = _key
             if _type not in configs:
                 return
-            configs[_type] = _Channel.__build_member(configs[_type], _key)
+            configs[_type] = _Channel._build_member(configs[_type], _key)
 
         _build_wrapper("converter")
         _build_wrapper("connector")
@@ -196,7 +180,7 @@ class _Channel(_Resource):
         return configs
 
     @staticmethod
-    def __build_member(configs: Optional[Dict[str, Any] | str], key: str) -> Optional[Dict[str, Any]]:
+    def _build_member(configs: Optional[Dict[str, Any] | str], key: str) -> Optional[Dict[str, Any]]:
         if isinstance(configs, str) or configs is None:
             return {key: configs}
         elif not isinstance(configs, Mapping):

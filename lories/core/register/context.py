@@ -10,42 +10,36 @@ from __future__ import annotations
 
 import re
 from abc import abstractmethod
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Collection, Generic, Optional, Sequence, Type
 
 from lories._core._configurations import Configurations  # noqa
-from lories._core._data import DataContext, _DataContext, _DataManager  # noqa
 from lories._core._registrator import Registrator  # noqa
+from lories._core._tasks import TaskContext, _TaskContext  # noqa
 from lories.core.errors import ResourceError
-from lories.core.register._load import _RegistratorLoader
+from lories.core.register._core import _RegistratorContext
 from lories.core.register.registry import Registry
 from lories.util import validate_key
 
 
 # noinspection SpellCheckingInspection, PyProtectedMember
-class RegistratorContext(_RegistratorLoader[Registrator], Generic[Registrator]):
-    __context: _DataContext
+class RegistratorContext(_RegistratorContext[Registrator], Generic[Registrator]):
+    __context: _TaskContext
 
     # noinspection PyUnresolvedReferences
-    def __init__(self, context: DataContext, **kwargs) -> None:
+    def __init__(self, context: TaskContext, **kwargs) -> None:
         context = self._assert_context(context)
         super().__init__(context._logger, **kwargs)
         self.__context = context
 
     @classmethod
-    def _assert_context(cls, context: DataContext) -> DataContext:
-        if context is None or not isinstance(context, _DataManager):
+    def _assert_context(cls, context: TaskContext) -> TaskContext:
+        if context is None or not isinstance(context, _TaskContext):
             raise ResourceError(f"Invalid '{cls.__name__}' context: {type(context)}")
         return context
 
     @property
-    def context(self) -> DataContext:
+    def context(self) -> TaskContext:
         return self.__context
-
-    # noinspection PyUnresolvedReferences
-    @property
-    def _executor(self) -> ThreadPoolExecutor:
-        return self.__context._executor
 
     @property
     @abstractmethod

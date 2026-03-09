@@ -19,18 +19,35 @@ from lories.util import parse_type
 # noinspection PyPep8Naming, PyShadowingBuiltins
 class Constant(_Constant):
     # noinspection PyTypeChecker
-    def __new__(cls, type: Type, key: str, name: Optional[str] = None, unit: Optional[str] = None):
-        if key in CONSTANTS:
+    def __new__(
+        cls,
+        type: Type,
+        key: str,
+        name: Optional[str] = None,
+        unit: Optional[str] = None,
+        alias: Optional[str] = None,
+        **configs,
+    ):
+        _key = key if alias is None else alias
+        if _key in CONSTANTS:
             raise ResourceError(f"Constant '{key}' already exists.")
-        constant = str.__new__(cls, key)
+        constant = str.__new__(cls, _key)
         CONSTANTS.append(constant)
         return constant
 
-    def __init__(self, type: Type | str, key: str, name: Optional[str] = None, unit: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        type: Type | str,
+        key: str,
+        name: Optional[str] = None,
+        unit: Optional[str] = None,
+        **configs,
+    ) -> None:
         self.__type = parse_type(type)
         self.__key = key
         self.__name = name
         self.__unit = unit
+        self.__configs = configs
 
     def __str__(self) -> str:
         return self.key
@@ -65,6 +82,7 @@ class Constant(_Constant):
         }
         if self.__unit is not None:
             dict["unit"] = self.__unit
+        dict.update(self.__configs)
         return dict
 
 

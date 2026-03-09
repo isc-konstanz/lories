@@ -9,6 +9,7 @@ lories._core._component
 from __future__ import annotations
 
 from abc import abstractmethod
+from collections.abc import Callable
 from typing import Any, Collection, Dict, Optional, TypeAlias, TypeVar, overload
 
 import pandas as pd
@@ -87,9 +88,17 @@ Component = TypeVar("Component", bound=_Component)
 class _ComponentContext(_RegistratorContext[Component]):
     TYPE: str = "components"
 
+    # noinspection PyShadowingBuiltins
+    @abstractmethod
+    def activate(self, filter: Optional[Callable[[Component], bool]] = None) -> None: ...
+
+    # noinspection PyShadowingBuiltins
+    @abstractmethod
+    def deactivate(self, filter: Optional[Callable[[Component], bool]] = None) -> None: ...
+
 
 ComponentContext = TypeVar(
     name="ComponentContext",
     bound=_ComponentContext,
 )
-Components: TypeAlias = ComponentContext
+Components: TypeAlias = _ComponentContext

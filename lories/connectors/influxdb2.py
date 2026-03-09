@@ -18,7 +18,7 @@ from influxdb_client.rest import ApiException
 from urllib3.exceptions import HTTPError, NewConnectionError
 
 import pandas as pd
-from lories.connectors import ConnectionError, Database, DatabaseException, register_connector_type
+from lories.connectors import ConnectionError, Database, DatabaseError, register_connector_type
 from lories.core.configs import ConfigurationError
 from lories.data.util import hash_value
 from lories.typing import Configurations, Resource, Resources, Timestamp
@@ -31,8 +31,8 @@ except ImportError:
     from typing_extensions import Literal
 
 
-@register_connector_type("influx", "influxdb")
-class InfluxDatabase(Database):
+@register_connector_type("influxdb2", "influxdb_v2")
+class InfluxDB2(Database):
     host: str
     port: int
 
@@ -45,20 +45,6 @@ class InfluxDatabase(Database):
     timeout: int
 
     _client: Optional[InfluxDBClient] = None
-
-    # noinspection PyShadowingBuiltins
-    def _get_vars(self) -> Dict[str, Any]:
-        vars = super()._get_vars()
-        if self.is_configured():
-            vars["host"] = self.host
-            vars["port"] = self.port
-            vars["org"] = self.org
-            vars["bucket"] = self.bucket
-            vars["token"] = f"...{self.token[-6:]}"
-            vars["ssl"] = self.ssl_verify
-            vars["ssl_verify"] = self.ssl_verify
-            vars["timeout"] = self.timeout
-        return vars
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
@@ -111,6 +97,7 @@ class InfluxDatabase(Database):
                 # TODO: Configure retention from channel attributes
                 retention = BucketRetentionRules(every_seconds=0)  # 0 means infinite retention
                 buckets_api.create_bucket(bucket_name=self.bucket, retention_rules=retention)
+
         except (ApiException, InfluxDBError, HTTPError) as e:
             self._raise(e)
 
@@ -393,7 +380,7 @@ class InfluxDatabase(Database):
         end: str = "now()",
     ) -> str:
         if measurement is None:
-            raise DatabaseException(self, f"Measurement is None for following resources: {resources}")
+            raise DatabaseError(self, f"Measurement is None for following resources: {resources}")
         query = f"""
             from(bucket: "{self.bucket}")
                 |> range(start: {start}, stop: {end})
@@ -416,13 +403,27 @@ class InfluxDatabase(Database):
             self._raise(e)
         return False
 
+    # noinspection PyShadowingBuiltins
+    def _get_vars(self) -> Dict[str, Any]:
+        vars = super()._get_vars()
+        if self.is_configured():
+            vars["host"] = self.host
+            vars["port"] = self.port
+            vars["org"] = self.org
+            vars["bucket"] = self.bucket
+            vars["token"] = f"...{self.token[-6:]}"
+            vars["ssl"] = self.ssl_verify
+            vars["ssl_verify"] = self.ssl_verify
+            vars["timeout"] = self.timeout
+        return vars
+
     def _raise(self, e: Exception):
         if isinstance(e, ApiException):
-            raise DatabaseException(self, str(e))
+            raise DatabaseError(self, str(e))
         elif isinstance(e, InfluxDBError):
-            raise DatabaseException(self, str(e))
+            raise DatabaseError(self, str(e))
         elif isinstance(e, NewConnectionError):
-            raise DatabaseException(self, str(e))
+            raise DatabaseError(self, str(e))
         else:
             raise ConnectionError(self, str(e))
 

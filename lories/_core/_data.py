@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lories._data._manager
-~~~~~~~~~~~~~~~~~~~~~
+lories._core._data
+~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -13,12 +13,9 @@ from collections.abc import Callable
 from typing import Any, List, Optional, Tuple, TypeAlias, TypeVar, overload
 
 import pandas as pd
-from lories._core._activator import Activator, _Activator
 from lories._core._channel import Channel, _Channel
 from lories._core._channels import Channels, ChannelsArgument
-from lories._core._connector import Connector
 from lories._core._context import _Context
-from lories._core._entity import _Entity
 from lories._core.typing import Timestamp
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -36,8 +33,16 @@ class _DataContext(_Context[Channel]):
     @abstractmethod
     def channels(self) -> Channels: ...
 
+    # noinspection PyShadowingBuiltins
+    @overload
+    def filter(self, filter: Callable[[Channel], bool]) -> Channels: ...
+
+    # noinspection PyShadowingBuiltins
+    @overload
+    def filter(self, filter: Callable[[Channel], bool], *other: Callable[[Channel], bool]) -> Channels: ...
+
     @abstractmethod
-    def filter(self, *filters: Optional[Callable[[Channel], bool]]) -> Channels: ...
+    def filter(self, *filters: Callable[[Channel], bool]) -> Channels: ...
 
     # noinspection SpellCheckingInspection
     @abstractmethod
@@ -152,45 +157,12 @@ class _DataContext(_Context[Channel]):
         data: pd.DataFrame,
         channels: Optional[ChannelsArgument] = None,
         timeout: Optional[float] = None,
+        **kwargs,
     ) -> None: ...
 
     @abstractmethod
     def to_frame(self, **kwargs) -> pd.DataFrame: ...
 
 
-class _DataManager(_DataContext, _Activator, _Entity):
-    # noinspection PyShadowingBuiltins
-    @abstractmethod
-    def activate(self, filter: Optional[Callable[[Activator], bool]] = None) -> None: ...
-
-    # noinspection PyShadowingBuiltins
-    @abstractmethod
-    def connect(
-        self,
-        filter: Optional[Callable[[Connector], bool]] = None,
-        channels: Optional[ChannelsArgument] = None,
-        timeout: Optional[float] = None,
-    ) -> None: ...
-
-    # noinspection PyShadowingBuiltins
-    @abstractmethod
-    def reconnect(
-        self,
-        filter: Optional[Callable[[Connector], bool]] = None,
-    ) -> None: ...
-
-    # noinspection PyShadowingBuiltins
-    @abstractmethod
-    def disconnect(
-        self,
-        filter: Optional[Callable[[Connector], bool]] = None,
-    ) -> None: ...
-
-    # noinspection PyShadowingBuiltins
-    @abstractmethod
-    def deactivate(self, *_, filter: Optional[Callable[[Activator], bool]] = None) -> None: ...
-
-
 DataContext = TypeVar("DataContext", bound=_DataContext[_Channel])
-DataManager = TypeVar("DataManager", bound=_DataManager)
 Data: TypeAlias = DataContext

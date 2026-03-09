@@ -9,11 +9,12 @@ lories._core._connectors
 from __future__ import annotations
 
 from abc import abstractmethod
+from collections.abc import Callable
 from enum import Enum
-from typing import Collection, TypeAlias, TypeVar
+from typing import Collection, Optional, TypeAlias, TypeVar
 
 import pandas as pd
-from lories._core._channels import Channels
+from lories._core._channels import Channels, ChannelsArgument
 from lories._core._registrator import _Registrator, _RegistratorContext
 from lories._core._resources import Resources
 
@@ -76,9 +77,32 @@ Connector = TypeVar("Connector", bound=_Connector)
 class _ConnectorContext(_RegistratorContext[Connector]):
     TYPE: str = "connectors"
 
+    # noinspection PyShadowingBuiltins
+    @abstractmethod
+    def connect(
+        self,
+        filter: Optional[Callable[[Connector], bool]] = None,
+        channels: Optional[ChannelsArgument] = None,
+        timeout: Optional[float] = None,
+    ) -> None: ...
+
+    # noinspection PyShadowingBuiltins
+    @abstractmethod
+    def reconnect(
+        self,
+        filter: Optional[Callable[[Connector], bool]] = None,
+    ) -> None: ...
+
+    # noinspection PyShadowingBuiltins
+    @abstractmethod
+    def disconnect(
+        self,
+        filter: Optional[Callable[[Connector], bool]] = None,
+    ) -> None: ...
+
 
 ConnectorContext = TypeVar(
     name="ConnectorContext",
     bound=_ConnectorContext,
 )
-Connectors: TypeAlias = ConnectorContext
+Connectors: TypeAlias = _ConnectorContext

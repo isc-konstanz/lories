@@ -71,6 +71,15 @@ class Configurator(_Configurator, metaclass=ConfiguratorMeta):
     def __replace__(self, **changes) -> ConfiguratorType:
         return self.duplicate(**changes)
 
+    def __getstate__(self) -> Dict[str, Any]:
+        state = self.__dict__.copy()
+        state.pop("_logger", None)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        self.__dict__.update(state)
+        self._logger = self._build_logger()
+
     @classmethod
     def _assert_configs(cls, configs: Optional[Configurations]) -> Optional[Configurations]:
         if configs is None:
@@ -193,13 +202,15 @@ class Configurator(_Configurator, metaclass=ConfiguratorMeta):
             configs = self.__configs.copy()
         try:
             duplicator = super().duplicate
+            if duplicator.__isabstractmethod__:
+                duplicator = type(self)
         except AttributeError:
             duplicator = type(self)
         return duplicator(configs=configs, **changes)
 
     # noinspection PyUnresolvedReferences
     @wraps(_Configurator.duplicate, updated=())
-    def _do_duplicate(self, configs: Configurations, **changes) -> ConfiguratorType:
+    def _do_duplicate(self, configs: Optional[Configurations] = None, **changes) -> ConfiguratorType:
         if configs is None:
             configs = self.__configs.copy()
         self._at_duplicate(configs=configs, **changes)
