@@ -7,5 +7,26 @@ lories.data.filters
 """
 
 from .filter import Filter  # noqa: F401
-from .ir_filters import IirFilter, FirFilter  # noqa: F401
-from .basic_filters import MovingAverageFilter, LowPassFilter  # noqa: F401
+
+from . import iir
+from .iir import Iir
+
+from . import fir
+from .fir import Fir
+
+import importlib
+
+FILTERS = [
+    "lowpass",
+    "movingaverage"
+]
+
+for import_filter in FILTERS:
+    try:
+        importlib.import_module(f".{import_filter}", "lories.data.filters")
+
+    except ModuleNotFoundError:
+        # TODO: Implement meaningful logging here
+        pass
+
+del importlib
