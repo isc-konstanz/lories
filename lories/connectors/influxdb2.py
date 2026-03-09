@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lories.connectors.influx
-~~~~~~~~~~~~~~~~~~~~~~~~
+lories.connectors.influxdb2
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
