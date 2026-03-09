@@ -8,7 +8,7 @@ lories.data.filters.basic_filters
 
 from __future__ import annotations
 
-from lories.data.filters.basic_filters import IirFilter, FirFilter
+from lories.data.filters import IirFilter, FirFilter
 
 
 class LowPassFilter(IirFilter):
