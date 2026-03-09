@@ -8,7 +8,7 @@ lories.connectors.math
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 import sympy
 
@@ -22,14 +22,11 @@ from lories.typing import Configurations, Resources
 
 @register_connector_type("math")
 class MathConnector(Connector):
-    _connected: bool
-
+    _symbols: List[InputSymbol]
     _expr: sympy.Expr
-    _symbols: list[InputSymbol]
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self._connected = False
         self._symbols = []
 
         math = configs.get("math")
@@ -37,6 +34,7 @@ class MathConnector(Connector):
             expr = sympy.sympify(math)
             expr = sympy.simplify(expr)
             self._expr = expr
+
         except Exception as e:
             raise ConfigurationError(f"Error parsing math expression: {math}: {e}")
 
@@ -51,13 +49,11 @@ class MathConnector(Connector):
         for unmapped in mapping.items():
             raise ConfigurationError(f"Mapping for unknown symbol '{unmapped}'")
 
-    def is_connected(self) -> bool:
-        return self._connected
-
     def connect(self, resources: Resources) -> None:
-        # Todo: is filtering necessary?
+        # TODO: Is filtering necessary?
         # channels = resources.filter(lambda r: isinstance(r, Channel))
-        # resources is only the output resources (channels) assigned to this connector, which receive the computed values
+        # resources is only the output resources (channels) assigned to this connector,
+        # which receive the computed values
 
         for symbol in self._symbols:
             channel = self._find_channel(symbol.channel_id)
@@ -69,14 +65,13 @@ class MathConnector(Connector):
             # Todo: call _evaluate when symbol channel is updated
 
         self._evaluate()
-        self._connected = True
 
     def _find_channel(self, channel_id: str) -> Optional[Channel]:
         if "." in channel_id:
-            # Todo: find globally by id
+            # TODO: Find globally by id
             raise NotImplementedError("Finding channels by global id is not implemented yet.")
         else:
-            # Todo: not tested
+            # TODO: Not tested yet
             component = self.context.context
             return component.data.get(channel_id)
 
@@ -91,16 +86,16 @@ class MathConnector(Connector):
             channel.set(timestamp, result)
 
     def disconnect(self) -> None:
-        self._connected = False
         for symbol in self._symbols:
             self.context.context.data.unregister(symbol)
             del symbol.channel
 
     def read(self, resources: Resources) -> pd.DataFrame:
+        # TODO: Implement reading data non-reactingly (pull mode)
         pass
 
     def write(self, data: pd.DataFrame) -> None:
-        pass
+        raise NotImplementedError("Math connector does not support writing data")
 
 
 class InputSymbol:
