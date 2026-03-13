@@ -152,7 +152,12 @@ class InfluxDB1(Database):
             raise ValueError(f"Invalid mode '{mode}'")
         results = []
 
-        for measurement, measurement_resources in resources.groupby(lambda r: r.get("measurement", default=r.group)):
+        for measurement, measurement_resources in resources.groupby(
+                lambda r: r.get("measurement", default=r.group)
+        ):
+            if measurement is None:
+                measurement = "None"
+
             for tag, tagged_resources in measurement_resources.groupby("tag"):
                 for field in tagged_resources:
                     field_name = _get_field(field)
@@ -196,7 +201,12 @@ class InfluxDB1(Database):
     ) -> pd.DataFrame:
         results = []
 
-        for measurement, measurement_resources in resources.groupby(lambda r: r.get("measurement", default=r.group)):
+        for measurement, measurement_resources in resources.groupby(
+                lambda r: r.get("measurement", default=r.group)
+        ):
+            if measurement is None:
+                measurement = "None"
+
             for tag, tagged_resources in measurement_resources.groupby("tag"):
                 select = _build_select(
                     resources=tagged_resources,
@@ -271,8 +281,13 @@ class InfluxDB1(Database):
                     self._raise(e)
 
     def delete(self, resources: Resources, start=None, end=None) -> None:
-        for measurement, group_resources in resources.groupby(lambda r: r.get("measurement", default=r.group)):
-            for tag, _ in group_resources.groupby("tag"):
+        for measurement, measurement_resources in resources.groupby(
+                lambda r: r.get("measurement", default=r.group)
+        ):
+            if measurement is None:
+                measurement = "None"
+
+            for tag, _ in measurement_resources.groupby("tag"):
                 where = [f"\"_measurement\" = '{measurement}'"]  # optional
                 if tag is not None:
                     where.append(f"\"tag\" = '{tag}'")
