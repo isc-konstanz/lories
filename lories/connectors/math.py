@@ -8,117 +8,137 @@ lories.connectors.math
 
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from collections.abc import Callable
+from copy import deepcopy
+from typing import Any, Dict, List, Optional
 
 import sympy
 
 import pandas as pd
 import pytz as tz
+
 from lories.connectors import Connector, register_connector_type
 from lories.core import ConfigurationError
-from lories.data import Channel
-from lories.typing import Configurations, Resources
+from lories.data import Channel, DataContext
+from lories.typing import Resource, Resources
+from lories.util import get_context, to_bool
 
 
+# noinspection SpellCheckingInspection
 @register_connector_type("math")
 class MathConnector(Connector):
-    _symbols: List[InputSymbol]
-    _expr: sympy.Expr
-
-    def configure(self, configs: Configurations) -> None:
-        super().configure(configs)
-        self._symbols = []
-
-        math = configs.get("math")
-        try:
-            expr = sympy.sympify(math)
-            expr = sympy.simplify(expr)
-            self._expr = expr
-
-        except Exception as e:
-            raise ConfigurationError(f"Error parsing math expression: {math}: {e}")
-
-        mapping = configs.get("mapping", {})
-        for symbol in expr.free_symbols:
-            input_symbol = InputSymbol(symbol)
-            if symbol.name in mapping:
-                input_symbol.update_id(mapping[symbol.name])
-                mapping.pop(symbol.name)
-            self._symbols.append(input_symbol)
-
-        for unmapped in mapping.items():
-            raise ConfigurationError(f"Mapping for unknown symbol '{unmapped}'")
+    _exprs: Dict[str, ChannelExpr]
 
     def connect(self, resources: Resources) -> None:
-        # TODO: Is filtering necessary?
-        # channels = resources.filter(lambda r: isinstance(r, Channel))
-        # resources is only the output resources (channels) assigned to this connector,
-        # which receive the computed values
+        self._exprs = {}
 
-        for symbol in self._symbols:
-            channel = self._find_channel(symbol.channel_id)
-            if channel is None:
-                raise ConfigurationError(f"Channel '{symbol.channel_id}' for symbol '{symbol.name}' not found.")
-            symbol.update_channel(channel)
-            symbol.update_value()
-            self.context.context.data.register(symbol, channel, how="any", unique=False)
-            # Todo: call _evaluate when symbol channel is updated
+        mapping = self.configs.get("mapping", default={})
+        for resource in resources:
+            resource_mappings = deepcopy(mapping)
+            resource_mappings.update(resource.get("mapping", default={}))
 
-        self._evaluate()
+            self._exprs[resource.id] = self._build_expr(resource, **resource_mappings)
 
-    def _find_channel(self, channel_id: str) -> Optional[Channel]:
-        if "." in channel_id:
-            # TODO: Find globally by id
-            raise NotImplementedError("Finding channels by global id is not implemented yet.")
-        else:
-            # TODO: Not tested yet
-            component = self.context.context
-            return component.data.get(channel_id)
+    # noinspection PyTypeChecker, PyUnresolvedReferences
+    def _build_expr(self, resource: Resource, **mappings: str) -> ChannelExpr:
+        data = get_context(self.context, DataContext)
 
-    def _evaluate(self) -> None:
-        timestamp = pd.Timestamp.now(tz=tz.UTC).floor(freq="s")
-        local_dict = {symbol.name: symbol.value for symbol in self._symbols}
-        if any(value is None for value in local_dict.values()):
-            return
+        expression = resource.get("expression", resource.get("expr", resource.get("math", None)))
+        try:
+            expr = sympy.sympify(expression)
+            expr = sympy.simplify(expr)
 
-        result = self._expr.evalf(subs=local_dict)
-        for channel in self.resources.filter(lambda r: isinstance(r, Channel)):
-            channel.set(timestamp, result)
+            channels = []
+            channel_symbols = []
+            for symbol in expr.free_symbols:
+                channel_id = mappings.get(symbol.name, symbol.name)
+                if "." not in channel_id:
+                    channel_id = ".".join((*resource.path[:-1], channel_id))
+
+                channel = data.get(channel_id)
+                if channel is None:
+                    raise ConfigurationError(f"Channel '{channel_id}' for symbol '{symbol.name}' not found.")
+                channels.append(channel)
+                channel_symbols.append(ChannelSymbol(symbol, channel))
+            channel_expr = ChannelExpr(expr, resource, channel_symbols)
+
+            listen = resource.get("listen", default=None)
+            if to_bool(resource.get("listener", default=listen is not None)):
+                data.register(channel_expr, channels, how=listen, unique=True)
+
+            return channel_expr
+
+        except Exception as e:
+            raise ConfigurationError(f"Error parsing math expression for channel '{resource.id}': {expression}: {e}")
 
     def disconnect(self) -> None:
-        for symbol in self._symbols:
-            self.context.context.data.unregister(symbol)
-            del symbol.channel
+        for expr in self._exprs.keys():
+            self.context.context.unregister(self._exprs.pop(expr))
 
     def read(self, resources: Resources) -> pd.DataFrame:
-        # TODO: Implement reading data non-reactingly (pull mode)
-        pass
+        timestamp = pd.Timestamp.now(tz.UTC).floor(freq="s")
+        columns = []
+        data = []
+        for resource in resources:
+            columns.append(resource.id)
+            data.append(self._exprs[resource.id].evaluate())
+
+        return pd.DataFrame(index=[timestamp], data=data, columns=columns)
 
     def write(self, data: pd.DataFrame) -> None:
         raise NotImplementedError("Math connector does not support writing data")
 
 
-class InputSymbol:
-    name: str
-    channel_id: str
-    channel: Channel
-    value: Any
+class ChannelExpr(Callable):
+    _expr: sympy.Expr
+    _channel: Channel
 
-    def __init__(self, symbol: sympy.Symbol) -> None:
-        self.name = symbol.name
-        self.channel_id = self.name
-        self.channel = None
-        self.value = None
+    symbols: List[ChannelSymbol]
 
+    def __init__(self, expr: sympy.Expr, channel: Channel, symbols: List[ChannelSymbol]) -> None:
+        self._expr = expr
+        self._channel = channel
+        self.symbols = symbols
+
+    @property
+    def __self__(self) -> Channel:
+        return self._channel
+
+    @property
+    def __name__(self) -> str:
+        return "expr"
+
+    # noinspection PyTypeChecker
     def __call__(self, data: pd.DataFrame) -> None:
-        self.value = data.at[data.index[-1], self.channel.id]
+        timestamp = data.index[-1]
+        result = self.evaluate()
+        if result is None:
+            return
 
-    def update_id(self, channel_id: str) -> None:
-        self.channel_id = channel_id
+        self._channel.set(timestamp, result)
 
-    def update_channel(self, channel: Channel) -> None:
-        self.channel = channel
+    def evaluate(self) -> Optional[float]:
+        if not all(symbol.is_valid() for symbol in self.symbols):
+            return None
 
-    def update_value(self) -> None:
-        if self.channel is not None:
-            self.value = self.channel.value
+        return float(self._expr.evalf(subs={ symbol.name: symbol.value for symbol in self.symbols }))
+
+
+class ChannelSymbol:
+    _channel: Channel
+    _symbol: sympy.Symbol
+
+    def __init__(self, symbol: sympy.Symbol, channel: Channel) -> None:
+        self._channel = channel
+        self._symbol = symbol
+
+    @property
+    def name(self) -> Any:
+        return self._symbol.name
+
+    @property
+    def value(self) -> Any:
+        return self._channel.value
+
+    def is_valid(self) -> bool:
+        return self._channel.is_valid()
