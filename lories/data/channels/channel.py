@@ -18,7 +18,7 @@ from lories._core._tasks import TaskContext, _TaskContext  # noqa
 from lories._core.typing import Timestamp  # noqa
 from lories.core import Resource, ResourceError
 from lories.data.channels import ChannelConnector, ChannelConverter, ChannelProcessors, Channels
-from lories.util import parse_freq, to_timedelta
+from lories.util import parse_freq, to_bool, to_timedelta
 
 
 class Channel(_Channel, Resource):
@@ -133,6 +133,12 @@ class Channel(_Channel, Resource):
         if isinstance(value, Collection) and not isinstance(value, str) and not isinstance(value, bytes):
             return any(pd.isna(value))
         return pd.isna(value)
+
+    def is_listener(self) -> bool:
+        listener = self.get(next((k for k in ["listener", "listening", "listen"] if k in self), None), default=None)
+        if listener is None:
+            listener = False
+        return to_bool(listener, any_str=True)
 
     def set(
         self,

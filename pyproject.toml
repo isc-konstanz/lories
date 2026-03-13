@@ -46,6 +46,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+math = [
+    "sympy",
+]
 postgresql = [
     "sqlalchemy >= 2.0",
     "psycopg2 >= 2.9",

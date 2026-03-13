@@ -392,6 +392,7 @@ class Application(_Application, DataContext, TaskContext):
         freq = channel.freq
         if (
             freq is None
+            or channel.is_listener()
             or not channel.has_connector()
             or not self.connectors.get(channel.connector.id, False)
             or not self.connectors.get(channel.connector.id).is_connected()
