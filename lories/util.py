@@ -344,12 +344,14 @@ def is_bool(value: str | bool) -> bool:
     return False
 
 
-def to_bool(value: str | bool) -> Optional[bool]:
+def to_bool(value: str | bool, any_str: bool = False) -> Optional[bool]:
     if value is None:
         return None
     if type(value) == bool:  # noqa E721
         return value
     if isinstance(value, str):
+        if any_str:
+            return bool(value)
         if value.lower() in ["true", "yes", "y"]:
             return True
         if value.lower() in ["false", "no", "n"]:

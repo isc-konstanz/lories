@@ -16,7 +16,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 import pandas as pd
 import pytz as tz
-from lories.connectors import ConnectionError, Database, DatabaseException, register_connector_type
+from lories.connectors import ConnectionError, Database, DatabaseError, register_connector_type
 from lories.connectors.sql import Schema, Table
 from lories.core.configs import ConfigurationError
 from lories.data.util import hash_value
@@ -121,6 +121,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
             raise ConfigurationError(f"Unable to create database engine: {str(e)}")
 
     def connect(self, resources: Resources) -> None:
+        super().connect(resources)
         self._logger.debug(f"Connecting to {self.dialect.name} database {self.database}@{self.host}:{self.port}")
         try:
             self._connection = self.engine.connect()
@@ -129,7 +130,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
             now = pd.Timestamp.now()
             self._set_timezone(tz.UTC)
             if self._select_timezone().utcoffset(now).seconds != 0:
-                raise DatabaseException(self, "Error setting connection timezone to UTC")
+                raise DatabaseError(self, "Error setting connection timezone to UTC")
 
             self.__tables = self._schema.connect(self.engine, resources)
 
@@ -137,6 +138,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
             self._raise(e)
 
     def disconnect(self) -> None:
+        super().disconnect()
         if self._connection is not None:
             self._connection.close()
             self._logger.debug("Disconnected from the database")
@@ -187,7 +189,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
             for table_schema, schema_resources in resources.groupby("schema"):
                 for table_name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
                     if table_name not in self.__tables:
-                        raise DatabaseException(self, f"Table '{table_name}' not available")
+                        raise DatabaseError(self, f"Table '{table_name}' not available")
 
                     table = self.get(table_name)
                     select = table.hash(table_resources, start, end, method=method)
@@ -224,7 +226,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
             for table_schema, schema_resources in resources.groupby("schema"):
                 for table_name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
                     if table_name not in self.__tables:
-                        raise DatabaseException(self, f"Table '{table_name}' not available")
+                        raise DatabaseError(self, f"Table '{table_name}' not available")
 
                     table = self.get(table_name)
                     select = table.exists(table_resources, start, end)
@@ -253,7 +255,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
                 for table_name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
                     table_key = table_name if table_schema is None else f"{table_schema}.{table_name}"
                     if table_key not in self.__tables:
-                        raise DatabaseException(self, f"Table '{table_key}' not available")
+                        raise DatabaseError(self, f"Table '{table_key}' not available")
 
                     table = self.get(table_key)
                     if start is None and end is None:
@@ -281,7 +283,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
             for table_schema, schema_resources in resources.groupby("schema"):
                 for table_name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
                     if table_name not in self.__tables:
-                        raise DatabaseException(self, f"Table '{table_name}' not available")
+                        raise DatabaseError(self, f"Table '{table_name}' not available")
 
                     table = self.get(table_name)
                     select = table.read(table_resources, order_by="asc").limit(1)
@@ -305,7 +307,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
             for table_schema, schema_resources in resources.groupby("schema"):
                 for table_name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
                     if table_name not in self.__tables:
-                        raise DatabaseException(self, f"Table '{table_name}' not available")
+                        raise DatabaseError(self, f"Table '{table_name}' not available")
 
                     table = self.get(table_name)
                     select = table.read(table_resources, order_by="desc").limit(1)
@@ -328,7 +330,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
             for table_schema, schema_resources in self.resources.groupby("schema"):
                 for table_name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
                     if table_name not in self.__tables:
-                        raise DatabaseException(self, f"Table '{table_name}' not available")
+                        raise DatabaseError(self, f"Table '{table_name}' not available")
                     table_data = data.loc[:, [r.id for r in table_resources if r.id in data.columns]]
                     table_data = table_data.dropna(axis="index", how="all")
                     if table_data.empty:
@@ -353,7 +355,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
             for table_schema, schema_resources in resources.groupby("schema"):
                 for table_name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
                     if table_name not in self.__tables:
-                        raise DatabaseException(self, f"Table '{table_name}' not available")
+                        raise DatabaseError(self, f"Table '{table_name}' not available")
                     table = self.get(table_name)
                     delete = table.delete(table_resources, start, end)
                     self._logger.debug(delete)
@@ -372,6 +374,6 @@ class SqlDatabase(Database, Mapping[str, Table]):
 
     def _raise(self, e: SQLAlchemyError):
         if "syntax" in str(e).lower():
-            raise DatabaseException(self, str(e))
+            raise DatabaseError(self, str(e))
         else:
             raise ConnectionError(self, str(e))

@@ -14,8 +14,8 @@ from .errors import (  # noqa: F401
     ConnectorError,
     ConnectorUnavailableError,
     ConnectionError,
-    DatabaseException,
-    DatabaseUnavailableException,
+    DatabaseError,
+    DatabaseUnavailableError,
 )
 
 from . import access  # noqa: F401
@@ -41,9 +41,11 @@ import importlib
 
 CONNECTORS = [
     "virtual",
+    "math",
     "csv",
     "sql",
-    "influx",
+    "influxdb1",
+    "influxdb2",
     "tables",
     "cameras",
     "serial",

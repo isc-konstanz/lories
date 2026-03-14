@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from lories._core._component import Component  # noqa
 from lories._core._converter import Converter, _Converter, _ConverterContext  # noqa
-from lories._core._data import _DataManager  # noqa
+from lories._core._tasks import _TaskContext  # noqa
 from lories.core import RegistratorAccess, ResourceError
 from lories.util import get_context
 
@@ -18,7 +18,7 @@ from lories.util import get_context
 class ConverterAccess(_ConverterContext, RegistratorAccess[Converter]):
     # noinspection PyUnresolvedReferences
     def __init__(self, registrar: Component, **kwargs) -> None:
-        context = get_context(registrar, _DataManager).converters
+        context = get_context(registrar, _TaskContext).converters
         super().__init__(context, registrar, **kwargs)
 
     # noinspection PyProtectedMember, PyShadowingBuiltins

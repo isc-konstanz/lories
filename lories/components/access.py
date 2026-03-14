@@ -13,25 +13,35 @@ import os.path
 from collections.abc import Callable
 from typing import Any, Collection, Mapping, Optional, Sequence, Type
 
+from lories._core._application import _Application  # noqa
 from lories._core._component import Component, _Component, _ComponentContext  # noqa
-from lories._core._data import _DataManager  # noqa
 from lories.core import Configurations, RegistratorAccess, ResourceError
 from lories.util import get_context, update_recursive
 
 
-# noinspection PyProtectedMember
+# noinspection PyProtectedMember, PyShadowingBuiltins
 class ComponentAccess(_ComponentContext, RegistratorAccess[Component]):
     # noinspection PyUnresolvedReferences
     def __init__(self, registrar: Component, **kwargs) -> None:
-        context = get_context(registrar, _DataManager).components
+        context = get_context(registrar, _Application).components
         super().__init__(context, registrar, **kwargs)
 
-    # noinspection PyShadowingBuiltins
     def _set(self, id: str, component: Component) -> None:
         if not isinstance(component, _Component):
             raise ResourceError(f"Invalid component type: {type(component)}")
 
         super()._set(id, component)
+
+    def activate(self, filter: Optional[Callable[[Component], bool]] = None) -> None:
+        _components = self.filter(filter)
+        if len(_components) > 0:
+            self.context._activate(*_components)
+
+    # noinspection PyShadowingBuiltins
+    def deactivate(self, filter: Optional[Callable[[Component], bool]] = None) -> None:
+        _components = self.filter(filter)
+        if len(_components) > 0:
+            self.context._deactivate(*_components)
 
     def load(
         self,

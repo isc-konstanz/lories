@@ -302,7 +302,10 @@ class Configurations(_Configurations):
         return self.__dirs.conf.joinpath(self.__path.name.replace(".conf", ".d"))
 
     def has_member(self, key: str, includes: bool = False) -> bool:
-        if key in self.members:
+        member = self.get(key, default=None)
+        if member is None:
+            return False
+        if isinstance(member, (Configurations, bool)):
             return True
         if includes and self._members_dir.joinpath(f"{key}.conf").exists():
             return True
@@ -336,6 +339,8 @@ class Configurations(_Configurations):
 
         elif self.has_member(key):
             configs = self[key]
+            if isinstance(configs, bool):
+                self[key] = configs = self._create_member(key, {"enabled": configs})
             if defaults is not None:
                 configs.update(defaults, replace=False)
             return configs

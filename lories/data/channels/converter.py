@@ -8,69 +8,38 @@ lories.data.channels.converter
 
 from __future__ import annotations
 
-from collections import OrderedDict
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import pandas as pd
+from lories._core._channel import Channel  # noqa
 from lories._core._converter import Converter, _Converter  # noqa
-from lories.core.configs import ConfigurationError
-from lories.core.errors import ResourceError
-from lories.util import to_bool, update_recursive
+from lories.core.errors import ResourceError, ResourceUnavailableError
+from lories.data.channels._core import _ChannelWrapper
 
 
-class ChannelConverter:
-    __configs: OrderedDict[str, Any]
-    _connector: _Converter
+class ChannelConverter(_ChannelWrapper[Converter]):
+    # noinspection PyProtectedMember, PyUnresolvedReferences, PyTypeChecker
+    @classmethod
+    def build(cls, channel: Channel, **configs) -> ChannelConverter:
+        converter_context = channel._context._converters
+        if converter_context is None:
+            raise ResourceUnavailableError(f"Missing converter context for channel '{channel.id}'")
+        converter_id = configs.pop(_Converter.TYPE, None)
+        if converter_id is None:
+            converter = converter_context.get_by_dtype(channel.type)
+        else:
+            converter = cls._build_registrator(converter_context, channel.path, converter_id)
+        return cls(_Converter, converter, **configs)
 
-    # noinspection PyShadowingBuiltins
-    def __init__(self, converter, **configs: Any) -> None:
-        if "converter" in configs:
-            raise ConfigurationError("Invalid channel converter configuration 'converter'")
-        self.__configs = OrderedDict(configs)
-        self._converter = self._assert_converter(converter)
-
-        self.enabled = self.__configs.pop("enabled", converter is not None)
-
-    # noinspection PyMethodMayBeStatic
-    def _assert_converter(self, converter) -> Converter:
+    @classmethod
+    def _assert_registrator(cls, converter) -> Converter:
         if converter is None or not isinstance(converter, _Converter):
             raise ResourceError(f"Invalid converter: {None if converter is None else type(converter)}")
         return converter
 
-    def __eq__(self, other: Any) -> bool:
-        return (
-            isinstance(other, ChannelConverter)
-            and self._converter == other._converter
-            and self._get_vars() == other._get_vars()
-        )
-
-    def __hash__(self) -> int:
-        return hash((self._converter, *self._get_vars()))
-
-    def __contains__(self, attr: str) -> bool:
-        return attr in self._get_attrs()
-
-    def __getattr__(self, attr):
-        # __getattr__ gets called when the item is not found via __getattribute__
-        # To avoid recursion, call __getattribute__ directly to get components dict
-        configs = ChannelConverter.__getattribute__(self, f"_{ChannelConverter.__name__}__configs")
-        if attr in configs.keys():
-            return configs[attr]
-        raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
-
-    def __getitem__(self, attr: str) -> Any:
-        value = self.get(attr)
-        if value is not None:
-            return value
-        raise KeyError(attr)
-
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.key})"
-
-    def __str__(self) -> str:
-        return f"{type(self).__name__}:\n\tid={self.id}\n\t" + "\n\t".join(
-            f"{k}={v}" for k, v in self._get_vars().items()
-        )
+    @property
+    def _converter(self) -> Converter:
+        return self._get_registrator()
 
     def __call__(self, data: Any) -> Any:
         converter_args = self._get_configs()
@@ -80,74 +49,11 @@ class ChannelConverter:
         converted_data = self._converter.convert(data, **converter_args)
         return self._converter.to_dtype(converted_data, **converter_args)
 
-    # noinspection PyTypeChecker
-    @property
-    def id(self) -> str:
-        return self._converter.id
-
-    # noinspection PyTypeChecker
-    @property
-    def key(self) -> str:
-        return self._converter.key
-
     def to_str(self, value: Any) -> str:
         return self._converter.to_str(value)
 
     def to_json(self, value: Any) -> str:
         return self._converter.to_json(value)
 
-    def to_configs(self) -> Dict[str, Any]:
-        configs = {
-            "converter": self._converter.key,
-            "enabled": self.enabled,
-            **self._copy_configs(),
-        }
-        return configs
-
     def to_series(self, value: Any, timestamp: Optional[pd.Timestamp] = None, name: Optional[str] = None) -> pd.Series:
         return self._converter.to_series(value, timestamp=timestamp, name=name)
-
-    def get(self, attr: str, default: Optional[Any] = None) -> Any:
-        return self._get_vars().get(attr, default)
-
-    # noinspection PyShadowingBuiltins
-    def _get_vars(self) -> Dict[str, Any]:
-        vars = self._copy_configs()
-        vars["enabled"] = self.enabled
-        return vars
-
-    def _get_attrs(self) -> List[str]:
-        return [*self._copy_configs().keys(), "enabled"]
-
-    def _get_configs(self) -> Dict[str, Any]:
-        return self.__configs
-
-    def _copy_configs(self) -> Dict[str, Any]:
-        return OrderedDict(**self._get_configs())
-
-    def __update_configs(self, configs: Dict[str, Any]) -> None:
-        update_recursive(self.__configs, configs)
-
-    # noinspection PyShadowingBuiltins
-    def _update(
-        self,
-        converter: Optional[str | Converter] = None,
-        enabled: Optional[str | bool] = None,
-        **configs: Any,
-    ) -> None:
-        if converter is not None:
-            if isinstance(converter, str):
-                if self._converter.key != converter.split(".")[-1]:
-                    raise ConfigurationError(f"Unable to update channel converter from key '{converter}'")
-            elif not isinstance(converter, _Converter):
-                raise ConfigurationError(f"Unable to update channel converter to invalid type '{type(converter)}'")
-            else:
-                self._converter = converter
-        if enabled is not None:
-            self.enabled = to_bool(enabled)
-        self.__update_configs(configs)
-
-    def copy(self) -> ChannelConverter:
-        configs = self._copy_configs()
-        configs["enabled"] = self.enabled
-        return type(self)(self._converter, **configs)

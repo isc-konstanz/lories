@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, Generic, Iterable, Iterator, List, Seque
 from lories._core._resource import Resource  # noqa
 from lories._core._resources import Resources as ResourcesType  # noqa
 from lories._core._resources import _Resources  # noqa
+from lories.core.errors import ResourceError
 
 
 class Resources(_Resources, Generic[Resource]):
@@ -21,13 +22,22 @@ class Resources(_Resources, Generic[Resource]):
 
     def __init__(self, resources=()) -> None:
         self._logger = logging.getLogger(type(self).__module__)
-        self._resources = [*resources]
+        self._resources = [] if resources is None else [*resources]
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({', '.join(str(r.id) for r in self._resources)})"
 
     def __str__(self) -> str:
         return f"{type(self).__name__}:\n\t" + "\n\t".join(f"{r.id} = {repr(r)}" for r in self._resources)
+
+    def __getstate__(self) -> Dict[str, Any]:
+        state = self.__dict__.copy()
+        state.pop("_logger", None)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        self.__dict__.update(state)
+        self._logger = logging.getLogger(type(self).__module__)
 
     def __contains__(self, resource: str | Resource) -> bool:
         if isinstance(resource, str):
@@ -74,6 +84,13 @@ class Resources(_Resources, Generic[Resource]):
 
     def copy(self) -> ResourcesType:
         return type(self)([resource.copy() for resource in self._resources])
+
+    def duplicate(self, **changes) -> ResourcesType:
+        for key in ["id", "key", "name", "group", "unit", "type"]:
+            if key in changes.keys():
+                raise ResourceError(f"Cannot override '{key}' when duplicating")
+
+        return type(self)([resource.duplicate(**changes) for resource in self._resources])
 
     def apply(self, apply: Callable[[Resource], Resource], inplace: bool = False) -> ResourcesType:
         resources = self._resources if not inplace else self._resources.copy()

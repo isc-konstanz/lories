@@ -13,13 +13,12 @@ from concurrent import futures
 from concurrent.futures import Future
 from typing import Callable, Dict, Optional, Type
 
-from lories._core._channels import Channels  # noqa
 from lories._core._connector import Connector, _Connector, _ConnectorContext  # noqa
 from lories.connectors.errors import ConnectorError
 from lories.connectors.tasks import ConnectTask
 from lories.core.configs import Configurations
 from lories.core.register import RegistratorContext, Registry
-from lories.data.channels import ChannelState
+from lories.data.channels import Channels, ChannelState
 
 registry = Registry[_Connector]()
 
@@ -52,13 +51,17 @@ class ConnectorContext(_ConnectorContext, RegistratorContext[Connector]):
         channels: Optional[Channels] = None,
         timeout: Optional[float] = None,
     ) -> None:
-        self._connect(*self.filter(filter), channels=channels, timeout=timeout)
+        _connectors = self.filter(filter)
+        if len(_connectors) > 0:
+            self._connect(*_connectors, channels=channels, timeout=timeout)
 
+    # noinspection PyProtectedMember, PyUnresolvedReferences
     def _connect(
         self,
         *connectors: Connector,
-        channels: Optional[Channels] = None,
+        channels: Channels = None,
         timeout: Optional[float] = None,
+        force: bool = False,
     ) -> None:
         connect_futures = {}
         for connector in connectors:
@@ -74,24 +77,35 @@ class ConnectorContext(_ConnectorContext, RegistratorContext[Connector]):
                 )
                 continue
 
-            if not connector._is_connectable():
+            if not connector._is_connectable() and not force:
                 self._logger.debug(
                     f"Skipping not connectable {type(connector).__name__} '{connector.name}': {connector.id}"
                 )
                 continue
 
-            connect_task = self.__connect(connector, channels)
-            connect_future = self._executor.submit(connect_task)
+            connect_channels = Channels()
+            if channels is not None:
+                connect_channels.update(
+                    channels.filter(lambda c: c.has_connector(connector.id)),
+                )
+                connect_channels.update(
+                    channels.filter(lambda c: c.has_logger(connector.id)).apply(lambda c: c.from_logger()),
+                )
+            if len(connect_channels) == 0:
+                self._logger.debug(
+                    f"Skipping to connect {type(connector).__name__} '{connector.name}': "
+                    f"{connector.id} missing channels"
+                )
+                continue
+
+            connect_task = self.__connect(connector, connect_channels)
+            connect_future = self.context._submit(connect_task)
             connect_futures[connect_future] = connect_task
 
         self.__connect_futures(connect_futures, timeout)
 
-    # noinspection PyUnresolvedReferences
-    def __connect(self, connector: Connector, channels: Optional[Channels] = None) -> ConnectTask:
+    def __connect(self, connector: Connector, channels: Channels) -> ConnectTask:
         self._logger.debug(f"Connecting {type(connector).__name__} '{connector.name}': {connector.id}")
-        if channels is None:
-            channels = self.context.filter(lambda c: c.has_connector(connector.id))
-            channels.update(self.context.filter(lambda c: c.has_logger(connector.id)).apply(lambda c: c.from_logger()))
 
         return ConnectTask(connector, channels)
 
@@ -125,8 +139,11 @@ class ConnectorContext(_ConnectorContext, RegistratorContext[Connector]):
         self,
         filter: Optional[Callable[[Connector], bool]] = None,
     ) -> None:
-        self._reconnect(*self.filter(filter))
+        _connectors = self.filter(filter)
+        if len(_connectors) > 0:
+            self._reconnect(*_connectors)
 
+    # noinspection PyProtectedMember, PyUnresolvedReferences
     def _reconnect(self, *connectors: Connector) -> None:
         for connector in connectors:
             if not connector.is_enabled():
@@ -140,8 +157,8 @@ class ConnectorContext(_ConnectorContext, RegistratorContext[Connector]):
                 self._disconnect(connector)
                 continue
 
-            connect_task = self.__connect(connector)
-            connect_future = self._executor.submit(connect_task)
+            connect_task = self.__connect(connector, connector.channels)
+            connect_future = self.context._submit(connect_task)
             connect_future.add_done_callback(self.__connect_callback)
 
     # noinspection PyShadowingBuiltins
@@ -149,8 +166,11 @@ class ConnectorContext(_ConnectorContext, RegistratorContext[Connector]):
         self,
         filter: Optional[Callable[[Connector], bool]] = None,
     ) -> None:
-        self._disconnect(*self.filter(filter))
+        _connectors = self.filter(filter)
+        if len(_connectors) > 0:
+            self._disconnect(*_connectors)
 
+    # noinspection PyProtectedMember, PyUnresolvedReferences
     def _disconnect(self, *connectors: Connector) -> None:
         for connector in reversed(connectors):
             if not connector._is_connected():

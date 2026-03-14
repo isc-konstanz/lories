@@ -39,14 +39,14 @@ class ConnectionError(ConnectorError, ConnectionError):
     """
 
 
-class DatabaseException(ConnectorError):
+class DatabaseError(ConnectorError):
     """
     Raise if an error occurred accessing the database.
 
     """
 
 
-class DatabaseUnavailableException(ConnectorUnavailableError):
+class DatabaseUnavailableError(ConnectorUnavailableError):
     """
     Raise if an accessed database can not be found.
 
