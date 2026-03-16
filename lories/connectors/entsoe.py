@@ -46,6 +46,7 @@ class EntsoeConnector(Connector):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
+        self._client = None
         self.resolution = self._validate_resolution(configs.get("resolution", default=EntsoeConnector.resolution))
         self.country_code = self._validate_country_code(configs.get("country_code").upper())
         self._api_key = configs.get("api_key")
