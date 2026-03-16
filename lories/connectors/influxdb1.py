@@ -16,7 +16,7 @@ from influxdb.client import InfluxDBClientError, InfluxDBServerError
 from urllib3.exceptions import HTTPError, NewConnectionError
 
 import pandas as pd
-from lories.connectors import ConnectionError, Database, DatabaseException, register_connector_type
+from lories.connectors import ConnectionError, Database, DatabaseError, register_connector_type
 from lories.core.configs import ConfigurationError
 from lories.typing import Configurations, Resource, Resources, Timestamp
 
@@ -325,9 +325,9 @@ class InfluxDB1(Database):
 
     def _raise(self, e: Exception):
         if isinstance(e, (InfluxDBClientError, InfluxDBServerError)):
-            raise DatabaseException(self, str(e))
+            raise DatabaseError(self, str(e))
         elif isinstance(e, NewConnectionError):
-            raise DatabaseException(self, str(e))
+            raise DatabaseError(self, str(e))
         else:
             raise ConnectionError(self, str(e))
 
