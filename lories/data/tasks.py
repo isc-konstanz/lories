@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lories.data.futures
-~~~~~~~~~~~~~~~~~~~
+lories.data.tasks
+~~~~~~~~~~~~~~~~~
 
 
 """
@@ -36,7 +36,7 @@ class TaskContext(_TaskContext, Activator):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._name_prefix = kwargs.get("name", "")
+        self._task_prefix = kwargs.get("name", "")
 
     def __eq__(self, other: Any) -> bool:
         return self is other
@@ -56,15 +56,20 @@ class TaskContext(_TaskContext, Activator):
         return self.__executor.submit(fn, *args, **kwargs)
 
     def _build(self, configs: Configurations) -> Executor:
+        get_cpu_count = getattr(os, "process_cpu_count", os.cpu_count)
+        max_workers_default = min(32, (get_cpu_count() or 1) + 4)
         return ThreadPoolExecutor(
             thread_name_prefix=self._task_prefix,
-            max_workers=configs.get_int("workers_max", default=min(32, (os.process_cpu_count() or 1) + 4)),
+            max_workers=configs.get_int("workers_max", default=max_workers_default),
         )
+
+    def configure(self, configs: Configurations) -> None:
+        super().configure(configs)
+        if self.is_enabled():
+            self.__executor = self._build(configs.get_member(TaskContext.TYPE, defaults={}))
 
     def activate(self) -> None:
         super().activate()
-        if self.is_enabled():
-            self.__executor = self._build(self.configs.get_member(TaskContext.TYPE, defaults={}))
 
     def deactivate(self, *_) -> None:
         self.interrupt()

@@ -41,9 +41,11 @@ import importlib
 
 CONNECTORS = [
     "virtual",
+    "math",
     "csv",
     "sql",
-    "influx",
+    "influxdb1",
+    "influxdb2",
     "tables",
     "cameras",
     "serial",

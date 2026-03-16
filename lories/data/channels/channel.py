@@ -17,8 +17,8 @@ from lories._core._channel import ChannelState, _Channel  # noqa
 from lories._core._tasks import TaskContext, _TaskContext  # noqa
 from lories._core.typing import Timestamp  # noqa
 from lories.core import Resource, ResourceError
-from lories.data.channels import ChannelConnector, ChannelConverter, Channels
-from lories.util import parse_freq, to_timedelta
+from lories.data.channels import ChannelConnector, ChannelConverter, ChannelProcessors, Channels
+from lories.util import parse_freq, to_bool, to_timedelta
 
 
 class Channel(_Channel, Resource):
@@ -31,6 +31,7 @@ class Channel(_Channel, Resource):
     logger: ChannelConnector
     connector: ChannelConnector
     converter: ChannelConverter
+    processors: ChannelProcessors
 
     # noinspection PyShadowingBuiltins
     def __init__(
@@ -40,6 +41,7 @@ class Channel(_Channel, Resource):
         key: str = None,
         name: str = None,
         type: str | Type = None,
+        processors: Optional[Dict[str, Any] | str] = None,
         converter: Optional[Dict[str, Any] | str] = None,
         connector: Optional[Dict[str, Any] | str] = None,
         logger: Optional[Dict[str, Any] | str] = None,
@@ -47,6 +49,7 @@ class Channel(_Channel, Resource):
     ) -> None:
         super().__init__(id=id, key=key, name=name, type=type, **configs)
         self._context = self._assert_context(context)
+        self.processors = ChannelProcessors.build(self, processors)
         self.converter = ChannelConverter.build(self, **Channel._build_member(converter, "converter"))
         self.connector = ChannelConnector.build(self, **Channel._build_member(connector, "connector"))
         self.logger = ChannelConnector.build(self, **Channel._build_member(logger, "connector"))
@@ -60,6 +63,7 @@ class Channel(_Channel, Resource):
     def _get_attrs(self) -> List[str]:
         return [
             *super()._get_attrs(),
+            "processors",
             "converter",
             "connector",
             "logger",
@@ -130,6 +134,12 @@ class Channel(_Channel, Resource):
             return any(pd.isna(value))
         return pd.isna(value)
 
+    def is_listener(self) -> bool:
+        listener = self.get(next((k for k in ["listener", "listening", "listen"] if k in self), None), default=None)
+        if listener is None:
+            listener = False
+        return to_bool(listener, any_str=True)
+
     def set(
         self,
         timestamp: pd.Timestamp,
@@ -150,8 +160,11 @@ class Channel(_Channel, Resource):
             raise ResourceError(f"Expected pandas Timestamp for '{self.id}', not: {type(value)}")
         self._timestamp = timestamp
 
-        if self._is_empty(value) and state == ChannelState.VALID:
-            raise ResourceError(f"Invalid value for valid state '{self.id}': {value}")
+        if state == ChannelState.VALID:
+            for processor in self.processors:
+                value = processor(timestamp, value)
+            if self._is_empty(value):
+                raise ResourceError(f"Invalid value for valid state '{self.id}': {value}")
         self._value = value
         self._state = state
 
@@ -176,7 +189,7 @@ class Channel(_Channel, Resource):
             "id": self._id,
             **self.to_configs(),
             "context": self._context,
-            # "processors": self.processors.to_configs()
+            "processors": self.processors.to_configs(),
             "converter": self.converter.to_configs(),
             "connector": self.connector.to_configs(),
             "logger": self.logger.to_configs(),
@@ -194,7 +207,7 @@ class Channel(_Channel, Resource):
 
     def to_configs(self) -> Dict[str, Any]:
         configs = super().to_configs()
-        # configs["processors"] = self.processors.to_configs()
+        configs["processors"] = self.processors.to_configs()
         configs["converter"] = self.converter.to_configs()
         configs["connector"] = self.connector.to_configs()
         configs["logger"] = self.logger.to_configs()

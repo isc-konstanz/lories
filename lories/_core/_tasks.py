@@ -16,10 +16,15 @@ from lories._core._activator import _Activator
 from lories._core._channels import Channels
 from lories._core._connector import Connectors
 from lories._core._converter import Converters
+from lories._core._processor import Processors
 from lories._core.typing import Timestamp
 
 
 class _TaskContext(_Activator):
+    @property
+    @abstractmethod
+    def processors(self) -> Processors: ...
+
     @property
     @abstractmethod
     def converters(self) -> Converters: ...

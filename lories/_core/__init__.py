@@ -30,6 +30,11 @@ from ._converter import (  # noqa: F401
     _ConverterContext,
 )
 
+from ._processor import (  # noqa: F401
+    _Processor,
+    _ProcessorContext,
+)
+
 from ._listener import _Listener  # noqa: F401
 
 from ._configurations import _Configurations  # noqa: F401
