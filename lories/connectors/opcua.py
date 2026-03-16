@@ -28,7 +28,7 @@ class OpcUaConnector(Connector):
     _host: str
     _port: int
     _timeout: int
-    _settings: str
+    _settings: list[str]
 
     _client: Optional[opcua.Client]
     _nodes: Dict[str, opcua.Node]
@@ -45,17 +45,22 @@ class OpcUaConnector(Connector):
         settings = configs.get("settings", default="").split(",")
         self._settings = [s.strip() for s in settings]
 
-        # Todo: is endpoint needed / wanted?
-        # self._endpoint = configs.get("endpoint", default="")
-
         self._client = opcua.Client(
             f"opc.tcp://{self._host}:{self._port}",
             timeout=self._timeout
         )
 
-        if "username" in configs and "password" in configs:
+        username = configs.get("username")
+        password = configs.get("password")
+        
+        if username and password:
             self._client.set_user(configs.get("username"))
             self._client.set_password(configs.get("password"))
+        elif username or password:
+            self._logger.warning(
+                "Only one of 'username' or 'password' provided. "
+                "Both are required for authentication."
+            )
 
         self._nodes = {}
 
@@ -63,10 +68,7 @@ class OpcUaConnector(Connector):
         logging.getLogger("opcua").setLevel(logging.CRITICAL)
 
     def is_connected(self) -> bool:
-        return self._client is not None \
-            and True
-        # self._client.uaclient._uasocket is not None and \
-        # self._client.uaclient._uasocket.connected
+        return self._client is not None
 
     def connect(self, resources: Resources) -> None:
         self._client.connect()
@@ -98,7 +100,6 @@ class OpcUaConnector(Connector):
             node = self._nodes.get(channel.id)
             if node is None:
                 self._logger.warning(f"Node for '{channel.id}' not found")
-
                 data.at[timestamp, channel.id] = ChannelState.NOT_AVAILABLE
                 continue
 
