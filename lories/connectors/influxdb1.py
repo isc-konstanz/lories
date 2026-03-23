@@ -152,9 +152,7 @@ class InfluxDB1(Database):
             raise ValueError(f"Invalid mode '{mode}'")
         results = []
 
-        for measurement, measurement_resources in resources.groupby(
-                lambda r: r.get("measurement", default=r.group)
-        ):
+        for measurement, measurement_resources in resources.groupby(lambda r: r.get("measurement", default=r.group)):
             if measurement is None:
                 measurement = "None"
 
@@ -201,9 +199,7 @@ class InfluxDB1(Database):
     ) -> pd.DataFrame:
         results = []
 
-        for measurement, measurement_resources in resources.groupby(
-                lambda r: r.get("measurement", default=r.group)
-        ):
+        for measurement, measurement_resources in resources.groupby(lambda r: r.get("measurement", default=r.group)):
             if measurement is None:
                 measurement = "None"
 
@@ -281,9 +277,7 @@ class InfluxDB1(Database):
                     self._raise(e)
 
     def delete(self, resources: Resources, start=None, end=None) -> None:
-        for measurement, measurement_resources in resources.groupby(
-                lambda r: r.get("measurement", default=r.group)
-        ):
+        for measurement, measurement_resources in resources.groupby(lambda r: r.get("measurement", default=r.group)):
             if measurement is None:
                 measurement = "None"
 

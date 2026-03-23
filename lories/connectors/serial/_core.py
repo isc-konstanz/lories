@@ -12,8 +12,6 @@ from typing import AnyStr, Optional
 
 import serial
 from serial import SerialException
-from serial.tools import list_ports
-
 
 from lories.connectors import ConnectionError, Connector
 from lories.core import Configurations, Resources
