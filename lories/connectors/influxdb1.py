@@ -9,10 +9,11 @@ lories.connectors.influxdb1
 from __future__ import annotations
 
 import warnings
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Mapping
 
 from influxdb import InfluxDBClient
 from influxdb.client import InfluxDBClientError, InfluxDBServerError
+from influxdb.line_protocol import make_lines
 from urllib3.exceptions import HTTPError, NewConnectionError
 
 import pandas as pd
@@ -242,12 +243,15 @@ class InfluxDB1(Database):
 
     def write(self, data: pd.DataFrame) -> None:
         for measurement, measurement_resources in self.resources.groupby(
-            lambda r: r.get("measurement", default=r.group)
+                lambda r: r.get("measurement", default=r.group)
         ):
             if measurement is None:
                 measurement = "None"
 
-            for tag, tagged_resources in measurement_resources.groupby("tag"):
+            for tags_key, tagged_resources in measurement_resources.groupby(
+                    lambda r: frozenset((_get_tags(r) or {}).items())
+            ):
+                tags = dict(tags_key) if tags_key else None
                 tagged_data = data.loc[:, [r.id for r in tagged_resources if r.id in data.columns]]
                 tagged_data = tagged_data.dropna(axis="index", how="all").dropna(axis="columns", how="all")
                 if tagged_data.empty:
@@ -258,16 +262,11 @@ class InfluxDB1(Database):
                     fields = {_get_field(r): row[r.id] for r in tagged_resources if r.id in row and pd.notna(row[r.id])}
                     if not fields:
                         continue
-
-                    point = {
-                        "measurement": measurement,
-                        "time": timestamp.isoformat(),
-                        "fields": fields,
-                    }
-                    if tag is not None:
-                        point["tags"] = {"tag": tag}
-
+                    point = {"measurement": measurement, "time": timestamp.isoformat(), "fields": fields}
+                    if tags:
+                        point["tags"] = tags
                     points.append(point)
+
                 if not points:
                     return
                 try:
@@ -379,3 +378,10 @@ def _to_isoformat(
 
 def _get_field(resource: Resource) -> str:
     return resource.get("field", default=resource.get("column", default=resource.key))
+
+
+def _get_tags(resource: Resource) -> Mapping[str, str]:
+    tags = resource.get("tags", default={})
+    if isinstance(tags, Mapping):
+        return {str(k): str(v) for k, v in tags.items()}
+    return {}
