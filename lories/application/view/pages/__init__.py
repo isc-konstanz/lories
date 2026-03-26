@@ -47,3 +47,6 @@ from .components.system import SystemPage  # noqa: F401
 
 from .components import weather  # noqa: F401
 from .components.weather import WeatherPage  # noqa: F401
+
+from . import docs  # noqa: F401
+from .docs import DocsPage  # noqa: F401

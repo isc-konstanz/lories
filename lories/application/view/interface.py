@@ -17,11 +17,13 @@ from typing import Optional
 
 import dash
 from dash import Dash, dcc, html
+import dash_bootstrap_components as dbc
 from dash_bootstrap_components import themes
 
 from lories.application import Application
 from lories.application.interface import Interface, register_interface_type
 from lories.application.view import LoginPage, PageFooter, PageHeader, View
+from lories.application.view.pages.docs import DocsPage
 from lories.core.configs.parameters import Parameter
 from lories.typing import Configurations
 
@@ -112,7 +114,12 @@ class ViewInterface(Interface, Dash):
         self.view.create_connector_pages(self.context.connectors)
         for component in self.context.components.values():
             self.view.create_connector_pages(component.connectors)
+        docs_page = DocsPage()
+        self.view.append(docs_page)
         self.view.create_layout(self.view.layout)
+        self.view.header.menu.append(
+            dbc.NavItem(dbc.NavLink(docs_page.title, href=docs_page.path))
+        )
         self.view.register()
         self.layout = self.create_layout
 

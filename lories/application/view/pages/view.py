@@ -156,7 +156,7 @@ class View(PageGroup):
         label = "Systems"
         menu = [dbc.DropdownMenuItem("Select", header=True)]
         for page in self._pages:
-            if page.key in ["auth", "login"]:
+            if page.key in ["auth", "login", "docs"]:
                 continue
             _component = getattr(page, "_component", None)
             if _component is not None and not isinstance(_component, System):
