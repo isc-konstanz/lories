@@ -28,6 +28,7 @@ from lories.components import Component, ComponentContext, Weather
 from lories.connectors import Connector, ConnectorContext, Database, DatabaseError
 from lories.connectors.tasks import LogTask, ReadTask
 from lories.core.configs import Configurations, ConfigurationUnavailableError
+from lories.core.configs.parameters import Parameter, ParameterGroup
 from lories.core.register import Registrator
 from lories.core.typing import ChannelsArgument, Timestamp
 from lories.data.channels import Channel, Channels
@@ -65,6 +66,28 @@ class Application(_Application, DataContext, TaskContext):
     __interrupt: Event
 
     _interval: int
+
+    # Top-level Settings keys read directly by Application.
+    _action = Parameter(key="action", type=str, required=False, default="start", desc="CLI action to perform")
+    _interval = Parameter(
+        key="interval", type=int, required=False, default=1, min=1, desc="Main loop interval in seconds"
+    )
+    _start = Parameter(key="start", type=str, required=False, desc="Simulation start timestamp")
+    _end = Parameter(key="end", type=str, required=False, desc="Simulation end timestamp")
+    _full = Parameter(key="full", type=bool, required=False, default=False, desc="Full retention/replication run")
+    _force = Parameter(
+        key="force", type=bool, required=False, default=False, desc="Force replication even when up-to-date"
+    )
+    _systems = ParameterGroup(
+        key="systems",
+        required=False,
+        desc="System discovery settings",
+        children=[
+            Parameter(key="flat", type=bool, required=False, default=False, desc="Flat system layout"),
+            Parameter(key="scan", type=bool, required=False, default=False, desc="Scan data dir for systems"),
+            Parameter(key="copy", type=bool, required=False, default=False, desc="Copy settings before scanning"),
+        ],
+    )
 
     @classmethod
     def load(cls, name: str, factory: Type[System] = System, **kwargs) -> Application:

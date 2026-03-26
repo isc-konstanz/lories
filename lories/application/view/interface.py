@@ -22,6 +22,7 @@ from dash_bootstrap_components import themes
 from lories.application import Application
 from lories.application.interface import Interface, register_interface_type
 from lories.application.view import LoginPage, PageFooter, PageHeader, View
+from lories.core.configs.parameters import Parameter
 from lories.typing import Configurations
 
 logging.getLogger("werkzeug").setLevel(logging.WARNING)
@@ -30,7 +31,11 @@ logging.getLogger("werkzeug").setLevel(logging.WARNING)
 # noinspection PyProtectedMember
 @register_interface_type("dash")
 class ViewInterface(Interface, Dash):
-    _proxy: Optional[str] = None
+    _proxy = Parameter(key="proxy", type=str, required=False, default=None, desc="Reverse proxy URL prefix path")
+    _host = Parameter(key="host", type=str, default="127.0.0.1", desc="Host address to bind to")
+    _port = Parameter(key="port", type=int, default=8050, desc="TCP port number")
+
+    _proxy: Optional[str]
     _host: str
     _port: int
 
@@ -102,9 +107,6 @@ class ViewInterface(Interface, Dash):
     # noinspection PyUnresolvedReferences
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self._proxy = configs.get("proxy", default=None)
-        self._host = configs.get("host", default="127.0.0.1")
-        self._port = configs.get_int("port", default=8050)
 
         self.view.create_pages(self.context.components)
         self.view.create_layout(self.view.layout)

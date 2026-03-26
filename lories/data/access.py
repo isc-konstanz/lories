@@ -15,6 +15,7 @@ from lories._core import _Context, _Registrator  # noqa
 from lories._core._data import DataContext, _DataContext  # noqa
 from lories._core._tasks import TaskContext, _TaskContext  # noqa
 from lories.core import Configurator, Constant, ResourceError
+from lories.core.configs.parameters import Parameter, ParameterGroup
 from lories.core.typing import ChannelsArgument, Registrator, Timestamp
 from lories.data.channels import Channel, Channels
 from lories.data.context import DataContext as _DataAccess
@@ -32,6 +33,28 @@ except ImportError:
 class DataAccess(_DataAccess, Configurator):
     __registrar: _Registrator
     __context: _TaskContext | _DataContext
+
+    # Structural channel configuration sections — declared so the undeclared-key
+    # checker does not warn about them.  Retention bucket names (e.g. "1month")
+    # are dynamic, so _retention has no children and the checker skips its content.
+    _channels = ParameterGroup(
+        key="channels",
+        required=False,
+        desc="Per-component channel configurations",
+        children=[
+            ParameterGroup(
+                key="replication",
+                required=False,
+                desc="Channel replication settings",
+                children=[
+                    Parameter(key="freq", type=str, required=False, desc="Replication frequency"),
+                    Parameter(key="slice", type=str, required=False, desc="Replication time slice"),
+                    Parameter(key="database", type=str, required=False, desc="Target replication database"),
+                ],
+            ),
+            ParameterGroup(key="retention", required=False, desc="Retention policies (dynamic bucket names)"),
+        ],
+    )
 
     def __init__(self, registrar: Registrator, **kwargs: Any) -> None:
         registrar = self._assert_registrar(registrar)

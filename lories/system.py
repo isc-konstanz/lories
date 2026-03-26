@@ -14,6 +14,7 @@ from typing import Any, List, Optional
 import pandas as pd
 from lories import Configurations
 from lories.components import Component, ComponentContext, ComponentUnavailableError, Weather
+from lories.core.configs.parameters import Parameter, ParameterGroup
 from lories.core.typing import Timestamp
 from lories.location import Location, LocationUnavailableException
 from lories.simulation import Results
@@ -23,6 +24,22 @@ class System(Component):
     TYPE: str = "system"
 
     _location: Optional[Location] = None
+
+    # The [location] subsection is consumed by localize() via get_member().
+    # Children cover all keys the framework reads from it.
+    _location_config = ParameterGroup(
+        key="location",
+        required=False,
+        desc="Geographic location of the system",
+        children=[
+            Parameter(key="latitude", type=float, required=False, desc="Latitude in decimal degrees"),
+            Parameter(key="longitude", type=float, required=False, desc="Longitude in decimal degrees"),
+            Parameter(key="timezone", type=str, required=False, desc="IANA timezone name"),
+            Parameter(key="altitude", type=float, required=False, desc="Altitude above sea level in metres"),
+            Parameter(key="country", type=str, required=False, desc="Country name or ISO code"),
+            Parameter(key="state", type=str, required=False, desc="State or region name"),
+        ],
+    )
 
     @classmethod
     def scan(cls, context: ComponentContext, scan_dir: str, **kwargs) -> List[System]:
