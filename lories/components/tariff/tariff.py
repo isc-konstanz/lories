@@ -12,8 +12,8 @@ from collections.abc import Callable
 from typing import Optional, Type, TypeVar
 
 from lories.components import Component, register_component_type
+from lories.components.component import ComponentMeta
 from lories.core import Constant, ResourceError
-from lories.core.activator import ActivatorMeta
 from lories.core.register import Registry
 from lories.typing import Configurations, ContextArgument
 from lories.util import validate_key
@@ -34,7 +34,7 @@ def register_tariff_type(
     return _register
 
 
-class TariffMeta(ActivatorMeta):
+class TariffMeta(ComponentMeta):
     def __call__(cls, context: ContextArgument, configs: Configurations, **kwargs) -> TariffType:
         _type = validate_key(configs.get("type", default="default"))
         _cls = cls._get_class(_type)

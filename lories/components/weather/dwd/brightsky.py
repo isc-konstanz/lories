@@ -15,11 +15,12 @@ import requests
 
 import numpy as np
 import pandas as pd
-from lories import ConfigurationError
 from lories.components.weather import Weather
 from lories.connectors import Connector
+from lories.core.configs import Configurations
+from lories.core.configs.parameters import Parameter
 from lories.location import Location
-from lories.typing import Configurations, Resources, Timestamp
+from lories.typing import Resources, Timestamp
 
 
 class Brightsky(Connector):
@@ -27,17 +28,18 @@ class Brightsky(Connector):
     address: str = "https://api.brightsky.dev/"
     horizon: int = 10
 
+    address = Parameter(type=str, default="https://api.brightsky.dev/", desc="Base URL of the Brightsky API")
+    horizon = Parameter(type=int, default=10, desc="Forecast horizon in days (0-10)", min=0, max=10)
+
+    address: str
+    horizon: int
+
     def __init__(self, context: Weather, location: Location, **kwargs) -> None:
         super().__init__(context, context.configs.get_member("brightsky", defaults={}), **kwargs)
         self.location = location
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-
-        self.address = configs.get("address", default=Brightsky.address)
-        self.horizon = configs.get_int("horizon", default=Brightsky.horizon)
-        if -1 > self.horizon > 10:
-            raise ConfigurationError(f"Invalid forecast horizon: {self.horizon}")
 
     def read(
         self,

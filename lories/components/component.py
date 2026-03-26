@@ -17,18 +17,30 @@ from lories._core._registrator import RegistratorContext  # noqa
 from lories._core.typing import Timestamp  # noqa
 from lories.components.access import ComponentAccess
 from lories.connectors.access import ConnectorAccess
-from lories.core.activator import Activator
+from lories.core.activator import Activator, ActivatorMeta
+from lories.core.configs.parameters import ParameterGroup
 from lories.core.register import Registrator
 from lories.data.access import DataAccess
 from lories.data.converters import ConverterAccess
 from lories.util import to_date
 
 
-class Component(_Component, Registrator, Activator):
+class ComponentMeta(ActivatorMeta):
+    pass
+
+
+class Component(_Component, Registrator, Activator, metaclass=ComponentMeta):
     __converters: ConverterAccess
     __connectors: ConnectorAccess
     __components: ComponentAccess
     __data: DataAccess
+
+    # Framework structural sections — declared so the undeclared-key checker does
+    # not warn about them.  No children: the checker will not recurse into these
+    # sections, which are consumed by the framework internals (DataAccess,
+    # _Registrator) rather than via Parameter declarations.
+    _data_config = ParameterGroup(key="data", required=False, desc="Data and channel configuration section")
+    _component_config = ParameterGroup(key="component", required=False, desc="Component registration metadata")
 
     def __init__(
         self,
@@ -43,6 +55,7 @@ class Component(_Component, Registrator, Activator):
         self.__data = DataAccess(self)
 
     def _at_configure(self, configs: Configurations) -> None:
+        super()._at_configure(configs)
         self.__data.configure(configs.get_member(DataAccess.TYPE, ensure_exists=True))
 
     def _on_configure(self, configs: Configurations) -> None:

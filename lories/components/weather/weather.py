@@ -12,8 +12,8 @@ from collections.abc import Callable
 from typing import Optional, Type, TypeVar
 
 from lories.components import Component, ComponentError, register_component_type
+from lories.components.component import ComponentMeta
 from lories.core import Constant, ResourceError
-from lories.core.activator import ActivatorMeta
 from lories.core.register import Registry
 from lories.location import Location, LocationUnavailableException
 from lories.typing import Configurations, ContextArgument
@@ -34,7 +34,7 @@ def register_weather_type(
     return _register
 
 
-class WeatherMeta(ActivatorMeta):
+class WeatherMeta(ComponentMeta):
     def __call__(cls, context: ContextArgument, configs: Configurations, **kwargs) -> WeatherType:
         _type = configs.get("type", default="default").lower()
         _cls = cls._get_class(_type)
