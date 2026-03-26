@@ -9,6 +9,8 @@ lories.connectors.connector
 from __future__ import annotations
 
 import datetime as dt
+import inspect
+import logging
 from collections import OrderedDict
 from collections.abc import Callable
 from functools import wraps
@@ -23,14 +25,35 @@ from lories._core._context import _Context  # noqa
 from lories._core._registrator import RegistratorContext  # noqa
 from lories.connectors.errors import ConnectionError, ConnectorError
 from lories.core import Resource, ResourceError, Resources
-from lories.core.configs.configurator import Configurator, ConfiguratorMeta
+from lories.core.configs.configurator import _WH, _WK, _WR, Configurator, ConfiguratorMeta
 from lories.core.configs.errors import ConfigurationError
+from lories.core.configs.parameters import Parameter
 from lories.core.register.registrator import Registrator
 from lories.data.channels import Channel, Channels, ChannelState
 from lories.data.validation import validate_index
 
 
 class ConnectorMeta(ConfiguratorMeta):
+    __channel_parameters__: Dict[str, Any]
+
+    def __new__(mcls, name, bases, namespace):
+        from lories.core.configs.parameters.resource_parameter import ResourceParameter
+
+        # Inherit channel parameters from all parent classes (left-to-right MRO).
+        channel_params: Dict[str, Any] = {}
+        for base in bases:
+            channel_params.update(getattr(base, "__channel_parameters__", {}))
+
+        # Collect ResourceParameter descriptors declared in this class body.
+        for attr, value in namespace.items():
+            if isinstance(value, ResourceParameter):
+                if value.name is None:
+                    value.name = attr
+                channel_params[attr] = value
+
+        namespace["__channel_parameters__"] = channel_params
+        return super().__new__(mcls, name, bases, namespace)
+
     # noinspection PyProtectedMember
     def __call__(cls, *args, **kwargs):
         connector = super().__call__(*args, **kwargs)
@@ -44,6 +67,8 @@ class ConnectorMeta(ConfiguratorMeta):
 
 # noinspection PyAbstractClass
 class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
+    _connect = Parameter(key="connect", type=bool, default=True, desc="Connect on activation")
+
     _connected: bool = False
     _connect_type: ConnectType = ConnectType.AUTO
 
@@ -55,6 +80,11 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
 
     _lock_timeout: int = 60
     _lock: Lock
+
+    # Set to False on a subclass to suppress channel-config tracing even at DEBUG level.
+    _WARN_UNDECLARED_CHANNEL_CONFIGS: bool = True
+    # Keys always present in a channel's connector config that are never user-declared.
+    _CHANNEL_CONFIGS_RESERVED_KEYS: frozenset = frozenset({"enabled"})
 
     def __init__(
         self,
@@ -143,7 +173,7 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self._connect_type = ConnectType.get(configs.get("connect", default=True))
+        self._connect_type = ConnectType.get(self._connect)
 
     def _is_disconnected(self) -> bool:
         return not self._is_connected()
@@ -193,8 +223,94 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
         finally:
             self._lock.release()
 
+    @classmethod
+    def _warn_undeclared_channel_configs(cls, resources: Resources) -> None:
+        """Log a DEBUG message for every per-channel connector config key that
+        has no matching :class:`~lories.core.configs.parameters.ChannelParameter`
+        declaration on this connector class.
+
+        Called automatically from :meth:`_at_connect` — silent above DEBUG level
+        and disabled per-class via ``_WARN_UNDECLARED_CHANNEL_CONFIGS = False``.
+        """
+        if not cls._WARN_UNDECLARED_CHANNEL_CONFIGS:
+            return
+        logger = logging.getLogger(cls.__module__)
+        if not logger.isEnabledFor(logging.DEBUG):
+            return
+
+        declared: frozenset = frozenset(p._resolve_key() for p in getattr(cls, "__channel_parameters__", {}).values())
+
+        try:
+            cls_file = inspect.getfile(cls)
+        except (TypeError, OSError):
+            cls_file = "<unknown file>"
+
+        for resource in resources:
+            channel_connector = getattr(resource, "connector", None)
+            if channel_connector is None or not getattr(channel_connector, "enabled", False):
+                continue
+            # Only inspect channels that are wired to this connector class.
+            registrator = channel_connector._get_registrator()
+            if registrator is not None and not isinstance(registrator, cls):
+                continue
+            channel_configs = channel_connector._copy_configs()
+            for key in channel_configs:
+                if key in cls._CHANNEL_CONFIGS_RESERVED_KEYS:
+                    continue
+                if key not in declared:
+                    logger.debug(
+                        f"{_WH}%s (module: %s, file: %s): "
+                        f"channel '%s' uses config key '{_WK}%s{_WH}' "
+                        f"with no ChannelParameter declaration{_WR}",
+                        cls.__name__,
+                        cls.__module__,
+                        cls_file,
+                        resource.id,
+                        key,
+                    )
+
+    def _resolve_channel_params(self, resources: Resources) -> None:
+        """Resolve per-channel parameters for *resources* and write them back.
+
+        Iterates all ``ResourceParameter`` declarations in
+        ``__channel_parameters__``, calls ``param.resolve(channel_configs)`` for
+        each channel, and stores the typed results into the live channel-connector
+        config dict via :meth:`~lories.data.channels._core._ChannelWrapper._set_resolved`.
+
+        The merged config dict (resource-level + connector-level) is used so that
+        the flat INI/TOML format (keys at channel level) and the nested format
+        (keys inside a ``connector:`` sub-dict) are both supported.
+
+        Raises ``ConfigurationError`` for any missing required key or constraint
+        violation (delegated to ``ResourceParameter.resolve()``).
+        """
+        from lories.core.configs.parameters.resource_parameter import ResourceParameter
+
+        channel_params = type(self).__channel_parameters__
+        if not channel_params:
+            return
+
+        for resource in resources:
+            channel_connector = getattr(resource, "connector", None)
+            if channel_connector is None or not channel_connector.enabled:
+                continue
+            registrator = channel_connector._get_registrator()
+            if registrator is not None and not isinstance(registrator, type(self)):
+                continue
+
+            # Merge connector-level configs (nested format) with resource-level
+            # configs (flat format) so that both layouts are supported.
+            channel_configs = {**channel_connector._copy_configs(), **resource._copy_configs()}
+            resolved = {
+                param._resolve_key(): param.resolve(channel_configs)
+                for attr, param in channel_params.items()
+                if isinstance(param, ResourceParameter)
+            }
+            channel_connector._set_resolved(resolved)
+
     def _at_connect(self, resources: Resources) -> None:
-        pass
+        type(self)._warn_undeclared_channel_configs(resources)
+        self._resolve_channel_params(resources)
 
     def _on_connect(self, resources: Resources) -> None:
         pass

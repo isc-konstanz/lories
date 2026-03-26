@@ -19,7 +19,7 @@ from urllib3.exceptions import HTTPError, NewConnectionError
 
 import pandas as pd
 from lories.connectors import ConnectionError, Database, DatabaseError, register_connector_type
-from lories.core.configs import ConfigurationError
+from lories.core.configs.parameters import Parameter
 from lories.data.util import hash_value
 from lories.typing import Configurations, Resource, Resources, Timestamp
 
@@ -33,6 +33,15 @@ except ImportError:
 
 @register_connector_type("influxdb2", "influxdb_v2")
 class InfluxDB2(Database):
+    _host = Parameter(key="host", type=str, default="localhost", desc="InfluxDB host")
+    _port = Parameter(key="port", type=int, default=8086, min=1, max=65535, desc="InfluxDB port")
+    _org = Parameter(key="org", type=str, desc="Organisation name")
+    _bucket = Parameter(key="bucket", type=str, desc="Bucket name")
+    _token = Parameter(key="token", type=str, desc="API token")
+    _timeout = Parameter(key="timeout", type=float, default=10.0, min=0.0, desc="Request timeout (s)")
+    _ssl = Parameter(key="ssl", type=bool, default=False, desc="Use HTTPS")
+    _ssl_verify = Parameter(key="ssl_verify", type=bool, default=True, desc="Verify SSL certificate")
+
     host: str
     port: int
 
@@ -49,27 +58,19 @@ class InfluxDB2(Database):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        self.host = configs.get("host", default="localhost")
-        self.port = configs.get_int("port", default=8086)
+        self.host = self._host
+        self.port = self._port
 
-        self.org = configs.get("org")
-        if self.org is None:
-            raise ConfigurationError("Missing 'org' for InfluxDB connector")
-
-        self.bucket = configs.get("bucket")
-        if self.bucket is None:
-            raise ConfigurationError("Missing 'bucket' for InfluxDB connector")
-
-        self.token = configs.get("token")
-        if self.token is None:
-            raise ConfigurationError("Missing 'token' for InfluxDB connector")
+        self.org = self._org
+        self.bucket = self._bucket
+        self.token = self._token
 
         # In seconds
-        self.timeout = int(configs.get_float("timeout", default=10) * 1000)
+        self.timeout = int(self._timeout * 1000)
 
         # TODO: Determine SSL usage from certificate availability
-        self.ssl = configs.get_bool("ssl", default=False)
-        self.ssl_verify = configs.get_bool("ssl_verify", default=True)
+        self.ssl = self._ssl
+        self.ssl_verify = self._ssl_verify
 
     def connect(self, resources: Resources) -> None:
         self._logger.debug(f"Connecting to InfluxDB ({self.host}:{self.port}) at {self.bucket}")

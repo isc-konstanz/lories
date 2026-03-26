@@ -18,6 +18,7 @@ import pandas as pd
 import pytz as tz
 from lories.connectors import Connector, register_connector_type
 from lories.core import ConfigurationError
+from lories.core.configs.parameters import ParameterGroup, ResourceParameter
 from lories.data import Channel, DataContext
 from lories.typing import Resource, Resources
 from lories.util import get_context, to_bool
@@ -26,6 +27,20 @@ from lories.util import get_context, to_bool
 # noinspection SpellCheckingInspection
 @register_connector_type("math")
 class MathConnector(Connector):
+    _mapping = ParameterGroup(key="mapping", required=False, desc="Symbol-to-channel mapping")
+
+    # Per-channel parameters
+    expression = ResourceParameter(
+        type=str, required=False, desc="Math expression (sympy syntax); also accepted as 'expr' or 'math'"
+    )
+    mapping = ResourceParameter(
+        type=None, required=False, default={}, desc="Per-channel symbol-to-channel mapping overrides"
+    )
+    listen = ResourceParameter(type=str, required=False, desc="Channel ID whose updates trigger re-evaluation")
+    listener = ResourceParameter(
+        type=bool, required=False, desc="Register as listener (default: True when 'listen' is set)"
+    )
+
     _exprs: Dict[str, ChannelExpr]
 
     def connect(self, resources: Resources) -> None:
@@ -42,7 +57,7 @@ class MathConnector(Connector):
     def _build_expr(self, resource: Resource, **mappings: str) -> ChannelExpr:
         data = get_context(self.context, DataContext)
 
-        expression = resource.get("expression", resource.get("expr", resource.get("math", None)))
+        expression = resource.get("expression", None)
         try:
             expr = sympy.sympify(expression)
             expr = sympy.simplify(expr)

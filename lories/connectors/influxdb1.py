@@ -17,7 +17,7 @@ from urllib3.exceptions import HTTPError, NewConnectionError
 
 import pandas as pd
 from lories.connectors import ConnectionError, Database, DatabaseError, register_connector_type
-from lories.core.configs import ConfigurationError
+from lories.core.configs.parameters import Parameter
 from lories.typing import Configurations, Resource, Resources, Timestamp
 
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="influxdb.*")
@@ -32,6 +32,13 @@ except ImportError:
 
 @register_connector_type("influxdb1", "influxdb_v1")
 class InfluxDB1(Database):
+    _host = Parameter(key="host", type=str, default="localhost", desc="InfluxDB host")
+    _port = Parameter(key="port", type=int, default=8086, min=1, max=65535, desc="InfluxDB port")
+    _user = Parameter(key="user", type=str, default="admin", desc="Username")
+    _password = Parameter(key="password", type=str, default="admin", desc="Password")
+    _database = Parameter(key="database", type=str, default="lories", desc="Database name")
+    _timeout = Parameter(key="timeout", type=int, default=10, min=1, desc="Request timeout (s)")
+
     host: str
     port: int
 
@@ -46,20 +53,15 @@ class InfluxDB1(Database):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        self.host = configs.get("host", default="localhost")
-        self.port = configs.get_int("port", default=8086)
+        self.host = self._host
+        self.port = self._port
 
-        self.user = configs.get("user", default="admin")
-        self.password = configs.get("password", default="admin")
-        if self.user is None or self.password is None:
-            raise ConfigurationError("Missing 'user' or 'password' for InfluxDB connector")
+        self.user = self._user
+        self.password = self._password
 
-        self.database = configs.get("database", default="lories")
-        if self.database is None:
-            raise ConfigurationError("Missing 'database' for InfluxDB connector")
+        self.database = self._database
 
-        # In seconds
-        self.timeout = configs.get_int("timeout", default=10)
+        self.timeout = self._timeout
 
     def connect(self, resources: Resources) -> None:
         self._logger.debug(f"Connecting to InfluxDB v1 ({self.host}:{self.port}) at {self.database}")

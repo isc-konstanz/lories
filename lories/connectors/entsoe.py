@@ -20,6 +20,7 @@ import pandas as pd
 import pytz as tz
 from lories.connectors import ConnectionError, Connector, ConnectorError
 from lories.core.configs import ConfigurationError
+from lories.core.configs.parameters import Parameter, SelectParameter
 from lories.typing import Configurations, Resources, Timestamp
 from lories.util import parse_freq
 
@@ -33,6 +34,12 @@ except ImportError:
 
 # noinspection SpellCheckingInspection
 class EntsoeConnector(Connector):
+    _country_code = Parameter(key="country_code", type=str, desc="ENTSO-E country code (e.g. DE)")
+    _api_key = Parameter(key="api_key", type=str, desc="ENTSO-E API security token")
+    _resolution = SelectParameter(
+        ["15min", "30min", "60min"], key="resolution", default="60min", desc="Data resolution"
+    )
+
     DAY_AHEAD: str = "day_ahead"
     METHODS: list = [DAY_AHEAD]
 
@@ -50,11 +57,9 @@ class EntsoeConnector(Connector):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        self.resolution = self._validate_resolution(configs.get("resolution", default=EntsoeConnector.resolution))
-        self.country_code = self._validate_country_code(configs.get("country_code").upper())
-        self._api_key = configs.get("api_key", default=None)
-        if self._api_key is None:
-            raise ConfigurationError("Missing security token")
+        self._client = None
+        self.resolution = self._validate_resolution(self._resolution)
+        self.country_code = self._validate_country_code(self._country_code.upper())
 
     # noinspection PyTypeChecker
     def _validate_resolution(self, resolution: str) -> Literal["60min", "30min", "15min"]:

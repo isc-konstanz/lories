@@ -19,6 +19,7 @@ import pytz as tz
 from lories.connectors import ConnectionError, Database, DatabaseError, register_connector_type
 from lories.connectors.sql import Schema, Table
 from lories.core.configs import ConfigurationError
+from lories.core.configs.parameters import Parameter, ParameterGroup, SelectParameter
 from lories.data.util import hash_value
 from lories.typing import Configurations, Resources, Timestamp
 from lories.util import to_timezone
@@ -33,6 +34,14 @@ except ImportError:
 
 @register_connector_type("sql")
 class SqlDatabase(Database, Mapping[str, Table]):
+    _host = Parameter(key="host", type=str, desc="Database host")
+    _port = Parameter(key="port", type=int, min=1, max=65535, desc="Database port")
+    _user = Parameter(key="user", type=str, desc="Username")
+    _password = Parameter(key="password", type=str, desc="Password")
+    _database = Parameter(key="database", type=str, desc="Database/schema name")
+    _dialect = SelectParameter(["postgresql", "mysql", "sqlite", "mssql"], key="dialect", desc="SQLAlchemy dialect")
+    _tables = ParameterGroup(key="tables", required=False, desc="Per-table configuration overrides")
+
     dialect: Dialect
 
     host: str
@@ -90,15 +99,15 @@ class SqlDatabase(Database, Mapping[str, Table]):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        self.host = configs.get("host")
-        self.port = configs.get_int("port")
+        self.host = self._host
+        self.port = self._port
 
-        self.user = configs.get("user")
-        self.password = configs.get("password")
+        self.user = self._user
+        self.password = self._password
 
-        self.database = configs.get("database")
+        self.database = self._database
 
-        dialect = configs.get("dialect").lower()
+        dialect = self._dialect.lower()
         if dialect == "mysql":
             prefix = "mysql+pymysql://"
         elif dialect == "mariadb":
@@ -106,7 +115,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
         elif dialect == "postgresql":
             prefix = "postgresql+psycopg2://"
         else:
-            raise ConfigurationError(f"Unsupported database type: {dialect}")
+            raise ConfigurationError(f"Unsupported database type: {self._dialect}")
         try:
             self.engine = create_engine(
                 url=f"{prefix}{self.user}:{self.password}@{self.host}:{self.port}/{self.database}",

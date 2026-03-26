@@ -15,6 +15,7 @@ from serial import SerialException
 
 from lories.connectors import ConnectionError, Connector
 from lories.core import Configurations, Resources
+from lories.core.configs.parameters import Parameter, SelectParameter
 
 # sudo lsusb -v | grep 'idVendor\|idProduct\|iProduct\|iSerial'
 #   idVendor           0x10c4 Silicon Labs
@@ -27,21 +28,31 @@ from lories.core import Configurations, Resources
 
 # noinspection PyAbstractClass, SpellCheckingInspection
 class _SerialConnector(Connector):
+    _port = Parameter(key="port", type=str, desc="Serial device path (e.g. /dev/ttyUSB0)")
+    _baudrate = Parameter(key="baudrate", type=int, default=9600, desc="Baud rate")
+    _bytesize = Parameter(key="bytesize", type=int, default=8, desc="Data bits")
+    _parity = SelectParameter(["N", "E", "O"], key="parity", default="N", desc="Parity")
+    _stopbits = Parameter(key="stopbits", type=int, default=1, desc="Stop bits")
+    _timeout = Parameter(key="timeout", type=float, default=3.0, min=0.0, desc="Read timeout (s)")
+    _xonxoff = Parameter(key="xonxoff", type=bool, default=False, desc="XON/XOFF flow control")
+    _rtscts = Parameter(key="rtscts", type=bool, default=False, desc="RTS/CTS flow control")
+    _dsrdtr = Parameter(key="dsrdtr", type=bool, default=False, desc="DSR/DTR flow control")
+
     _serial: Optional[serial.Serial]
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
         self._serial = serial.Serial(
-            baudrate=configs.get_int("baudrate", default=9600),
-            bytesize=configs.get_int("bytesize", default=serial.EIGHTBITS),
-            parity=configs.get("parity", default=serial.PARITY_NONE),
-            stopbits=configs.get_int("stopbits", default=serial.STOPBITS_ONE),
-            timeout=configs.get_float("timeout", default=3),
-            xonxoff=configs.get_bool("xonxoff", default=False),
-            rtscts=configs.get_bool("rtscts", default=False),
-            dsrdtr=configs.get_bool("dsrdtr", default=False),
+            baudrate=self._baudrate,
+            bytesize=self._bytesize,
+            parity=self._parity,
+            stopbits=self._stopbits,
+            timeout=self._timeout,
+            xonxoff=self._xonxoff,
+            rtscts=self._rtscts,
+            dsrdtr=self._dsrdtr,
         )
-        self._serial.port = configs.get("port")
+        self._serial.port = self._port
 
     def connect(self, resources: Resources) -> None:
         try:

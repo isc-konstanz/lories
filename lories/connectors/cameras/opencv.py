@@ -11,29 +11,26 @@ import cv2
 
 from lories.connectors import ConnectionError, ConnectorError, register_connector_type
 from lories.connectors.cameras import CameraConnector
+from lories.core.configs.parameters import Parameter
 from lories.typing import Configurations, Resources
 
 
 @register_connector_type("opencv")
 class OpenCV(CameraConnector):
+    _host = Parameter(key="host", type=str, desc="Camera hostname or IP")
+    _port = Parameter(key="port", type=int, default=554, min=1, max=65535, desc="RTSP port")
+    _username = Parameter(key="username", type=str, desc="Camera username")
+    _password = Parameter(key="password", type=str, desc="Camera password")
+
     _capture: cv2.VideoCapture
+
     _host: str
     _port: int
-
     _username: str
     _password: str
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-
-        self._host = configs.get("host")
-        self._port = configs.get_int("port", default=554)
-
-        self._username = configs.get("username")
-        self._password = configs.get("password")
-
-        if not all([self._host, self._port, self._username, self._password]):
-            raise ValueError("Camera configuration requires 'host', 'port', 'username' and 'password'")
 
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
             "rtsp_transport;tcp|"  # use TCP only
