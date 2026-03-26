@@ -75,9 +75,6 @@ class ComponentAccess(_ComponentContext, RegistratorAccess[Component]):
             configs["key"] = key
             configs["name"] = name
         configs = configs.get_member(type, defaults={**configs.get_members(includes), **defaults})
-        if any(i in configs.members for i in includes):
-            components.append(self._load_from_configs(self._registrar, configs, **kwargs))
-
         update_recursive(defaults, _Component._build_defaults(configs, includes))
 
         configs_dirs = configs.dirs.copy()
@@ -96,6 +93,9 @@ class ComponentAccess(_ComponentContext, RegistratorAccess[Component]):
                 **configs_dirs.to_dict(),
                 **defaults,
             )
+            components.append(self._load_from_configs(self._registrar, configs, **kwargs))
+
+        if len(components) == 0 and any(i in configs.members for i in includes):
             components.append(self._load_from_configs(self._registrar, configs, **kwargs))
 
         if sort:

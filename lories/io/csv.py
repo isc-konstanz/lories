@@ -186,7 +186,7 @@ def write_files(
     index_name = data.index.name
     if index_name is None:
         index_name = "timestamp"
-    if data.index.tzinfo is None or data.index.tzinfo.utcoffset(data.index) is None:
+    if data.index.tzinfo is None or data.index.tzinfo.utcoffset(data.index[0].to_pydatetime()) is None:
         data.index = data.index.tz_localize(tz.UTC, ambiguous="infer")
     if timezone is None:
         timezone = data.index.tzinfo
@@ -221,7 +221,7 @@ def write_file(
     override: bool = False,
     encoding: str = "utf-8-sig",
 ):
-    if data.index.tzinfo is None or data.index.tzinfo.utcoffset(data.index) is None:
+    if data.index.tzinfo is None or data.index.tzinfo.utcoffset(data.index[0].to_pydatetime()) is None:
         data.index = data.index.tz_localize(timezone, ambiguous="infer")
     if timezone is None:
         timezone = data.index.tzinfo

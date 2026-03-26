@@ -116,7 +116,15 @@ class ModbusClient(Connector):
                     try:
                         register = self.__registers[resource.id]
                         function = getattr(self.__client, f"read_{register.function}s")
-                        result = function(register.address, count=register.length, slave=device)
+
+                        try:
+                            result = function(register.address, count=register.length, device_id=device)
+                        except TypeError:
+                            try:
+                                result = function(register.address, count=register.length, slave=device)
+                            except TypeError:
+                                result = function(register.address, count=register.length, unit=device)
+
                         if result.isError():
                             data.at[timestamp, resource.id] = ChannelState.UNKNOWN_ERROR
                             self._logger.warning(f"Error reading register '{resource.id}'")
