@@ -18,7 +18,7 @@ from lories._core.typing import Timestamp  # noqa
 from lories.components.access import ComponentAccess
 from lories.connectors.access import ConnectorAccess
 from lories.core.activator import Activator, ActivatorMeta
-from lories.core.configs.parameters import ParameterGroup
+from lories.core.configs.parameters import Parameter, ParameterGroup
 from lories.core.register import Registrator
 from lories.data.access import DataAccess
 from lories.data.converters import ConverterAccess
@@ -39,9 +39,13 @@ class Component(_Component, Registrator, Activator, metaclass=ComponentMeta):
     # not warn about them.  No children: the checker will not recurse into these
     # sections, which are consumed by the framework internals (DataAccess,
     # _Registrator) rather than via Parameter declarations.
+    _key_config = Parameter(key="key", required=False, desc="Component key (unique identifier)")
+    _name_config = Parameter(key="name", required=False, desc="Component name (human-readable)")
+    _description_config = Parameter(key="description", required=False, desc="Component description")
     _data_config = ParameterGroup(key="data", required=False, desc="Data and channel configuration section")
-    _component_config = ParameterGroup(key="component", required=False, desc="Component registration metadata")
-
+    _components_config = ParameterGroup(key="components", required=False, desc="Components registration metadata")
+    _connectors_config = ParameterGroup(key="connectors", required=False, desc="Connectors registration metadata")
+    _converters_config = ParameterGroup(key="converters", required=False, desc="Converters registration metadata")
     def __init__(
         self,
         context: RegistratorContext,

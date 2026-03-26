@@ -9,14 +9,15 @@ lories.application.view.pages.components.page
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Collection, Generic, Optional
+from typing import Collection, Generic, List, Optional
 
 import dash_bootstrap_components as dbc
 from dash import Input, Output, callback, html
 
 import pandas as pd
 from lories.application.view.pages import Page, PageLayout
-from lories.typing import Channel, Channels, Component, Components, Configurations, Connectors, Data
+from lories.application.view.pages.widgets import build_configs_widget
+from lories.typing import Channel, Channels, Component, Components, Configurations, Connector, Connectors, Data
 
 
 class ComponentPage(Page, Generic[Component]):
@@ -58,18 +59,52 @@ class ComponentPage(Page, Generic[Component]):
 
     def _on_create_layout(self, layout: PageLayout) -> None:
         super()._on_create_layout(layout)
+        self._create_configs_layout(layout)
         self._create_data_layout(layout, self.data.channels)
+        self._create_components_layout(layout)
+        self._create_connectors_layout(layout)
+
+    # -- Configs --------------------------------------------------------------
+
+    def _create_configs_layout(self, layout: PageLayout) -> None:
+        layout.append(html.Hr())
+        layout.append(dbc.Row(dbc.Col(dbc.Accordion(
+            dbc.AccordionItem(
+                title="Configs",
+                children=self._build_configs(),
+                item_id=f"{self.id}-section-configs",
+            ),
+            active_item=f"{self.id}-section-configs",
+            always_open=True,
+        ))))
+
+    def _build_configs(self) -> html.Div:
+        return build_configs_widget(
+            self.configs,
+            type(self._component),
+            prefix=f"{self.id}-",
+        )
+
+    # -- Data -----------------------------------------------------------------
 
     def _create_data_layout(self, layout: PageLayout, channels: Channels, title: Optional[str] = "Data") -> None:
-        if len(self.data.channels) > 0:
-            layout.append(html.Hr())
+        layout.append(html.Hr())
 
-            data = []
-            if title is not None:
-                data.append(html.H5(f"{title}:"))
-            data.append(self._build_data(channels))
+        if len(channels) > 0:
+            content = self._build_data(channels)
+        else:
+            content = html.Div(html.I("No data channels.", className="text-muted"))
 
-            layout.append(dbc.Row(data))
+        section_title = title if title is not None else "Data"
+        layout.append(dbc.Row(dbc.Col(dbc.Accordion(
+            dbc.AccordionItem(
+                title=section_title,
+                children=content,
+                item_id=f"{self.id}-section-data",
+            ),
+            active_item=f"{self.id}-section-data",
+            always_open=True,
+        ))))
 
         # TODO: append data-update separately to view
 
@@ -104,6 +139,19 @@ class ComponentPage(Page, Generic[Component]):
                 className="w-100",
             ),
             children=[
+                dbc.Row(
+                    [
+                        dbc.Col(html.Span("Value:", className="text-muted"), width=1),
+                        dbc.Col(
+                            [
+                                self._build_channel_value(channel),
+                                self._build_channel_unit(channel),
+                            ],
+                            width="auto",
+                        ),
+                    ],
+                    justify="start",
+                ),
                 dbc.Row(
                     [
                         dbc.Col(html.Span("Updated:", className="text-muted"), width=1),
@@ -155,9 +203,10 @@ class ComponentPage(Page, Generic[Component]):
     def _build_channel_value(self, channel: Channel) -> html.Span:
         # TODO: Implement further type validation
         value = channel.value
-        if not pd.isna(value):
-            if channel.type == float:
-                value = round(channel.value, 2)
+        if pd.isna(value):
+            return html.Span("—", className="text-muted mb-1", style={"margin-right": "0.2rem"})
+        if channel.type == float:
+            value = round(channel.value, 2)
         return html.Span(value, className="mb-1", style={"margin-right": "0.2rem"})
 
     # noinspection PyMethodMayBeStatic
@@ -171,3 +220,160 @@ class ComponentPage(Page, Generic[Component]):
         if state.lower().endswith("error") or state.lower() == "disabled":
             color = "danger"
         return html.Small(state.title(), className=f"text-{color}", style={"margin-right": "1rem"})
+
+    # -- Connectors -----------------------------------------------------------
+
+    def _create_connectors_layout(self, layout: PageLayout) -> None:
+        connectors = list(self._component.connectors.values())
+        if connectors:
+            content = self._build_connectors(connectors)
+        else:
+            content = html.Div(html.I("No connectors.", className="text-muted"))
+        layout.append(html.Hr())
+        layout.append(dbc.Row(dbc.Col(dbc.Accordion(
+            dbc.AccordionItem(
+                title="Connectors",
+                children=content,
+                item_id=f"{self.id}-section-connectors",
+            ),
+            active_item=f"{self.id}-section-connectors",
+            always_open=True,
+        ))))
+
+    def _build_connectors(self, connectors: List[Connector]) -> html.Div:
+        @callback(
+            Output(f"{self.id}-connectors", "children"),
+            Input("view-update", "n_intervals"),
+        )
+        def _update(*_):
+            return [self._build_connector_item(c) for c in connectors]
+
+        return html.Div(
+            dbc.Accordion(
+                id=f"{self.id}-connectors",
+                children=_update(),
+                start_collapsed=True,
+                always_open=True,
+                flush=True,
+            )
+        )
+
+    def _build_connector_item(self, connector: Connector) -> dbc.AccordionItem:
+        href = f"/connector/{self._encode_id(connector.id)}"
+
+        if not connector.is_enabled():
+            badge = dbc.Badge("Disabled", color="secondary")
+            timestamp_str = "—"
+        elif connector._is_connected():
+            badge = dbc.Badge("Connected", color="success")
+            ts = connector._timestamp_connect
+            timestamp_str = ts.isoformat(sep=" ", timespec="seconds") if not pd.isna(ts) else "—"
+        else:
+            badge = dbc.Badge("Disconnected", color="danger")
+            ts = connector._timestamp_disconnect
+            timestamp_str = ts.isoformat(sep=" ", timespec="seconds") if not pd.isna(ts) else "—"
+
+        return dbc.AccordionItem(
+            title=dbc.Row(
+                [
+                    dbc.Col(html.A(connector.name, href=href), width="auto"),
+                    dbc.Col(
+                        [
+                            html.Small(
+                                type(connector).__name__,
+                                className="text-muted",
+                                style={"marginRight": "2rem"},
+                            ),
+                            badge,
+                        ],
+                        width="auto",
+                    ),
+                ],
+                justify="between",
+                className="w-100",
+            ),
+            children=dbc.Row(
+                [
+                    dbc.Col(html.Span("Since:", className="text-muted"), width=1),
+                    dbc.Col(html.Small(timestamp_str, className="text-muted"), width="auto"),
+                ],
+                justify="start",
+            ),
+            id=f"{self.id}-conn-{self._encode_id(connector.key)}",
+        )
+
+    # -- Components -----------------------------------------------------------
+
+    def _create_components_layout(self, layout: PageLayout) -> None:
+        components = list(self._component.components.values())
+        if components:
+            content = self._build_components(components)
+        else:
+            content = html.Div(html.I("No components.", className="text-muted"))
+        layout.append(html.Hr())
+        layout.append(dbc.Row(dbc.Col(dbc.Accordion(
+            dbc.AccordionItem(
+                title="Components",
+                children=content,
+                item_id=f"{self.id}-section-components",
+            ),
+            active_item=f"{self.id}-section-components",
+            always_open=True,
+        ))))
+
+    def _build_components(self, components: List[Component]) -> html.Div:
+        @callback(
+            Output(f"{self.id}-components", "children"),
+            Input("view-update", "n_intervals"),
+        )
+        def _update(*_):
+            return [self._build_component_item(c) for c in components]
+
+        return html.Div(
+            dbc.Accordion(
+                id=f"{self.id}-components",
+                children=_update(),
+                start_collapsed=True,
+                always_open=True,
+                flush=True,
+            )
+        )
+
+    def _build_component_item(self, component: Component) -> dbc.AccordionItem:
+        href = f"{self.path}/{self._encode_id(component.key)}"
+
+        if not component.is_enabled():
+            badge = dbc.Badge("Disabled", color="secondary")
+        elif component.is_active():
+            badge = dbc.Badge("Active", color="success")
+        else:
+            badge = dbc.Badge("Inactive", color="warning")
+
+        return dbc.AccordionItem(
+            title=dbc.Row(
+                [
+                    dbc.Col(html.A(component.name, href=href), width="auto"),
+                    dbc.Col(
+                        [
+                            html.Small(
+                                type(component).__name__,
+                                className="text-muted",
+                                style={"marginRight": "2rem"},
+                            ),
+                            badge,
+                        ],
+                        width="auto",
+                    ),
+                ],
+                justify="between",
+                className="w-100",
+            ),
+            children=dbc.Row(
+                [
+                    dbc.Col(html.Span("Type:", className="text-muted"), width=1),
+                    dbc.Col(html.Small(type(component).__name__, className="text-muted"), width="auto"),
+                ],
+                justify="start",
+            ),
+            id=f"{self.id}-comp-{self._encode_id(component.key)}",
+        )

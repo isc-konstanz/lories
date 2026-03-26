@@ -109,6 +109,9 @@ class ViewInterface(Interface, Dash):
         super().configure(configs)
 
         self.view.create_pages(self.context.components)
+        self.view.create_connector_pages(self.context.connectors)
+        for component in self.context.components.values():
+            self.view.create_connector_pages(component.connectors)
         self.view.create_layout(self.view.layout)
         self.view.register()
         self.layout = self.create_layout

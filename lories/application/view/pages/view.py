@@ -8,13 +8,15 @@ lories.application.view.pages.view
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Optional, Sequence, Type, TypeVar
+from typing import Any, Callable, Dict, List, Optional, Sequence, Type, TypeVar
 
 import dash_bootstrap_components as dbc
 from dash import html
 
 from lories.application.view.pages import Page, PageFooter, PageGroup, PageHeader, PageLayout, PageRegistry
+from lories.application.view.pages.connectors import ConnectorPage
 from lories.components import Component, ComponentContext
+from lories.connectors import ConnectorContext
 from lories.system import System
 from lories.util import validate_key
 
@@ -76,6 +78,8 @@ class View(PageGroup):
         self.footer = footer
 
         self.groups = {}
+        self._connector_pages: List[ConnectorPage] = []
+        self._connector_ids: set = set()
 
     @property
     def path(self) -> str:
@@ -87,6 +91,14 @@ class View(PageGroup):
             if isinstance(component, System) or not isinstance(component.context, Component):
                 self._create_page(self, component)
 
+    def create_connector_pages(self, connectors: ConnectorContext) -> None:
+        for connector in connectors.values():
+            if connector.id in self._connector_ids:
+                continue
+            self._connector_ids.add(connector.id)
+            page = ConnectorPage(connector=connector)
+            self._connector_pages.append(page)
+
     # noinspection PyUnresolvedReferences
     def _create_page(self, view: PageGroup, component: Component) -> Optional[Page]:
         if not component.is_enabled():
@@ -94,14 +106,15 @@ class View(PageGroup):
             return None
 
         _type = type(component)
-        if not registry.has_page(_type):
-            return None
-
-        registration = registry.get_page(_type)
-        page = registration.initialize(
-            component=component,
-            group=view,
-        )
+        if registry.has_page(_type):
+            registration = registry.get_page(_type)
+            page = registration.initialize(
+                component=component,
+                group=view,
+            )
+        else:
+            from lories.application.view.pages.components.page import ComponentPage
+            page = ComponentPage(component=component, group=view)
         if page is not None:
             group = self._get_group(component)
             if group is not None:
@@ -145,7 +158,8 @@ class View(PageGroup):
         for page in self._pages:
             if page.key in ["auth", "login"]:
                 continue
-            if not isinstance(page._component, System):
+            _component = getattr(page, "_component", None)
+            if _component is not None and not isinstance(_component, System):
                 label = "Select"
             menu.append(dbc.DropdownMenuItem(page.name, href=page.path))
 
@@ -174,8 +188,8 @@ class View(PageGroup):
             page.create_layout(page.layout)
         for group in self.groups.values():
             group.create_layout(group.layout)
-            if group.layout.has_menu_item():
-                self.header.menu.append(group.layout.menu)
+        for page in self._connector_pages:
+            page.create_layout(page.layout)
 
     def _on_create_layout(self, layout: PageLayout) -> None:
         super()._on_create_layout(layout)
@@ -195,3 +209,6 @@ class View(PageGroup):
         _register(self)
         for group in groups:
             group.register()
+        for page in self._connector_pages:
+            if page.is_created():
+                page.register()

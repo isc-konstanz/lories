@@ -27,6 +27,9 @@ from .components import (  # noqa: F401
     ComponentGroup,
 )
 
+from . import connectors  # noqa: F401
+from .connectors import ConnectorPage  # noqa: F401
+
 from .header import PageHeader  # noqa: F401
 from .footer import PageFooter  # noqa: F401
 

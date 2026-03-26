@@ -34,11 +34,17 @@ class ComponentGroup(PageGroup[ComponentPage], ComponentPage[ComponentType], Gen
 
     def _create_data_layout(self, layout: PageLayout, channels: Channels, title: Optional[str] = "Data") -> None:
         if len(channels) > 0:
-            data = []
-            if title is not None:
-                data.append(html.H5(f"{title}:"))
-            data.append(self._build_data(channels))
-            layout.append(dbc.Row(dbc.Col(dbc.Card(dbc.CardBody(data)))))
+            section_title = title if title is not None else "Data"
+            layout.append(html.Hr())
+            layout.append(dbc.Row(dbc.Col(dbc.Accordion(
+                dbc.AccordionItem(
+                    title=section_title,
+                    children=self._build_data(channels),
+                    item_id=f"{self.id}-section-data",
+                ),
+                active_item=f"{self.id}-section-data",
+                always_open=True,
+            ))))
 
     def get_page(self, _page: str | Component) -> Optional[ComponentPage]:
         if isinstance(_page, Component):
