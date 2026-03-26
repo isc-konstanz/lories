@@ -167,6 +167,10 @@ class _ChannelWrapper(ABC, Generic[Registrator]):
     def _copy_configs(self) -> Dict[str, Any]:
         return OrderedDict(**self._get_configs())
 
+    def _set_resolved(self, resolved: dict) -> None:
+        """Overwrite channel configs with typed values resolved by ResourceParameter."""
+        self._get_configs().update(resolved)
+
     def __update_configs(self, configs: Dict[str, Any]) -> None:
         update_recursive(self.__configs, configs)
 

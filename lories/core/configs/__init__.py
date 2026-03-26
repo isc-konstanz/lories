@@ -16,7 +16,11 @@ from .directories import (  # noqa: F401
     Directories,
 )
 
-from .parameter import Parameter, Parameters, with_parameters  # noqa: F401
+from .parameters import (  # noqa: F401
+    _Parameter,
+    Parameter,
+    ParameterGroup,
+)
 
 from .configurations import Configurations  # noqa: F401
 
