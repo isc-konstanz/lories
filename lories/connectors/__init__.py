@@ -53,6 +53,7 @@ CONNECTORS = [
     "mqtt",
     "revpi",
     "entsoe",
+    "opcua",
 ]
 
 for import_connector in CONNECTORS:
