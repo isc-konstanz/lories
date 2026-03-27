@@ -14,7 +14,7 @@ from typing import AnyStr, Dict, Optional
 import pandas as pd
 import pytz as tz
 from lories.connectors import register_connector_type
-from lories.connectors.serial._serial import _SerialConnector
+from lories.connectors.serial._core import _SerialConnector
 from lories.data import ChannelState
 from lories.typing import Resources
 from lories.util import is_int
@@ -60,7 +60,7 @@ class Sdi12Connector(_SerialConnector):
             return None
 
         # Extract the time to wait in seconds
-        ttt = int(response[len(address):len(address) + 3])
+        ttt = int(response[len(address) : len(address) + 3])
         if ttt > 0:
             time.sleep(ttt)
 

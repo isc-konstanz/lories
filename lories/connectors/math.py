@@ -16,7 +16,6 @@ import sympy
 
 import pandas as pd
 import pytz as tz
-
 from lories.connectors import Connector, register_connector_type
 from lories.core import ConfigurationError
 from lories.data import Channel, DataContext
@@ -121,7 +120,7 @@ class ChannelExpr(Callable):
         if not all(symbol.is_valid() for symbol in self.symbols):
             return None
 
-        return float(self._expr.evalf(subs={ symbol.name: symbol.value for symbol in self.symbols }))
+        return float(self._expr.evalf(subs={symbol.name: symbol.value for symbol in self.symbols}))
 
 
 class ChannelSymbol:
