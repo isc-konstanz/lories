@@ -46,6 +46,7 @@ class Component(_Component, Registrator, Activator, metaclass=ComponentMeta):
     _components_config = ParameterGroup(key="components", required=False, desc="Components registration metadata")
     _connectors_config = ParameterGroup(key="connectors", required=False, desc="Connectors registration metadata")
     _converters_config = ParameterGroup(key="converters", required=False, desc="Converters registration metadata")
+
     def __init__(
         self,
         context: RegistratorContext,

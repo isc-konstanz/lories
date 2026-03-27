@@ -68,15 +68,21 @@ class ComponentPage(Page, Generic[Component]):
 
     def _create_configs_layout(self, layout: PageLayout) -> None:
         layout.append(html.Hr())
-        layout.append(dbc.Row(dbc.Col(dbc.Accordion(
-            dbc.AccordionItem(
-                title="Configs",
-                children=self._build_configs(),
-                item_id=f"{self.id}-section-configs",
-            ),
-            active_item=f"{self.id}-section-configs",
-            always_open=True,
-        ))))
+        layout.append(
+            dbc.Row(
+                dbc.Col(
+                    dbc.Accordion(
+                        dbc.AccordionItem(
+                            title="Configs",
+                            children=self._build_configs(),
+                            item_id=f"{self.id}-section-configs",
+                        ),
+                        active_item=f"{self.id}-section-configs",
+                        always_open=True,
+                    )
+                )
+            )
+        )
 
     def _build_configs(self) -> html.Div:
         return build_configs_widget(
@@ -96,15 +102,21 @@ class ComponentPage(Page, Generic[Component]):
             content = html.Div(html.I("No data channels.", className="text-muted"))
 
         section_title = title if title is not None else "Data"
-        layout.append(dbc.Row(dbc.Col(dbc.Accordion(
-            dbc.AccordionItem(
-                title=section_title,
-                children=content,
-                item_id=f"{self.id}-section-data",
-            ),
-            active_item=f"{self.id}-section-data",
-            always_open=True,
-        ))))
+        layout.append(
+            dbc.Row(
+                dbc.Col(
+                    dbc.Accordion(
+                        dbc.AccordionItem(
+                            title=section_title,
+                            children=content,
+                            item_id=f"{self.id}-section-data",
+                        ),
+                        active_item=f"{self.id}-section-data",
+                        always_open=True,
+                    )
+                )
+            )
+        )
 
         # TODO: append data-update separately to view
 
@@ -230,15 +242,21 @@ class ComponentPage(Page, Generic[Component]):
         else:
             content = html.Div(html.I("No connectors.", className="text-muted"))
         layout.append(html.Hr())
-        layout.append(dbc.Row(dbc.Col(dbc.Accordion(
-            dbc.AccordionItem(
-                title="Connectors",
-                children=content,
-                item_id=f"{self.id}-section-connectors",
-            ),
-            active_item=f"{self.id}-section-connectors",
-            always_open=True,
-        ))))
+        layout.append(
+            dbc.Row(
+                dbc.Col(
+                    dbc.Accordion(
+                        dbc.AccordionItem(
+                            title="Connectors",
+                            children=content,
+                            item_id=f"{self.id}-section-connectors",
+                        ),
+                        active_item=f"{self.id}-section-connectors",
+                        always_open=True,
+                    )
+                )
+            )
+        )
 
     def _build_connectors(self, connectors: List[Connector]) -> html.Div:
         @callback(
@@ -311,15 +329,21 @@ class ComponentPage(Page, Generic[Component]):
         else:
             content = html.Div(html.I("No components.", className="text-muted"))
         layout.append(html.Hr())
-        layout.append(dbc.Row(dbc.Col(dbc.Accordion(
-            dbc.AccordionItem(
-                title="Components",
-                children=content,
-                item_id=f"{self.id}-section-components",
-            ),
-            active_item=f"{self.id}-section-components",
-            always_open=True,
-        ))))
+        layout.append(
+            dbc.Row(
+                dbc.Col(
+                    dbc.Accordion(
+                        dbc.AccordionItem(
+                            title="Components",
+                            children=content,
+                            item_id=f"{self.id}-section-components",
+                        ),
+                        active_item=f"{self.id}-section-components",
+                        always_open=True,
+                    )
+                )
+            )
+        )
 
     def _build_components(self, components: List[Component]) -> html.Div:
         @callback(

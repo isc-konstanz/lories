@@ -36,15 +36,21 @@ class ComponentGroup(PageGroup[ComponentPage], ComponentPage[ComponentType], Gen
         if len(channels) > 0:
             section_title = title if title is not None else "Data"
             layout.append(html.Hr())
-            layout.append(dbc.Row(dbc.Col(dbc.Accordion(
-                dbc.AccordionItem(
-                    title=section_title,
-                    children=self._build_data(channels),
-                    item_id=f"{self.id}-section-data",
-                ),
-                active_item=f"{self.id}-section-data",
-                always_open=True,
-            ))))
+            layout.append(
+                dbc.Row(
+                    dbc.Col(
+                        dbc.Accordion(
+                            dbc.AccordionItem(
+                                title=section_title,
+                                children=self._build_data(channels),
+                                item_id=f"{self.id}-section-data",
+                            ),
+                            active_item=f"{self.id}-section-data",
+                            always_open=True,
+                        )
+                    )
+                )
+            )
 
     def get_page(self, _page: str | Component) -> Optional[ComponentPage]:
         if isinstance(_page, Component):

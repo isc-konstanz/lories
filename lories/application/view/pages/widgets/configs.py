@@ -17,7 +17,7 @@ from typing import Dict, List, Optional
 import dash_bootstrap_components as dbc
 from dash import html
 
-from lories.core.configs.parameters import _Parameter, ParameterGroup
+from lories.core.configs.parameters import ParameterGroup, _Parameter
 
 
 def build_configs_widget(
@@ -46,11 +46,13 @@ def build_configs_widget(
 
     declared = [(k, v) for k, v in configs.items() if k in param_keys]
     undeclared_flat = [
-        (k, v) for k, v in configs.items()
+        (k, v)
+        for k, v in configs.items()
         if k not in param_keys and k not in param_group_keys and not isinstance(v, Mapping)
     ]
     undeclared_sections = [
-        (k, v) for k, v in configs.items()
+        (k, v)
+        for k, v in configs.items()
         if k not in param_keys and k not in param_group_keys and isinstance(v, Mapping)
     ]
 
@@ -66,16 +68,17 @@ def build_configs_widget(
     for gkey in param_group_keys:
         if configs.has_member(gkey):
             member = configs.get_member(gkey)
-            children.append(
-                _render_section_card(gkey, member, prefix=f"{prefix}{gkey}-", depth=0)
-            )
+            children.append(_render_section_card(gkey, member, prefix=f"{prefix}{gkey}-", depth=0))
 
     # -- Undeclared sections --------------------------------------------------
     if undeclared_sections:
         for key, section in undeclared_sections:
             children.append(
                 _render_section_card(
-                    key, section, prefix=f"{prefix}{key}-", depth=0,
+                    key,
+                    section,
+                    prefix=f"{prefix}{key}-",
+                    depth=0,
                     header_color="rgba(220, 53, 69, 0.06)",
                 )
             )
@@ -125,14 +128,16 @@ def _render_param_table(items: List[tuple], param_by_key: Dict[str, _Parameter])
             meta_parts.append(html.Small(desc, className="text-muted fst-italic"))
 
         rows.append(
-            html.Tr([
-                html.Td(
-                    [html.Code(key)] + badge_children,
-                    style={"whiteSpace": "nowrap", "width": "1%", "paddingRight": "1rem"},
-                ),
-                html.Td(html.Span(str(value)), style={"fontFamily": "monospace"}),
-                html.Td(meta_parts, style={"whiteSpace": "nowrap"}),
-            ])
+            html.Tr(
+                [
+                    html.Td(
+                        [html.Code(key)] + badge_children,
+                        style={"whiteSpace": "nowrap", "width": "1%", "paddingRight": "1rem"},
+                    ),
+                    html.Td(html.Span(str(value)), style={"fontFamily": "monospace"}),
+                    html.Td(meta_parts, style={"whiteSpace": "nowrap"}),
+                ]
+            )
         )
     return dbc.Table(
         html.Tbody(rows),
@@ -146,19 +151,23 @@ def _render_param_table(items: List[tuple], param_by_key: Dict[str, _Parameter])
 
 def _render_plain_table(items: List[tuple]) -> dbc.Table:
     return dbc.Table(
-        html.Tbody([
-            html.Tr([
-                html.Td(
-                    html.Code(key, style={"fontSize": "0.8rem"}),
-                    style={"whiteSpace": "nowrap", "width": "1%", "paddingRight": "1rem"},
-                ),
-                html.Td(
-                    html.Small(str(value)),
-                    style={"fontFamily": "monospace"},
-                ),
-            ])
-            for key, value in items
-        ]),
+        html.Tbody(
+            [
+                html.Tr(
+                    [
+                        html.Td(
+                            html.Code(key, style={"fontSize": "0.8rem"}),
+                            style={"whiteSpace": "nowrap", "width": "1%", "paddingRight": "1rem"},
+                        ),
+                        html.Td(
+                            html.Small(str(value)),
+                            style={"fontFamily": "monospace"},
+                        ),
+                    ]
+                )
+                for key, value in items
+            ]
+        ),
         bordered=True,
         hover=True,
         size="sm",
@@ -188,7 +197,8 @@ def _render_section_card(
         for key, section in sub_sections:
             body_children.append(
                 _render_section_card(
-                    key, section,
+                    key,
+                    section,
                     prefix=f"{prefix}{key}-",
                     depth=depth + 1,
                     header_color=header_color,

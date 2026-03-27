@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Optional
 
 import dash
-from dash import Dash, dcc, html
 import dash_bootstrap_components as dbc
+from dash import Dash, dcc, html
 from dash_bootstrap_components import themes
 
 from lories.application import Application
@@ -117,9 +117,7 @@ class ViewInterface(Interface, Dash):
         docs_page = DocsPage()
         self.view.append(docs_page)
         self.view.create_layout(self.view.layout)
-        self.view.header.menu.append(
-            dbc.NavItem(dbc.NavLink(docs_page.title, href=docs_page.path))
-        )
+        self.view.header.menu.append(dbc.NavItem(dbc.NavLink(docs_page.title, href=docs_page.path)))
         self.view.register()
         self.layout = self.create_layout
 

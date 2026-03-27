@@ -20,7 +20,6 @@ from lories.application.view.pages.widgets import build_configs_widget
 from lories.connectors import Connector
 from lories.typing import Channel, Channels, Configurations
 
-
 ConnectorType = TypeVar("ConnectorType", bound=Connector)
 
 
@@ -56,19 +55,25 @@ class ConnectorPage(Page, Generic[ConnectorType]):
         layout.append(self._build_status())
 
         layout.append(html.Hr())
-        layout.append(dbc.Row(dbc.Col(dbc.Accordion(
-            dbc.AccordionItem(
-                title="Configs",
-                children=build_configs_widget(
-                    self.configs,
-                    type(self._connector),
-                    prefix=f"{self.id}-",
-                ),
-                item_id=f"{self.id}-section-configs",
-            ),
-            active_item=f"{self.id}-section-configs",
-            always_open=True,
-        ))))
+        layout.append(
+            dbc.Row(
+                dbc.Col(
+                    dbc.Accordion(
+                        dbc.AccordionItem(
+                            title="Configs",
+                            children=build_configs_widget(
+                                self.configs,
+                                type(self._connector),
+                                prefix=f"{self.id}-",
+                            ),
+                            item_id=f"{self.id}-section-configs",
+                        ),
+                        active_item=f"{self.id}-section-configs",
+                        always_open=True,
+                    )
+                )
+            )
+        )
 
         channels = self._connector.channels
         if len(channels) > 0:
@@ -88,9 +93,7 @@ class ConnectorPage(Page, Generic[ConnectorType]):
             color = "success" if connected else "danger"
             label = "Connected" if connected else "Disconnected"
             timestamp = self._connector._timestamp_connect if connected else self._connector._timestamp_disconnect
-            timestamp_str = (
-                timestamp.isoformat(sep=" ", timespec="seconds") if not pd.isna(timestamp) else "—"
-            )
+            timestamp_str = timestamp.isoformat(sep=" ", timespec="seconds") if not pd.isna(timestamp) else "—"
             return [
                 dbc.Badge(label, color=color, className="me-2"),
                 html.Small(timestamp_str, className="text-muted"),

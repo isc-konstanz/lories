@@ -20,7 +20,7 @@ from dash import html
 
 from lories.application.view.pages.layout import PageLayout
 from lories.application.view.pages.page import Page
-from lories.core.configs.parameters import _Parameter, ParameterGroup
+from lories.core.configs.parameters import ParameterGroup, _Parameter
 
 
 class DocsPage(Page):
@@ -58,9 +58,10 @@ class DocsPage(Page):
 # Module-level rendering helpers (no instance state needed)
 # ---------------------------------------------------------------------------
 
+
 def _build_tabs() -> dbc.Tabs:
-    from lories.connectors.context import registry as connector_registry
     from lories.components.context import registry as component_registry
+    from lories.connectors.context import registry as connector_registry
 
     return dbc.Tabs(
         [
@@ -104,9 +105,7 @@ def _build_type_item(registration, category: str) -> dbc.AccordionItem:
         html.Small(cls.__name__, className="text-muted me-2"),
     ]
     for alias in registration.alias:
-        title_children.append(
-            dbc.Badge(alias, color="secondary", pill=True, className="ms-1")
-        )
+        title_children.append(dbc.Badge(alias, color="secondary", pill=True, className="ms-1"))
 
     body: List[Any] = []
 
@@ -143,9 +142,7 @@ def _build_type_item(registration, category: str) -> dbc.AccordionItem:
         body.append(_render_channel_params(channel_params))
 
     if not config_params and not channel_params:
-        body.append(
-            dbc.Badge("no configurable parameters", color="light", text_color="secondary", className="me-1")
-        )
+        body.append(dbc.Badge("no configurable parameters", color="light", text_color="secondary", className="me-1"))
 
     return dbc.AccordionItem(
         title=dbc.Row(
@@ -160,6 +157,7 @@ def _build_type_item(registration, category: str) -> dbc.AccordionItem:
 # ---------------------------------------------------------------------------
 # Parameter rendering
 # ---------------------------------------------------------------------------
+
 
 def _render_config_params(params: Dict[str, _Parameter]) -> html.Div:
     """Render _Parameter / ParameterGroup declarations as readable tables."""
@@ -242,18 +240,22 @@ def _render_channel_params(params: dict) -> dbc.Table:
             )
 
         rows.append(
-            html.Tr([
-                html.Td(
-                    [html.Code(key)] + badges,
-                    style={"whiteSpace": "nowrap", "width": "1%", "paddingRight": "1rem"},
-                ),
-                html.Td(desc_parts or ""),
-            ])
+            html.Tr(
+                [
+                    html.Td(
+                        [html.Code(key)] + badges,
+                        style={"whiteSpace": "nowrap", "width": "1%", "paddingRight": "1rem"},
+                    ),
+                    html.Td(desc_parts or ""),
+                ]
+            )
         )
 
     return dbc.Table(
         html.Tbody(rows),
-        bordered=True, hover=True, size="sm",
+        bordered=True,
+        hover=True,
+        size="sm",
         className="mb-2",
         style={"fontSize": "0.85rem"},
     )
@@ -295,18 +297,22 @@ def _param_table(items: List[Tuple[str, dict]]) -> dbc.Table:
             )
 
         rows.append(
-            html.Tr([
-                html.Td(
-                    [html.Code(key)] + badges,
-                    style={"whiteSpace": "nowrap", "width": "1%", "paddingRight": "1rem"},
-                ),
-                html.Td(desc_parts or ""),
-            ])
+            html.Tr(
+                [
+                    html.Td(
+                        [html.Code(key)] + badges,
+                        style={"whiteSpace": "nowrap", "width": "1%", "paddingRight": "1rem"},
+                    ),
+                    html.Td(desc_parts or ""),
+                ]
+            )
         )
 
     return dbc.Table(
         html.Tbody(rows),
-        bordered=True, hover=True, size="sm",
+        bordered=True,
+        hover=True,
+        size="sm",
         className="mb-2",
         style={"fontSize": "0.85rem"},
     )
