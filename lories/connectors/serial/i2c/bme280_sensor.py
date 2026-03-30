@@ -10,25 +10,7 @@ from __future__ import annotations
 try:
     import bme280
 except ImportError:
-
-    class BME280Results:
-        def __init__(self):
-            self.temperature = 0
-            self.humidity = 0
-            self.pressure = 0
-
-    class BME280Mock:
-        @staticmethod
-        def load_calibration_params(bus, addr):
-            print(f"BME280 mock calibration: addr: {addr}")
-            return {}
-
-        @staticmethod
-        def sample(bus, address, calibration_params):
-            print(f"BME280 mock sample: address: {address}, calibration_params: {calibration_params}")
-            return BME280Results()
-
-    bme280 = BME280Mock
+    bme280 = None  # type: ignore
 
 from lories.components.environment import Environment
 

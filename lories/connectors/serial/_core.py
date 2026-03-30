@@ -10,12 +10,21 @@ from __future__ import annotations
 
 from typing import AnyStr, Optional
 
-import serial
-from serial import SerialException
-
 from lories.connectors import ConnectionError, Connector
 from lories.core import Configurations, Resources
 from lories.core.configs.parameters import Parameter, SelectParameter
+
+_AVAILABLE = True
+_IMPORT_ERROR = None
+
+try:
+    import serial
+    from serial import SerialException
+except ImportError as _e:
+    _AVAILABLE = False
+    _IMPORT_ERROR = f"Missing dependency: pyserial — pip install lories[serial] ({_e})"
+    serial = None  # type: ignore
+    SerialException = Exception  # type: ignore
 
 # sudo lsusb -v | grep 'idVendor\|idProduct\|iProduct\|iSerial'
 #   idVendor           0x10c4 Silicon Labs
@@ -28,6 +37,8 @@ from lories.core.configs.parameters import Parameter, SelectParameter
 
 # noinspection PyAbstractClass, SpellCheckingInspection
 class _SerialConnector(Connector):
+    __available__ = _AVAILABLE
+    __import_error__ = _IMPORT_ERROR
     _port = Parameter(key="port", type=str, desc="Serial device path (e.g. /dev/ttyUSB0)")
     _baudrate = Parameter(key="baudrate", type=int, default=9600, desc="Baud rate")
     _bytesize = Parameter(key="bytesize", type=int, default=8, desc="Data bits")

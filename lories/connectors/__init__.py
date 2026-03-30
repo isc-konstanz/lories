@@ -38,6 +38,9 @@ from ..data import databases  # noqa: F401
 from ..data.databases import Databases  # noqa: F401
 
 import importlib
+import logging
+
+_logger = logging.getLogger(__name__)
 
 CONNECTORS = [
     "virtual",
@@ -60,8 +63,7 @@ for import_connector in CONNECTORS:
     try:
         importlib.import_module(f".{import_connector}", "lories.connectors")
 
-    except ModuleNotFoundError:
-        # TODO: Implement meaningful logging here
-        pass
+    except ImportError as e:
+        _logger.debug("Failed to load connector '%s': %s", import_connector, e)
 
 del importlib

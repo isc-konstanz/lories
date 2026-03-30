@@ -5,14 +5,24 @@ lories.connectors.cameras.opencv
 
 """
 
-import os
+from __future__ import annotations
 
-import cv2
+import os
 
 from lories.connectors import ConnectionError, ConnectorError, register_connector_type
 from lories.connectors.cameras import CameraConnector
 from lories.core.configs.parameters import Parameter
 from lories.typing import Configurations, Resources
+
+_AVAILABLE = True
+_IMPORT_ERROR = None
+
+try:
+    import cv2
+except ImportError as _e:
+    _AVAILABLE = False
+    _IMPORT_ERROR = f"Missing dependency: opencv-python — pip install opencv-python ({_e})"
+    cv2 = None  # type: ignore
 
 
 @register_connector_type("opencv")
@@ -24,6 +34,9 @@ class OpenCV(CameraConnector):
     Performance depends on network latency and camera firmware; some cameras may require adjusted timeouts
     or stream paths.
     """
+
+    __available__ = _AVAILABLE
+    __import_error__ = _IMPORT_ERROR
 
     _host = Parameter(key="host", type=str, desc="Camera hostname or IP")
     _port = Parameter(key="port", type=int, default=554, min=1, max=65535, desc="RTSP port")

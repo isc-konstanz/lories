@@ -11,9 +11,6 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Any, Dict, Iterator, Mapping, Optional
 
-from sqlalchemy import Connection, Dialect, Engine, create_engine, text
-from sqlalchemy.exc import SQLAlchemyError
-
 import pandas as pd
 import pytz as tz
 from lories.connectors import ConnectionError, Database, DatabaseError, register_connector_type
@@ -31,6 +28,22 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
+_AVAILABLE = True
+_IMPORT_ERROR = None
+
+try:
+    from sqlalchemy import Connection, Dialect, Engine, create_engine, text
+    from sqlalchemy.exc import SQLAlchemyError
+except ImportError as _e:
+    _AVAILABLE = False
+    _IMPORT_ERROR = f"Missing dependency: sqlalchemy — pip install lories[postgresql] or lories[mariadb] ({_e})"
+    Connection = None  # type: ignore
+    Dialect = None  # type: ignore
+    Engine = None  # type: ignore
+    create_engine = None  # type: ignore
+    text = None  # type: ignore
+    SQLAlchemyError = Exception  # type: ignore
+
 
 @register_connector_type("sql")
 class SqlDatabase(Database, Mapping[str, Table]):
@@ -41,6 +54,9 @@ class SqlDatabase(Database, Mapping[str, Table]):
     dialect support enables portability across database engines, though performance characteristics
     and SQL feature availability vary by backend.
     """
+
+    __available__ = _AVAILABLE
+    __import_error__ = _IMPORT_ERROR
 
     _host = Parameter(key="host", type=str, desc="Database host")
     _port = Parameter(key="port", type=int, min=1, max=65535, desc="Database port")

@@ -11,7 +11,7 @@ from __future__ import annotations
 import pandas as pd
 from lories import Constant
 from lories.components.tariff import Tariff, TariffProvider, register_tariff_type
-from lories.connectors.entsoe import EntsoeConnector
+from lories.connectors.entsoe import _AVAILABLE, _IMPORT_ERROR, EntsoeConnector
 from lories.core.configs.parameters import Parameter
 from lories.typing import Configurations
 
@@ -25,6 +25,9 @@ class EntsoeProvider(TariffProvider):
     13:00 CET for the following day. The provider converts day-ahead prices from €/MWh to ct/kWh and
     applies a configurable offset to account for taxes, levies, or margin adjustments.
     """
+
+    __available__ = _AVAILABLE
+    __import_error__ = _IMPORT_ERROR
 
     PRICE_DAY_AHEAD = Constant(float, "price_day_ahead", name="Day-Ahead Tariff Price", unit="€/MWh")
 

@@ -12,8 +12,6 @@ from collections.abc import Callable
 from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
-import sympy
-
 import pandas as pd
 import pytz as tz
 from lories.connectors import Connector, register_connector_type
@@ -22,6 +20,16 @@ from lories.core.configs.parameters import ParameterGroup, ResourceParameter
 from lories.data import Channel, DataContext
 from lories.typing import Resource, Resources
 from lories.util import get_context, to_bool
+
+_AVAILABLE = True
+_IMPORT_ERROR = None
+
+try:
+    import sympy
+except ImportError as _e:
+    _AVAILABLE = False
+    _IMPORT_ERROR = f"Missing dependency: sympy — pip install lories[math] ({_e})"
+    sympy = None  # type: ignore
 
 
 # noinspection SpellCheckingInspection
@@ -34,6 +42,9 @@ class MathConnector(Connector):
     listeners or evaluated on demand during read cycles. However, complex expressions with many symbols may
     introduce noticeable computation overhead.
     """
+
+    __available__ = _AVAILABLE
+    __import_error__ = _IMPORT_ERROR
 
     _mapping = ParameterGroup(key="mapping", required=False, desc="Symbol-to-channel mapping")
 

@@ -10,8 +10,6 @@ from __future__ import annotations
 
 from typing import Dict, Optional
 
-from revpimodio2 import EventCallback, RevPiModIO, io
-
 import pandas as pd
 import pytz as tz
 from lories.connectors import Connector, register_connector_type
@@ -19,6 +17,18 @@ from lories.core.configs.parameters import Parameter
 from lories.data.channels import Channel
 from lories.typing import Resources
 from lories.util import to_bool
+
+_AVAILABLE = True
+_IMPORT_ERROR = None
+
+try:
+    from revpimodio2 import EventCallback, RevPiModIO, io
+except ImportError as _e:
+    _AVAILABLE = False
+    _IMPORT_ERROR = f"Missing dependency: revpimodio2 — pip install revpimodio2 ({_e})"
+    EventCallback = None  # type: ignore
+    RevPiModIO = None  # type: ignore
+    io = None  # type: ignore
 
 
 # noinspection PyShadowingBuiltins, SpellCheckingInspection
@@ -30,6 +40,9 @@ class RevPiConnector(Connector):
     modular hardware design supports various I/O expansion modules (DIO, AIO, MIO, RO). However, the process
     image interface is Linux-specific and requires direct hardware access, limiting remote or cross-platform usage.
     """
+
+    __available__ = _AVAILABLE
+    __import_error__ = _IMPORT_ERROR
 
     _cycletime = Parameter(key="cycletime", type=int, required=False, desc="Cycle time override (ms)")
 

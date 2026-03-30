@@ -150,8 +150,19 @@ def _build_type_item(registration, category: str) -> dbc.AccordionItem:
     ]
     for alias in registration.alias:
         title_children.append(dbc.Badge(alias, color="secondary", pill=True, className="ms-1"))
+    if not registration.available:
+        title_children.append(dbc.Badge("not installed", color="danger", pill=True, className="ms-1"))
 
     body: List[Any] = []
+
+    if not registration.available:
+        body.append(
+            dbc.Alert(
+                [html.Strong("Unavailable: "), registration.error or "Missing dependency."],
+                color="warning",
+                className="mb-2 py-2",
+            )
+        )
 
     # Docstring — full text rendered as Markdown
     doc = inspect.getdoc(cls)

@@ -7,41 +7,27 @@ lories.connectors.i2c._i2c
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Optional
 
 from lories.connectors import ConnectionError, Connector
 from lories.core import Configurations
 from lories.typing import Resources
 
+_AVAILABLE = True
+_IMPORT_ERROR = None
+
 try:
     from smbus2 import SMBus
-except (ImportError, OSError):
-
-    class SMBus:
-        """
-        Minimal mock replacement for smbus2.SMBus
-        Works on Windows and in dev environments.
-        """
-
-        def __init__(self, *args, **kwargs):
-            pass
-
-        @staticmethod
-        def write_i2c_block_data(addr: int, register: int, data: List[int]) -> None:
-            print(f"I2C mock write: addr: {addr}, register: {register}, data: {data}")
-
-        @staticmethod
-        def read_i2c_block_data(addr: int, register: int, length: int) -> List[int]:
-            print(f"I2C mock read: addr: {addr}, register: {register}, length: {length}")
-            return [0 for _ in range(length)]
-
-        @staticmethod
-        def close() -> None:
-            print("I2C mock close")
+except (ImportError, OSError) as _e:
+    _AVAILABLE = False
+    _IMPORT_ERROR = f"Missing dependency: smbus2 — pip install smbus2 ({_e})"
+    SMBus = None  # type: ignore
 
 
 # noinspection PyAbstractClass
 class _I2CConnector(Connector):
+    __available__ = _AVAILABLE
+    __import_error__ = _IMPORT_ERROR
     _bus: Optional[SMBus]
     _bus_number: int
     _port: int

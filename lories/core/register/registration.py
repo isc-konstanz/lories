@@ -62,10 +62,20 @@ class Registration(Generic[Registrator]):
     def is_alias(self, type: str) -> bool:
         return any(type.startswith(a) for a in self.alias)
 
+    @property
+    def available(self) -> bool:
+        return getattr(self.__class, "__available__", True)
+
+    @property
+    def error(self) -> Optional[str]:
+        return getattr(self.__class, "__import_error__", None)
+
     def is_instance(self, registrator: Registrator) -> bool:
         return isinstance(registrator, self.__class)
 
     def initialize(self, *args, **kwargs) -> Registrator:
+        if not self.available:
+            raise RegistrationError(f"Cannot instantiate '{self.key}': {self.error}")
         # registrator = self.__factory(*args, **kwargs)
         # if not isinstance(registrator, self.__class):
         #     raise ResourceError(f"{self.name} factory instanced invalid '{type(registrator)}' registrator")
