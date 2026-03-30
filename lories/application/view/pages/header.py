@@ -13,7 +13,7 @@ from typing import List, Optional
 
 from dash import html
 from dash.development.base_component import Component
-from dash_bootstrap_components import Button, Col, Input, NavbarBrand, NavbarSimple, Row
+from dash_bootstrap_components import Button, Col, Input, Nav, Navbar, NavbarBrand, Row
 from PIL import Image
 
 
@@ -53,12 +53,22 @@ class PageHeader:
         )
 
     @property
-    def navbar(self) -> NavbarSimple:
-        return NavbarSimple(
-            children=self.menu,
-            brand=self._brand,
-            brand_href="/",
-            links_left=True,
+    def navbar(self) -> Navbar:
+        isc_logo = html.A(
+            html.Img(src="/assets/isc_logo.png", height="40px"),
+            href="https://www.isc-konstanz.de",
+            target="_blank",
+            className="ms-auto",
+        )
+        return Navbar(
+            html.Div(
+                [
+                    html.A(self._brand, href="/", className="navbar-brand"),
+                    Nav(self.menu, navbar=True),
+                    isc_logo,
+                ],
+                className="container-fluid d-flex align-items-center",
+            ),
             color="light",
             dark=False,
         )
