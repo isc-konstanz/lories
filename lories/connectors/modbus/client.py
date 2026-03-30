@@ -44,6 +44,8 @@ class ModbusClient(Connector):
             raise ConnectorError(self, f"Invalid modbus word order '{_endian}'")
         self._endian = _endian
 
+        self._scale = configs.get_float("scale", default=1.0)
+
         timeout = configs.get_int("timeout", default=3)
         retries = configs.get_int("retries", default=3)
 
@@ -116,7 +118,15 @@ class ModbusClient(Connector):
                     try:
                         register = self.__registers[resource.id]
                         function = getattr(self.__client, f"read_{register.function}s")
-                        result = function(register.address, count=register.length, slave=device)
+
+                        try:
+                            result = function(register.address, count=register.length, device_id=device)
+                        except TypeError:
+                            try:
+                                result = function(register.address, count=register.length, slave=device)
+                            except TypeError:
+                                result = function(register.address, count=register.length, unit=device)
+
                         if result.isError():
                             data.at[timestamp, resource.id] = ChannelState.UNKNOWN_ERROR
                             self._logger.warning(f"Error reading register '{resource.id}'")
@@ -125,7 +135,7 @@ class ModbusClient(Connector):
                         value = self.__client.convert_from_registers(
                             result.registers, register.type, word_order=self._endian
                         )
-                        data.at[timestamp, resource.id] = value
+                        data.at[timestamp, resource.id] = value * self._scale
 
                         self._logger.debug(f"Read {register.type} value of register {register.address}: {value}")
 

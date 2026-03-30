@@ -16,6 +16,14 @@ from serial import SerialException
 from lories.connectors import ConnectionError, Connector
 from lories.core import Configurations, Resources
 
+# sudo lsusb -v | grep 'idVendor\|idProduct\|iProduct\|iSerial'
+#   idVendor           0x10c4 Silicon Labs
+#   idProduct          0xea60 CP210x UART Bridge
+#   iProduct                2 CP2102 USB to UART Bridge Controller
+#   iSerial                 3 0001
+
+# "10c4:ea60"
+
 
 # noinspection PyAbstractClass, SpellCheckingInspection
 class _SerialConnector(Connector):
@@ -38,19 +46,27 @@ class _SerialConnector(Connector):
     def connect(self, resources: Resources) -> None:
         try:
             self._serial.open()
-
         except SerialException as e:
-            raise ConnectionError(f"Failed to open serial port {self._serial.port}: {e}") from e
+            raise ConnectionError(self, f"Failed to open serial port {self._serial.port}: {e}")
 
     def disconnect(self) -> None:
-        if self.is_connected():
-            self._serial.close()
+        try:
+            if self.is_connected():
+                self._serial.close()
+        except SerialException as e:
+            raise ConnectionError(self, f"Failed to close serial port {self._serial.port}: {e}")
 
     def is_connected(self) -> bool:
         return self._serial is not None and self._serial.is_open
 
     def _write_string(self, data: AnyStr, encode="ascii") -> None:
-        self._serial.write(data.encode(encode))
+        try:
+            self._serial.write(data.encode(encode))
+        except SerialException as e:
+            raise ConnectionError(self, f"Failed to write to serial port {self._serial.port}: {e}")
 
     def _read_line(self, decode="ascii") -> AnyStr:
-        return self._serial.readline().decode(decode, errors="ignore").replace("\x00", "").strip()
+        try:
+            return self._serial.readline().decode(decode, errors="ignore").replace("\x00", "").strip()
+        except SerialException as e:
+            raise ConnectionError(self, f"Failed to read from serial port {self._serial.port}: {e}")

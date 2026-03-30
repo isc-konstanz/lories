@@ -17,6 +17,7 @@ import tzlocal
 
 import pandas as pd
 import pytz as tz
+from lories._core._database import _Database  # noqa
 from lories.connectors.connector import Connector, ConnectorMeta
 from lories.connectors.errors import ConnectionError, ConnectorError
 from lories.core import Configurations, Resources
@@ -49,7 +50,7 @@ class DatabaseMeta(ConnectorMeta):
 
 
 # noinspection PyUnresolvedReferences
-class Database(Connector, metaclass=DatabaseMeta):
+class Database(_Database, Connector, metaclass=DatabaseMeta):
     timezone: tz.BaseTzInfo
 
     def configure(self, configs: Configurations) -> None:

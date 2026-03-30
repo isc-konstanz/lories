@@ -6,5 +6,19 @@ lories.connectors.serial
 
 """
 
-from . import sdi12  # noqa: F401
-from .sdi12 import Sdi12Connector  # noqa: F401
+import importlib
+
+CONNECTORS = [
+    "sdi12",
+    "i2c",
+]
+
+for import_connector in CONNECTORS:
+    try:
+        importlib.import_module(f".{import_connector}", "lories.connectors.serial")
+
+    except ModuleNotFoundError:
+        # TODO: Implement meaningful logging here
+        pass
+
+del importlib

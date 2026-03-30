@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lories.data.futures
-~~~~~~~~~~~~~~~~~~~
+lories.data.tasks
+~~~~~~~~~~~~~~~~~
 
 
 """
