@@ -19,6 +19,13 @@ from lories.typing import Configurations
 # noinspection SpellCheckingInspection
 @register_tariff_type("entsoe", "entso_e")
 class EntsoeProvider(TariffProvider):
+    """
+    Tariff provider that retrieves day-ahead electricity prices from the ENTSO-E Transparency Platform.
+    ENTSO-E publishes hourly wholesale market prices for European bidding zones, typically available by
+    13:00 CET for the following day. The provider converts day-ahead prices from €/MWh to ct/kWh and
+    applies a configurable offset to account for taxes, levies, or margin adjustments.
+    """
+
     PRICE_DAY_AHEAD = Constant(float, "price_day_ahead", name="Day-Ahead Tariff Price", unit="€/MWh")
 
     _offset = Parameter(key="offset", type=float, default=0.0, desc="Price offset added to day-ahead price in ct/kWh")

@@ -18,19 +18,29 @@ import pandas as pd
 from lories.components.weather import Weather
 from lories.connectors import Connector
 from lories.core.configs import Configurations
-from lories.core.configs.parameters import Parameter
+from lories.core.configs.parameters import Parameter, ResourceParameter
 from lories.location import Location
 from lories.typing import Resources, Timestamp
 
 
 class Brightsky(Connector):
-    location: Location
-    address: str = "https://api.brightsky.dev/"
-    horizon: int = 10
+    """
+    Connector for the Bright Sky REST API, which provides free access to Deutscher Wetterdienst (DWD)
+    open weather data. It retrieves hourly observations and forecasts for a given geographic location,
+    including solar irradiance, temperature, wind, precipitation, and cloud cover. Bright Sky requires
+    no API key and serves data with low latency, but availability depends on the upstream DWD data
+    pipeline and may lag by a few hours for recent observations.
+    """
 
     address = Parameter(type=str, default="https://api.brightsky.dev/", desc="Base URL of the Brightsky API")
     horizon = Parameter(type=int, default=10, desc="Forecast horizon in days (0-10)", min=0, max=10)
 
+    # Per-channel parameters
+    source = ResourceParameter(
+        type=str, required=True, desc="DWD observation type filter (e.g. 'forecast', 'current, historical')"
+    )
+
+    location: Location
     address: str
     horizon: int
 

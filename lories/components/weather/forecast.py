@@ -22,7 +22,13 @@ from lories.util import floor_date, to_date, to_timezone
 
 
 class WeatherForecast(Weather):
-    TYPE: str = "weather_forecast"
+    """
+    A weather forecast sub-component that stores and retrieves predicted meteorological data on a
+    configurable schedule. It is owned by a WeatherProvider and shares its geographic location.
+    Forecast data is periodically fetched and cached, with historical entries available through the
+    data logger for gap-filling when the in-memory buffer does not cover the requested time range.
+    """
+
     TYPE: str = "forecast"
 
     interval = Parameter(type=int, default=60, desc="Forecast schedule interval in minutes")

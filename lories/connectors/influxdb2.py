@@ -19,7 +19,7 @@ from urllib3.exceptions import HTTPError, NewConnectionError
 
 import pandas as pd
 from lories.connectors import ConnectionError, Database, DatabaseError, register_connector_type
-from lories.core.configs.parameters import Parameter
+from lories.core.configs.parameters import Parameter, ResourceParameter
 from lories.data.util import hash_value
 from lories.typing import Configurations, Resource, Resources, Timestamp
 
@@ -33,6 +33,14 @@ except ImportError:
 
 @register_connector_type("influxdb2", "influxdb_v2")
 class InfluxDB2(Database):
+    """
+    InfluxDB 2.x is a time-series database platform that introduces the Flux query language, token-based
+    authentication, and a unified API for data ingestion, querying, and management. It supports organizations
+    and buckets for multi-tenant data isolation, built-in task scheduling, and dashboarding. However, the Flux
+    language has a steeper learning curve compared to InfluxQL, and migration from 1.x requires adapting queries
+    and authentication workflows.
+    """
+
     _host = Parameter(key="host", type=str, default="localhost", desc="InfluxDB host")
     _port = Parameter(key="port", type=int, default=8086, min=1, max=65535, desc="InfluxDB port")
     _org = Parameter(key="org", type=str, desc="Organisation name")
@@ -41,6 +49,12 @@ class InfluxDB2(Database):
     _timeout = Parameter(key="timeout", type=float, default=10.0, min=0.0, desc="Request timeout (s)")
     _ssl = Parameter(key="ssl", type=bool, default=False, desc="Use HTTPS")
     _ssl_verify = Parameter(key="ssl_verify", type=bool, default=True, desc="Verify SSL certificate")
+
+    # Per-channel parameters
+    measurement = ResourceParameter(
+        type=str, required=False, desc="InfluxDB measurement name (defaults to the channel group)"
+    )
+    tag = ResourceParameter(type=str, required=False, desc="Optional tag key for grouping fields within a measurement")
 
     host: str
     port: int

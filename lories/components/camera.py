@@ -16,6 +16,13 @@ from lories.core import Configurations
 # noinspection SpellCheckingInspection
 @register_component_type("camera")
 class Camera(Component):
+    """
+    A camera component captures image frames from connected video sources and provides them as binary
+    data channels. It serves as the integration point for optical sensors and surveillance devices,
+    enabling downstream processing such as object detection, monitoring dashboards, or time-lapse
+    recording within the lories framework.
+    """
+
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 

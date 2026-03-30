@@ -20,6 +20,12 @@ from lories.typing import Configurations, Timestamp
 # noinspection SpellCheckingInspection
 @register_tariff_type("static")
 class StaticTariff(Tariff):
+    """
+    A static tariff provider that returns constant import and export prices for any requested time range.
+    It is useful for fixed-rate energy contracts where prices do not vary over time, or as a fallback
+    when no dynamic pricing source is available.
+    """
+
     _price_import = Parameter(key="import", type=float, required=True, desc="Import tariff price in ct/kWh")
     _price_export = Parameter(key="export", type=float, default=0.0, desc="Export tariff price in ct/kWh")
 

@@ -19,7 +19,7 @@ import pytz as tz
 from lories.connectors import ConnectionError, Database, DatabaseError, register_connector_type
 from lories.connectors.sql import Schema, Table
 from lories.core.configs import ConfigurationError
-from lories.core.configs.parameters import Parameter, ParameterGroup, SelectParameter
+from lories.core.configs.parameters import Parameter, ParameterGroup, ResourceParameter, SelectParameter
 from lories.data.util import hash_value
 from lories.typing import Configurations, Resources, Timestamp
 from lories.util import to_timezone
@@ -34,6 +34,14 @@ except ImportError:
 
 @register_connector_type("sql")
 class SqlDatabase(Database, Mapping[str, Table]):
+    """
+    SQL connector backed by SQLAlchemy, supporting PostgreSQL, MySQL, SQLite, and MSSQL dialects.
+    It provides a unified interface for reading and writing time-series data to relational databases,
+    with per-table configuration overrides and automatic schema introspection. SQLAlchemy's broad
+    dialect support enables portability across database engines, though performance characteristics
+    and SQL feature availability vary by backend.
+    """
+
     _host = Parameter(key="host", type=str, desc="Database host")
     _port = Parameter(key="port", type=int, min=1, max=65535, desc="Database port")
     _user = Parameter(key="user", type=str, desc="Username")
@@ -41,6 +49,12 @@ class SqlDatabase(Database, Mapping[str, Table]):
     _database = Parameter(key="database", type=str, desc="Database/schema name")
     _dialect = SelectParameter(["postgresql", "mysql", "sqlite", "mssql"], key="dialect", desc="SQLAlchemy dialect")
     _tables = ParameterGroup(key="tables", required=False, desc="Per-table configuration overrides")
+
+    # Per-channel parameters
+    schema = ResourceParameter(type=str, required=False, desc="Database schema name for this channel's table")
+    table = ResourceParameter(
+        type=str, required=False, desc="Table name for this channel (defaults to the channel group)"
+    )
 
     dialect: Dialect
 

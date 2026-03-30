@@ -15,6 +15,7 @@ import pandas as pd
 import pytz as tz
 from lories.connectors import register_connector_type
 from lories.connectors.serial._core import _SerialConnector
+from lories.core.configs.parameters import ResourceParameter
 from lories.data import ChannelState
 from lories.typing import Resources
 from lories.util import is_int
@@ -22,6 +23,19 @@ from lories.util import is_int
 
 @register_connector_type("sdi12")
 class Sdi12Connector(_SerialConnector):
+    """
+    SDI-12 (Serial-Digital Interface at 1200 baud) is a standard protocol for interfacing environmental
+    sensors over a single data line. It supports addressing up to 62 sensors on one bus, uses a
+    master-slave communication model with measurement (M!) and data (D!) commands, and is widely adopted
+    in hydrology, meteorology, and soil science. However, SDI-12's low baud rate and sequential polling
+    model limit throughput, and its timing-sensitive break signaling requires precise serial control.
+    """
+
+    # Per-channel parameters
+    sensor = ResourceParameter(type=int, required=True, desc="SDI-12 sensor address (0-9, A-Z, a-z)")
+    data = ResourceParameter(type=int, required=False, default=0, desc="Data command index (D0!, D1!, …)")
+    index = ResourceParameter(type=int, required=False, default=0, desc="Value position within the data response")
+
     def read(self, resources: Resources) -> pd.DataFrame:
         """Read all sensors."""
         timestamp = pd.Timestamp.now(tz=tz.UTC).floor(freq="s")

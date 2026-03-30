@@ -53,6 +53,14 @@ CHANNEL_AGGREGATE_ALIAS = {
 # noinspection SpellCheckingInspection
 @register_weather_type("dwd", "brightsky")
 class DeutscherWetterDienst(WeatherProvider):
+    """
+    Weather provider that retrieves observations and forecasts from the Deutscher Wetterdienst (DWD)
+    via the Bright Sky open API. DWD is the German national meteorological service, offering free
+    access to a comprehensive set of weather parameters including solar irradiance, temperature, wind,
+    precipitation, and cloud cover at hourly resolution. The Bright Sky API aggregates DWD open data
+    into a convenient REST interface without requiring registration or API keys.
+    """
+
     # noinspection PyUnresolvedReferences
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)

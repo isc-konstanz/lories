@@ -24,6 +24,13 @@ from lories.util import to_bool
 # noinspection PyShadowingBuiltins, SpellCheckingInspection
 @register_connector_type("revpi", "revpi_io", "revpi_aio", "revpi_mio", "revpi_ro", "revolutionpi")
 class RevPiConnector(Connector):
+    """
+    Revolution Pi is a KUNBUS open-source industrial PC platform based on the Raspberry Pi Compute Module. It
+    exposes digital and analog I/O through a shared process image, accessible via the revpimodio2 library. The
+    modular hardware design supports various I/O expansion modules (DIO, AIO, MIO, RO). However, the process
+    image interface is Linux-specific and requires direct hardware access, limiting remote or cross-platform usage.
+    """
+
     _cycletime = Parameter(key="cycletime", type=int, required=False, desc="Cycle time override (ms)")
 
     _core: RevPiModIO

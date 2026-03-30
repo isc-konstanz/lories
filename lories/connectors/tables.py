@@ -14,13 +14,20 @@ from typing import Optional, Sequence
 
 import pandas as pd
 from lories.connectors import ConnectionError, Database, register_connector_type
-from lories.core.configs.parameters import Parameter, SelectParameter
+from lories.core.configs.parameters import Parameter, ResourceParameter, SelectParameter
 from lories.typing import Configurations, Resources, Timestamp
 from pandas import HDFStore
 
 
 @register_connector_type("tables", "hdfstore")
 class HDFDatabase(Database):
+    """
+    HDF5 (Hierarchical Data Format version 5) is a binary file format designed for storing and organizing large
+    amounts of numerical data efficiently. Using the PyTables-backed pandas HDFStore, it supports fast columnar
+    reads, on-disk querying, and optional compression. However, HDF5 files are not easily human-readable,
+    concurrent write access is limited, and the format can be sensitive to library version mismatches.
+    """
+
     _path = Parameter(key="path", type=str, required=False, desc="Base path for store files")
     _file = Parameter(key="file", type=str, default=".store.h5", desc="HDF5 store filename")
     _mode = SelectParameter(["a", "r", "r+", "w"], key="mode", default="a", desc="File open mode")
@@ -31,6 +38,9 @@ class HDFDatabase(Database):
     _compression_lib = Parameter(
         key="compression_lib", type=str, required=False, desc="Compression library (zlib, lzo, bzip2, blosc)"
     )
+
+    # Per-channel parameters
+    group = ResourceParameter(type=str, required=False, desc="HDF5 group key for organizing channels in the store")
 
     __store: HDFStore = None
 

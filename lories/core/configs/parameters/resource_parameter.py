@@ -13,7 +13,7 @@ from typing import Any, Callable, List, Optional, Type
 from lories.core.configs.errors import ConfigurationError
 from lories.util import to_bool
 
-# Sentinel – distinguishes "no default provided" from ``default=None``.
+# Sentinel - distinguishes "no default provided" from ``default=None``.
 _UNSET = object()
 
 

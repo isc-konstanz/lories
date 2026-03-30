@@ -20,7 +20,7 @@ import pandas as pd
 import pytz as tz
 from lories.connectors import ConnectionError, Connector, ConnectorError
 from lories.core.configs import ConfigurationError
-from lories.core.configs.parameters import Parameter, SelectParameter
+from lories.core.configs.parameters import Parameter, ResourceParameter, SelectParameter
 from lories.typing import Configurations, Resources, Timestamp
 from lories.util import parse_freq
 
@@ -34,10 +34,23 @@ except ImportError:
 
 # noinspection SpellCheckingInspection
 class EntsoeConnector(Connector):
+    """
+    ENTSO-E (European Network of Transmission System Operators for Electricity) provides a Transparency Platform
+    API for accessing European electricity market data, including day-ahead prices, generation forecasts, and
+    cross-border flows. The REST API delivers standardized data across all EU member states. However, rate limits,
+    occasional data gaps, and historical changes in bidding zone codes (e.g. the DE/AT/LU split) require careful
+    handling on the client side.
+    """
+
     _country_code = Parameter(key="country_code", type=str, desc="ENTSO-E country code (e.g. DE)")
     _api_key = Parameter(key="api_key", type=str, desc="ENTSO-E API security token")
     _resolution = SelectParameter(
         ["15min", "30min", "60min"], key="resolution", default="60min", desc="Data resolution"
+    )
+
+    # Per-channel parameters
+    method = ResourceParameter(
+        type=str, required=True, choices=["day_ahead"], desc="ENTSO-E query method (e.g. day_ahead)"
     )
 
     DAY_AHEAD: str = "day_ahead"

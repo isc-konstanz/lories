@@ -17,17 +17,25 @@ from lories.typing import Configurations, Resources
 
 @register_connector_type("opencv")
 class OpenCV(CameraConnector):
+    """
+    OpenCV-based camera connector that captures frames from RTSP streams using the FFmpeg backend.
+    It connects to IP cameras via RTSP with TCP transport, grabs single frames on demand, and encodes
+    them as JPEG. The connector manages connection lifecycle per read cycle to avoid stale frame buffers.
+    Performance depends on network latency and camera firmware; some cameras may require adjusted timeouts
+    or stream paths.
+    """
+
     _host = Parameter(key="host", type=str, desc="Camera hostname or IP")
     _port = Parameter(key="port", type=int, default=554, min=1, max=65535, desc="RTSP port")
     _username = Parameter(key="username", type=str, desc="Camera username")
     _password = Parameter(key="password", type=str, desc="Camera password")
 
-    _capture: cv2.VideoCapture
-
     _host: str
     _port: int
     _username: str
     _password: str
+
+    _capture: cv2.VideoCapture
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)

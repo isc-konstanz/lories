@@ -14,6 +14,7 @@ from typing import Optional, Type, TypeVar
 from lories.components import Component, ComponentError, register_component_type
 from lories.components.component import ComponentMeta
 from lories.core import Constant, ResourceError
+from lories.core.configs.parameters import Parameter, ParameterGroup
 from lories.core.register import Registry
 from lories.location import Location, LocationUnavailableException
 from lories.typing import Configurations, ContextArgument
@@ -57,6 +58,14 @@ class WeatherMeta(ComponentMeta):
 # noinspection SpellCheckingInspection
 @register_component_type("weather")
 class Weather(Component, metaclass=WeatherMeta):
+    """
+    A weather component provides meteorological observations and forecasts including solar irradiance,
+    temperature, humidity, wind, precipitation, and cloud cover. It requires a geographic location
+    (latitude, longitude) either from its own configuration or inherited from the parent context.
+    Concrete weather providers fetch data from external services and populate the defined channels,
+    which downstream components such as photovoltaic simulators or load forecasters consume.
+    """
+
     GHI = Constant(float, "ghi", "Global Horizontal Irradiance", "W/m2")
     DNI = Constant(float, "dni", "Direct Normal Irradiance", "W/m2")
     DHI = Constant(float, "dhi", "Diffuse Horizontal Irradiance", "W/m2")
@@ -80,6 +89,20 @@ class Weather(Component, metaclass=WeatherMeta):
     PRECIPITATION_PROB = Constant(float, "precipitation_probability", "Precipitation Probability", "%")
     PRECIPITABLE_WATER = Constant(float, "precipitable_water", "Precipitable Water", "cm")
     SNOW_FRACTION = Constant(float, "snow_fraction", "Snow Fraction", "1/0")
+
+    _location_config = ParameterGroup(
+        key="location",
+        required=False,
+        desc="Geographic location of the weather station",
+        children=[
+            Parameter(key="latitude", type=float, required=False, desc="Latitude in decimal degrees"),
+            Parameter(key="longitude", type=float, required=False, desc="Longitude in decimal degrees"),
+            Parameter(key="timezone", type=str, required=False, desc="IANA timezone name"),
+            Parameter(key="altitude", type=float, required=False, desc="Altitude above sea level in metres"),
+            Parameter(key="country", type=str, required=False, desc="Country name or ISO code"),
+            Parameter(key="state", type=str, required=False, desc="State or region name"),
+        ],
+    )
 
     location: Location
 

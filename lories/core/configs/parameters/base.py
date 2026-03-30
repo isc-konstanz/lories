@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Callable, List, Optional
 if TYPE_CHECKING:
     from lories._core._configurations import _Configurations
 
-# Sentinel – distinguishes "no default provided" from ``default=None``.
+# Sentinel - distinguishes "no default provided" from ``default=None``.
 # Defined here so every typed subclass and the factory can share the same object.
 _UNSET = object()
 

@@ -17,7 +17,7 @@ from urllib3.exceptions import HTTPError, NewConnectionError
 
 import pandas as pd
 from lories.connectors import ConnectionError, Database, DatabaseError, register_connector_type
-from lories.core.configs.parameters import Parameter
+from lories.core.configs.parameters import Parameter, ResourceParameter
 from lories.typing import Configurations, Resource, Resources, Timestamp
 
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="influxdb.*")
@@ -32,12 +32,26 @@ except ImportError:
 
 @register_connector_type("influxdb1", "influxdb_v1")
 class InfluxDB1(Database):
+    """
+    InfluxDB 1.x is an open-source time-series database optimized for high-throughput ingestion and real-time
+    querying of timestamped data using the InfluxQL query language. It provides built-in retention policies and
+    continuous queries for automatic data management. However, InfluxDB 1.x lacks native multi-tenancy, uses a
+    custom authentication model without token-based access, and its storage engine can become resource-intensive
+    under high cardinality workloads.
+    """
+
     _host = Parameter(key="host", type=str, default="localhost", desc="InfluxDB host")
     _port = Parameter(key="port", type=int, default=8086, min=1, max=65535, desc="InfluxDB port")
     _user = Parameter(key="user", type=str, default="admin", desc="Username")
     _password = Parameter(key="password", type=str, default="admin", desc="Password")
     _database = Parameter(key="database", type=str, default="lories", desc="Database name")
     _timeout = Parameter(key="timeout", type=int, default=10, min=1, desc="Request timeout (s)")
+
+    # Per-channel parameters
+    measurement = ResourceParameter(
+        type=str, required=False, desc="InfluxDB measurement name (defaults to the channel group)"
+    )
+    tag = ResourceParameter(type=str, required=False, desc="Optional tag key for grouping fields within a measurement")
 
     host: str
     port: int

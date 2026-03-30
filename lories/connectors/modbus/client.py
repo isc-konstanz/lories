@@ -32,6 +32,15 @@ except ImportError:
 
 @register_connector_type("modbus")
 class ModbusClient(Connector):
+    """
+    Modbus is a widely used industrial communication protocol for connecting electronic devices over
+    serial (RTU) or TCP/UDP networks. This connector uses the pymodbus library to read and write
+    holding registers, input registers, and coils from Modbus slave devices. It supports configurable
+    byte order, register grouping for multi-register data types (float32, int16, etc.), and automatic
+    retry logic. However, Modbus lacks built-in authentication and encryption, and its register-based
+    data model requires careful address mapping per device.
+    """
+
     # Shared
     _protocol = SelectParameter(["tcp", "udp", "rtu"], key="protocol", desc="Modbus transport protocol")
     _endian = SelectParameter(["big", "little"], key="endian", default="big", desc="Byte order")
@@ -59,6 +68,18 @@ class ModbusClient(Connector):
     )
     device = ResourceParameter(type=int, required=False, desc="Slave device ID (unit identifier)")
     data_type = ResourceParameter(type=str, required=False, desc="Override data type (e.g. float32, int16, string)")
+
+    _protocol: str
+    _endian: str
+    _timeout: int
+    _retries: int
+    _host: str
+    _port: int
+    _com_port: str
+    _baudrate: int
+    _bytesize: int
+    _stopbits: int
+    _parity: str
 
     __client: ModbusBaseSyncClient
     __registers: Mapping[str, ModbusRegister]

@@ -23,6 +23,13 @@ from lories.util import ceil_date, floor_date, parse_freq
 # noinspection PyShadowingBuiltins
 @register_connector_type("csv")
 class CsvDatabase(Database):
+    """
+    CSV (Comma-Separated Values) is a plain-text file format for tabular data, where each line represents a row
+    and values are separated by a delimiter (typically a comma). Its simplicity and broad tool support make it a
+    common choice for data exchange, logging, and archival. However, CSV lacks a standardized schema, type
+    information, and compression, which can lead to parsing ambiguities and inefficient storage for large datasets.
+    """
+
     _dir = Parameter(key="dir", type=str, required=False, desc="Directory path")
     _file = Parameter(key="file", type=str, required=False, desc="File name override")
     _index_column = Parameter(key="index_column", type=str, default="timestamp", desc="Index column name")

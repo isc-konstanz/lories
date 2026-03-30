@@ -57,6 +57,13 @@ class TariffMeta(ComponentMeta):
 # noinspection SpellCheckingInspection
 @register_component_type("tariff")
 class Tariff(Component, metaclass=TariffMeta):
+    """
+    A tariff component models electricity pricing for energy import and export. It provides time-resolved
+    price signals that downstream components such as optimizers or controllers can use to minimize costs or
+    maximize revenue. Concrete tariff providers supply the actual price data, either from external market
+    APIs or from static configuration values.
+    """
+
     PRICE_IMPORT = Constant(float, "price_import", name="Import Tariff Price", unit="ct/kWh")
     PRICE_EXPORT = Constant(float, "price_export", name="Export Tariff Price", unit="ct/kWh")
 
