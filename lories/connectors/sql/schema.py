@@ -118,7 +118,7 @@ class Schema(Configurator, MetaData):
     @staticmethod
     def _create_column(resource: Resource | Configurations) -> Column:
         name = resource.get("column", default=resource.key)
-        type = parse_type(resource["type"], resource.get("length", None))
+        type = parse_type(resource["type"], resource.get("length", 255))
         primary = to_bool(resource.get("primary", default=False))
         configs = {
             "primary_key": primary,

@@ -14,7 +14,7 @@ from typing import AnyStr, Dict, Optional
 import pandas as pd
 import pytz as tz
 from lories.connectors import register_connector_type
-from lories.connectors.serial._serial import _SerialConnector
+from lories.connectors.serial._core import _SerialConnector
 from lories.data import ChannelState
 from lories.typing import Resources
 from lories.util import is_int
@@ -31,9 +31,13 @@ class Sdi12Connector(_SerialConnector):
             if not is_int(sensor_address):
                 self._logger.warning(f"Invalid SDI12 sensor address: {sensor_address}")
                 continue
-            sensor_data = self._read_sensor(sensor_resources, str(sensor_address))
-            if sensor_data is not None:
-                results.update(sensor_data)
+
+            try:
+                sensor_data = self._read_sensor(sensor_resources, str(sensor_address))
+                if sensor_data is not None:
+                    results.update(sensor_data)
+            except IOError as e:
+                raise ConnectionError(self, f"Failed to read from SDI12 sensor at address {sensor_address}: {e}")
 
         if len(results) == 0:
             return pd.DataFrame()

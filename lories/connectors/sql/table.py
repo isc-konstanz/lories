@@ -104,7 +104,7 @@ class Table(sql.Table):
             for key, value in groups.items():
                 column = self.primary_key.columns[key]
                 group_clauses.append(column == value)
-            clauses.append(and_(*group_clauses).self_group())
+            clauses.append(and_(True, *group_clauses).self_group() if group_clauses else and_(True).self_group())
         return clauses
 
     def extract(self, resources: Resources, result: Result[Any]) -> pd.DataFrame:

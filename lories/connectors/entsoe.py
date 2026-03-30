@@ -43,12 +43,16 @@ class EntsoeConnector(Connector):
 
     _client: Optional[EntsoePandasClient]
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._client = None
+
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
         self.resolution = self._validate_resolution(configs.get("resolution", default=EntsoeConnector.resolution))
         self.country_code = self._validate_country_code(configs.get("country_code").upper())
-        self._api_key = configs.get("api_key")
+        self._api_key = configs.get("api_key", default=None)
         if self._api_key is None:
             raise ConfigurationError("Missing security token")
 

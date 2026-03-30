@@ -24,7 +24,7 @@ import pandas as pd
 import pytz as tz
 from lories._core import _Application, _Context  # noqa
 from lories.application import Interface, Settings
-from lories.components import Component, ComponentContext
+from lories.components import Component, ComponentContext, Weather
 from lories.connectors import Connector, ConnectorContext, Database, DatabaseError
 from lories.connectors.tasks import LogTask, ReadTask
 from lories.core.configs import Configurations, ConfigurationUnavailableError
@@ -392,6 +392,7 @@ class Application(_Application, DataContext, TaskContext):
         freq = channel.freq
         if (
             freq is None
+            or channel.is_listener()
             or not channel.has_connector()
             or not self.connectors.get(channel.connector.id, False)
             or not self.connectors.get(channel.connector.id).is_connected()
@@ -528,6 +529,12 @@ class Application(_Application, DataContext, TaskContext):
             start = simulation.get_date("start", default=None, timezone=timezone)
         if end is None:
             end = simulation.get_date("end", default=None, timezone=timezone)
+
+        if (start is None or end is None) and self.components.has_type(Weather):
+            weather = self.components.get_first(Weather).get()
+            if not weather.empty:
+                start = weather.index[0]
+                end = weather.index[-1]
 
         if start is None or end is None or end < start:
             self._logger.error("Invalid settings missing specified simulation period")

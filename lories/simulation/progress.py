@@ -37,7 +37,7 @@ class Progress:
         self._total = total
         self._value = value
         self._file = file
-        if os.path.exists(file):
+        if file is not None and os.path.exists(file):
             with open(self._file, "r", encoding="utf-8") as file:
                 self.status = json.load(file).get("status", "loaded")
         else:
@@ -63,7 +63,7 @@ class Progress:
                 json.dump({"status": status, **results}, file, ensure_ascii=False, indent=4)
 
     # noinspection PyUnresolvedReferences
-    def update(self) -> None:
+    def update(self, *_) -> None:
         if self._value is not None:
             if type(self._value).__name__ == "Synchronized":
                 with self._value.get_lock():
