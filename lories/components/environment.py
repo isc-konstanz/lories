@@ -7,11 +7,8 @@ lories.components.environment
 
 from __future__ import annotations
 
-from typing import TypeVar
-
 from lories import Constant
 from lories.components import Component, register_component_type
-from lories.core import Configurations
 
 
 @register_component_type("environment")
