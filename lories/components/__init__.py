@@ -36,6 +36,5 @@ from .camera import Camera  # noqa: F401
 from . import tariff  # noqa: F401
 from .tariff import Tariff  # noqa: F401
 
-from . import environment
-from .environment import Environment
-
+from . import environment  # noqa: F401
+from .environment import Environment  # noqa: F401
