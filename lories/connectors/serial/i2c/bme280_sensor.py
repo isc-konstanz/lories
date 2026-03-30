@@ -10,6 +10,7 @@ from __future__ import annotations
 try:
     import bme280
 except ImportError:
+
     class BME280Results:
         def __init__(self):
             self.temperature = 0

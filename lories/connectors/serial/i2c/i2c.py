@@ -5,21 +5,60 @@ lories.connectors.i2c.i2c
 
 """
 
-
 from __future__ import annotations
 
-import pandas as pd
 from typing import List
 
+import pandas as pd
 from lories._core import ChannelState  # noqa
 from lories.connectors import ConnectionError, register_connector_type
 from lories.connectors.serial.i2c._i2c import _I2CConnector
 from lories.connectors.serial.i2c.bme280_sensor import Bme280Sensor
+from lories.core.configs.parameters import Parameter, ResourceParameter
 from lories.typing import Resources
 
 
 @register_connector_type("i2c")
 class I2CConnector(_I2CConnector):
+    """
+    I2C (Inter-Integrated Circuit) is a two-wire serial bus protocol commonly used to connect
+    low-speed sensors and peripherals on embedded systems and single-board computers such as the
+    Raspberry Pi. This connector uses the smbus2 library to communicate over the I2C bus and
+    supports named sensor drivers (e.g. BME280) as well as raw register read/write access.
+    It falls back to a mock implementation when smbus2 is unavailable (e.g. on Windows or in
+    development environments).
+    """
+
+    # Connector-level parameters
+    _port = Parameter(key="port", type=int, default=1, min=0, desc="I2C bus number (e.g. 1 for /dev/i2c-1)")
+
+    # Per-resource parameters
+    sensor = ResourceParameter(
+        type=str,
+        required=False,
+        desc="Sensor driver to use (e.g. 'bme280'). Omit for raw register access.",
+    )
+    address = ResourceParameter(
+        type=int,
+        required=True,
+        desc="7-bit I2C device address (decimal or 0x-prefixed hex).",
+    )
+    measurement = ResourceParameter(
+        type=str,
+        required=False,
+        desc="Named measurement to read from the sensor (e.g. 'temperature', 'humidity', 'pressure' for bme280).",
+    )
+    register = ResourceParameter(
+        type=int,
+        required=False,
+        desc="Register address for raw byte access. Required when 'sensor' is not set.",
+    )
+    length = ResourceParameter(
+        type=int,
+        required=False,
+        desc="Number of bytes to read in raw register access mode (default: 1).",
+    )
+
     _sensors: dict
 
     def connect(self, resources: Resources) -> None:
@@ -34,12 +73,7 @@ class I2CConnector(_I2CConnector):
                     pass
 
     def _read_sensor(
-        self,
-        sensor: str,
-        address: int,
-        resources: Resources,
-        timestamp,
-        results: pd.DataFrame
+        self, sensor: str, address: int, resources: Resources, timestamp, results: pd.DataFrame
     ) -> pd.DataFrame:
         if sensor.lower() == "bme280":
             bme280_sensor = self._sensors[f"{sensor}_{address}"]
@@ -53,9 +87,7 @@ class I2CConnector(_I2CConnector):
                         results.at[timestamp, channel.id] = bme280_results[measurement]
 
             except Exception as e:
-                self._logger.warning(
-                    f"Failed to read sensor {sensor}: {e}"
-                )
+                self._logger.warning(f"Failed to read sensor {sensor}: {e}")
 
         elif sensor is None:
             for resource in resources:
@@ -76,9 +108,7 @@ class I2CConnector(_I2CConnector):
                     results[resource.id] = value
 
                 except Exception as e:
-                    self._logger.warning(
-                        f"Failed to read register 0x{register:02X}: {e}"
-                    )
+                    self._logger.warning(f"Failed to read register 0x{register:02X}: {e}")
 
         else:
             raise ConnectionError(f"Unknown sensor {sensor}")
@@ -121,9 +151,7 @@ class I2CConnector(_I2CConnector):
                 self._write_bytes(0, register, [value & 0xFF])
 
             except Exception as e:
-                self._logger.warning(
-                    f"Failed to write register 0x{register:02X}: {e}"
-                )
+                self._logger.warning(f"Failed to write register 0x{register:02X}: {e}")
 
     def _write_bytes(self, address: int, register: int, data: List[int]) -> None:
         if not self.is_connected():
@@ -133,10 +161,7 @@ class I2CConnector(_I2CConnector):
             self._bus.write_i2c_block_data(address, register, data)
 
         except Exception as e:
-            raise ConnectionError(
-                f"I2C write failed "
-                f"(addr=0x{address:02X}, reg=0x{register:02X}): {e}"
-            ) from e
+            raise ConnectionError(f"I2C write failed " f"(addr=0x{address:02X}, reg=0x{register:02X}): {e}") from e
 
     def _read_bytes(self, address: int, register: int, length: int) -> List[int]:
         if not self.is_connected():
@@ -146,7 +171,4 @@ class I2CConnector(_I2CConnector):
             return self._bus.read_i2c_block_data(address, register, length)
 
         except Exception as e:
-            raise ConnectionError(
-                f"I2C read failed "
-                f"(addr=0x{address:02X}, reg=0x{register:02X}): {e}"
-            ) from e
+            raise ConnectionError(f"I2C read failed " f"(addr=0x{address:02X}, reg=0x{register:02X}): {e}") from e

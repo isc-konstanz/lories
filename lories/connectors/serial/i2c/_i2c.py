@@ -7,8 +7,7 @@ lories.connectors.i2c._i2c
 
 from __future__ import annotations
 
-from typing import Optional, List
-
+from typing import List, Optional
 
 from lories.connectors import ConnectionError, Connector
 from lories.core import Configurations
@@ -17,6 +16,7 @@ from lories.typing import Resources
 try:
     from smbus2 import SMBus
 except (ImportError, OSError):
+
     class SMBus:
         """
         Minimal mock replacement for smbus2.SMBus
@@ -37,7 +37,7 @@ except (ImportError, OSError):
 
         @staticmethod
         def close() -> None:
-            print(f"I2C mock close")
+            print("I2C mock close")
 
 
 # noinspection PyAbstractClass
@@ -56,9 +56,7 @@ class _I2CConnector(Connector):
         try:
             self._bus = SMBus(self._port)
         except Exception as e:
-            raise ConnectionError(
-                f"Failed to open I2C bus {self._bus_number}: {e}"
-            ) from e
+            raise ConnectionError(f"Failed to open I2C bus {self._bus_number}: {e}") from e
 
     def disconnect(self) -> None:
         if self.is_connected():
