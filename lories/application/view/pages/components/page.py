@@ -219,6 +219,8 @@ class ComponentPage(Page, Generic[Component]):
             return html.Span("—", className="text-muted mb-1", style={"margin-right": "0.2rem"})
         if channel.type == float:
             value = round(channel.value, 2)
+            if channel.type == bytes:
+                value = None
         return html.Span(value, className="mb-1", style={"margin-right": "0.2rem"})
 
     # noinspection PyMethodMayBeStatic
