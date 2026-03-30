@@ -44,6 +44,8 @@ class ModbusClient(Connector):
             raise ConnectorError(self, f"Invalid modbus word order '{_endian}'")
         self._endian = _endian
 
+        self._scale = configs.get_float("scale", default=1.0)
+
         timeout = configs.get_int("timeout", default=3)
         retries = configs.get_int("retries", default=3)
 
@@ -133,7 +135,7 @@ class ModbusClient(Connector):
                         value = self.__client.convert_from_registers(
                             result.registers, register.type, word_order=self._endian
                         )
-                        data.at[timestamp, resource.id] = value
+                        data.at[timestamp, resource.id] = value * self._scale
 
                         self._logger.debug(f"Read {register.type} value of register {register.address}: {value}")
 
