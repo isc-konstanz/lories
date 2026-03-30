@@ -7,15 +7,15 @@ lories.connectors.cameras.motion
 
 from __future__ import annotations
 
-from typing import Optional, Sequence, Tuple
-
 import os
 import time
-import cv2
-import numpy as np
+from typing import Optional, Sequence, Tuple
 
-from lories.data import Channels
+import cv2
+
+import numpy as np
 from lories.core import Configurator
+from lories.data import Channels
 from lories.typing import Configurations
 
 
@@ -216,7 +216,7 @@ class MotionDetector(Configurator):
 
                 bboxes = self._merge_overlapping_boxes(motion_contours)
 
-                for (x, y, w, h) in bboxes:
+                for x, y, w, h in bboxes:
                     cv2.rectangle(bgr, (x, y), (x + w, y + h), (0, 0, 255), 2)
 
                 ok, encoded = cv2.imencode(".jpg", bgr)

@@ -6,9 +6,9 @@ lories.connectors.cameras.opencv
 """
 
 import os
+from typing import Dict
 
 import cv2
-from typing import Dict
 
 from lories.connectors import ConnectionError, ConnectorError, register_connector_type
 from lories.connectors.cameras import CameraConnector
@@ -104,7 +104,9 @@ class OpenCV(CameraConnector):
             if not streaming and not capture.isOpened():
                 self._connect(address, capture)
             if capture is None or not capture.isOpened():
-                raise ConnectionError(self, f"Cannot open RTSP stream: 'rtsp://#:#@{self._host}:{self._port}/{address}'")
+                raise ConnectionError(
+                    self, f"Cannot open RTSP stream: 'rtsp://#:#@{self._host}:{self._port}/{address}'"
+                )
 
             status = capture.read()
             if not status:

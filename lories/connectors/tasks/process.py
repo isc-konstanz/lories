@@ -110,22 +110,26 @@ def assert_picklable(obj, path="root", max_depth=6, max_items=50, seen=None):
 
         if isinstance(obj, dict):
             for i, (k, v) in enumerate(list(obj.items())[:max_items]):
-                r = assert_picklable(k, f"{path}[key#{i}]", max_depth-1, max_items, seen)
-                if r: return r
-                r = assert_picklable(v, f"{path}[{repr(k)[:40]}]", max_depth-1, max_items, seen)
-                if r: return r
+                r = assert_picklable(k, f"{path}[key#{i}]", max_depth - 1, max_items, seen)
+                if r:
+                    return r
+                r = assert_picklable(v, f"{path}[{repr(k)[:40]}]", max_depth - 1, max_items, seen)
+                if r:
+                    return r
             return path, type(obj), repr(e)
 
         if isinstance(obj, (list, tuple, set)):
             for i, v in enumerate(list(obj)[:max_items]):
-                r = assert_picklable(v, f"{path}[{i}]", max_depth-1, max_items, seen)
-                if r: return r
+                r = assert_picklable(v, f"{path}[{i}]", max_depth - 1, max_items, seen)
+                if r:
+                    return r
             return path, type(obj), repr(e)
 
         d = getattr(obj, "__dict__", None)
         if isinstance(d, dict):
             for k, v in list(d.items())[:max_items]:
-                r = assert_picklable(v, f"{path}.{k}", max_depth-1, max_items, seen)
-                if r: return r
+                r = assert_picklable(v, f"{path}.{k}", max_depth - 1, max_items, seen)
+                if r:
+                    return r
 
         return path, type(obj), repr(e)

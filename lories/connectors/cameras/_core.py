@@ -8,8 +8,8 @@ lories.connectors.cameras._core
 from abc import abstractmethod
 
 import pandas as pd
-from lories.core import Resource
 from lories.connectors import Connector
+from lories.core import Resource
 
 
 class _CameraConnector(Connector):
