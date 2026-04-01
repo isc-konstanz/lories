@@ -10,8 +10,6 @@ from __future__ import annotations
 import os
 from typing import Dict
 
-import cv2
-
 from lories.connectors import ConnectionError, ConnectorError, register_connector_type
 from lories.connectors.cameras import CameraConnector
 from lories.core.configs.parameters import Parameter

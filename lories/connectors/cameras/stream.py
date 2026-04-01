@@ -19,11 +19,16 @@ from lories.connectors.cameras.motion import MotionDetector
 from lories.connectors.errors import ConnectorError
 from lories.connectors.tasks.process import ProcessContext
 from lories.core import Configurations, Configurator, ResourceUnavailableError
+from lories.core.configs.parameters import Parameter
 from lories.data import Channels
 
 
 class CameraStream(Configurator, Thread):
     TYPE: str = "stream"
+
+    fps = Parameter(key="fps", type=int, default=30, min=1, max=120, desc="Target frames per second")
+
+    fps: int
 
     __context: ProcessContext
     __channels: Channels
@@ -74,7 +79,9 @@ class CameraStream(Configurator, Thread):
         _channels = self.__channels.duplicate(context=self.__context)
 
         self.__context.activate()
-        self.__context._submit(_stream, _camera, _channels, self.__trigger, self.__interrupt, self._memory.name)
+        self.__context._submit(
+            _stream, _camera, _channels, self.__trigger, self.__interrupt, self._memory.name, self.fps
+        )
         super().start()
 
     def stop(self) -> None:
@@ -109,7 +116,7 @@ def _stream(
     trigger: EventType,
     interrupt: EventType,
     memory_name: str,
-    fps: int = 30,
+    fps: int,
 ) -> None:
     camera.connect(channels)
 

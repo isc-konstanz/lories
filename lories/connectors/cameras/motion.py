@@ -11,30 +11,65 @@ import os
 import time
 from typing import Optional, Sequence, Tuple
 
-import cv2
-
 import numpy as np
 from lories.core import Configurator
+from lories.core.configs.parameters import Parameter
 from lories.data import Channels
 from lories.typing import Configurations
+
+_AVAILABLE = True
+_IMPORT_ERROR = None
+
+try:
+    import cv2
+except ImportError as _e:
+    _AVAILABLE = False
+    _IMPORT_ERROR = f"Missing dependency: opencv-python — pip install opencv-python ({_e})"
+    cv2 = None  # type: ignore
 
 
 class MotionDetector(Configurator):
     TYPE: str = "motion"
 
-    threshold: int = 25
-    dilate_iter: int = 2
-    alpha: float = 0.05
-    var_threshold: int = 32
-    persist_frames: int = 3
-    min_solidity: float = 0.50
-    min_extent: float = 0.20
-    min_motion_area: int = 1000
-    blur_size: int = 21
-    cooldown_seconds: float = 2.0
+    threshold = Parameter(
+        key="threshold", type=int, default=25, min=0, desc="Foreground mask binarization threshold (0 = skip)"
+    )
+    dilate_iter = Parameter(
+        key="dilate_iter", type=int, default=2, min=0, desc="Dilation iterations for foreground mask"
+    )
+    alpha = Parameter(key="alpha", type=float, default=0.05, min=0.0, max=1.0, desc="Background model learning rate")
+    var_threshold = Parameter(key="var_threshold", type=int, default=32, min=4, desc="MOG2 variance threshold")
+    persist_frames = Parameter(
+        key="persist_frames", type=int, default=3, min=1, desc="Consecutive frames before triggering motion"
+    )
+    min_solidity = Parameter(
+        key="min_solidity", type=float, default=0.50, min=0.0, max=1.0, desc="Minimum contour solidity"
+    )
+    min_extent = Parameter(key="min_extent", type=float, default=0.20, min=0.0, max=1.0, desc="Minimum contour extent")
+    min_motion_area = Parameter(
+        key="min_motion_area", type=int, default=1000, min=0, desc="Minimum contour area in pixels"
+    )
+    blur_size = Parameter(
+        key="blur_size", type=int, default=21, min=1, desc="Gaussian blur kernel size (auto-rounded to odd)"
+    )
+    cooldown_seconds = Parameter(
+        key="cooldown_seconds", type=float, default=2.0, min=0.0, desc="Minimum seconds between motion events"
+    )
+    _mask_path = Parameter(key="mask", type=str, required=False, default=None, desc="Path to binary mask image")
+
+    threshold: int
+    dilate_iter: int
+    alpha: float
+    var_threshold: int
+    persist_frames: int
+    min_solidity: float
+    min_extent: float
+    min_motion_area: int
+    blur_size: int
+    cooldown_seconds: float
+    _mask_path: Optional[str]
 
     _mask: Optional[np.ndarray]
-    _mask_path: Optional[str]
     _mask_size: Tuple[int, int]
 
     _persist_counter: int = 0
@@ -58,21 +93,8 @@ class MotionDetector(Configurator):
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self._mask_path = configs.get("mask", default=None)
 
-        self.min_motion_area = configs.get_int("min_motion_area", default=MotionDetector.min_motion_area)
-        self.blur_size = configs.get_int("blur_size", default=MotionDetector.blur_size)
-        self.threshold = configs.get_int("threshold", default=MotionDetector.threshold)
-        self.dilate_iter = configs.get_int("dilate_iter", default=MotionDetector.dilate_iter)
-        self.alpha = configs.get_float("alpha", default=MotionDetector.alpha)
-        self.var_threshold = configs.get_int("var_threshold", default=MotionDetector.var_threshold)
-        self.persist_frames = configs.get_int("persist_frames", default=MotionDetector.persist_frames)
-        self.min_solidity = configs.get_float("min_solidity", default=MotionDetector.min_solidity)
-        self.min_extent = configs.get_float("min_extent", default=MotionDetector.min_extent)
-        self.cooldown_seconds = configs.get_float("cooldown_seconds", default=MotionDetector.cooldown_seconds)
-
-        blur = self.blur_size if self.blur_size % 2 == 1 else self.blur_size + 1
-        self.blur_size = blur
+        self.blur_size = self.blur_size if self.blur_size % 2 == 1 else self.blur_size + 1
 
         self._mask = None
         self._mask_size: Tuple[int, int] = (0, 0)
