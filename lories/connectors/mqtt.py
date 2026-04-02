@@ -10,22 +10,14 @@ from __future__ import annotations
 
 from typing import Dict, Optional
 
+from paho.mqtt.client import Client as MqttClient
+
 import pandas as pd
 import pytz as tz
 from lories.connectors import Connector, register_connector_type
 from lories.core.configs.parameters import Parameter, ResourceParameter, SelectParameter
 from lories.data import Channel
 from lories.typing import Configurations, Resources
-
-_AVAILABLE = True
-_IMPORT_ERROR = None
-
-try:
-    from paho.mqtt.client import Client as MqttClient
-except ImportError as _e:
-    _AVAILABLE = False
-    _IMPORT_ERROR = f"Missing dependency: paho-mqtt — pip install paho-mqtt ({_e})"
-    MqttClient = None  # type: ignore
 
 
 @register_connector_type("mqtt")
@@ -37,9 +29,6 @@ class MqttConnector(Connector):
     advanced features like transactions and complex routing, coupled with its reliance on SSL/TLS for security,
     can limit its scalability and performance in large-scale environments.
     """
-
-    __available__ = _AVAILABLE
-    __import_error__ = _IMPORT_ERROR
 
     _host = Parameter(key="host", type=str, default="localhost", desc="Broker hostname")
     _port = Parameter(key="port", type=int, default=1883, min=1, max=65535, desc="Broker port")

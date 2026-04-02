@@ -12,22 +12,14 @@ import logging
 import math
 from typing import Dict, List, Optional
 
+import opcua
+
 import pandas as pd
 import pytz as tz
 from lories._core import ChannelState  # noqa
 from lories.connectors import Connector, register_connector_type
 from lories.data import Channel
 from lories.typing import Configurations, Resources
-
-_AVAILABLE = True
-_IMPORT_ERROR = None
-
-try:
-    import opcua
-except ImportError as _e:
-    _AVAILABLE = False
-    _IMPORT_ERROR = f"Missing dependency: opcua — pip install opcua ({_e})"
-    opcua = None  # type: ignore
 
 
 @register_connector_type("opc", "opcua")
@@ -39,9 +31,6 @@ class OpcUaConnector(Connector):
     be more complex to set up and configure, may involve additional licensing costs, and requires a learning curve
     for users familiarizing themselves with its standards and best practices.
     """
-
-    __available__ = _AVAILABLE
-    __import_error__ = _IMPORT_ERROR
 
     _host: str
     _port: int

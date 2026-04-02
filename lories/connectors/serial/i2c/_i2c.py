@@ -9,25 +9,15 @@ from __future__ import annotations
 
 from typing import Optional
 
+from smbus2 import SMBus
+
 from lories.connectors import ConnectionError, Connector
 from lories.core import Configurations
 from lories.typing import Resources
 
-_AVAILABLE = True
-_IMPORT_ERROR = None
-
-try:
-    from smbus2 import SMBus
-except (ImportError, OSError) as _e:
-    _AVAILABLE = False
-    _IMPORT_ERROR = f"Missing dependency: smbus2 — pip install smbus2 ({_e})"
-    SMBus = None  # type: ignore
-
 
 # noinspection PyAbstractClass
 class _I2CConnector(Connector):
-    __available__ = _AVAILABLE
-    __import_error__ = _IMPORT_ERROR
     _bus: Optional[SMBus]
     _bus_number: int
     _port: int

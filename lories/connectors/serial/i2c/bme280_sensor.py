@@ -7,10 +7,7 @@ lories.connectors.i2c.bme280
 
 from __future__ import annotations
 
-try:
-    import bme280
-except ImportError:
-    bme280 = None  # type: ignore
+import bme280
 
 from lories.components.environment import Environment
 

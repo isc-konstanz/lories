@@ -10,6 +10,11 @@ from __future__ import annotations
 
 from typing import Optional
 
+from entsoe import EntsoePandasClient
+from entsoe.mappings import Area as EntsoeArea
+from requests.exceptions import HTTPError
+from urllib3.exceptions import MaxRetryError
+
 import pandas as pd
 import pytz as tz
 from lories.connectors import ConnectionError, Connector, ConnectorError
@@ -21,25 +26,8 @@ from lories.util import parse_freq
 # FIXME: Remove this once Python >= 3.9 is a requirement
 try:
     from typing import Literal
-
 except ImportError:
     from typing_extensions import Literal
-
-_AVAILABLE = True
-_IMPORT_ERROR = None
-
-try:
-    from entsoe import EntsoePandasClient
-    from entsoe.mappings import Area as EntsoeArea
-    from requests.exceptions import HTTPError
-    from urllib3.exceptions import MaxRetryError
-except ImportError as _e:
-    _AVAILABLE = False
-    _IMPORT_ERROR = f"Missing dependency: entsoe-py — pip install entsoe-py ({_e})"
-    EntsoePandasClient = None  # type: ignore
-    EntsoeArea = None  # type: ignore
-    HTTPError = None  # type: ignore
-    MaxRetryError = None  # type: ignore
 
 
 # noinspection SpellCheckingInspection
@@ -51,9 +39,6 @@ class EntsoeConnector(Connector):
     occasional data gaps, and historical changes in bidding zone codes (e.g. the DE/AT/LU split) require careful
     handling on the client side.
     """
-
-    __available__ = _AVAILABLE
-    __import_error__ = _IMPORT_ERROR
 
     _country_code = Parameter(key="country_code", type=str, desc="ENTSO-E country code (e.g. DE)")
     _api_key = Parameter(key="api_key", type=str, desc="ENTSO-E API security token")

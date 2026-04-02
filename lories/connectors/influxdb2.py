@@ -11,6 +11,12 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional, Tuple
 
+from influxdb_client import BucketRetentionRules, InfluxDBClient
+from influxdb_client.client.exceptions import InfluxDBError
+from influxdb_client.client.write_api import SYNCHRONOUS
+from influxdb_client.rest import ApiException
+from urllib3.exceptions import HTTPError, NewConnectionError
+
 import pandas as pd
 from lories.connectors import ConnectionError, Database, DatabaseError, register_connector_type
 from lories.core.configs.parameters import Parameter, ResourceParameter
@@ -24,26 +30,6 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-_AVAILABLE = True
-_IMPORT_ERROR = None
-
-try:
-    from influxdb_client import BucketRetentionRules, InfluxDBClient
-    from influxdb_client.client.exceptions import InfluxDBError
-    from influxdb_client.client.write_api import SYNCHRONOUS
-    from influxdb_client.rest import ApiException
-    from urllib3.exceptions import HTTPError, NewConnectionError
-except ImportError as _e:
-    _AVAILABLE = False
-    _IMPORT_ERROR = f"Missing dependency: influxdb-client — pip install lories[influx] ({_e})"
-    BucketRetentionRules = None  # type: ignore
-    InfluxDBClient = None  # type: ignore
-    InfluxDBError = None  # type: ignore
-    SYNCHRONOUS = None  # type: ignore
-    ApiException = None  # type: ignore
-    HTTPError = None  # type: ignore
-    NewConnectionError = None  # type: ignore
-
 
 @register_connector_type("influxdb2", "influxdb_v2")
 class InfluxDB2(Database):
@@ -54,9 +40,6 @@ class InfluxDB2(Database):
     language has a steeper learning curve compared to InfluxQL, and migration from 1.x requires adapting queries
     and authentication workflows.
     """
-
-    __available__ = _AVAILABLE
-    __import_error__ = _IMPORT_ERROR
 
     _host = Parameter(key="host", type=str, default="localhost", desc="InfluxDB host")
     _port = Parameter(key="port", type=int, default=8086, min=1, max=65535, desc="InfluxDB port")

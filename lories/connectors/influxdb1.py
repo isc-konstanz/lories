@@ -11,6 +11,10 @@ from __future__ import annotations
 import warnings
 from typing import Any, Dict, Optional, Tuple
 
+from influxdb import InfluxDBClient
+from influxdb.client import InfluxDBClientError, InfluxDBServerError
+from urllib3.exceptions import HTTPError, NewConnectionError
+
 import pandas as pd
 from lories.connectors import ConnectionError, Database, DatabaseError, register_connector_type
 from lories.core.configs.parameters import Parameter, ResourceParameter
@@ -25,22 +29,6 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-_AVAILABLE = True
-_IMPORT_ERROR = None
-
-try:
-    from influxdb import InfluxDBClient
-    from influxdb.client import InfluxDBClientError, InfluxDBServerError
-    from urllib3.exceptions import HTTPError, NewConnectionError
-except ImportError as _e:
-    _AVAILABLE = False
-    _IMPORT_ERROR = f"Missing dependency: influxdb — pip install lories[influx] ({_e})"
-    InfluxDBClient = None  # type: ignore
-    InfluxDBClientError = None  # type: ignore
-    InfluxDBServerError = None  # type: ignore
-    HTTPError = None  # type: ignore
-    NewConnectionError = None  # type: ignore
-
 
 @register_connector_type("influxdb1", "influxdb_v1")
 class InfluxDB1(Database):
@@ -51,9 +39,6 @@ class InfluxDB1(Database):
     custom authentication model without token-based access, and its storage engine can become resource-intensive
     under high cardinality workloads.
     """
-
-    __available__ = _AVAILABLE
-    __import_error__ = _IMPORT_ERROR
 
     _host = Parameter(key="host", type=str, default="localhost", desc="InfluxDB host")
     _port = Parameter(key="port", type=int, default=8086, min=1, max=65535, desc="InfluxDB port")

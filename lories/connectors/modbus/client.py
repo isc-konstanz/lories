@@ -10,6 +10,9 @@ from __future__ import annotations
 
 from typing import Mapping
 
+from pymodbus import FramerType, ModbusException
+from pymodbus.client import ModbusBaseSyncClient, ModbusSerialClient, ModbusTcpClient, ModbusUdpClient
+
 import pandas as pd
 import pytz as tz
 from lories._core import ChannelState  # noqa
@@ -26,22 +29,6 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-_AVAILABLE = True
-_IMPORT_ERROR = None
-
-try:
-    from pymodbus import FramerType, ModbusException
-    from pymodbus.client import ModbusBaseSyncClient, ModbusSerialClient, ModbusTcpClient, ModbusUdpClient
-except ImportError as _e:
-    _AVAILABLE = False
-    _IMPORT_ERROR = f"Missing dependency: pymodbus — pip install lories[modbus] ({_e})"
-    FramerType = None  # type: ignore
-    ModbusException = None  # type: ignore
-    ModbusBaseSyncClient = None  # type: ignore
-    ModbusSerialClient = None  # type: ignore
-    ModbusTcpClient = None  # type: ignore
-    ModbusUdpClient = None  # type: ignore
-
 
 @register_connector_type("modbus")
 class ModbusClient(Connector):
@@ -53,9 +40,6 @@ class ModbusClient(Connector):
     retry logic. However, Modbus lacks built-in authentication and encryption, and its register-based
     data model requires careful address mapping per device.
     """
-
-    __available__ = _AVAILABLE
-    __import_error__ = _IMPORT_ERROR
 
     # Shared
     _protocol = SelectParameter(["tcp", "udp", "rtu"], key="protocol", desc="Modbus transport protocol")

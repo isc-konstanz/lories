@@ -79,9 +79,7 @@ class CameraStream(Configurator, Thread):
         _channels = self.__channels.duplicate(context=self.__context)
 
         self.__context.activate()
-        self.__context._submit(
-            _stream, _camera, _channels, self.__trigger, self.__interrupt, self._memory.name, self.fps
-        )
+        self.__context._submit(_stream, _camera, _channels, self.__trigger, self.__interrupt, self._memory.name)
         super().start()
 
     def stop(self) -> None:

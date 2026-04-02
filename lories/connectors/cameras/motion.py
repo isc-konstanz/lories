@@ -11,21 +11,13 @@ import os
 import time
 from typing import Optional, Sequence, Tuple
 
+import cv2
+
 import numpy as np
 from lories.core import Configurator
 from lories.core.configs.parameters import Parameter
 from lories.data import Channels
 from lories.typing import Configurations
-
-_AVAILABLE = True
-_IMPORT_ERROR = None
-
-try:
-    import cv2
-except ImportError as _e:
-    _AVAILABLE = False
-    _IMPORT_ERROR = f"Missing dependency: opencv-python — pip install opencv-python ({_e})"
-    cv2 = None  # type: ignore
 
 
 class MotionDetector(Configurator):
