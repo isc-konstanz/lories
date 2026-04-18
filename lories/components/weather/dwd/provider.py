@@ -25,6 +25,7 @@ CHANNELS = [
     Weather.WIND_SPEED_GUST,
     Weather.WIND_DIRECTION,
     Weather.CLOUD_COVER,
+    Weather.HUMIDITY_REL,
     Weather.SUNSHINE,
     Weather.VISIBILITY,
     Weather.PRECIPITATION,
@@ -39,6 +40,7 @@ CHANNEL_ADDRESS_ALIAS = {
     Weather.PRESSURE_SEA: "pressure_msl",
     Weather.WIND_SPEED_GUST: "wind_gust_speed",
     Weather.WIND_DIRECTION_GUST: "wind_gust_direction",
+    Weather.HUMIDITY_REL: "relative_humidity",
 }
 
 CHANNEL_AGGREGATE_ALIAS = {
