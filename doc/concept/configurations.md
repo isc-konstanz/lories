@@ -178,12 +178,88 @@ the `type`, `key` and `name` configs may be specified in a separate `[component]
 
 ### Channels
 
-This section contains (or will contain) detailed information on the configuration of channels.
+Channels are the individual data points within a component. They are configured in a
+`[data.channels]` section, either inside the component's configuration file or the
+`system.conf`.
 
+Every channel needs at least a `type` (Python data type) and a `connector` (which connector
+reads/writes this channel). Additional attributes control scheduling, persistence, and
+processing.
+
+#### Common channel attributes
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `type` | str | *(required)* | Data type: `float`, `int`, `bool`, `str`, `bytes` |
+| `connector` | str | *(required)* | Name of the connector that handles this channel |
+| `freq` | str | -- | Read frequency (e.g. `10s`, `1min`, `1h`). Inherited from the channel group if omitted |
+| `listener` | bool | `false` | If `true`, the channel receives data asynchronously (e.g. from MQTT or LoRa) and the scheduler skips polling it |
+| `unit` | str | -- | Unit label (for display and export) |
+| `name` | str | *(derived)* | Human-readable name (derived from the key if omitted) |
+
+#### Logging and persistence
+
+Channels can be logged to a separate connector for persistent storage:
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `logger` | str | -- | Name of the connector used for persistent storage |
+| `retention` | str | -- | How long logged data is kept (e.g. `30D`, `1Y`) |
+
+#### Converters
+
+A converter transforms raw values from a connector into the channel's target type.
+Converters are registered types and can be referenced by name:
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `converter` | str | -- | Converter type to apply on read (e.g. `json`, `crypto`) |
+
+#### Replication
+
+Channels can replicate their data to additional connectors:
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `replication` | str | -- | Name of the connector to replicate data to |
+
+#### Example
+
+```toml
+[data.channels]
+connector = "modbus"
+freq      = "10s"
+
+[data.channels.temperature]
+type   = "float"
+unit   = "°C"
+logger = "db"
+
+[data.channels.setpoint]
+type = "float"
+unit = "°C"
+```
 
 ## Connectors
 
-This section contains (or will contain) a general overview of the configuration of connectors.
+Connectors are configured in a `[connectors.<name>]` section. The `type` key selects the
+connector implementation; remaining keys are connector-specific.
 
-A more detailed overview of all connector specific configurations can be found in the
-dedicated [Connectors section](../connectors/index.md).
+```toml
+[connectors.db]
+type     = "sql"
+dialect  = "postgresql"
+host     = "localhost"
+port     = 5432
+user     = "lories"
+password = "secret"
+database = "lories_data"
+
+[connectors.broker]
+type = "mqtt"
+host = "192.168.1.100"
+port = 1883
+```
+
+A detailed reference for each connector type is available in the
+[Connectors section](../connectors/index.md).
