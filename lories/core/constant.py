@@ -22,16 +22,18 @@ class Constant(_Constant):
     def __new__(
         cls,
         type: Type,
-        key: str,
+        key: str = None,
         name: Optional[str] = None,
         unit: Optional[str] = None,
-        alias: Optional[str] = None,
+        context: Optional[str] = None,
         **configs,
     ):
-        _key = key if alias is None else alias
-        if _key in CONSTANTS:
-            raise ResourceError(f"Constant '{key}' already exists.")
-        constant = str.__new__(cls, _key)
+        if key is None:
+            raise ResourceError(f"Constant '{key}' is None.")
+        id = key if context is None else f"{context}_{key}"
+        if len(CONSTANTS.filter(lambda c: c.id == id)) > 0:
+            raise ResourceError(f"Constant '{id}' already exists.")
+        constant = str.__new__(cls, key)
         CONSTANTS.append(constant)
         return constant
 
@@ -41,9 +43,11 @@ class Constant(_Constant):
         key: str,
         name: Optional[str] = None,
         unit: Optional[str] = None,
+        context: Optional[str] = None,
         **configs,
     ) -> None:
         self.__type = parse_type(type)
+        self.__id = key if context is None else f"{context}_{key}"
         self.__key = key
         self.__name = name
         self.__unit = unit
@@ -55,6 +59,10 @@ class Constant(_Constant):
     @property
     def type(self) -> Type:
         return self.__type
+
+    @property
+    def id(self) -> str:
+        return self.__id
 
     @property
     def key(self) -> str:
