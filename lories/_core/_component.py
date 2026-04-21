@@ -17,7 +17,7 @@ from lories._core._activator import _Activator
 from lories._core._channel import _Channel
 from lories._core._channels import _Channels
 from lories._core._configurations import Configurations
-from lories._core._connector import Connectors
+from lories._core._connector import Connectors, _Connector
 from lories._core._converter import Converters
 from lories._core._data import Data, _DataContext
 from lories._core._registrator import _Registrator, _RegistratorContext
@@ -73,10 +73,11 @@ class _Component(_Registrator, _Activator):
         includes: Optional[Collection[str]] = (),
         strict: bool = False,
     ) -> Dict[str, Any]:
+        excludes = (_Connector.TYPE,)
         defaults = super()._build_defaults(configs, includes)
         if strict and _DataContext.TYPE in defaults:
             defaults[_DataContext.TYPE][_Channels.TYPE] = _Channel._build_defaults(
-                defaults[_DataContext.TYPE].get_member(_Channels.TYPE, defaults={})
+                defaults[_DataContext.TYPE].get_member(_Channels.TYPE, defaults={}, exclude=excludes)
             )
         return defaults
 

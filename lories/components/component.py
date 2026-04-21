@@ -85,14 +85,15 @@ class Component(_Component, Registrator, Activator):
         self,
         start: Optional[Timestamp | str] = None,
         end: Optional[Timestamp | str] = None,
+        unique: bool = False,
         **kwargs,
     ) -> pd.DataFrame:
         start = to_date(start)
         end = to_date(end)
 
-        data = self.__data.to_frame(unique=False)
+        data = self.__data.to_frame(unique=unique)
         if data.empty or (start is not None and start < data.index[0]) or (end is not None and end > data.index[-1]):
-            logged = self.__data.from_logger(start=start, end=end, unique=False)
+            logged = self.__data.from_logger(start=start, end=end, unique=unique)
             if not logged.empty:
                 data = logged if data.empty else data.combine_first(logged)
         return self._get_range(data, start, end, **kwargs)
