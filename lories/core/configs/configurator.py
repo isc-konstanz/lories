@@ -216,7 +216,7 @@ class Configurator(_Configurator, metaclass=ConfiguratorMeta):
         self._at_duplicate(configs=configs, **changes)
 
         duplicate = self._run_duplicate(configs=configs, **changes)
-        if configs.enabled:
+        if self.is_configured() and configs.enabled:
             duplicate.configure(configs)
         self._on_duplicate(duplicate)
         return duplicate
