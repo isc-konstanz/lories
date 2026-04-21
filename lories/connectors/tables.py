@@ -100,10 +100,11 @@ class HDFDatabase(Database):
                 if group_key not in self.__store:
                     continue
 
+                group_columns = self.__build_columns(group_resources)
                 group_data = self.__store.select(
                     group_key,
                     where=_build_where(start, end),
-                    columns=self.__build_columns(group_resources),
+                    columns=group_columns,
                 )
                 group_data = self.__extract_data(group_resources, group_data)
                 if not group_data.empty:
@@ -180,6 +181,7 @@ class HDFDatabase(Database):
             for group, group_resources in self.resources.filter(lambda c: c.id in data.columns).groupby("group"):
                 group_key = _format_key(group)
                 group_data = data[group_resources.ids].dropna(axis="index", how="all").dropna(axis="columns", how="all")
+                group_data.index.name = "index"
 
                 if not self._columns_unique:
                     group_data.rename(
@@ -217,7 +219,7 @@ def _build_where(
 ) -> Optional[str]:
     where = []
     if start is not None:
-        where.append(f'index>=Timestamp("{start.isoformat()}")')
+        where.append(f'index>="{start.isoformat()}"')
     if end is not None:
-        where.append(f'index<=Timestamp("{end.isoformat()}")')
+        where.append(f'index<="{end.isoformat()}"')
     return " & ".join(where) if len(where) > 0 else None

@@ -15,10 +15,10 @@ from functools import reduce
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence
 
 import pandas as pd
-from lories.components import Component
+from lories.components import Component, Weather
 from lories.connectors import Database
 from lories.connectors.tables import HDFDatabase
-from lories.core import CONSTANTS, Configurator, Constant, Directories, ResourceError, Resources
+from lories.core import Configurator, Constant, Directories, ResourceError, Resources
 from lories.core.typing import Configurations, Timestamp
 from lories.data.util import resample, scale_energy, scale_power
 from lories.simulation import Durations, Progress, Result
@@ -219,14 +219,10 @@ class Results(Configurator, Sequence[Result]):
             excel.write(excel_file, "Results", self.to_frame())
 
             if self.configs.get_bool("include", default=True):
-                columns = {c.key: c.full_name(unit=True) for c in CONSTANTS}
-                columns.update({r.get("column", default=r.key): r.full_name(unit=True) for r in self.__resources})
-
                 if self._freq is not None:
                     resampled = []
                     for method, resources in self.__resources.groupby("aggregate"):
-                        resample_columns = [r.get("column", default=r.key) for r in resources]
-                        resample_columns = [c for c in resample_columns if c in self.data.columns]
+                        resample_columns = [r.id for r in resources if r.id in self.data.columns]
                         if len(resample_columns) == 0:
                             continue
                         if method is None:
@@ -241,10 +237,23 @@ class Results(Configurator, Sequence[Result]):
                         data = pd.DataFrame()
                     else:
                         data = pd.concat(resampled, axis="columns")[self.data.columns]
-                        data.rename(inplace=True, columns=columns)
                 else:
-                    data = self.data.rename(columns=columns)
-                excel.write(excel_file, "Timeseries", data)
+                    data = self.data
+
+                def _extract_data(*components: Component) -> pd.DataFrame:
+                    _columns = {}
+                    for _component in components:
+                        _columns.update({r.id: r.full_name(unit=True) for r in _component.data.channels})
+                    _data = data[[k for k in _columns.keys() if k in data.columns]]
+                    return _data.rename(columns=_columns)
+
+                component_data = _extract_data(self.__component, self.__component.components.get_first(Weather))
+                excel.write(excel_file, self.__component.name, component_data)
+                for component in self.__component.components.values():
+                    if isinstance(component, Weather):
+                        continue
+                    component_name = f"{self.__component.name} {component.name}"
+                    excel.write(excel_file, component_name, _extract_data(component))
 
         except ImportError:
             pass
@@ -258,14 +267,11 @@ class Results(Configurator, Sequence[Result]):
         *args,
         **kwargs,
     ) -> None:
-        columns = {r.get("column", default=r.key): r.id for r in self.__resources}
-
         if self.__database.exists(self.__resources, start, end):
             data = self.__database.read(self.__resources, start, end)
-            data.rename(columns={v: k for k, v in columns.items()}, inplace=True)
         else:
             data = function(start, end, *args, **kwargs)
-            self.__database.write(data.rename(columns=columns))
+            self.__database.write(data)
 
         self.data = pd.concat([self.data, data], axis="index")
 
