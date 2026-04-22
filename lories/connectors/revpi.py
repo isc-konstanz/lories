@@ -15,14 +15,21 @@ from revpimodio2 import EventCallback, RevPiModIO, io
 import pandas as pd
 import pytz as tz
 from lories.connectors import Connector, register_connector_type
+from lories.core.configs.parameters import ChannelParameter, Parameter
 from lories.data.channels import Channel
-from lories.typing import Configurations, Resources
+from lories.typing import Resources
 from lories.util import to_bool
 
 
 # noinspection PyShadowingBuiltins, SpellCheckingInspection
 @register_connector_type("revpi", "revpi_io", "revpi_aio", "revpi_mio", "revpi_ro", "revolutionpi")
 class RevPiConnector(Connector):
+    _cycletime = Parameter(key="cycletime", type=int, required=False, desc="Cycle time override (ms)")
+
+    # Per-channel parameters
+    address = ChannelParameter(type=str, required=True, desc="RevPi process image I/O address name")
+    listener = ChannelParameter(type=bool, required=False, default=False, desc="Register rising-edge event listener")
+
     _core: RevPiModIO
     _cycletime: Optional[int]
 
@@ -31,10 +38,6 @@ class RevPiConnector(Connector):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._listeners = {}
-
-    def configure(self, configs: Configurations) -> None:
-        super().configure(configs)
-        self._cycletime = configs.get_int("cycletime", default=None)
 
     def connect(self, resources: Resources) -> None:
         super().connect(resources)
