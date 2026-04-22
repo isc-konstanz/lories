@@ -15,6 +15,7 @@ import pandas as pd
 import pytz as tz
 from lories.connectors import Connector, ConnectorError, register_connector_type
 from lories.core.configs import ConfigurationError
+from lories.core.configs.parameters import ChannelParameter
 from lories.typing import Channel, Resource, Resources, Timestamp
 
 
@@ -23,6 +24,17 @@ from lories.typing import Channel, Resource, Resources, Timestamp
 class VirtualConnector(Connector):
     VIRTUAL: str = "virtual"
     RANDOM: str = "random"
+
+    # Per-channel parameters
+    generator = ChannelParameter(
+        type=str,
+        required=False,
+        default=None,
+        desc="Generator type: 'random' for random values, omit to store/replay",
+    )
+    min = ChannelParameter(type=float, required=False, desc="Minimum value (required when generator='random')")
+    max = ChannelParameter(type=float, required=False, desc="Maximum value (required when generator='random')")
+    default = ChannelParameter(type=float, required=False, desc="Initial stored value")
 
     _data: pd.Series
 
