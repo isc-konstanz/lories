@@ -51,7 +51,7 @@ class ChannelProcessors(Sequence[Processor]):
         return isinstance(other, ChannelProcessors) and self._processors == other._processors
 
     def __hash__(self) -> int:
-        return hash(self._processors)
+        return hash(tuple(self._processors))
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({', '.join(str(p.id) for p in self._processors)})"
