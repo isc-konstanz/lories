@@ -56,7 +56,7 @@ class Sdi12Connector(_SerialConnector):
         self._write_string(f"{address}M!\r\n")
         response = self._read_line()
         if not response.startswith(address):
-            self._logger.warning(f"Invalid SDI12 response to M!: {response}")
+            self._logger.info(f"Invalid SDI12 response to {address}M!: {response}")
             return None
 
         # Extract the time to wait in seconds
@@ -103,11 +103,11 @@ class Sdi12Connector(_SerialConnector):
     def _break(self) -> None:
         """Issue SDI-12 break (≥12 ms of spacing, i.e. logic 0)."""
         self._serial.break_condition = True
-        time.sleep(0.015)
+        time.sleep(0.04)
         self._serial.break_condition = False
 
         # ≥8.33 ms mark before next command
-        time.sleep(0.0085)
+        time.sleep(0.02)
 
     def write(self, data: pd.DataFrame) -> None:
         raise NotImplementedError("SDI12 does not support writing data")
