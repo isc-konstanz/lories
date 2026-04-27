@@ -19,4 +19,4 @@
 # with the python modules ``pickle``, ``dbm.*``,
 # ``shelve``, ``marshal``, ``anydbm``, & ``bsddb``
 # (among others).
-lori/_version.py export-subst
+lories/_version.py export-subst

@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-lori
-~~~~
+lories
+~~~~~~
 
-Legacy compatibility setup script for the lori package.
+Legacy compatibility setup script for the lories package.
 
 """
 

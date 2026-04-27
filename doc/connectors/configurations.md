@@ -1,6 +1,6 @@
 # Configurations
 
-This section contains (or will contain) information on the lori connector configurations.
+This section contains (or will contain) information on the lories connector configurations.
 
 
 ## Connectors

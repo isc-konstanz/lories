@@ -1,6 +1,6 @@
 # Contributing to the Code
 
-Encouraging more people to help develop lori is essential to the project's success.
+Encouraging more people to help develop lories is essential to the project's success.
 Therefore, we want to make it easy and straight forward for you to contribute.
 
 There is a lot of material in this section, aimed at a variety of contributors from novice to expert.
@@ -11,16 +11,16 @@ Don't worry if you don't (yet) understand parts of it.
 
 ### The basics
 
-Contributors to lori use GitHub's pull requests to add/modify its source code.
+Contributors to lories use GitHub's pull requests to add/modify its source code.
 The GitHub pull request process can be intimidating for new users,
 but you'll find that it becomes straightforward once you use it a few times.
 Please let us know if you get stuck at any point in the process.
 Here's an outline of the process:
 
-- Create a [GitHub issue](https://github.com/isc-konstanz/lori/issues) and get initial feedback
+- Create a [GitHub issue](https://github.com/isc-konstanz/lories/issues) and get initial feedback
   from users and maintainers.  
   If the issue is a bug report, please take a look at how to [report bugs](bugs).
-- Obtain the latest version of lori: Fork the lori project to your GitHub account,
+- Obtain the latest version of lories: Fork the lories project to your GitHub account,
   ``git clone`` your fork to your computer.
 - Make some or all of your changes/additions and ``git commit`` them to your local repository.
 - Share your changes with us via a pull request: ``git push`` your local changes to your GitHub fork,
@@ -65,12 +65,12 @@ The best way to ensure that a pull request will be reviewed and merged in a time
 - Make a limited-scope pull request. It can be a lot of work to check all of the boxes in the recommended
   [contribution guidelines](https://pandas.pydata.org/pandas-docs/stable/development/contributing_codebase.html)
   especially for pull requests with a lot of new primary code.
-- Tag lori community members or ``@pvlib`` when the pull request is ready for review.
+- Tag lories community members or ``@pvlib`` when the pull request is ready for review.
 
 
 ## Code Style
 
-Lori generally follows the the [Python PEP8](https://peps.python.org/pep-0008/) code style.
+Lories generally follows the the [Python PEP8](https://peps.python.org/pep-0008/) code style.
 Maximum line length for code is 120 characters.  
 Additionally, the use of [Black](https://black.readthedocs.io/en/stable/) is aspired to ensure a consistent code style across the code base.
 
@@ -81,18 +81,18 @@ during development. ``warning`` is ok.
 ## Documentation
 
 ```{warning}
-The use of descriptive docstrings for all lori functions, classes and class methods is mandatory.
-Lori has adopted the [Google Docstring Style](https://google.github.io/styleguide/pyguide.html).
+The use of descriptive docstrings for all lories functions, classes and class methods is mandatory.
+Lories has adopted the [Google Docstring Style](https://google.github.io/styleguide/pyguide.html).
 ```
 
-Writing code that is easy to understand is a key principle of lori.
+Writing code that is easy to understand is a key principle of lories.
 This is why it is not enough to write code with descriptive variable names and comments.
 All functions, classes and class methods must be documented with a [docstring](https://en.wikipedia.org/wiki/docstring),
 similar to this [google style example](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html),
 which is rendered using the [Sphinx Napoleon extension](https://www.sphinx-doc.org/en/master/usage/extensions/napoleon.html).
-These docstrings are used to automatically generate the [lori documentation](https://lori.readthedocs.io/).
+These docstrings are used to automatically generate the [lories documentation](https://lories.readthedocs.io/).
 
-As such, they should form the basis of the documentation of the lori code base.
+As such, they should form the basis of the documentation of the lories code base.
 
 
 ### Building the documentation
@@ -101,11 +101,11 @@ Building the documentation locally is useful for testing out changes to the docu
 without having to repeatedly update a pull request and have Read the Docs (RTD) build it for you.
 For the RTD to be built correctly, a [Graphviz](https://www.graphviz.org/) needs to be accessible
 in the system path first.  
-Next, to build the docs locally requires installing lori as an editable library, including the ``doc`` dependencies
+Next, to build the docs locally requires installing lories as an editable library, including the ``doc`` dependencies
 specified in the project's setup configurations.
 An easy way to do this is with:
 
-    pip install lori[doc]    # on Mac:  pip install "lori[doc]"
+    pip install lories[doc]    # on Mac:  pip install "lories[doc]"
 
 Once the ``doc`` dependencies are installed, navigate to ``/doc`` and execute:
 
@@ -117,5 +117,5 @@ documentation's homepage located at ``_build/html/index.html``.
 This file can be opened with a web browser to view the local version like any other website.
 Other output formats are available. Run ``make help`` for more information.
 
-Note that Windows users need not have the ``make`` utility installed as lori includes a ``make.bat`` batch file
+Note that Windows users need not have the ``make`` utility installed as lories includes a ``make.bat`` batch file
 that emulates its interface.

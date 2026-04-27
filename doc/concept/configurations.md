@@ -1,12 +1,12 @@
 # Configurations
 
-To configure a *lori* project to run, several configuration files may be edited, to customize teh run setup first.  
+To configure a *lories* project to run, several configuration files may be edited, to customize teh run setup first.  
 Entry-point to all configurations is the `settings.conf`, which will be searched for in the local run directory
-`./conf/` by default. This configuration directory may be specified with the help of command line arguments when *lori*
+`./conf/` by default. This configuration directory may be specified with the help of command line arguments when *lories*
 is executed, e.g. for a commonly used Linux structure:
 
 ```bash
-lori --conf-dir=/etc/lori
+lories --conf-dir=/etc/lories
 ```
 
 All configuration files are expected to be in the [TOML](https://toml.io/en/) config file format, that aims to be a
@@ -18,24 +18,24 @@ The settings allow the more detailed setup of the project directory structure in
 ```toml
 [directories]
 # The directory of necessary library files
-lib_dir = "/var/lib/lori/"
+lib_dir = "/var/lib/lories/"
 
 # The directory for temporary files
-tmp_dir = "/var/tmp/lori/"
+tmp_dir = "/var/tmp/lories/"
 
 # The writable directory where configurations that may change during runtime
 # can be found or evaluation results will be stored in
-data_dir = "/var/opt/lori/"
+data_dir = "/var/opt/lories/"
 ```
 
 
 ## Systems
 
-Most *lori* projects aggregate several components as a holistic system, to leverage symbiotic effects and added value.  
+Most *lories* projects aggregate several components as a holistic system, to leverage symbiotic effects and added value.  
 Entry-point to each system is a `system.conf` file, that will be searched for in the specified `data_dir` by default.
 If no data directory is specified, the `conf_dir` will be used.
 
-*Lori* can be configured to run one or several systems at once and can be configured to make a copy of all
+*Lories* can be configured to run one or several systems at once and can be configured to make a copy of all
 configurations to the specified data directory, to allow reproducibility while experimenting with simulations.  
 These configurations can be made in the `settings.conf`:
 
@@ -51,12 +51,12 @@ scan = true
 flat = true
 ```
 
- - `scan = true` configures *lori* to scan for systems in the specified `data_dir`. Any directory in the data
+ - `scan = true` configures *lories* to scan for systems in the specified `data_dir`. Any directory in the data
     directory that contains a `./conf/system.conf`, will be run.  
     This allows, among other things, large batch
     simulations.
     ```
-    lori
+    lories
     │
     └───conf
     │   │   settings.conf
@@ -82,7 +82,7 @@ flat = true
     `system.conf` directly, instead of in a `conf` folder inside.  
     This makes most sense for systems with configured databases and no other local files than the configuration files.
     ```
-    lori
+    lories
     │
     └───conf
     │   │   settings.conf
@@ -139,12 +139,13 @@ timezone = "CET"
 
 Each system is intended to contain several components, which can be instanced dynamically and modular via configuration.
 
-*Lori* and all dependant projects provide `Component` classes, providing diverse functionalities. Each component can be
+*Lories* and all dependant projects provide `Component` classes, providing diverse functionalities. Each component can be
 instanced several times, by defining a configuration section or file for each instance.  
 A "**test**" component class `MyTestComponent` with the `key = test_1` can be instanced in several ways:
 
 ```python
-from lori.components import Component, register_component_type
+from lories.components import Component, register_component_type
+
 
 @register_component_type
 class MyTestComponent(Component):

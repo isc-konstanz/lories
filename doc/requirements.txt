@@ -1,6 +1,6 @@
 graphviz~=0.20
-lori@git+https://github.com/isc-konstanz/lori.git@stable
 myst-parser~=3.0
 pydata-sphinx-theme~=0.15
 sphinx~=7.4
 sphinx-autoapi~=3.1
+lories@git+https://github.com/isc-konstanz/lories.git@stable
