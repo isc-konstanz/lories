@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.data.predictors.util
-~~~~~~~~~~~~~~~~~~~~~~~~~
+lories.data.predictors.util
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -11,10 +11,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from lori.util import to_timedelta
+from lories.util import to_timedelta
 
 
-def prediction_correction(
+def correct_prediction(
     value: float,
     prediction: pd.Series,
     horizon: str = "12h",

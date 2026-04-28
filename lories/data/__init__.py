@@ -35,6 +35,14 @@ from .listeners import (  # noqa: F401
     ListenerError,
 )
 
+from . import predictors  # noqa: F401
+from .predictors import (  # noqa: F401
+    Predictor,
+    PredictorError,
+    PredictorUnavailableError,
+    register_predictor_type,
+)
+
 from .context import DataContext  # noqa: F401
 
 from .access import DataAccess  # noqa: F401

@@ -6,10 +6,9 @@ lori.data.predictors
 
 """
 
-from .core import (  # noqa: F401
-    _Predictor,
-    PredictorException,
-    PredictorUnavailableException,
+from .errors import (  # noqa: F401
+    PredictorError,
+    PredictorUnavailableError,
 )
 
 from . import access  # noqa: F401

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lori.data.predictors.virtual
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lories.data.predictors.virtual
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -9,9 +9,9 @@ lori.data.predictors.virtual
 from __future__ import annotations
 
 import pandas as pd
-from lori import Resources
-from lori.data.predictors import Predictor, PredictorException, register_predictor_type
-from lori.typing import TimestampType
+from lories import Resources
+from lories.data.predictors import Predictor, PredictorException, register_predictor_type
+from lories.typing import Timestamp
 
 
 # noinspection PyShadowingBuiltins
@@ -20,8 +20,8 @@ class VirtualPredictor(Predictor):
     def predict(
         self,
         resources: Resources,
-        start: TimestampType = None,
-        end: TimestampType = None,
+        start: Timestamp = None,
+        end: Timestamp = None,
     ) -> pd.DataFrame:
         data = []
 

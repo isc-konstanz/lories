@@ -48,11 +48,8 @@ class Activator(_Activator, Configurator, metaclass=ActivatorMeta):
     def is_active(self) -> bool:
         return self._active
 
-    def activate(self, *args) -> None:
-        pass
-
     # noinspection PyUnresolvedReferences
-    @wraps(activate, updated=())
+    @wraps(_Activator.activate, updated=())
     def _do_activate(self, *args, **kwargs) -> None:
         if not self.is_enabled():
             raise ConfigurationError(f"Trying to activate disabled '{type(self).__name__}'")
@@ -73,11 +70,8 @@ class Activator(_Activator, Configurator, metaclass=ActivatorMeta):
     def _on_activate(self, *args) -> None:
         pass
 
-    def deactivate(self) -> None:
-        pass
-
     # noinspection PyUnresolvedReferences
-    @wraps(deactivate, updated=())
+    @wraps(_Activator.deactivate, updated=())
     def _do_deactivate(self, *args, **kwargs) -> None:
         if not self.is_active():
             return

@@ -14,7 +14,7 @@ from lories.core.errors import ResourceError, ResourceUnavailableError
 
 class ComponentError(ResourceError):
     """
-    Raise if an error occurred accessing the connector.
+    Raise if an error occurred accessing the component.
 
     """
 
@@ -26,6 +26,6 @@ class ComponentError(ResourceError):
 
 class ComponentUnavailableError(ResourceUnavailableError, ComponentError):
     """
-    Raise if an accessed connector can not be found.
+    Raise if an accessed component can not be found.
 
     """

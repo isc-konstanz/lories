@@ -32,11 +32,13 @@ class ComponentAccess(_ComponentContext, RegistratorAccess[Component]):
 
         super()._set(id, component)
 
+    # noinspection PyUnresolvedReferences
     def activate(self, filter: Optional[Callable[[Component], bool]] = None) -> None:
         _components = self.filter(filter)
         if len(_components) > 0:
             self.context._activate(*_components)
 
+    # noinspection PyUnresolvedReferences
     # noinspection PyShadowingBuiltins
     def deactivate(self, filter: Optional[Callable[[Component], bool]] = None) -> None:
         _components = self.filter(filter)

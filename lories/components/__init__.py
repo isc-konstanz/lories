@@ -27,7 +27,7 @@ from .component import Component  # noqa: F401
 from . import weather  # noqa: F401
 from .weather import (  # noqa: F401
     Weather,
-    WeatherForecast,
+    WeatherPredictor,
 )
 
 from . import camera  # noqa: F401

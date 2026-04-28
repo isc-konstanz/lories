@@ -13,8 +13,8 @@ from .weather import (  # noqa: F401
     registry,
 )
 
-from . import forecast  # noqa: F401
-from .forecast import WeatherForecast  # noqa: F401
+from . import predictor  # noqa: F401
+from .predictor import WeatherPredictor  # noqa: F401
 
 from . import provider  # noqa: F401
 from .provider import WeatherProvider  # noqa: F401

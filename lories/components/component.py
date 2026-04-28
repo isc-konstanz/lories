@@ -21,6 +21,7 @@ from lories.core.activator import Activator
 from lories.core.register import Registrator
 from lories.data.access import DataAccess
 from lories.data.converters import ConverterAccess
+from lories.data.predictors.access import PredictorAccess
 from lories.util import to_date
 
 
@@ -28,6 +29,7 @@ class Component(_Component, Registrator, Activator):
     __converters: ConverterAccess
     __connectors: ConnectorAccess
     __components: ComponentAccess
+    __predictors: PredictorAccess
     __data: DataAccess
 
     def __init__(
@@ -40,6 +42,7 @@ class Component(_Component, Registrator, Activator):
         self.__converters = ConverterAccess(self)
         self.__connectors = ConnectorAccess(self)
         self.__components = ComponentAccess(self)
+        self.__predictors = PredictorAccess(self)
         self.__data = DataAccess(self)
 
     def _at_configure(self, configs: Configurations) -> None:
@@ -54,6 +57,10 @@ class Component(_Component, Registrator, Activator):
         self.__connectors.sort()
         self.__connectors.configure()
 
+        self.__predictors.load(configure=False, sort=False)
+        self.__predictors.sort()
+        self.__predictors.configure()
+
         self.__components.load(configure=False, sort=False)
         self.__components.sort()
         self.__components.configure()
@@ -64,6 +71,7 @@ class Component(_Component, Registrator, Activator):
         self.__converters.duplicate(**changes)
         self.__connectors.duplicate(**changes)
         self.__components.duplicate(**changes)
+        self.__predictors.duplicate(**changes)
 
     @property
     def components(self) -> ComponentAccess:
@@ -76,6 +84,10 @@ class Component(_Component, Registrator, Activator):
     @property
     def connectors(self) -> ConnectorAccess:
         return self.__connectors
+
+    @property
+    def predictors(self) -> PredictorAccess:
+        return self.__predictors
 
     @property
     def data(self) -> DataAccess:
@@ -97,6 +109,22 @@ class Component(_Component, Registrator, Activator):
             if not logged.empty:
                 data = logged if data.empty else data.combine_first(logged)
         return self._get_range(data, start, end, **kwargs)
+
+    def predict(
+        self,
+        start: Optional[Timestamp | str] = None,
+        end: Optional[Timestamp | str] = None,
+        unique: bool = False,
+        **kwargs,
+    ) -> pd.DataFrame:
+        start = to_date(start)
+        end = to_date(end)
+
+        data = [ self.__predictors.predict(start=start, end=end, unique=unique) ]
+        for component in self.__components.values():
+            data.append(component.predict(start=start, end=end, unique=unique))
+
+        return self._get_range(pd.concat(data, axis="columns"), start, end, **kwargs)
 
     @staticmethod
     def _get_range(

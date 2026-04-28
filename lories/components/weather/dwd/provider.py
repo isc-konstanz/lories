@@ -12,7 +12,7 @@ from typing import Any, Collection, Dict
 
 import pandas as pd
 from lories import Constant
-from lories.components.weather import Weather, WeatherForecast, WeatherProvider, register_weather_type
+from lories.components.weather import Weather, WeatherPredictor, WeatherProvider, register_weather_type
 from lories.components.weather.dwd import Brightsky
 from lories.typing import Configurations
 
@@ -62,7 +62,7 @@ class DeutscherWetterDienst(WeatherProvider):
         connector = Brightsky(self, self.location, key="brightsky")
         self.connectors.add(connector)
 
-        if self.forecast.is_enabled() and isinstance(self.forecast, WeatherForecast):
+        if self.forecast.is_enabled() and isinstance(self.forecast, WeatherPredictor):
             self.forecast.data.add(
                 key="timestamp_creation",
                 name="Creation Timestamp",

@@ -1,29 +1,26 @@
 # -*- coding: utf-8 -*-
 """
-lories.components.weather.forecast
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lories.components.weather.predictor
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
 
 from __future__ import annotations
 
-import datetime as dt
 from typing import Optional
 
 import pandas as pd
 import pytz as tz
-from lories.components.weather import Weather
 from lories.core.errors import ResourceError
 from lories.core.typing import Component, Configurations
+from lories.data.predictors import Predictor
 from lories.location import Location
 from lories.util import floor_date, to_date, to_timezone
+from lories.typing import Timestamp
 
 
-class WeatherForecast(Weather):
-    TYPE: str = "weather_forecast"
-    TYPE: str = "forecast"
-
+class WeatherPredictor(Predictor):
     interval: int = 60
     offset: int = 0
 
@@ -38,22 +35,19 @@ class WeatherForecast(Weather):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        self.interval = configs.get_int("interval", default=WeatherForecast.interval)
-        self.offset = configs.get_int("offset", default=WeatherForecast.offset)
-
-    def localize(self, configs: Configurations) -> None:
-        # Do nothing, as context was already validated as WeatherProvider, that does have a location
-        pass
+        self.interval = configs.get_int("interval", default=WeatherPredictor.interval)
+        self.offset = configs.get_int("offset", default=WeatherPredictor.offset)
 
     # noinspection PyUnresolvedReferences
     @property
     def location(self) -> Location:
+        # Context was already validated as WeatherProvider, that does have a location
         return self.context.location
 
-    def get(
+    def predict(
         self,
-        start: Optional[pd.Timestamp, dt.datetime, str] = None,
-        end: Optional[pd.Timestamp, dt.datetime, str] = None,
+        start: Optional[Timestamp | str] = None,
+        end: Optional[Timestamp | str] = None,
         timezone: Optional[tz.BaseTzInfo | str | int | float] = None,
         **kwargs,
     ) -> pd.DataFrame:

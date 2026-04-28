@@ -20,6 +20,7 @@ from lories._core._configurations import Configurations
 from lories._core._connector import Connectors, _Connector
 from lories._core._converter import Converters
 from lories._core._data import Data, _DataContext
+from lories._core._predictor import Predictors
 from lories._core._registrator import _Registrator, _RegistratorContext
 from lories._core.typing import Timestamp
 
@@ -42,19 +43,24 @@ class _Component(_Registrator, _Activator):
 
     @property
     @abstractmethod
+    def predictors(self) -> Predictors: ...
+
+    @property
+    @abstractmethod
     def data(self) -> Data: ...
 
     @overload
-    def get(self) -> pd.DataFrame: ...
+    def get(self, unique: bool = False) -> pd.DataFrame: ...
 
     @overload
-    def get(self, date: Timestamp | str) -> pd.DataFrame: ...
+    def get(self, date: Timestamp | str, unique: bool = False) -> pd.DataFrame: ...
 
     @overload
     def get(
         self,
         start: Timestamp | str,
         end: Timestamp | str,
+        unique: bool = False,
     ) -> pd.DataFrame: ...
 
     @abstractmethod
@@ -62,6 +68,30 @@ class _Component(_Registrator, _Activator):
         self,
         start: Optional[Timestamp | str] = None,
         end: Optional[Timestamp | str] = None,
+        unique: bool = False,
+        **kwargs,
+    ) -> pd.DataFrame: ...
+
+    @overload
+    def predict(self, unique: bool = False) -> pd.DataFrame: ...
+
+    @overload
+    def predict(self, date: Timestamp | str, unique: bool = False) -> pd.DataFrame: ...
+
+    @overload
+    def predict(
+        self,
+        start: Timestamp | str,
+        end: Timestamp | str,
+        unique: bool = False,
+    ) -> pd.DataFrame: ...
+
+    @abstractmethod
+    def predict(
+        self,
+        start: Optional[Timestamp | str] = None,
+        end: Optional[Timestamp | str] = None,
+        unique: bool = False,
         **kwargs,
     ) -> pd.DataFrame: ...
 

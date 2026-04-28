@@ -49,6 +49,11 @@ from ._connector import (  # noqa: F401
 )
 from ._database import _Database  # noqa: F401
 
+from ._predictor import (  # noqa: F401
+    _Predictor,
+    _PredictorContext,
+)
+
 from ._tasks import _TaskContext  # noqa: F401
 from ._data import _DataContext  # noqa: F401
 

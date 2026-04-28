@@ -14,46 +14,19 @@ from __future__ import annotations
 
 from typing import Optional
 
-from lories.components.weather import Weather, WeatherForecast
+from lories.components.weather import Weather, WeatherPredictor
 from lories.typing import Configurations, ContextArgument
 
 
 # noinspection SpellCheckingInspection
 class WeatherProvider(Weather):
-    __forecast: WeatherForecast
 
-    # noinspection PyTypeChecker
-    def __init__(
-        self,
-        context: ContextArgument,
-        configs: Optional[Configurations] = None,
-        **kwargs,
-    ) -> None:
-        super().__init__(context=context, configs=configs, **kwargs)
-        forecast_configs = configs.get_member(WeatherForecast.TYPE, ensure_exists=True)
-        forecast_configs.set("key", "forecast", replace=False)
-        self.__forecast = WeatherForecast(self, forecast_configs)
-
-    def _at_configure(self, configs: Configurations) -> None:
-        super()._at_configure(configs)
-        if self.__forecast.is_enabled():
-            self.__forecast.configure(configs.get_member(WeatherForecast.TYPE, ensure_exists=True))
-
-    def _on_configure(self, configs: Configurations) -> None:
-        super()._on_configure(configs)
-        if self.__forecast.is_enabled() and len(self.__forecast.data) == 0:
-            self.__forecast.configs.enabled = False
-
-    def activate(self) -> None:
-        super().activate()
-        if self.__forecast.is_enabled():
-            self.__forecast.activate()
-
-    def deactivate(self) -> None:
-        super().deactivate()
-        if self.__forecast.is_active():
-            self.__forecast.deactivate()
+    def configure(self, configs: Configurations) -> None:
+        super().configure(configs)
+        predictor_configs = configs.get_member(WeatherPredictor.TYPE, ensure_exists=True)
+        predictor_configs.set("key", "forecast", replace=False)
+        self.predictors.add(WeatherPredictor(self, configs))
 
     @property
-    def forecast(self) -> WeatherForecast:
-        return self.__forecast
+    def forecast(self) -> WeatherPredictor:
+        return self.predictors.get_first(WeatherPredictor)

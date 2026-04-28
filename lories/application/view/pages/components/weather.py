@@ -17,7 +17,7 @@ from dash import Input, Output, callback, dcc, html
 import pandas as pd
 import pytz as tz
 from lories.application.view.pages import ComponentPage, PageLayout, register_component_group, register_component_page
-from lories.components.weather import WeatherForecast as Forecast
+from lories.components.weather import WeatherPredictor as Forecast
 from lories.components.weather import WeatherProvider as Weather
 from lories.util import floor_date
 

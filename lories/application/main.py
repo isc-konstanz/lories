@@ -35,6 +35,7 @@ from lories.data.context import DataContext
 from lories.data.converters import ConverterContext
 from lories.data.databases import Databases
 from lories.data.listeners import ListenerContext
+from lories.data.predictors import PredictorContext
 from lories.data.processors import ProcessorContext
 from lories.data.replication import Replication
 from lories.data.retention import Retention
@@ -57,6 +58,7 @@ class Application(_Application, DataContext, TaskContext):
     _converters: ConverterContext
     _connectors: ConnectorContext
     _components: ComponentContext
+    _predictors: PredictorContext
     _listeners: ListenerContext
 
     _interface: Optional[Interface] = None
@@ -84,6 +86,7 @@ class Application(_Application, DataContext, TaskContext):
         self._converters = ConverterContext(self)
         self._connectors = ConnectorContext(self)
         self._components = ComponentContext(self)
+        self._predictors = PredictorContext(self)
         self._listeners = ListenerContext(self)
 
         if not settings.has_member(Interface.TYPE):
@@ -148,6 +151,9 @@ class Application(_Application, DataContext, TaskContext):
         self._connectors.load(configure=False, sort=False)
         self._connectors.configure()
 
+        self._predictors.load(configure=False, sort=False)
+        self._predictors.configure()
+
         self._components.load(configure=False, sort=False)
         self._components.configure()
 
@@ -155,6 +161,7 @@ class Application(_Application, DataContext, TaskContext):
         super()._on_configure(configs)
         self._converters.sort()
         self._connectors.sort()
+        self._predictors.sort()
         self._components.sort()
         self.sort()
 
@@ -162,12 +169,14 @@ class Application(_Application, DataContext, TaskContext):
     def activate(self, filter: Optional[Callable[[Registrator], bool]] = None) -> None:
         super().activate()
         self._connectors.connect(chain_filters(filter), self.channels)
+        self._predictors.activate(chain_filters(filter), self.channels)
         self._components.activate(chain_filters(filter))
 
     # noinspection PyShadowingBuiltins
     def deactivate(self, *_, filter: Optional[Callable[[Registrator], bool]] = None) -> None:
         super().deactivate()
         self._components.deactivate(chain_filters(filter))
+        self._predictors.deactivate(chain_filters(filter))
         self._connectors.disconnect(chain_filters(filter))
 
     def interrupt(self, *_) -> None:
@@ -208,6 +217,10 @@ class Application(_Application, DataContext, TaskContext):
     @property
     def components(self) -> ComponentContext:
         return self._components
+
+    @property
+    def predictors(self) -> PredictorContext:
+        return self._predictors
 
     @property
     def listeners(self) -> ListenerContext:

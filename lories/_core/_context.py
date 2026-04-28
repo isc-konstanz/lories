@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Callable, MutableMapping
 from itertools import chain
-from typing import Any, Collection, Generic, Iterable, Iterator, Sequence, Tuple, TypeVar, overload
+from typing import Any, Collection, Generic, Iterable, Iterator, Optional, Sequence, Tuple, TypeVar, overload
 
 import pandas as pd
 from lories._core._entity import Entity, _Entity
@@ -103,10 +103,21 @@ class _Context(ABC, Generic[Entity], MutableMapping[str, Entity]):
 
     # noinspection PyShadowingBuiltins
     @overload
-    def filter(self, filter: Callable[[Entity], bool], *other: Callable[[Entity], bool]) -> Sequence[Entity]: ...
+    def filter(
+        self,
+        filter: Optional[Callable[[Entity], bool]],
+        *other: Callable[[Entity], bool],
+    ) -> Sequence[Entity]: ...
 
-    def filter(self, *filters: Callable[[Entity], bool]) -> Sequence[Entity]:
-        return self._filter(*filters)
+    # noinspection PyShadowingBuiltins
+    def filter(
+        self,
+        filter: Optional[Callable[[Entity], bool]],
+        *other: Callable[[Entity], bool],
+    ) -> Sequence[Entity]:
+        if filter is None:
+            return list(self.__map.values())
+        return self._filter(filter, *other)
 
     def _filter(self, *filters: Callable[[Entity], bool]) -> Sequence[Entity]:
         def _filters(__object: Entity) -> bool:
