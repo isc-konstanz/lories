@@ -15,6 +15,7 @@ import pandas as pd
 import pytz as tz
 from lories.connectors import register_connector_type
 from lories.connectors.serial._core import _SerialConnector
+from lories.core.configs.parameters import ChannelParameter
 from lories.data import ChannelState
 from lories.typing import Resources
 from lories.util import is_int
@@ -22,6 +23,11 @@ from lories.util import is_int
 
 @register_connector_type("sdi12")
 class Sdi12Connector(_SerialConnector):
+    # Per-channel parameters
+    sensor = ChannelParameter(type=str, required=True, desc="SDI-12 sensor bus address (single digit)")
+    data = ChannelParameter(type=int, required=True, desc="SDI-12 data command index (n in 'aDn!')")
+    index = ChannelParameter(type=int, required=False, default=0, desc="Position of the value in the response")
+
     def read(self, resources: Resources) -> pd.DataFrame:
         """Read all sensors."""
         timestamp = pd.Timestamp.now(tz=tz.UTC).floor(freq="s")
