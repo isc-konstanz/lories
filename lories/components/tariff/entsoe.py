@@ -12,6 +12,7 @@ import pandas as pd
 from lories import Constant
 from lories.components.tariff import Tariff, TariffProvider, register_tariff_type
 from lories.connectors.entsoe import EntsoeConnector
+from lories.core.configs.parameters import Parameter
 from lories.typing import Configurations
 
 
@@ -20,11 +21,12 @@ from lories.typing import Configurations
 class EntsoeProvider(TariffProvider):
     PRICE_DAY_AHEAD = Constant(float, "price_day_ahead", name="Day-Ahead Tariff Price", unit="€/MWh")
 
-    _offset: float = 0
+    _offset = Parameter(key="offset", type=float, default=0.0, desc="Constant offset added to import price (ct/kWh)")
+
+    _offset: float
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self._offset = configs.get_float("offset", default=0)
 
         entsoe_connector = EntsoeConnector(
             self,
