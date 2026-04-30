@@ -14,6 +14,7 @@ from typing import Optional
 import pandas as pd
 import pytz as tz
 from lories.components.weather import Weather
+from lories.core.configs.parameters import Parameter
 from lories.core.errors import ResourceError
 from lories.core.typing import Component, Configurations
 from lories.location import Location
@@ -24,8 +25,11 @@ class WeatherForecast(Weather):
     TYPE: str = "weather_forecast"
     TYPE: str = "forecast"
 
-    interval: int = 60
-    offset: int = 0
+    interval = Parameter(key="interval", type=int, default=60, desc="Forecast schedule interval (minutes)")
+    offset = Parameter(key="offset", type=int, default=0, desc="Forecast schedule offset within interval (minutes)")
+
+    interval: int
+    offset: int
 
     @classmethod
     def _assert_context(cls, context: Component):
@@ -37,9 +41,6 @@ class WeatherForecast(Weather):
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-
-        self.interval = configs.get_int("interval", default=WeatherForecast.interval)
-        self.offset = configs.get_int("offset", default=WeatherForecast.offset)
 
     def localize(self, configs: Configurations) -> None:
         # Do nothing, as context was already validated as WeatherProvider, that does have a location
