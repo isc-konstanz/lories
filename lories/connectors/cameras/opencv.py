@@ -17,6 +17,14 @@ from lories.typing import Configurations, Resources
 
 @register_connector_type("opencv")
 class OpenCV(CameraConnector):
+    """
+    OpenCV-based camera connector that captures frames from RTSP streams using the FFmpeg backend.
+    It connects to IP cameras via RTSP with TCP transport, grabs single frames on demand, and encodes
+    them as JPEG. The connector manages connection lifecycle per read cycle to avoid stale frame buffers.
+    Performance depends on network latency and camera firmware; some cameras may require adjusted timeouts
+    or stream paths.
+    """
+
     _host = Parameter(key="host", type=str, required=True, desc="RTSP camera host")
     _port = Parameter(key="port", type=int, default=554, min=1, max=65535, desc="RTSP camera port")
     _username = Parameter(key="username", type=str, required=True, desc="RTSP authentication username")

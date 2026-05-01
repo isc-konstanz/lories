@@ -21,6 +21,13 @@ from pandas import HDFStore
 
 @register_connector_type("tables", "hdfstore")
 class HDFDatabase(Database):
+    """
+    HDF5 (Hierarchical Data Format version 5) is a binary file format designed for storing and organizing large
+    amounts of numerical data efficiently. Using the PyTables-backed pandas HDFStore, it supports fast columnar
+    reads, on-disk querying, and optional compression. However, HDF5 files are not easily human-readable,
+    concurrent write access is limited, and the format can be sensitive to library version mismatches.
+    """
+
     _path = Parameter(key="path", type=str, required=False, desc="Base path for store files")
     _file = Parameter(key="file", type=str, default=".store.h5", desc="HDF5 store filename")
     _mode = SelectParameter(["a", "r", "r+", "w"], key="mode", default="a", desc="File open mode")

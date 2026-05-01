@@ -33,6 +33,14 @@ except ImportError:
 
 @register_connector_type("influxdb2", "influxdb_v2")
 class InfluxDB2(Database):
+    """
+    InfluxDB 2.x is a time-series database platform that introduces the Flux query language, token-based
+    authentication, and a unified API for data ingestion, querying, and management. It supports organizations
+    and buckets for multi-tenant data isolation, built-in task scheduling, and dashboarding. However, the Flux
+    language has a steeper learning curve compared to InfluxQL, and migration from 1.x requires adapting queries
+    and authentication workflows.
+    """
+
     _host = Parameter(key="host", type=str, default="localhost", desc="InfluxDB host")
     _port = Parameter(key="port", type=int, default=8086, min=1, max=65535, desc="InfluxDB port")
     _org = Parameter(key="org", type=str, desc="Organisation name")
