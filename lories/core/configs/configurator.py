@@ -22,6 +22,7 @@ from lories._core._configurator import Configurator as ConfiguratorType  # noqa
 from lories._core._configurator import _Configurator  # noqa
 from lories.core.configs.errors import ConfigurationError
 from lories.core.configs.parameters.base import _Parameter, _TypedParameter
+from lories.core.configs.parameters.entity import _EntityParameter
 from lories.core.configs.parameters.group import ParameterGroup
 from lories.io.shell import ANSI_KEY as _WK
 from lories.io.shell import ANSI_RESET as _WR
@@ -284,7 +285,7 @@ class Configurator(_Configurator, metaclass=ConfiguratorMeta):
         reserved: frozenset = frozenset(),
     ) -> None:
         declared_flat = {k for k, p in param_map.items() if isinstance(p, _TypedParameter)}
-        declared_sections = {k for k, p in param_map.items() if isinstance(p, ParameterGroup)}
+        declared_sections = {k for k, p in param_map.items() if isinstance(p, (ParameterGroup, _EntityParameter))}
 
         for key in configs:
             if key in reserved:
@@ -321,6 +322,10 @@ class Configurator(_Configurator, metaclass=ConfiguratorMeta):
                         )
                 else:
                     group = param_map[key]
+                    if isinstance(group, _EntityParameter):
+                        # Entity slots delegate validation to the referenced
+                        # Component / Connector class itself — no recursion here.
+                        continue
                     if group.children and configs.has_member(key):
                         child_map = {p._resolve_key(): p for p in group.children.values()}
                         cls._warn_undeclared_in_section(
