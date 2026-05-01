@@ -16,6 +16,14 @@ from lories.core import Configurations
 # noinspection SpellCheckingInspection
 @register_component_type("camera")
 class Camera(Component):
+    """
+    A camera component captures still frames from an underlying camera connector and exposes them as a
+    bytes-typed channel for downstream consumers. It abstracts over the specific capture backend (e.g.
+    RTSP via OpenCV) so that motion detection, snapshot logging, or visual inspection workflows can be
+    composed against a uniform interface. Frames are aggregated with last-value semantics, reflecting
+    that consumers typically care about the most recent image rather than a continuous stream.
+    """
+
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
