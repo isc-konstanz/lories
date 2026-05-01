@@ -26,6 +26,7 @@ from dash import ALL, Input, Output, State, callback, ctx, html
 from lories.core.configs.parameters import (
     BoolParameter,
     ParameterGroup,
+    _EntityParameter,
     _Parameter,
 )
 
@@ -157,9 +158,12 @@ def _build_param_fields(configs, params: Dict[str, _Parameter], entity_id: str) 
         return html.Div(html.I("No parameters.", className="text-muted"))
 
     param_by_key: Dict[str, _Parameter] = {
-        p._resolve_key(): p for p in params.values() if not isinstance(p, ParameterGroup)
+        p._resolve_key(): p for p in params.values() if not isinstance(p, (ParameterGroup, _EntityParameter))
     }
     group_keys = {p._resolve_key() for p in params.values() if isinstance(p, ParameterGroup)}
+    entity_params: Dict[str, _EntityParameter] = {
+        p._resolve_key(): p for p in params.values() if isinstance(p, _EntityParameter)
+    }
 
     rows: List = []
 
@@ -170,10 +174,11 @@ def _build_param_fields(configs, params: Dict[str, _Parameter], entity_id: str) 
             current_value = param.default
         rows.append(_build_field_row(entity_id, key, param, current_value))
 
-    # Undeclared flat keys (skip nested mappings and known group keys)
+    # Undeclared flat keys (skip nested mappings, group keys, entity slots)
     if configs:
+        skip_keys = set(param_by_key) | group_keys | set(entity_params)
         for key, value in configs.items():
-            if key not in param_by_key and key not in group_keys and not isinstance(value, Mapping):
+            if key not in skip_keys and not isinstance(value, Mapping):
                 rows.append(_build_plain_field_row(entity_id, key, value))
 
     # ParameterGroup children as indented sub-sections
@@ -204,9 +209,140 @@ def _build_param_fields(configs, params: Dict[str, _Parameter], entity_id: str) 
                 )
             )
 
+    # Entity slots (ComponentParameter / ConnectorParameter) — declarative-only.
+    # The actual children live in dynamically-loaded sub-configs, so we just
+    # surface the schema (slot type, multiplicity, fitting registered types,
+    # and recursive child parameters of the expected class).
+    for ekey, eparam in entity_params.items():
+        rows.append(_build_entity_slot_row(eparam, ekey, entity_id))
+
     if not rows:
         return html.Div(html.I("No parameters.", className="text-muted"))
 
+    return html.Div(rows)
+
+
+def _build_entity_slot_row(eparam: _EntityParameter, key: str, entity_id: str) -> html.Div:
+    """Render a declarative ComponentParameter / ConnectorParameter slot."""
+    schema = eparam.to_schema()
+    kind = schema.get("type", "entity")
+    multiple = schema.get("multiple", False)
+    cls_name = schema.get("cls")
+    desc = schema.get("desc") or ""
+    fitting = schema.get("fitting_types") or []
+
+    header_parts: List[Any] = [
+        html.Span(key, className="fw-semibold text-secondary"),
+        dbc.Badge(
+            f"{kind}{'[]' if multiple else ''}",
+            color="info" if kind == "component" else "primary",
+            pill=True,
+            className="ms-2",
+        ),
+    ]
+    if cls_name:
+        header_parts.append(dbc.Badge(cls_name, color="light", text_color="dark", pill=True, className="ms-1"))
+    if desc:
+        header_parts.append(html.Small(f" — {desc}", className="text-muted ms-2"))
+
+    body: List[Any] = []
+    if fitting:
+        badges = [
+            dbc.Badge(
+                entry["key"],
+                color="light",
+                text_color="dark" if entry.get("available", True) else "danger",
+                pill=True,
+                className="me-1 mb-1",
+            )
+            for entry in fitting
+        ]
+        body.append(
+            html.Div(
+                [html.Small("fitting types: ", className="text-muted me-1")] + badges,
+                className="mb-1",
+            )
+        )
+
+    nested = schema.get("children") or {}
+    if nested:
+        body.append(html.Small("expected child parameters:", className="text-muted d-block"))
+        body.append(
+            html.Div(
+                _build_nested_schema_readonly(nested),
+                className="ps-3 border-start border-2 small",
+            )
+        )
+
+    return html.Div(
+        [
+            html.Hr(className="mt-3 mb-2"),
+            html.Div(header_parts, className="mb-2"),
+            html.Div(body),
+        ]
+    )
+
+
+def _build_nested_schema_readonly(schemas: Dict[str, Any]) -> html.Div:
+    """Read-only rendering of a nested schema dict (used inside entity slots)."""
+    rows: List[Any] = []
+    for attr_or_key, schema in schemas.items():
+        t = schema.get("type")
+        key = schema.get("key", attr_or_key)
+        if t in ("component", "connector"):
+            cls_name = schema.get("cls")
+            multiple = schema.get("multiple", False)
+            label_parts: List[Any] = [
+                html.Code(key),
+                dbc.Badge(
+                    f"{t}{'[]' if multiple else ''}",
+                    color="info" if t == "component" else "primary",
+                    pill=True,
+                    className="ms-1",
+                ),
+            ]
+            if cls_name:
+                label_parts.append(dbc.Badge(cls_name, color="light", text_color="dark", pill=True, className="ms-1"))
+            rows.append(html.Div(label_parts, className="mb-1"))
+            nested = schema.get("children") or {}
+            if nested:
+                rows.append(
+                    html.Div(
+                        _build_nested_schema_readonly(nested),
+                        className="ps-3 border-start border-2",
+                    )
+                )
+        elif t == "group":
+            label_parts = [
+                html.Code(key),
+                dbc.Badge("group", color="secondary", pill=True, className="ms-1"),
+            ]
+            rows.append(html.Div(label_parts, className="mb-1"))
+            nested = schema.get("children") or {}
+            if nested:
+                rows.append(
+                    html.Div(
+                        _build_nested_schema_readonly(nested),
+                        className="ps-3 border-start border-2",
+                    )
+                )
+        else:
+            badges: List[Any] = [html.Code(key)]
+            if t:
+                badges.append(dbc.Badge(t, color="info", pill=True, className="ms-1"))
+            if schema.get("required"):
+                badges.append(dbc.Badge("required", color="warning", pill=True, className="ms-1"))
+            elif schema.get("default") is not None:
+                badges.append(
+                    dbc.Badge(
+                        f"default: {schema['default']}",
+                        color="light",
+                        text_color="dark",
+                        pill=True,
+                        className="ms-1",
+                    )
+                )
+            rows.append(html.Div(badges, className="mb-1"))
     return html.Div(rows)
 
 
