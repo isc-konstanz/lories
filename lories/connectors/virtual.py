@@ -22,6 +22,13 @@ from lories.typing import Channel, Resource, Resources, Timestamp
 # noinspection PyShadowingBuiltins
 @register_connector_type("virtual", "random", "dummy")
 class VirtualConnector(Connector):
+    """
+    The Virtual connector provides in-memory channels for testing, simulation, and soft-sensor prototyping. It
+    supports simple value storage with read/write semantics and optional random-walk value generation within
+    configurable bounds. Since all state is held in memory, data does not persist across restarts, making it
+    suitable for development and simulation scenarios rather than production data acquisition.
+    """
+
     VIRTUAL: str = "virtual"
     RANDOM: str = "random"
 

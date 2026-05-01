@@ -22,6 +22,14 @@ from lories.typing import Configurations, Resources
 
 @register_connector_type("mqtt")
 class MqttConnector(Connector):
+    """
+    MQTT (Message Queuing Telemetry Transport) is a lightweight messaging protocol designed for use in IoT
+    applications. It features a publish/subscribe model, QoS levels, and message persistence, making it efficient
+    for resource-constrained devices with limited bandwidth or high-latency networks. However, MQTT's lack of
+    advanced features like transactions and complex routing, coupled with its reliance on SSL/TLS for security,
+    can limit its scalability and performance in large-scale environments.
+    """
+
     _host = Parameter(key="host", type=str, default="localhost", desc="Broker hostname")
     _port = Parameter(key="port", type=int, default=1883, min=1, max=65535, desc="Broker port")
     _transport = SelectParameter(

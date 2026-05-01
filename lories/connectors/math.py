@@ -27,6 +27,14 @@ from lories.util import get_context, to_bool
 # noinspection SpellCheckingInspection
 @register_connector_type("math")
 class MathConnector(Connector):
+    """
+    The Math connector evaluates symbolic mathematical expressions at runtime using the SymPy computer algebra
+    library. It maps free symbols in an expression to live channel values, enabling computed or derived channels
+    such as unit conversions, aggregations, or physical formulas. Expressions can be triggered reactively via
+    listeners or evaluated on demand during read cycles. However, complex expressions with many symbols may
+    introduce noticeable computation overhead.
+    """
+
     _mapping = ParameterGroup(key="mapping", required=False, desc="Symbol-to-channel mapping")
 
     # Per-channel parameters

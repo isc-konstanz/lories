@@ -25,6 +25,14 @@ from lories.typing import Configurations, Resources
 
 @register_connector_type("opc", "opcua")
 class OpcUaConnector(Connector):
+    """
+    OPC UA (Open Platform Communications Unified Architecture) is an industrial automation standard that
+    facilitates secure, real-time data exchange between devices and systems. It offers robust security features,
+    interoperability across different platforms, and scalability for large-scale deployments. However, OPC UA can
+    be more complex to set up and configure, may involve additional licensing costs, and requires a learning curve
+    for users familiarizing themselves with its standards and best practices.
+    """
+
     _host = Parameter(key="host", type=str, default="127.0.0.1", desc="OPC UA server host")
     _port = Parameter(key="port", type=int, default=4840, min=1, max=65535, desc="OPC UA server port")
     _timeout = Parameter(key="timeout", type=int, default=60, desc="Connection timeout (s)")

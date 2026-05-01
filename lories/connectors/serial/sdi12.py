@@ -23,6 +23,14 @@ from lories.util import is_int
 
 @register_connector_type("sdi12")
 class Sdi12Connector(_SerialConnector):
+    """
+    SDI-12 (Serial-Digital Interface at 1200 baud) is a standard protocol for interfacing environmental
+    sensors over a single data line. It supports addressing up to 62 sensors on one bus, uses a
+    master-slave communication model with measurement (M!) and data (D!) commands, and is widely adopted
+    in hydrology, meteorology, and soil science. However, SDI-12's low baud rate and sequential polling
+    model limit throughput, and its timing-sensitive break signaling requires precise serial control.
+    """
+
     # Per-channel parameters
     sensor = ChannelParameter(type=str, required=True, desc="SDI-12 sensor bus address (single digit)")
     data = ChannelParameter(type=int, required=True, desc="SDI-12 data command index (n in 'aDn!')")

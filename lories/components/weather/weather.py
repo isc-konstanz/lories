@@ -57,6 +57,14 @@ class WeatherMeta(ActivatorMeta):
 # noinspection SpellCheckingInspection
 @register_component_type("weather")
 class Weather(Component, metaclass=WeatherMeta):
+    """
+    A weather component provides meteorological observations and forecasts including solar irradiance,
+    temperature, humidity, wind, precipitation, and cloud cover. It requires a geographic location
+    (latitude, longitude) either from its own configuration or inherited from the parent context.
+    Concrete weather providers fetch data from external services and populate the defined channels,
+    which downstream components such as photovoltaic simulators or load forecasters consume.
+    """
+
     GHI = Constant(float, "ghi", "Global Horizontal Irradiance", "W/m2")
     DNI = Constant(float, "dni", "Direct Normal Irradiance", "W/m2")
     DHI = Constant(float, "dhi", "Diffuse Horizontal Irradiance", "W/m2")

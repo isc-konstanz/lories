@@ -18,4 +18,5 @@ from .list import ListParameter  # noqa: F401
 from .custom import CustomParameter  # noqa: F401
 from .select import SelectParameter  # noqa: F401
 from .group import ParameterGroup  # noqa: F401
+from .entity import ComponentParameter, ConnectorParameter, _EntityParameter  # noqa: F401
 from .channel_parameter import ChannelParameter  # noqa: F401

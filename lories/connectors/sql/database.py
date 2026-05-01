@@ -34,6 +34,14 @@ except ImportError:
 
 @register_connector_type("sql")
 class SqlDatabase(Database, Mapping[str, Table]):
+    """
+    SQL connector backed by SQLAlchemy, supporting PostgreSQL, MySQL, SQLite, and MSSQL dialects.
+    It provides a unified interface for reading and writing time-series data to relational databases,
+    with per-table configuration overrides and automatic schema introspection. SQLAlchemy's broad
+    dialect support enables portability across database engines, though performance characteristics
+    and SQL feature availability vary by backend.
+    """
+
     _host = Parameter(key="host", type=str, desc="Database host")
     _port = Parameter(key="port", type=int, min=1, max=65535, desc="Database port")
     _user = Parameter(key="user", type=str, desc="Username")

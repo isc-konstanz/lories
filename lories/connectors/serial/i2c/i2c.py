@@ -20,6 +20,15 @@ from lories.typing import Resources
 
 @register_connector_type("i2c")
 class I2CConnector(_I2CConnector):
+    """
+    I2C (Inter-Integrated Circuit) is a two-wire serial bus protocol commonly used to connect
+    low-speed sensors and peripherals on embedded systems and single-board computers such as the
+    Raspberry Pi. This connector uses the smbus2 library to communicate over the I2C bus and
+    supports named sensor drivers (e.g. BME280) as well as raw register read/write access.
+    It falls back to a mock implementation when smbus2 is unavailable (e.g. on Windows or in
+    development environments).
+    """
+
     # Per-channel parameters
     sensor = ChannelParameter(
         type=str, required=False, choices=["bme280"], desc="Sensor type (e.g. 'bme280'); omit for raw register access"
