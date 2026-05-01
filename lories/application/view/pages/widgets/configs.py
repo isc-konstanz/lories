@@ -100,40 +100,50 @@ def build_configs_widget(
 
 
 def _render_param_table(items: List[tuple], param_by_key: Dict[str, _Parameter]) -> dbc.Table:
+    nowrap = {"whiteSpace": "nowrap"}
+    mono = {"fontFamily": "monospace"}
+    muted = {"color": "var(--bs-secondary-color)"}
+
+    header = html.Thead(
+        html.Tr(
+            [
+                html.Th("Name", style=nowrap),
+                html.Th("Type", style=nowrap),
+                html.Th("Required", style=nowrap),
+                html.Th("Default", style=nowrap),
+                html.Th("Value"),
+                html.Th("Description"),
+            ]
+        )
+    )
+
     rows = []
     for key, value in items:
         param = param_by_key.get(key)
         schema = param.to_schema() if param else {}
-        type_label = schema.get("type", "")
+        type_label = schema.get("type", "") or ""
         default = schema.get("default")
         desc = schema.get("desc") or ""
-
-        badge_children = []
-        if type_label:
-            badge_children.append(dbc.Badge(type_label, color="info", className="ms-1", pill=True))
-        if schema.get("required"):
-            badge_children.append(dbc.Badge("required", color="warning", className="ms-1", pill=True))
-
-        meta_parts = []
-        if default is not None:
-            meta_parts.append(html.Small(f"default: {default}", className="text-muted me-2"))
-        if desc:
-            meta_parts.append(html.Small(desc, className="text-muted fst-italic"))
+        required = bool(schema.get("required"))
+        has_default = bool(schema.get("has_default")) if "has_default" in schema else (default is not None)
 
         rows.append(
             html.Tr(
                 [
+                    html.Td(html.Code(key), style={**nowrap, "width": "1%", "paddingRight": "1rem"}),
+                    html.Td(type_label, style={**nowrap, **mono}),
+                    html.Td("yes" if required else html.Span("no", style=muted), style=nowrap),
                     html.Td(
-                        [html.Code(key)] + badge_children,
-                        style={"whiteSpace": "nowrap", "width": "1%", "paddingRight": "1rem"},
+                        str(default) if has_default else html.Span("—", style=muted),
+                        style={**nowrap, **mono},
                     ),
-                    html.Td(html.Span(str(value)), style={"fontFamily": "monospace"}),
-                    html.Td(meta_parts, style={"whiteSpace": "nowrap"}),
+                    html.Td(html.Span(str(value)), style=mono),
+                    html.Td(html.Small(desc, style=muted) if desc else "", style={"fontStyle": "italic"}),
                 ]
             )
         )
     return dbc.Table(
-        html.Tbody(rows),
+        [header, html.Tbody(rows)],
         bordered=True,
         hover=True,
         size="sm",
