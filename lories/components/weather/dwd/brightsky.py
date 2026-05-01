@@ -16,13 +16,24 @@ import requests
 import numpy as np
 import pandas as pd
 from lories.components.weather import Weather
-from lories.connectors import Connector
+from lories.connectors import Connector, register_connector_type
 from lories.core.configs.parameters import Parameter
 from lories.location import Location
 from lories.typing import Configurations, Resources, Timestamp
 
 
+@register_connector_type("brightsky")
 class Brightsky(Connector):
+    """
+    Connector for the Bright Sky API, an open REST interface that re-publishes Deutscher Wetterdienst (DWD)
+    open weather data without requiring registration or API keys. It serves observations, current conditions
+    and forecasts for any geographic location, returning hourly records covering solar irradiance, temperature,
+    wind, precipitation, cloud cover and related parameters. This connector queries the ``/weather`` endpoint
+    for the location bound to the parent weather component, converts global horizontal irradiance from
+    kWh/m² to W/m², interpolates missing cloud cover values, and groups records by source type
+    (``forecast``, ``current``, ``historical``) so resources can subscribe to the appropriate slice.
+    """
+
     address = Parameter(key="address", type=str, default="https://api.brightsky.dev/", desc="Brightsky API base URL")
     horizon = Parameter(key="horizon", type=int, default=10, min=-1, max=10, desc="Forecast horizon (days)")
 
