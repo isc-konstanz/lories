@@ -19,6 +19,7 @@ from lories._core import ChannelState  # noqa
 from lories.connectors import ConnectionError, Connector, ConnectorError, register_connector_type
 from lories.connectors.modbus import ModbusRegister
 from lories.core.configs import ConfigurationError
+from lories.core.configs.parameters import ChannelParameter, Parameter, SelectParameter
 from lories.typing import Configurations, Resources
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
@@ -31,57 +32,86 @@ except ImportError:
 
 @register_connector_type("modbus")
 class ModbusClient(Connector):
+    # Shared
+    _protocol = SelectParameter(["tcp", "udp", "rtu"], key="protocol", desc="Modbus transport protocol")
+    _endian = SelectParameter(["big", "little"], key="endian", default="big", desc="Byte order")
+    _timeout = Parameter(key="timeout", type=int, default=3, min=1, desc="Timeout (s)")
+    _retries = Parameter(key="retries", type=int, default=3, min=0, desc="Retry attempts")
+    _scale = Parameter(key="scale", type=float, default=1.0, desc="Scale factor applied to all read values")
+    # TCP / UDP
+    _host = Parameter(key="host", type=str, required=False, desc="Remote host (tcp/udp)")
+    _port = Parameter(key="port", type=int, required=False, default=502, min=1, max=65535, desc="Remote port (tcp/udp)")
+    # Serial
+    _com_port = Parameter(key="com_port", type=str, required=False, desc="Serial device path (e.g. /dev/ttyUSB0)")
+    _baudrate = Parameter(key="baudrate", type=int, required=False, desc="Baud rate (serial)")
+    _bytesize = Parameter(key="bytesize", type=int, required=False, default=8, desc="Byte size (serial)")
+    _stopbits = Parameter(key="stopbits", type=int, required=False, default=1, desc="Stop bits (serial)")
+    _parity = SelectParameter(["N", "E", "O"], key="parity", required=False, default="N", desc="Parity (serial)")
+
+    # Per-channel parameters
+    address = ChannelParameter(type=int, required=True, desc="Register start address (decimal or 0x hex)")
+    function = ChannelParameter(
+        type=str,
+        required=False,
+        default="holding_register",
+        choices=["holding_register", "input_register", "coil"],
+        desc="Modbus function code",
+    )
+    device = ChannelParameter(type=int, required=False, desc="Slave device ID (unit identifier)")
+    data_type = ChannelParameter(type=str, required=False, desc="Override data type (e.g. float32, int16, string)")
+
+    _protocol: str
+    _endian: Literal["big", "little"]
+    _timeout: int
+    _retries: int
+    _scale: float
+    _host: str
+    _port: int
+    _com_port: str
+    _baudrate: int
+    _bytesize: int
+    _stopbits: int
+    _parity: str
+
     __client: ModbusBaseSyncClient
     __registers: Mapping[str, ModbusRegister]
-
-    _endian: Literal["big", "little"]
 
     # noinspection SpellCheckingInspection
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        _endian = configs.get("endian", default="big").lower()
-        if _endian not in ["big", "little"]:
-            raise ConnectorError(self, f"Invalid modbus word order '{_endian}'")
-        self._endian = _endian
 
-        self._scale = configs.get_float("scale", default=1.0)
-
-        timeout = configs.get_int("timeout", default=3)
-        retries = configs.get_int("retries", default=3)
-
-        protocol = configs.get("protocol").lower()
-        if protocol == "tcp":
+        if self._protocol == "tcp":
             self.__client = ModbusTcpClient(
-                host=configs.get("host"),
-                port=configs.get_int("port", 502),
+                host=self._host,
+                port=self._port,
                 framer=FramerType.SOCKET,
-                timeout=timeout,
-                retries=retries,
+                timeout=self._timeout,
+                retries=self._retries,
                 # source_address=("localhost", 0),
             )
-        elif protocol == "udp":
+        elif self._protocol == "udp":
             self.__client = ModbusUdpClient(
-                host=configs.get("host"),
-                port=configs.get_int("port", 502),
+                host=self._host,
+                port=self._port,
                 framer=FramerType.SOCKET,
-                timeout=timeout,
-                retries=retries,
+                timeout=self._timeout,
+                retries=self._retries,
                 # source_address=None,
             )
-        elif protocol in ["rtu", "serial"]:
+        elif self._protocol == "rtu":
             self.__client = ModbusSerialClient(
-                port=configs.get("port"),
+                port=self._com_port,
                 framer=FramerType.RTU,
-                timeout=timeout,
-                retries=retries,
-                baudrate=configs.get_int("baudrate"),
-                bytesize=configs.get_int("bytesize", default=8),
-                stopbits=configs.get_int("stopbits", default=1),
-                parity=configs.get("parity", default="N"),
+                timeout=self._timeout,
+                retries=self._retries,
+                baudrate=self._baudrate,
+                bytesize=self._bytesize,
+                stopbits=self._stopbits,
+                parity=self._parity,
                 # handle_local_echo=False,
             )
         else:
-            raise ConnectorError(self, f"Unknown modbus protocol type '{protocol}'")
+            raise ConnectorError(self, f"Unknown modbus protocol type '{self._protocol}'")
 
     # noinspection PyUnresolvedReferences
     def is_connected(self) -> bool:

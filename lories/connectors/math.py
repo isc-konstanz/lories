@@ -18,6 +18,7 @@ import pandas as pd
 import pytz as tz
 from lories.connectors import Connector, register_connector_type
 from lories.core import ConfigurationError
+from lories.core.configs.parameters import ChannelParameter, ParameterGroup
 from lories.data import Channel, DataContext
 from lories.typing import Resource, Resources
 from lories.util import get_context, to_bool
@@ -26,6 +27,18 @@ from lories.util import get_context, to_bool
 # noinspection SpellCheckingInspection
 @register_connector_type("math")
 class MathConnector(Connector):
+    _mapping = ParameterGroup(key="mapping", required=False, desc="Symbol-to-channel mapping")
+
+    # Per-channel parameters
+    expression = ChannelParameter(
+        type=str, required=False, desc="Math expression (sympy syntax); also accepted as 'expr' or 'math'"
+    )
+    mapping = ChannelParameter(type=None, required=False, default={}, desc="Per-channel symbol-to-channel mapping")
+    listen = ChannelParameter(type=str, required=False, desc="Channel ID whose updates trigger re-evaluation")
+    listener = ChannelParameter(
+        type=bool, required=False, desc="Register as listener (default: True when 'listen' is set)"
+    )
+
     _exprs: Dict[str, ChannelExpr]
 
     def connect(self, resources: Resources) -> None:

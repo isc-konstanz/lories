@@ -18,16 +18,24 @@ import pandas as pd
 import pytz as tz
 from lories._core import ChannelState  # noqa
 from lories.connectors import Connector, register_connector_type
+from lories.core.configs.parameters import ChannelParameter, Parameter
 from lories.data import Channel
 from lories.typing import Configurations, Resources
 
 
 @register_connector_type("opc", "opcua")
 class OpcUaConnector(Connector):
-    _host: str
-    _port: int
-    _timeout: int
-    _settings: List[str]
+    _host = Parameter(key="host", type=str, default="127.0.0.1", desc="OPC UA server host")
+    _port = Parameter(key="port", type=int, default=4840, min=1, max=65535, desc="OPC UA server port")
+    _timeout = Parameter(key="timeout", type=int, default=60, desc="Connection timeout (s)")
+    _settings = Parameter(
+        key="settings", type=List[str], default=[], desc="Extra OPC UA node-id prefixes (e.g. 'ns=2')"
+    )
+    _username = Parameter(key="username", type=str, required=False, desc="Optional username for authentication")
+    _password = Parameter(key="password", type=str, required=False, desc="Optional password for authentication")
+
+    # Per-channel parameters
+    address = ChannelParameter(type=str, required=False, desc="OPC UA node string identifier (defaults to channel id)")
 
     _client: Optional[opcua.Client]
     _nodes: Dict[str, opcua.Node]
@@ -40,28 +48,16 @@ class OpcUaConnector(Connector):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        self._host = configs.get("host", default="127.0.0.1")
-        self._port = configs.get_int("port", default=4840)
-        self._timeout = configs.get_int("timeout", default=60)
-
-        settings = configs.get("settings", default="").split(",")
-        self._settings = [s.strip() for s in settings]
-
         self._client = opcua.Client(
             f"opc.tcp://{self._host}:{self._port}",
             timeout=self._timeout,
         )
 
-        username = configs.get("username")
-        password = configs.get("password")
-
-        if username and password:
-            self._client.set_user(configs.get("username"))
-            self._client.set_password(configs.get("password"))
-        elif username or password:
-            self._logger.warning(
-                "Only one of 'username' or 'password' provided. " "Both are required for authentication."
-            )
+        if self._username and self._password:
+            self._client.set_user(self._username)
+            self._client.set_password(self._password)
+        elif self._username or self._password:
+            self._logger.warning("Only one of 'username' or 'password' provided. Both are required for authentication.")
 
         # Disable all log messages from the 'opcua' logger
         logging.getLogger("opcua").setLevel(logging.CRITICAL)

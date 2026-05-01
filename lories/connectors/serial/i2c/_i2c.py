@@ -11,6 +11,7 @@ from typing import List, Optional
 
 from lories.connectors import ConnectionError, Connector
 from lories.core import Configurations
+from lories.core.configs.parameters import Parameter
 from lories.typing import Resources
 
 try:
@@ -42,6 +43,8 @@ except (ImportError, OSError):
 
 # noinspection PyAbstractClass
 class _I2CConnector(Connector):
+    _port = Parameter(key="port", type=int, default=1, desc="I2C bus number (e.g. 1 for /dev/i2c-1)")
+
     _bus: Optional[SMBus]
     _bus_number: int
     _port: int
@@ -50,7 +53,6 @@ class _I2CConnector(Connector):
         super().configure(configs)
 
         self._bus = None
-        self._port = configs.get_int("port", default=1)
 
     def connect(self, resources: Resources) -> None:
         try:

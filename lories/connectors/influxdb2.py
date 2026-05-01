@@ -19,7 +19,7 @@ from urllib3.exceptions import HTTPError, NewConnectionError
 
 import pandas as pd
 from lories.connectors import ConnectionError, Database, DatabaseError, register_connector_type
-from lories.core.configs import ConfigurationError
+from lories.core.configs.parameters import ChannelParameter, Parameter
 from lories.data.util import hash_value
 from lories.typing import Configurations, Resource, Resources, Timestamp
 
@@ -33,6 +33,21 @@ except ImportError:
 
 @register_connector_type("influxdb2", "influxdb_v2")
 class InfluxDB2(Database):
+    _host = Parameter(key="host", type=str, default="localhost", desc="InfluxDB host")
+    _port = Parameter(key="port", type=int, default=8086, min=1, max=65535, desc="InfluxDB port")
+    _org = Parameter(key="org", type=str, desc="Organisation name")
+    _bucket = Parameter(key="bucket", type=str, desc="Bucket name")
+    _token = Parameter(key="token", type=str, desc="API token")
+    _timeout = Parameter(key="timeout", type=float, default=10.0, min=0.0, desc="Request timeout (s)")
+    _ssl = Parameter(key="ssl", type=bool, default=False, desc="Use HTTPS")
+    _ssl_verify = Parameter(key="ssl_verify", type=bool, default=True, desc="Verify SSL certificate")
+
+    # Per-channel parameters
+    measurement = ChannelParameter(
+        type=str, required=False, desc="InfluxDB measurement name (defaults to the channel group)"
+    )
+    tag = ChannelParameter(type=str, required=False, desc="Optional tag key for grouping fields within a measurement")
+
     host: str
     port: int
 
@@ -49,41 +64,26 @@ class InfluxDB2(Database):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        self.host = configs.get("host", default="localhost")
-        self.port = configs.get_int("port", default=8086)
-
-        self.org = configs.get("org")
-        if self.org is None:
-            raise ConfigurationError("Missing 'org' for InfluxDB connector")
-
-        self.bucket = configs.get("bucket")
-        if self.bucket is None:
-            raise ConfigurationError("Missing 'bucket' for InfluxDB connector")
-
-        self.token = configs.get("token")
-        if self.token is None:
-            raise ConfigurationError("Missing 'token' for InfluxDB connector")
-
-        # In seconds
-        self.timeout = int(configs.get_float("timeout", default=10) * 1000)
+        # In milliseconds
+        self._timeout = int(self._timeout * 1000)
 
         # TODO: Determine SSL usage from certificate availability
-        self.ssl = configs.get_bool("ssl", default=False)
-        self.ssl_verify = configs.get_bool("ssl_verify", default=True)
+        self._ssl = self._ssl
+        self._ssl_verify = self._ssl_verify
 
     def connect(self, resources: Resources) -> None:
-        self._logger.debug(f"Connecting to InfluxDB ({self.host}:{self.port}) at {self.bucket}")
+        self._logger.debug(f"Connecting to InfluxDB ({self._host}:{self._port}) at {self._bucket}")
 
         ssl = {
-            "verify_ssl": self.ssl_verify,
+            "verify_ssl": self._ssl_verify,
         }
-        url = f"{'https' if self.ssl else 'http'}://{self.host}:{self.port}"
+        url = f"{'https' if self._ssl else 'http'}://{self._host}:{self._port}"
 
         self._client = InfluxDBClient(
             url=url,
-            org=self.org,
-            token=self.token,
-            timeout=self.timeout,
+            org=self._org,
+            token=self._token,
+            timeout=self._timeout,
             debug=self._logger.getEffectiveLevel() <= logging.DEBUG,
             **ssl,
         )
@@ -92,11 +92,11 @@ class InfluxDB2(Database):
         buckets_api = self._client.buckets_api()
         try:
             existing_buckets = [b.name for b in buckets_api.find_buckets().buckets]
-            if self.bucket not in existing_buckets:
-                self._logger.info(f"InfluxDB Bucket doesn't exist. Creating Bucket {self.bucket}")
+            if self._bucket not in existing_buckets:
+                self._logger.info(f"InfluxDB Bucket doesn't exist. Creating Bucket {self._bucket}")
                 # TODO: Configure retention from channel attributes
                 retention = BucketRetentionRules(every_seconds=0)  # 0 means infinite retention
-                buckets_api.create_bucket(bucket_name=self.bucket, retention_rules=retention)
+                buckets_api.create_bucket(bucket_name=self._bucket, retention_rules=retention)
 
         except (ApiException, InfluxDBError, HTTPError) as e:
             self._raise(e)
@@ -336,7 +336,7 @@ class InfluxDB2(Database):
                 try:
                     tagged_data = tagged_data.rename(columns={r.id: _get_field(r) for r in tagged_resources})
                     write_api.write(
-                        bucket=self.bucket,
+                        bucket=self._bucket,
                         record=tagged_data,
                         data_frame_measurement_name=measurement,
                         data_frame_tag_columns=["tag"] if tag is not None else None,
@@ -365,8 +365,8 @@ class InfluxDB2(Database):
                         start=start,
                         stop=end,
                         predicate=predicate,
-                        bucket=self.bucket,
-                        org=self.org,
+                        bucket=self._bucket,
+                        org=self._org,
                     )
                 except (ApiException, InfluxDBError, HTTPError) as e:
                     self._raise(e)
@@ -382,7 +382,7 @@ class InfluxDB2(Database):
         if measurement is None:
             raise DatabaseError(self, f"Measurement is None for following resources: {resources}")
         query = f"""
-            from(bucket: "{self.bucket}")
+            from(bucket: "{self._bucket}")
                 |> range(start: {start}, stop: {end})
                 |> filter(fn: (r) => r["_measurement"] == "{measurement}")
                 |> filter(fn: (r) => {" or ".join([f'r["_field"] == "{_get_field(r)}"' for r in resources])})
@@ -407,14 +407,14 @@ class InfluxDB2(Database):
     def _get_vars(self) -> Dict[str, Any]:
         vars = super()._get_vars()
         if self.is_configured():
-            vars["host"] = self.host
-            vars["port"] = self.port
-            vars["org"] = self.org
-            vars["bucket"] = self.bucket
-            vars["token"] = f"...{self.token[-6:]}"
-            vars["ssl"] = self.ssl_verify
-            vars["ssl_verify"] = self.ssl_verify
-            vars["timeout"] = self.timeout
+            vars["host"] = self._host
+            vars["port"] = self._port
+            vars["org"] = self._org
+            vars["bucket"] = self._bucket
+            vars["token"] = f"...{self._token[-6:]}"
+            vars["ssl"] = self._ssl_verify
+            vars["ssl_verify"] = self._ssl_verify
+            vars["timeout"] = self._timeout
         return vars
 
     def _raise(self, e: Exception):
