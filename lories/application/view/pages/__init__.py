@@ -27,6 +27,9 @@ from .components import (  # noqa: F401
     ComponentGroup,
 )
 
+from . import connectors  # noqa: F401
+from .connectors import ConnectorPage  # noqa: F401
+
 from .header import PageHeader  # noqa: F401
 from .footer import PageFooter  # noqa: F401
 
@@ -39,8 +42,11 @@ from .view import (  # noqa: F401
     registry,
 )
 
+from .components import weather  # noqa: F401
+from .components.weather import WeatherPage  # noqa: F401
+
 from .components import system  # noqa: F401
 from .components.system import SystemPage  # noqa: F401
 
-from .components import weather  # noqa: F401
-from .components.weather import WeatherPage  # noqa: F401
+from . import docs  # noqa: F401
+from .docs import DocsPage  # noqa: F401
