@@ -20,6 +20,8 @@ from .parameters import (  # noqa: F401
     _Parameter,
     Parameter,
     ParameterGroup,
+    ComponentParameter,
+    ConnectorParameter,
 )
 
 from .configurations import Configurations  # noqa: F401
