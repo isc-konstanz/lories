@@ -194,3 +194,22 @@ class BytesConverter(Converter[bytes]):
         elif isinstance(value, str):
             return value.encode()
         return None
+
+
+# noinspection PyMethodMayBeStatic
+class ListConverter(Converter[list]):
+    dtype: Type[list] = list
+
+    def is_dtype(self, value: Any) -> bool:
+        return isinstance(value, list)
+
+    def to_dtype(self, value: Any, **_) -> Optional[list]:
+        if value is None:
+            return None
+        if isinstance(value, list):
+            return value
+        if isinstance(value, str):
+            return json.loads(value)
+        if isinstance(value, tuple) or hasattr(value, "tolist"):
+            return list(value.tolist()) if hasattr(value, "tolist") else list(value)
+        return list(value)

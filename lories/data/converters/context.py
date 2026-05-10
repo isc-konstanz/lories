@@ -20,6 +20,7 @@ from lories.data.converters.converter import (
     DatetimeConverter,
     FloatConverter,
     IntConverter,
+    ListConverter,
     StringConverter,
     TimestampConverter,
 )
@@ -32,6 +33,7 @@ CONVERTERS_BUILTINS = [
     IntConverter,
     BoolConverter,
     BytesConverter,
+    ListConverter,
 ]
 
 registry = Registry[Converter]()
@@ -42,6 +44,7 @@ registry.register(FloatConverter, "float")
 registry.register(IntConverter, "int", "integer")
 registry.register(BoolConverter, "bool", "boolean")
 registry.register(BytesConverter, "byte", "bytes")
+registry.register(ListConverter, "list")
 
 
 def register_converter_type(
