@@ -9,7 +9,6 @@ from typing import Any, Dict, Optional
 
 import pandas as pd
 from lories.connectors.cameras._core import _CameraConnector
-from lories.connectors.cameras.motion import MotionDetector
 from lories.connectors.cameras.stream import CameraStream, CameraStreamUnavailableError
 from lories.data import Channel
 from lories.typing import Resources
@@ -54,16 +53,10 @@ class CameraConnector(_CameraConnector):
 
         stream_configs = self.configs.get_member(CameraStream.TYPE, defaults={})
         stream_channels = resources.filter(self._is_streaming)
-        stream_callbacks = []
-
-        motion = MotionDetector(resources.filter(lambda c: to_bool(c.get("motion_detection", default=False))))
-        motion.configure(stream_configs.get_member(MotionDetector.TYPE, defaults={}))
-        if motion.is_enabled():
-            stream_callbacks.append(motion)
 
         self.__streaming = len(stream_channels) > 0
         if self.__streaming:
-            self._stream = CameraStream(self, stream_channels, stream_configs, stream_callbacks, motion)
+            self._stream = CameraStream(self, stream_channels, stream_configs)
             self._stream.configure(stream_configs)
             self._stream.start()
 

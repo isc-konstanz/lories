@@ -7,15 +7,12 @@ lories.connectors.cameras.stream
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from multiprocessing.shared_memory import SharedMemory
 from multiprocessing.synchronize import Event as EventType
 from threading import Thread
 from time import sleep, time
-from typing import List, Optional
 
 from lories.connectors.cameras._core import _CameraConnector as CameraConnector
-from lories.connectors.cameras.motion import MotionDetector
 from lories.connectors.errors import ConnectorError
 from lories.connectors.tasks.process import ProcessContext
 from lories.core import Configurations, Configurator, ResourceUnavailableError
@@ -28,7 +25,6 @@ class CameraStream(Configurator, Thread):
     __context: ProcessContext
     __channels: Channels
     __connector: CameraConnector
-    __callbacks: List[Callable[[bytes],]]
 
     __trigger: EventType
     __interrupt: EventType
@@ -36,16 +32,12 @@ class CameraStream(Configurator, Thread):
     _memory: SharedMemory
     _buffer: memoryview
 
-    motion: Optional[MotionDetector] = None
-
     # noinspection PyProtectedMember
     def __init__(
         self,
         connector: CameraConnector,
         channels: Channels,
         configs: Configurations,
-        callbacks: List[Callable[[bytes],]] = (),
-        motion: Optional[MotionDetector] = None,
     ):
         super().__init__(configs, name=f"{connector.id}.stream", target=self.__stream, args=(channels,), daemon=True)
         _process = ProcessContext(configs=configs)
@@ -53,16 +45,14 @@ class CameraStream(Configurator, Thread):
         self.__context = _process
         self.__channels = channels
         self.__connector = connector
-        self.__callbacks = callbacks
         self.__interrupt = _manager.Event()
         self.__trigger = _manager.Event()
+        # Frames the subprocess has written to shared memory. Compared against
+        # the main thread's local consumed counter to surface the drop rate.
+        self.__produced = _manager.Value("i", 0)
 
         self._memory = SharedMemory(create=True, size=CameraConnector.SIZE + 4)
         self._buffer = self._memory.buf
-        self.motion = motion
-
-    def has_motion_detection(self) -> bool:
-        return self.motion is not None and self.motion.is_enabled()
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
@@ -74,7 +64,15 @@ class CameraStream(Configurator, Thread):
         _channels = self.__channels.duplicate(context=self.__context)
 
         self.__context.activate()
-        self.__context._submit(_stream, _camera, _channels, self.__trigger, self.__interrupt, self._memory.name)
+        self.__context._submit(
+            _stream,
+            _camera,
+            _channels,
+            self.__trigger,
+            self.__interrupt,
+            self._memory.name,
+            self.__produced,
+        )
         super().start()
 
     def stop(self) -> None:
@@ -87,6 +85,10 @@ class CameraStream(Configurator, Thread):
         self._memory.unlink()
 
     def __stream(self, channels: Channels) -> None:
+        consumed = 0
+        last_report = time()
+        last_produced = 0
+        last_consumed = 0
         while not self.__interrupt.is_set():
             self.__trigger.wait(1)
 
@@ -98,9 +100,24 @@ class CameraStream(Configurator, Thread):
             data = bytes(self._buffer[4 : 4 + length])
             for channel in channels:
                 channel.value = data
-            for callback in self.__callbacks:
-                callback(data)
             self.__trigger.clear()
+            consumed += 1
+
+            now = time()
+            if now - last_report >= 5.0:
+                produced = int(self.__produced.value)
+                dp = produced - last_produced
+                dc = consumed - last_consumed
+                drop = (dp - dc) / dp if dp > 0 else 0.0
+                self._logger.debug(
+                    f"stream {self.__connector.id}: "
+                    f"produced={dp / (now - last_report):.1f}/s "
+                    f"consumed={dc / (now - last_report):.1f}/s "
+                    f"dropped={drop:.0%}"
+                )
+                last_report = now
+                last_produced = produced
+                last_consumed = consumed
 
 
 def _stream(
@@ -109,9 +126,15 @@ def _stream(
     trigger: EventType,
     interrupt: EventType,
     memory_name: str,
+    produced,
     fps: int = 30,
 ) -> None:
     camera.connect(channels)
+
+    # All streaming channels on a camera share the same RTSP capture; we
+    # read one frame per cycle and the main-process __stream loop fans it
+    # out to every channel. Pick any channel as the read source.
+    source = next(iter(channels))
 
     memory = SharedMemory(name=memory_name)
     buffer = memory.buf
@@ -122,11 +145,12 @@ def _stream(
                 interrupt.set()
                 return
 
-            payload = camera.read_frame(*channels)
+            payload = camera.read_frame(source)
             length = len(payload)
             buffer[0:4] = length.to_bytes(4, "little")
             buffer[4 : 4 + length] = payload
             trigger.set()
+            produced.value += 1
 
             sleep_seconds = (1 / fps) - (time() - now)
             if sleep_seconds > 0:

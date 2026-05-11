@@ -6,8 +6,6 @@ lories.connectors.cameras
 
 """
 
-from .motion import MotionDetector  # noqa: F401
-
 from .camera import CameraConnector  # noqa: F401
 
 from .stream import (  # noqa: F401
