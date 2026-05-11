@@ -14,6 +14,7 @@ from .integer import IntParameter  # noqa: F401
 from .float import FloatParameter  # noqa: F401
 from .bool import BoolParameter  # noqa: F401
 from .date import DateParameter  # noqa: F401
+from .duration import DurationParameter  # noqa: F401
 from .list import ListParameter  # noqa: F401
 from .custom import CustomParameter  # noqa: F401
 from .select import SelectParameter  # noqa: F401

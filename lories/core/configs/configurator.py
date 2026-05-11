@@ -109,6 +109,10 @@ class _WarnOnGetConfigurations:
         self._check_key(key)
         return object.__getattribute__(self, "_configs").get_date(key, default, **kwargs)
 
+    def get_duration(self, key: str, default=None):
+        self._check_key(key)
+        return object.__getattribute__(self, "_configs").get_duration(key, default)
+
     def get_member(self, key: str, defaults=None, ensure_exists: bool = False):
         _configs = object.__getattribute__(self, "_configs")
         _param_map = object.__getattribute__(self, "_param_map")
