@@ -13,6 +13,7 @@ from typing import AnyStr, Optional
 import serial
 from serial import SerialException
 
+import pandas as pd
 from lories.connectors import ConnectionError, Connector
 from lories.core import Configurations, Resources
 from lories.core.configs.parameters import Parameter, SelectParameter
@@ -38,7 +39,7 @@ class _SerialConnector(Connector):
         desc="Parity setting",
     )
     _stopbits = Parameter(key="stopbits", type=int, default=serial.STOPBITS_ONE, desc="Number of stop bits")
-    _timeout = Parameter(key="timeout", type=float, default=3.0, desc="Read timeout (s)")
+    _timeout = Parameter(key="timeout", type=pd.Timedelta, default="3s", desc="Read timeout")
     _xonxoff = Parameter(key="xonxoff", type=bool, default=False, desc="Enable software flow control")
     _rtscts = Parameter(key="rtscts", type=bool, default=False, desc="Enable RTS/CTS hardware flow control")
     _dsrdtr = Parameter(key="dsrdtr", type=bool, default=False, desc="Enable DSR/DTR hardware flow control")
@@ -52,7 +53,7 @@ class _SerialConnector(Connector):
             bytesize=self._bytesize,
             parity=self._parity,
             stopbits=self._stopbits,
-            timeout=self._timeout,
+            timeout=self._timeout.total_seconds(),
             xonxoff=self._xonxoff,
             rtscts=self._rtscts,
             dsrdtr=self._dsrdtr,

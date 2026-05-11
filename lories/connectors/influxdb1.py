@@ -45,7 +45,7 @@ class InfluxDB1(Database):
     _user = Parameter(key="user", type=str, default="admin", desc="Username")
     _password = Parameter(key="password", type=str, default="admin", desc="Password")
     _database = Parameter(key="database", type=str, default="lories", desc="Database name")
-    _timeout = Parameter(key="timeout", type=int, default=10, min=1, desc="Request timeout (s)")
+    _timeout = Parameter(key="timeout", type=pd.Timedelta, default="10s", min="1s", desc="Request timeout")
 
     # Per-channel parameters
     measurement = ChannelParameter(
@@ -60,7 +60,7 @@ class InfluxDB1(Database):
     password: str
     database: str
 
-    timeout: int
+    timeout: pd.Timedelta
 
     _client: Optional[InfluxDBClient] = None
 
@@ -73,7 +73,7 @@ class InfluxDB1(Database):
             username=self._user,
             password=self._password,
             database=self._database,
-            timeout=self._timeout,
+            timeout=self._timeout.total_seconds(),
         )
 
         # Check if database exists and create it if not

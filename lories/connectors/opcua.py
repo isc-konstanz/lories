@@ -35,7 +35,7 @@ class OpcUaConnector(Connector):
 
     _host = Parameter(key="host", type=str, default="127.0.0.1", desc="OPC UA server host")
     _port = Parameter(key="port", type=int, default=4840, min=1, max=65535, desc="OPC UA server port")
-    _timeout = Parameter(key="timeout", type=int, default=60, desc="Connection timeout (s)")
+    _timeout = Parameter(key="timeout", type=pd.Timedelta, default="60s", desc="Connection timeout")
     _settings = Parameter(
         key="settings", type=List[str], default=[], desc="Extra OPC UA node-id prefixes (e.g. 'ns=2')"
     )
@@ -58,7 +58,7 @@ class OpcUaConnector(Connector):
 
         self._client = opcua.Client(
             f"opc.tcp://{self._host}:{self._port}",
-            timeout=self._timeout,
+            timeout=self._timeout.total_seconds(),
         )
 
         if self._username and self._password:

@@ -36,7 +36,7 @@ class MqttConnector(Connector):
         ["tcp", "websockets", "unix"], key="transport", default="tcp", desc="Transport protocol"
     )
     _clean_session = Parameter(key="clean_session", type=bool, default=True, desc="MQTT clean session flag")
-    _timeout = Parameter(key="timeout", type=int, default=60, min=1, desc="Connection timeout (s)")
+    _timeout = Parameter(key="timeout", type=pd.Timedelta, default="60s", min="1s", desc="Connection keepalive")
     _username = Parameter(key="username", type=str, required=False, desc="MQTT username (optional auth)")
     _password = Parameter(key="password", type=str, required=False, desc="MQTT password (optional auth)")
 
@@ -46,7 +46,7 @@ class MqttConnector(Connector):
     _port: int
     _transport: str
     _clean_session: bool
-    _timeout: int
+    _timeout: pd.Timedelta
     _username: Optional[str]
     _password: Optional[str]
 
@@ -89,7 +89,7 @@ class MqttConnector(Connector):
         return self._client is not None and self._client.is_connected()
 
     def connect(self, resources: Resources) -> None:
-        self._client.connect(self._host, self._port, self._timeout)
+        self._client.connect(self._host, self._port, int(self._timeout.total_seconds()))
 
         channels = resources.filter(lambda r: isinstance(r, Channel))
         for topic, topic_channels in channels.groupby("topic"):

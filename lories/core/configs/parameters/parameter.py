@@ -19,6 +19,7 @@ from lories.core.configs.parameters.base import _UNSET, _TypedParameter  # noqa:
 from lories.core.configs.parameters.bool import BoolParameter
 from lories.core.configs.parameters.custom import CustomParameter
 from lories.core.configs.parameters.date import DateParameter
+from lories.core.configs.parameters.duration import DurationParameter
 from lories.core.configs.parameters.float import FloatParameter
 from lories.core.configs.parameters.integer import IntParameter
 from lories.core.configs.parameters.list import ListParameter  # noqa: F401
@@ -33,6 +34,7 @@ _TYPE_MAP: dict = {
     float: FloatParameter,
     bool: BoolParameter,
     pd.Timestamp: DateParameter,
+    pd.Timedelta: DurationParameter,
 }
 
 _COMMON = ("key", "default", "required", "desc", "choices", "validator")
@@ -104,7 +106,7 @@ def Parameter(
 
     cls = _TYPE_MAP.get(type)
 
-    if cls in (IntParameter, FloatParameter):
+    if cls in (IntParameter, FloatParameter, DurationParameter):
         return cls(**_common, min=min, max=max, **kwargs)
 
     if cls is not None:
