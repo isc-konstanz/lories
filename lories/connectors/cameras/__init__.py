@@ -14,5 +14,9 @@ from .stream import (  # noqa: F401
     CameraStreamUnavailableError,
 )
 
-from . import opencv  # noqa: F401
-from .opencv import OpenCV  # noqa: F401
+try:
+    from . import opencv  # noqa: F401
+    from .opencv import OpenCV  # noqa: F401
+except ImportError:
+    # opencv-python is an optional dependency
+    pass

@@ -87,7 +87,7 @@ class OpenCV(CameraConnector):
 
     def disconnect(self) -> None:
         super().disconnect()
-        for address in self._captures.keys():
+        for address in list(self._captures.keys()):
             capture = self._captures.pop(address)
             self._disconnect(capture)
 

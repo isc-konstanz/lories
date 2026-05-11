@@ -77,6 +77,9 @@ mqtt = [
 revpi = [
     "revpimodio2",
 ]
+cameras = [
+    "opencv-python ~= 4.12",
+]
 dash = [
     "dash",
     "dash-auth",
