@@ -138,6 +138,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# LLM
+.claude/
+
 # Root libraries
 !/lib
 

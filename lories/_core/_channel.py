@@ -180,7 +180,7 @@ class _Channel(_Resource):
         return configs
 
     @staticmethod
-    def _build_member(configs: Optional[Dict[str, Any] | str], key: str) -> Optional[Dict[str, Any]]:
+    def _build_member(configs: Optional[Dict[str, Any] | str], key: str) -> Dict[str, Any]:
         if isinstance(configs, str) or configs is None:
             return {key: configs}
         elif not isinstance(configs, Mapping):

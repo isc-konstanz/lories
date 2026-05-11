@@ -20,6 +20,10 @@ class _Constant(ABC, str):
 
     @property
     @abstractmethod
+    def id(self) -> str: ...
+
+    @property
+    @abstractmethod
     def key(self) -> str: ...
 
     @property

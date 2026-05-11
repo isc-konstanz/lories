@@ -239,7 +239,7 @@ class Channel(_Channel, Resource):
         start: Optional[Timestamp] = None,
         end: Optional[Timestamp] = None,
     ) -> pd.DataFrame:
-        return self._context.read(self.to_list(), start, end)
+        return self._context.read(self.to_list(), start=start, end=end)
 
     # noinspection PyUnresolvedReferences
     def write(self, data: pd.DataFrame | pd.Series | Any) -> None:

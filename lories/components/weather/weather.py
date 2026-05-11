@@ -73,6 +73,7 @@ class Weather(Component, metaclass=WeatherMeta):
     CLOUDS_LOW = Constant(float, "clouds_low", "Low Cloud Cover", "%")
     CLOUDS_MID = Constant(float, "clouds_mid", "Medium Cloud Cover", "%")
     CLOUDS_HIGH = Constant(float, "clouds_high", "High Cloud Cover", "%")
+    CLEAR_SKY_INDEX = Constant(float, "clear_sky_index", "Clear Sky Index", "-")
     SUNSHINE = Constant(int, "sunshine", "Sunshine Duration", "min")
     VISIBILITY = Constant(int, "visibility", "Visibility", "m")
     PRECIPITATION = Constant(float, "precipitation", "Precipitation", "mm")

@@ -30,10 +30,11 @@ def write(
 ) -> None:
     if data.dropna(axis="index", how="all").dropna(axis="columns", how="all").empty:
         return None
-    if isinstance(data.index, pd.DatetimeIndex):
-        data.index = data.index.tz_localize(None)
     if data.index.name is not None:
         data.index.name = data.index.name.title()
+    if isinstance(data.index, pd.DatetimeIndex):
+        data.index.name = f"Timestamp [{str(data.index.tz)}]"
+        data.index = data.index.tz_localize(None)
     if index is None:
         index = len(data.index) > 1
 

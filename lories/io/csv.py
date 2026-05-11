@@ -193,12 +193,12 @@ def write_files(
     elif data.index.tzinfo != timezone:
         data.index = data.index.tz_convert(timezone)
 
-    time_step = floor_date(data.index[0], freq=freq)
+    time_step = floor_date(data.index[0], timezone=timezone, freq=freq)
 
     def next_step() -> pd.Timestamp:
         return floor_date(time_step + to_timedelta(freq), timezone=timezone, freq=freq)
 
-    while time_step < data.index[-1]:
+    while time_step <= data.index[-1]:
         time_next = next_step()
 
         file = time_step.strftime(format) + ".csv"
@@ -228,7 +228,7 @@ def write_file(
     elif data.index.tzinfo != timezone:
         data.index = data.index.tz_convert(timezone)
 
-    if not override and os.path.isfile(path):
+    if not override and os.path.isfile(path) and os.path.getsize(path) > 0:
         index = data.index.name
         csv = read_file(
             path,
@@ -236,7 +236,7 @@ def write_file(
             timezone=timezone,
             separator=separator,
             decimal=decimal,
-            rename={column: name for name, column in rename.items()} if not None else None,
+            rename={column: name for name, column in rename.items()} if rename is not None else None,
             encoding=encoding,
         )
 

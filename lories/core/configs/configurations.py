@@ -151,11 +151,12 @@ class Configurations(_Configurations):
     def get(self, key: str | Iterable[str], default: Any = None) -> Any:
         if not isinstance(key, Iterable) or isinstance(key, str):
             return self._get(key, default)
-        return {
+        configs = {
             k: self._get(k, default=default[k] if default is not None and isinstance(default, Mapping) else None)
             for k in key
             if k in self
         }
+        return Configurations(self.name, self.__dirs.copy(), configs)
 
     def get_bool(self, key: str, default: bool = None) -> bool:
         return to_bool(self._get(key, default))
@@ -316,19 +317,21 @@ class Configurations(_Configurations):
         keys: Collection[str],
         ensure_exists: bool = False,
     ) -> Configurations:
-        member = {
+        members = {
             s: self.get_member(s, defaults={}, ensure_exists=ensure_exists)
             for s in keys
             if s in self.members or ensure_exists
         }
         member_dirs = self.__dirs.copy()
         member_dirs.conf = self._members_dir
-        return Configurations(self.name, member_dirs, member)
+        return Configurations(self.name, member_dirs, members)
 
     def get_member(
         self,
         key: str,
         defaults: Optional[Mapping[str, Any]] = None,
+        include: Optional[Collection[str]] = None,
+        exclude: Optional[Collection[str]] = None,
         ensure_exists: bool = False,
     ) -> Configurations:
         if not self.has_member(key) and ensure_exists:
@@ -343,6 +346,10 @@ class Configurations(_Configurations):
                 self[key] = configs = self._create_member(key, {"enabled": configs})
             if defaults is not None:
                 configs.update(defaults, replace=False)
+            if include is not None:
+                return configs.get(k for k in configs.keys() if k in include)
+            if exclude is not None:
+                return configs.get(k for k in configs.keys() if k not in exclude)
             return configs
 
         elif defaults is not None:
