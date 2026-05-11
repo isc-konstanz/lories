@@ -17,8 +17,8 @@ from urllib3.exceptions import HTTPError, NewConnectionError
 
 import pandas as pd
 from lories.connectors import ConnectionError, Database, DatabaseError, register_connector_type
-from lories.core.configs import ConfigurationError
-from lories.typing import Configurations, Resource, Resources, Timestamp
+from lories.core.configs.parameters import ChannelParameter, Parameter
+from lories.typing import Resource, Resources, Timestamp
 
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="influxdb.*")
 
@@ -32,6 +32,27 @@ except ImportError:
 
 @register_connector_type("influxdb1", "influxdb_v1")
 class InfluxDB1(Database):
+    """
+    InfluxDB 1.x is an open-source time-series database optimized for high-throughput ingestion and real-time
+    querying of timestamped data using the InfluxQL query language. It provides built-in retention policies and
+    continuous queries for automatic data management. However, InfluxDB 1.x lacks native multi-tenancy, uses a
+    custom authentication model without token-based access, and its storage engine can become resource-intensive
+    under high cardinality workloads.
+    """
+
+    _host = Parameter(key="host", type=str, default="localhost", desc="InfluxDB host")
+    _port = Parameter(key="port", type=int, default=8086, min=1, max=65535, desc="InfluxDB port")
+    _user = Parameter(key="user", type=str, default="admin", desc="Username")
+    _password = Parameter(key="password", type=str, default="admin", desc="Password")
+    _database = Parameter(key="database", type=str, default="lories", desc="Database name")
+    _timeout = Parameter(key="timeout", type=pd.Timedelta, default="10s", min="1s", desc="Request timeout")
+
+    # Per-channel parameters
+    measurement = ChannelParameter(
+        type=str, required=False, desc="InfluxDB measurement name (defaults to the channel group)"
+    )
+    tag = ChannelParameter(type=str, required=False, desc="Optional tag key for grouping fields within a measurement")
+
     host: str
     port: int
 
@@ -39,45 +60,27 @@ class InfluxDB1(Database):
     password: str
     database: str
 
-    timeout: int
+    timeout: pd.Timedelta
 
     _client: Optional[InfluxDBClient] = None
 
-    def configure(self, configs: Configurations) -> None:
-        super().configure(configs)
-
-        self.host = configs.get("host", default="localhost")
-        self.port = configs.get_int("port", default=8086)
-
-        self.user = configs.get("user", default="admin")
-        self.password = configs.get("password", default="admin")
-        if self.user is None or self.password is None:
-            raise ConfigurationError("Missing 'user' or 'password' for InfluxDB connector")
-
-        self.database = configs.get("database", default="lories")
-        if self.database is None:
-            raise ConfigurationError("Missing 'database' for InfluxDB connector")
-
-        # In seconds
-        self.timeout = configs.get_int("timeout", default=10)
-
     def connect(self, resources: Resources) -> None:
-        self._logger.debug(f"Connecting to InfluxDB v1 ({self.host}:{self.port}) at {self.database}")
+        self._logger.debug(f"Connecting to InfluxDB v1 ({self._host}:{self._port}) at {self._database}")
 
         self._client = InfluxDBClient(
-            host=self.host,
-            port=self.port,
-            username=self.user,
-            password=self.password,
-            database=self.database,
-            timeout=self.timeout,
+            host=self._host,
+            port=self._port,
+            username=self._user,
+            password=self._password,
+            database=self._database,
+            timeout=self._timeout.total_seconds(),
         )
 
         # Check if database exists and create it if not
         databases = [database["name"] for database in self._client.get_list_database()]
-        if self.database not in databases:
-            self._logger.info(f"Creating InfluxDB database '{self.database}'")
-            self._client.create_database(self.database)
+        if self._database not in databases:
+            self._logger.info(f"Creating InfluxDB database '{self._database}'")
+            self._client.create_database(self._database)
 
     def disconnect(self) -> None:
         # TODO: Check if "ping" is necessary
@@ -310,11 +313,11 @@ class InfluxDB1(Database):
     def _get_vars(self) -> Dict[str, Any]:
         vars = super()._get_vars()
         if self.is_configured():
-            vars["host"] = self.host
-            vars["port"] = self.port
-            vars["user"] = self.user
-            vars["database"] = self.database
-            vars["timeout"] = self.timeout
+            vars["host"] = self._host
+            vars["port"] = self._port
+            vars["user"] = self._user
+            vars["database"] = self._database
+            vars["timeout"] = self._timeout
         return vars
 
     def _raise(self, e: Exception):

@@ -15,18 +15,40 @@ from paho.mqtt.client import Client as MqttClient
 import pandas as pd
 import pytz as tz
 from lories.connectors import Connector, register_connector_type
-from lories.core import ConfigurationError
+from lories.core.configs.parameters import ChannelParameter, Parameter, SelectParameter
 from lories.data import Channel
 from lories.typing import Configurations, Resources
 
 
 @register_connector_type("mqtt")
 class MqttConnector(Connector):
-    TRANSPORTS = ["tcp", "websockets", "unix"]
+    """
+    MQTT (Message Queuing Telemetry Transport) is a lightweight messaging protocol designed for use in IoT
+    applications. It features a publish/subscribe model, QoS levels, and message persistence, making it efficient
+    for resource-constrained devices with limited bandwidth or high-latency networks. However, MQTT's lack of
+    advanced features like transactions and complex routing, coupled with its reliance on SSL/TLS for security,
+    can limit its scalability and performance in large-scale environments.
+    """
+
+    _host = Parameter(key="host", type=str, default="localhost", desc="Broker hostname")
+    _port = Parameter(key="port", type=int, default=1883, min=1, max=65535, desc="Broker port")
+    _transport = SelectParameter(
+        ["tcp", "websockets", "unix"], key="transport", default="tcp", desc="Transport protocol"
+    )
+    _clean_session = Parameter(key="clean_session", type=bool, default=True, desc="MQTT clean session flag")
+    _timeout = Parameter(key="timeout", type=pd.Timedelta, default="60s", min="1s", desc="Connection keepalive")
+    _username = Parameter(key="username", type=str, required=False, desc="MQTT username (optional auth)")
+    _password = Parameter(key="password", type=str, required=False, desc="MQTT password (optional auth)")
+
+    topic = ChannelParameter(type=str, desc="MQTT topic this channel subscribes / publishes to")
 
     _host: str
     _port: int
-    _timeout: int
+    _transport: str
+    _clean_session: bool
+    _timeout: pd.Timedelta
+    _username: Optional[str]
+    _password: Optional[str]
 
     _client: Optional[MqttClient]
     _listeners: Dict[str, MqttListener]
@@ -38,24 +60,16 @@ class MqttConnector(Connector):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        transport = configs.get("transport", default="tcp")
-        if transport not in self.TRANSPORTS:
-            raise ConfigurationError(f"Invalid MQTT transport: {transport} (valid: {self.TRANSPORTS})")
-
         self._client = MqttClient(
             client_id=self.id.replace(".", "_"),
-            clean_session=configs.get_bool("clean_session", default=True),
-            transport=transport,
+            clean_session=self._clean_session,
+            transport=self._transport,
             # userdata=None,
             # protocol=mqtt.MQTTv311,
         )
 
-        self._host = configs.get("host", default="localhost")
-        self._port = configs.get_int("port", default=1883)
-        self._timeout = configs.get_int("timeout", default=60)
-
-        if "username" in configs and "password" in configs:
-            self._client.username_pw_set(configs.get("username"), configs.get("password"))
+        if self._username is not None and self._password is not None:
+            self._client.username_pw_set(self._username, self._password)
         # elif ...
         #     self._client.tls_set(
         #         ca_certs=configs.get("ca_certs", default=None),
@@ -75,7 +89,7 @@ class MqttConnector(Connector):
         return self._client is not None and self._client.is_connected()
 
     def connect(self, resources: Resources) -> None:
-        self._client.connect(self._host, self._port, self._timeout)
+        self._client.connect(self._host, self._port, int(self._timeout.total_seconds()))
 
         channels = resources.filter(lambda r: isinstance(r, Channel))
         for topic, topic_channels in channels.groupby("topic"):

@@ -15,11 +15,25 @@ from __future__ import annotations
 from typing import Optional
 
 from lories.components.weather import Weather, WeatherForecast
+from lories.core.configs.parameters import ComponentParameter
 from lories.typing import Configurations, ContextArgument
 
 
 # noinspection SpellCheckingInspection
 class WeatherProvider(Weather):
+    """
+    Base class for weather providers that fetch meteorological data from external services and populate
+    the weather channels. A provider manages an optional WeatherForecast sub-component for predicted
+    data alongside its own observation channels. Subclasses implement the actual data retrieval by
+    adding connectors during configuration.
+    """
+
+    _forecast = ComponentParameter(
+        cls=WeatherForecast,
+        key=WeatherForecast.TYPE,
+        desc="Forecast sub-component fetching predicted weather data on a schedule",
+    )
+
     __forecast: WeatherForecast
 
     # noinspection PyTypeChecker

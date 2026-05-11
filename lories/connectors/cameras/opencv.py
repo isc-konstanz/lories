@@ -6,39 +6,39 @@ lories.connectors.cameras.opencv
 """
 
 import os
-from typing import Dict, Optional
 
 import cv2
 
 from lories.connectors import ConnectionError, ConnectorError, register_connector_type
 from lories.connectors.cameras import CameraConnector
+from lories.core.configs.parameters import Parameter
 from lories.typing import Configurations, Resource, Resources
 
 
 @register_connector_type("opencv")
 class OpenCV(CameraConnector):
-    PREVIEW_MAIN: str = "Preview_01_main"
-    PREVIEW_SUB: str = "Preview_01_sub"
+    """
+    OpenCV-based camera connector that captures frames from RTSP streams using the FFmpeg backend.
+    It connects to IP cameras via RTSP with TCP transport, grabs single frames on demand, and encodes
+    them as JPEG. The connector manages connection lifecycle per read cycle to avoid stale frame buffers.
+    Performance depends on network latency and camera firmware; some cameras may require adjusted timeouts
+    or stream paths.
+    """
+
+    _host = Parameter(key="host", type=str, required=True, desc="RTSP camera host")
+    _port = Parameter(key="port", type=int, default=554, min=1, max=65535, desc="RTSP camera port")
+    _username = Parameter(key="username", type=str, required=True, desc="RTSP authentication username")
+    _password = Parameter(key="password", type=str, required=True, desc="RTSP authentication password")
 
     _host: str
     _port: int
+    _username: str
+    _password: str
 
-    _username: Optional[str]
-    _password: Optional[str]
-
-    _captures: Dict[str, cv2.VideoCapture]
+    _capture: cv2.VideoCapture
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-
-        self._host = configs.get("host")
-        self._port = configs.get_int("port", default=554)
-
-        self._username = configs.get("username", default=None)
-        self._password = configs.get("password", default=None)
-
-        if not self._host or not self._port:
-            raise ValueError("Camera configuration requires 'host' and 'port'")
 
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
             "rtsp_transport;tcp|"  # use TCP only
