@@ -438,6 +438,15 @@ def _build_input(
         val = str(current_value)[:10] if current_value is not None else ""
         return dbc.Input(id=field_id, value=val, type="date", size="sm")
 
+    if param_type == "timedelta":
+        return dbc.Input(
+            id=field_id,
+            value=str(current_value) if current_value is not None else "",
+            type="text",
+            size="sm",
+            placeholder="e.g. 30s, 5min, 1h, 1D",
+        )
+
     if param_type == "list":
         val = ", ".join(str(v) for v in current_value) if isinstance(current_value, list) else str(current_value or "")
         return dbc.Textarea(id=field_id, value=val, size="sm", rows=2)
