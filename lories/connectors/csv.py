@@ -126,7 +126,7 @@ class CsvDatabase(Database):
         self.separator = self._separator
 
         self.pretty = self._pretty
-        self.columns = configs.get("columns", default=CsvDatabase.columns)  # TODO: ParameterGroup with dynamic keys
+        self.columns = self._columns or CsvDatabase.columns
 
     def _build_columns(self, resources: Optional[Resources] = None) -> Mapping[str, str]:
         columns = {r.id: self.columns[r.key] for r in resources if r.key in self.columns}

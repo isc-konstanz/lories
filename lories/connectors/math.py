@@ -52,9 +52,8 @@ class MathConnector(Connector):
     def connect(self, resources: Resources) -> None:
         self._exprs = {}
 
-        mapping = self.configs.get("mapping", default={})
         for resource in resources:
-            resource_mappings = deepcopy(mapping)
+            resource_mappings = deepcopy(self._mapping)
             resource_mappings.update(resource.get("mapping", default={}))
 
             self._exprs[resource.id] = self._build_expr(resource, **resource_mappings)
