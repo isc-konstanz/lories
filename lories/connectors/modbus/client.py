@@ -44,7 +44,7 @@ class ModbusClient(Connector):
     # Shared
     _protocol = SelectParameter(["tcp", "udp", "rtu"], key="protocol", desc="Modbus transport protocol")
     _endian = SelectParameter(["big", "little"], key="endian", default="big", desc="Byte order")
-    _timeout = Parameter(key="timeout", type=int, default=3, min=1, desc="Timeout (s)")
+    _timeout = Parameter(key="timeout", type=pd.Timedelta, default="3s", min="1s", desc="Timeout")
     _retries = Parameter(key="retries", type=int, default=3, min=0, desc="Retry attempts")
     _scale = Parameter(key="scale", type=float, default=1.0, desc="Scale factor applied to all read values")
     # TCP / UDP
@@ -71,7 +71,7 @@ class ModbusClient(Connector):
 
     _protocol: str
     _endian: Literal["big", "little"]
-    _timeout: int
+    _timeout: pd.Timedelta
     _retries: int
     _scale: float
     _host: str
@@ -94,7 +94,7 @@ class ModbusClient(Connector):
                 host=self._host,
                 port=self._port,
                 framer=FramerType.SOCKET,
-                timeout=self._timeout,
+                timeout=self._timeout.total_seconds(),
                 retries=self._retries,
                 # source_address=("localhost", 0),
             )
@@ -103,7 +103,7 @@ class ModbusClient(Connector):
                 host=self._host,
                 port=self._port,
                 framer=FramerType.SOCKET,
-                timeout=self._timeout,
+                timeout=self._timeout.total_seconds(),
                 retries=self._retries,
                 # source_address=None,
             )
@@ -111,7 +111,7 @@ class ModbusClient(Connector):
             self.__client = ModbusSerialClient(
                 port=self._com_port,
                 framer=FramerType.RTU,
-                timeout=self._timeout,
+                timeout=self._timeout.total_seconds(),
                 retries=self._retries,
                 baudrate=self._baudrate,
                 bytesize=self._bytesize,

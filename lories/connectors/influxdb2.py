@@ -46,7 +46,7 @@ class InfluxDB2(Database):
     _org = Parameter(key="org", type=str, desc="Organisation name")
     _bucket = Parameter(key="bucket", type=str, desc="Bucket name")
     _token = Parameter(key="token", type=str, desc="API token")
-    _timeout = Parameter(key="timeout", type=float, default=10.0, min=0.0, desc="Request timeout (s)")
+    _timeout = Parameter(key="timeout", type=pd.Timedelta, default="10s", min="0s", desc="Request timeout")
     _ssl = Parameter(key="ssl", type=bool, default=False, desc="Use HTTPS")
     _ssl_verify = Parameter(key="ssl_verify", type=bool, default=True, desc="Verify SSL certificate")
 
@@ -73,7 +73,7 @@ class InfluxDB2(Database):
         super().configure(configs)
 
         # In milliseconds
-        self._timeout = int(self._timeout * 1000)
+        self._timeout = int(self._timeout.total_seconds() * 1000)
 
         # TODO: Determine SSL usage from certificate availability
         self._ssl = self._ssl
