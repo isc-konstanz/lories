@@ -32,6 +32,26 @@ def _coerce(value: Any) -> Optional[Duration]:
     return to_timedelta(value)
 
 
+def _format(value: Any) -> Any:
+    """Render a duration as a short ``parse_freq``-style string for display."""
+    if isinstance(value, relativedelta):
+        n = value.years or value.months or value.weeks
+        suffix = "Y" if value.years else "M" if value.months else "W"
+        return f"{n}{suffix}"
+    if isinstance(value, pd.Timedelta):
+        total = int(value.total_seconds())
+        if total == 0:
+            return "0s"
+        if total % 86400 == 0:
+            return f"{total // 86400}D"
+        if total % 3600 == 0:
+            return f"{total // 3600}h"
+        if total % 60 == 0:
+            return f"{total // 60}min"
+        return f"{total}s"
+    return value
+
+
 class DurationParameter(_TypedParameter):
     """Parameter for duration / frequency configuration values.
 
@@ -98,7 +118,16 @@ class DurationParameter(_TypedParameter):
             ) from exc
 
     def to_schema(self) -> dict:
-        return {**super().to_schema(), "type": "timedelta", "min": self.min, "max": self.max}
+        schema = super().to_schema()
+        schema["default"] = _format(schema["default"])
+        if schema.get("choices") is not None:
+            schema["choices"] = [_format(c) for c in schema["choices"]]
+        return {
+            **schema,
+            "type": "timedelta",
+            "min": _format(self.min) if self.min is not None else None,
+            "max": _format(self.max) if self.max is not None else None,
+        }
 
     def __repr__(self) -> str:
         range_str = ""

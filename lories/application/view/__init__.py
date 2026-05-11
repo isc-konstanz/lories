@@ -21,6 +21,7 @@ from .pages import (  # noqa: F401
     PageFooter,
     ComponentPage,
     ComponentGroup,
+    ConnectorPage,
     View,
 )
 
