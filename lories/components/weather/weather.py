@@ -15,7 +15,7 @@ from lories.components import Component, ComponentError, register_component_type
 from lories.core import Constant, ResourceError
 from lories.core.activator import ActivatorMeta
 from lories.core.register import Registry
-from lories.location import Location, LocationUnavailableException
+from lories.location import Location, LocationUnavailableException, location_parameter_group
 from lories.typing import Configurations, ContextArgument
 
 
@@ -89,6 +89,8 @@ class Weather(Component, metaclass=WeatherMeta):
     PRECIPITATION_PROB = Constant(float, "precipitation_probability", "Precipitation Probability", "%")
     PRECIPITABLE_WATER = Constant(float, "precipitable_water", "Precipitable Water", "cm")
     SNOW_FRACTION = Constant(float, "snow_fraction", "Snow Fraction", "1/0")
+
+    _location_section = location_parameter_group()
 
     location: Location
 
