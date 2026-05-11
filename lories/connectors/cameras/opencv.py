@@ -6,7 +6,7 @@ lories.connectors.cameras.opencv
 """
 
 import os
-from typing import Dict
+from typing import Dict, Optional
 
 import cv2
 
@@ -23,8 +23,8 @@ class OpenCV(CameraConnector):
     _host: str
     _port: int
 
-    _username: str
-    _password: str
+    _username: Optional[str]
+    _password: Optional[str]
 
     _captures: Dict[str, cv2.VideoCapture]
 
@@ -34,11 +34,11 @@ class OpenCV(CameraConnector):
         self._host = configs.get("host")
         self._port = configs.get_int("port", default=554)
 
-        self._username = configs.get("username")
-        self._password = configs.get("password")
+        self._username = configs.get("username", default=None)
+        self._password = configs.get("password", default=None)
 
-        if not all([self._host, self._port, self._username, self._password]):
-            raise ValueError("Camera configuration requires 'host', 'port', 'username' and 'password'")
+        if not self._host or not self._port:
+            raise ValueError("Camera configuration requires 'host' and 'port'")
 
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
             "rtsp_transport;tcp|"  # use TCP only
@@ -69,9 +69,10 @@ class OpenCV(CameraConnector):
                 self._disconnect(capture)
 
     def _connect(self, address: str, capture: cv2.VideoCapture) -> None:
-        auth = f"{self._username}:{self._password}"
+        auth = f"{self._username}:{self._password}@" if self._username and self._password else ""
         address = f"{self._host}:{self._port}/{address}"
-        capture.open(f"rtsp://{auth}@{address}", apiPreference=cv2.CAP_FFMPEG)
+        url = f"rtsp://{auth}{address}"
+        capture.open(url, apiPreference=cv2.CAP_FFMPEG)
 
         if not capture.isOpened():
             raise ConnectionError(self, f"Cannot open RTSP stream: 'rtsp://#:#@{address}'")
@@ -108,11 +109,21 @@ class OpenCV(CameraConnector):
                     self, f"Cannot open RTSP stream: 'rtsp://#:#@{self._host}:{self._port}/{address}'"
                 )
 
-            status = capture.read()
-            if not status:
-                raise ConnectionError(self, "Failed to grab frame")
-
-            status, frame = capture.retrieve()
+            if streaming:
+                # FFmpeg's RTSP demuxer keeps an internal FIFO. CAP_PROP_BUFFERSIZE
+                # is ignored by this backend, so we drain queued frames with cheap
+                # grab() calls (no decode) and only retrieve() the most recent one.
+                # Without this, the stream lags by up to seconds of buffered frames.
+                grabbed = False
+                for _ in range(64):
+                    if not capture.grab():
+                        break
+                    grabbed = True
+                if not grabbed:
+                    raise ConnectionError(self, "Failed to grab frame")
+                status, frame = capture.retrieve()
+            else:
+                status, frame = capture.read()
             if not status or frame is None:
                 raise ConnectionError(self, "Failed to retrieve frame")
 
