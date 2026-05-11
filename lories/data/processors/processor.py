@@ -8,9 +8,11 @@ lories.data.processors.processor
 
 from __future__ import annotations
 
+import logging
 from abc import ABCMeta
 from collections import OrderedDict
 from functools import wraps
+from logging import Logger
 from typing import Any, Dict, List, Optional
 
 from lories._core import _Processor  # noqa
@@ -36,6 +38,11 @@ class ProcessorMeta(ABCMeta):
 
 # noinspection PyAbstractClass
 class Processor(_Processor, metaclass=ProcessorMeta):
+    # Sentinel return value: signals to the channel pipeline that this update
+    # should be dropped — _value, _timestamp and _state stay as they were.
+    SKIP: Any = object()
+
+    _logger: Logger
     __configs: OrderedDict[str, Any]
     __type: str
 
@@ -44,17 +51,30 @@ class Processor(_Processor, metaclass=ProcessorMeta):
     # noinspection PyShadowingBuiltins
     def __init__(
         self,
-        _type: str,
         id: Optional[str] = None,
         key: Optional[str] = None,
         name: Optional[str] = None,
         enabled: bool = True,
         **configs,
     ) -> None:
+        _type = getattr(type(self), "TYPE", None)
+        if _type is None:
+            raise TypeError(f"{type(self).__name__} has no registered type: declare a TYPE class attribute")
         super().__init__(id, key, name)
+        self._logger = logging.getLogger(self.__module__)
         self.enabled = to_bool(enabled)
         self.__configs = OrderedDict(configs)
         self.__type = _type
+
+    def __getstate__(self) -> Dict[str, Any]:
+        # Loggers carry thread locks and aren't picklable. Recreated on unpickle.
+        state = self.__dict__.copy()
+        state.pop("_logger", None)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        self.__dict__.update(state)
+        self._logger = logging.getLogger(type(self).__module__)
 
     def __eq__(self, other: Any) -> bool:
         return isinstance(other, Processor) and self._get_vars() == other._get_vars()

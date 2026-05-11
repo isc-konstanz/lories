@@ -17,6 +17,8 @@ from lories.util import is_float
 
 @register_processor_type("differentiator", "difference", "diff")
 class Differentiator(Processor):
+    TYPE: str = "differentiator"
+
     _last: Optional[float]
 
     def __init__(self, **kwargs) -> None:
