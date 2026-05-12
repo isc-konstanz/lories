@@ -41,6 +41,11 @@ class CameraConnector(_CameraConnector):
     def is_streaming(self) -> bool:
         return self.__streaming and self._stream is not None and self._stream.is_enabled()
 
+    def is_connected(self) -> bool:
+        if self.__streaming:
+            return self._stream is not None and not self._stream.is_failed()
+        return True
+
     # noinspection PyMethodMayBeStatic
     def _is_streaming(self, channel: Channel) -> bool:
         return to_bool(channel.get("stream", default=False)) or to_bool(channel.get("listener", default=False))
@@ -54,6 +59,14 @@ class CameraConnector(_CameraConnector):
         stream_configs = self.configs.get_member(CameraStream.TYPE, defaults={})
         stream_channels = resources.filter(self._is_streaming)
 
+        # A failed prior connect can leave a subprocess running — stop it first.
+        if self._stream is not None:
+            try:
+                self._stream.stop()
+            except Exception as e:
+                self._logger.debug(f"Stopping stale stream before reconnect raised: {e}")
+            self._stream = None
+
         self.__streaming = len(stream_channels) > 0
         if self.__streaming:
             self._stream = CameraStream(self, stream_channels, stream_configs)
@@ -63,7 +76,11 @@ class CameraConnector(_CameraConnector):
     def disconnect(self) -> None:
         super().disconnect()
         if self.__streaming and not self.__stream_lock:
-            self._stream.stop()
+            try:
+                self._stream.stop()
+            finally:
+                self._stream = None
+                self.__streaming = False
 
     def read(self, resources: Resources) -> pd.DataFrame:
         timestamp = pd.Timestamp.now(tz="UTC").floor(freq="s")
