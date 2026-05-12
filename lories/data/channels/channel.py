@@ -18,6 +18,7 @@ from lories._core._tasks import TaskContext, _TaskContext  # noqa
 from lories._core.typing import Timestamp  # noqa
 from lories.core import Resource, ResourceError
 from lories.data.channels import ChannelConnector, ChannelConverter, ChannelProcessors, Channels
+from lories.data.processors import Processor
 from lories.util import parse_freq, to_bool, to_timedelta
 
 
@@ -158,13 +159,17 @@ class Channel(_Channel, Resource):
     ) -> None:
         if not isinstance(timestamp, pd.Timestamp):
             raise ResourceError(f"Expected pandas Timestamp for '{self.id}', not: {type(value)}")
-        self._timestamp = timestamp
 
         if state == ChannelState.VALID:
             for processor in self.processors:
                 value = processor(timestamp, value)
+                if value is Processor.SKIP:
+                    # Leave _value, _timestamp and _state untouched — listeners
+                    # must not see a "fresh" update for a skipped frame.
+                    return
             if self._is_empty(value):
                 raise ResourceError(f"Invalid value for valid state '{self.id}': {value}")
+        self._timestamp = timestamp
         self._value = value
         self._state = state
 

@@ -219,6 +219,10 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
     def _is_reconnectable(self) -> bool:
         if not self.is_enabled() or not self.is_configured() or not self._is_connectable():
             return False
+        if self._connected:
+            # Reachable only when is_connected() reports False — i.e. the handle
+            # is dead. Tear it down now, don't wait for the interval.
+            return True
         if not pd.isna(self._timestamp_connect):
             return self._timestamp_connect + self._interval_reconnect <= pd.Timestamp.now(tz.UTC)
         if not pd.isna(self._timestamp_disconnect):
@@ -245,18 +249,25 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
             if not self.is_configured():
                 raise ConfigurationError(f"Trying to connect unconfigured {type(self).__name__}: {self.id}")
 
-            self._timestamp_connect = pd.Timestamp.now(tz.UTC)
-            self._timestamp_disconnect = pd.NaT
+            try:
+                if not self._is_connected():
+                    self._at_connect(resources)
+                    self._run_connect(resources, *args, **kwargs)
+                    self._on_connect(resources)
+                    self.__resources = resources
+                else:
+                    self._logger.warning(f"{type(self).__name__} '{self.id}' already connected")
 
-            if not self._is_connected():
-                self._at_connect(resources)
-                self._run_connect(resources, *args, **kwargs)
-                self._on_connect(resources)
-                self.__resources = resources
-            else:
-                self._logger.warning(f"{type(self).__name__} '{self.id}' already connected")
-
-            self._connected = True
+                self._timestamp_connect = pd.Timestamp.now(tz.UTC)
+                self._timestamp_disconnect = pd.NaT
+                self._connected = True
+            except Exception:
+                # Stamp the failure moment so _is_reconnectable measures the retry
+                # interval from the failure, not from a half-set connect timestamp.
+                self._timestamp_connect = pd.NaT
+                self._timestamp_disconnect = pd.Timestamp.now(tz.UTC)
+                self._connected = False
+                raise
         finally:
             self._lock.release()
 

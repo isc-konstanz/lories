@@ -5,43 +5,90 @@ lories.connectors.cameras.camera
 
 """
 
-from abc import abstractmethod
-from time import sleep, time
-from typing import Iterable
+from typing import Any, Dict, Optional
 
 import pandas as pd
-from lories.connectors import ConnectionError, Connector
+from lories.connectors.cameras._core import _CameraConnector
+from lories.connectors.cameras.stream import CameraStream, CameraStreamUnavailableError
+from lories.data import Channel
 from lories.typing import Resources
+from lories.util import to_bool
 
 
-class CameraConnector(Connector):
+# noinspection PyAbstractClass
+class CameraConnector(_CameraConnector):
+    _stream: Optional[CameraStream] = None
+    __stream_lock: bool = False
+    __streaming: bool = False
+
+    def __getstate__(self) -> Dict[str, Any]:
+        state = super().__getstate__()
+        state.pop("_stream", None)
+        state[f"_{CameraConnector.__name__}__streaming"] = False
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        state[f"_{CameraConnector.__name__}__stream_lock"] = True
+        super().__setstate__(state)
+
+    @property
+    def stream(self) -> CameraStream:
+        if self._stream is None:
+            raise CameraStreamUnavailableError(self)
+
+        return self._stream
+
+    def is_streaming(self) -> bool:
+        return self.__streaming and self._stream is not None and self._stream.is_enabled()
+
+    def is_connected(self) -> bool:
+        if self.__streaming:
+            return self._stream is not None and not self._stream.is_failed()
+        return True
+
+    # noinspection PyMethodMayBeStatic
+    def _is_streaming(self, channel: Channel) -> bool:
+        return to_bool(channel.get("stream", default=False)) or to_bool(channel.get("listener", default=False))
+
+    def connect(self, resources: Resources) -> None:
+        super().connect(resources)
+
+        if self.__stream_lock:
+            return
+
+        stream_configs = self.configs.get_member(CameraStream.TYPE, defaults={})
+        stream_channels = resources.filter(self._is_streaming)
+
+        # A failed prior connect can leave a subprocess running — stop it first.
+        if self._stream is not None:
+            try:
+                self._stream.stop()
+            except Exception as e:
+                self._logger.debug(f"Stopping stale stream before reconnect raised: {e}")
+            self._stream = None
+
+        self.__streaming = len(stream_channels) > 0
+        if self.__streaming:
+            self._stream = CameraStream(self, stream_channels, stream_configs)
+            self._stream.configure(stream_configs)
+            self._stream.start()
+
+    def disconnect(self) -> None:
+        super().disconnect()
+        if self.__streaming and not self.__stream_lock:
+            try:
+                self._stream.stop()
+            finally:
+                self._stream = None
+                self.__streaming = False
+
     def read(self, resources: Resources) -> pd.DataFrame:
         timestamp = pd.Timestamp.now(tz="UTC").floor(freq="s")
 
         # TODO: Wrap read_frame() and cache latest frame to only read if frame is older than a second
-        data = self.read_frame()
-        return pd.DataFrame(data=[data] * len(resources), index=[timestamp], columns=list(resources.ids))
-
-    @abstractmethod
-    def read_frame(self) -> bytes: ...
-
-    def stream(self, fps: int = 30) -> Iterable[bytes]:
-        while True:
-            try:
-                now = time()
-
-                if self.is_connected():
-                    yield self.read_frame()
-
-                seconds = (1 / fps) - (time() - now)
-                if seconds > 0:
-                    sleep(seconds)
-
-            except KeyboardInterrupt:
-                pass
-            except ConnectionError as e:
-                self._logger.error(f"Unexpected error '{e}' while streaming")
-                self.disconnect()
-
-    def write(self, data: pd.DataFrame) -> None:
-        raise NotImplementedError("Camera connector does not support writing")
+        data = []
+        columns = []
+        for resource in resources:
+            columns.append(resource.id)
+            data.append(self.read_frame(resource))
+        return pd.DataFrame(data=[data], index=[timestamp], columns=columns)
