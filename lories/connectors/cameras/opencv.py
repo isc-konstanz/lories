@@ -6,6 +6,8 @@ lories.connectors.cameras.opencv
 """
 
 import os
+import time
+from typing import Any, Dict
 
 import cv2
 
@@ -25,6 +27,9 @@ class OpenCV(CameraConnector):
     or stream paths.
     """
 
+    PREVIEW_MAIN: str = "Preview_01_main"
+    PREVIEW_SUB: str = "Preview_01_sub"
+
     _host = Parameter(key="host", type=str, required=True, desc="RTSP camera host")
     _port = Parameter(key="port", type=int, default=554, min=1, max=65535, desc="RTSP camera port")
     _username = Parameter(key="username", type=str, required=True, desc="RTSP authentication username")
@@ -35,7 +40,16 @@ class OpenCV(CameraConnector):
     _username: str
     _password: str
 
-    _capture: cv2.VideoCapture
+    _captures: Dict[str, cv2.VideoCapture]
+
+    def __getstate__(self) -> Dict[str, Any]:
+        state = super().__getstate__()
+        state.pop("_captures", None)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        super().__setstate__(state)
+        self._captures = {}
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
@@ -64,11 +78,11 @@ class OpenCV(CameraConnector):
             else:
                 capture = self._captures.get(address)
             if not capture.isOpened():
-                self._connect(address, capture)
+                self._open_capture(address, capture)
             if not streaming:
                 self._disconnect(capture)
 
-    def _connect(self, address: str, capture: cv2.VideoCapture) -> None:
+    def _open_capture(self, address: str, capture: cv2.VideoCapture) -> None:
         auth = f"{self._username}:{self._password}@" if self._username and self._password else ""
         address = f"{self._host}:{self._port}/{address}"
         url = f"rtsp://{auth}{address}"
@@ -99,11 +113,11 @@ class OpenCV(CameraConnector):
     def read_frame(self, resource: Resource) -> bytes:
         streaming = self._is_streaming(resource)
 
-        address = resource.get("address", default=OpenCV.PREVIEW_SUB if streaming else OpenCV.PREVIEW_MAIN)
+        address = resource.get("address")
         capture = self._captures.get(address, None)
         try:
             if not streaming and not capture.isOpened():
-                self._connect(address, capture)
+                self._open_capture(address, capture)
             if capture is None or not capture.isOpened():
                 raise ConnectionError(
                     self, f"Cannot open RTSP stream: 'rtsp://#:#@{self._host}:{self._port}/{address}'"
@@ -113,14 +127,16 @@ class OpenCV(CameraConnector):
                 # FFmpeg's RTSP demuxer keeps an internal FIFO. CAP_PROP_BUFFERSIZE
                 # is ignored by this backend, so we drain queued frames with cheap
                 # grab() calls (no decode) and only retrieve() the most recent one.
-                # Without this, the stream lags by up to seconds of buffered frames.
-                grabbed = False
-                for _ in range(64):
+                # `grab()` is blocking on RTSP: once the backlog is empty it waits
+                # for the next network frame at camera-fps. A fixed-count drain
+                # therefore caps throughput at <1 fps on a fresh buffer. Time-budget
+                # the drain so we exit as soon as the backlog is empty.
+                if not capture.grab():
+                    raise ConnectionError(self, "Failed to grab frame")
+                deadline = time.monotonic() + 0.005  # 5 ms additional drain budget
+                while time.monotonic() < deadline:
                     if not capture.grab():
                         break
-                    grabbed = True
-                if not grabbed:
-                    raise ConnectionError(self, "Failed to grab frame")
                 status, frame = capture.retrieve()
             else:
                 status, frame = capture.read()

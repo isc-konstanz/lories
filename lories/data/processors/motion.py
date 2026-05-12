@@ -125,7 +125,7 @@ class MotionDetector(Processor):
             return Processor.SKIP
 
         if self._cooldown_logged:
-            self._logger.info("Motion cooldown ended")
+            self._logger.debug("Motion cooldown ended")
             self._cooldown_logged = False
 
         if not contours:

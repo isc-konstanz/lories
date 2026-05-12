@@ -173,7 +173,7 @@ class ConnectorContext(_ConnectorContext, RegistratorContext[Connector]):
     # noinspection PyProtectedMember, PyUnresolvedReferences
     def _disconnect(self, *connectors: Connector) -> None:
         for connector in reversed(connectors):
-            if not connector._is_connected():
+            if not connector._connected:
                 self._logger.debug(
                     f"Skipping to disconnect unconnected {type(connector).__name__} '{connector.name}': {connector.id}"
                 )
