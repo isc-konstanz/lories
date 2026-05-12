@@ -30,8 +30,8 @@ from .weather import (  # noqa: F401
     WeatherForecast,
 )
 
-from . import camera  # noqa: F401
-from .camera import Camera  # noqa: F401
+from . import cameras  # noqa: F401
+from .cameras import Camera  # noqa: F401
 
 from . import tariff  # noqa: F401
 from .tariff import Tariff  # noqa: F401
