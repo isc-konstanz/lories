@@ -121,9 +121,11 @@ class ConnectorPage(Page, Generic[ConnectorType]):
         header_items = []
         if channel.is_valid():
             value = channel.value
-            if not pd.isna(value) and channel.type == float:
+            if channel.type == bytes:
+                value = "(image)"
+            elif not pd.isna(value) and channel.type == float:
                 value = round(value, 2)
-            header_items.append(html.Span(value, className="mb-1", style={"margin-right": "0.2rem"}))
+            header_items.append(html.Span(str(value), className="mb-1", style={"margin-right": "0.2rem"}))
             header_items.append(html.Span(channel.unit, className="text-muted", style={"margin-right": "2rem"}))
         header_items.append(html.Small(state.title(), className=f"text-{color}", style={"margin-right": "1rem"}))
 
@@ -141,7 +143,11 @@ class ConnectorPage(Page, Generic[ConnectorType]):
             ),
             children=dbc.Row(
                 [
-                    dbc.Col(html.Span("Updated:", className="text-muted"), width=1),
+                    dbc.Col(
+                        html.Span("Updated:", className="text-muted"),
+                        width=1,
+                        style={"minWidth": "5.5rem"},
+                    ),
                     dbc.Col(html.Small(timestamp_str, className="text-muted"), width="auto"),
                 ],
                 justify="start",

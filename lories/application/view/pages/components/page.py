@@ -8,6 +8,7 @@ lories.application.view.pages.components.page
 
 from __future__ import annotations
 
+import base64
 from collections.abc import Sequence
 from typing import Collection, Generic, List, Optional
 
@@ -140,7 +141,11 @@ class ComponentPage(Page, Generic[Component]):
             children=[
                 dbc.Row(
                     [
-                        dbc.Col(html.Span("Value:", className="text-muted"), width=1),
+                        dbc.Col(
+                            html.Span("Value:", className="text-muted"),
+                            width=1,
+                            style={"minWidth": "5.5rem"},
+                        ),
                         dbc.Col(
                             [
                                 self._build_channel_value(channel),
@@ -153,14 +158,18 @@ class ComponentPage(Page, Generic[Component]):
                 ),
                 dbc.Row(
                     [
-                        dbc.Col(html.Span("Updated:", className="text-muted"), width=1),
+                        dbc.Col(
+                            html.Span("Updated:", className="text-muted"),
+                            width=1,
+                            style={"minWidth": "5.5rem"},
+                        ),
                         dbc.Col(self._build_channel_timestamp(channel), width="auto"),
                     ],
                     justify="start",
                 ),
                 dbc.Row(
                     [
-                        dbc.Col(None, width=1),
+                        dbc.Col(None, width=1, style={"minWidth": "5.5rem"}),
                         dbc.Col(self._build_channel_body(channel), width="auto"),
                     ],
                     justify="start",
@@ -185,7 +194,27 @@ class ComponentPage(Page, Generic[Component]):
 
     # noinspection PyMethodMayBeStatic
     def _build_channel_body(self, channel: Channel) -> Optional[html.Div]:
-        if not channel.is_valid() or not (channel.has_logger() or channel.type == pd.Series):
+        if not channel.is_valid():
+            return None
+        if channel.type == bytes:
+            if bool(channel.get("stream", default=False)):
+                return html.Div(
+                    html.Img(
+                        src=f"/api/stream/{channel.id}",
+                        style={"maxWidth": "100%", "height": "auto"},
+                    )
+                )
+            value = channel.value
+            if value is None or not isinstance(value, (bytes, bytearray)):
+                return None
+            encoded = base64.b64encode(value).decode("ascii")
+            return html.Div(
+                html.Img(
+                    src=f"data:image/jpeg;base64,{encoded}",
+                    style={"maxWidth": "100%", "height": "auto"},
+                )
+            )
+        if not (channel.has_logger() or channel.type == pd.Series):
             return None
 
         # TODO: Implement a Graph for logged values or pandas.Series types
@@ -204,11 +233,14 @@ class ComponentPage(Page, Generic[Component]):
         value = channel.value
         if pd.isna(value):
             return html.Span("—", className="text-muted mb-1", style={"margin-right": "0.2rem"})
+        if channel.type == bytes:
+            label = "(streaming)" if bool(channel.get("stream", default=False)) else "(image)"
+            return html.Span(label, className="text-muted mb-1", style={"margin-right": "0.2rem"})
         if channel.type == float:
             value = round(channel.value, 2)
-            if channel.type == bytes:
-                value = None
-        return html.Span(value, className="mb-1", style={"margin-right": "0.2rem"})
+        # React does not render bare bools (False → empty). Stringify so the
+        # channel value is always visible.
+        return html.Span(str(value), className="mb-1", style={"margin-right": "0.2rem"})
 
     # noinspection PyMethodMayBeStatic
     def _build_channel_unit(self, channel: Channel) -> html.Span:
