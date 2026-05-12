@@ -17,6 +17,8 @@ from lories.util import is_float
 
 @register_processor_type("integrator", "integrate", "counter")
 class Integrator(Processor):
+    TYPE: str = "integrator"
+
     _integral: float
     _factor: float
 

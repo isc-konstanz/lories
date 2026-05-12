@@ -11,7 +11,8 @@ from __future__ import annotations
 import multiprocessing as mp
 import os
 from collections.abc import Callable
-from concurrent.futures import Executor, ProcessPoolExecutor
+from concurrent.futures import Executor, Future, ProcessPoolExecutor
+from multiprocessing.reduction import ForkingPickler
 from typing import Collection, Optional, Sequence
 
 from lories._core._channel import Channel  # noqa
@@ -19,6 +20,7 @@ from lories._core._channels import ChannelsArgument  # noqa
 from lories._core._connector import Connector  # noqa
 from lories._core._registrator import Registrator  # noqa
 from lories.connectors import ConnectorContext
+from lories.core.errors import ResourceError
 from lories.core.typing import Configurations
 from lories.data.converters import ConverterContext
 from lories.data.processors import ProcessorContext
@@ -82,3 +84,52 @@ class ProcessContext(TaskContext):
 
     def _filter_connectors(self, *filters: Optional[Callable[[Connector], bool]]) -> Sequence[Connector]:
         return self._connectors.filter(*filters)
+
+    def _submit(self, fn, /, *args, **kwargs) -> Future:
+        for arg in [*args, *kwargs.values()]:
+            result = assert_picklable(arg)
+            if result:
+                raise ResourceError(f"Argument {result[0]} of type {result[1]} is not picklable: {result[2]}")
+        return super()._submit(fn, *args, **kwargs)
+
+
+def assert_picklable(obj, path="root", max_depth=6, max_items=50, seen=None):
+    if seen is None:
+        seen = set()
+    xid = id(obj)
+    if xid in seen:
+        return None
+    seen.add(xid)
+    try:
+        ForkingPickler.dumps(obj)
+        return None
+
+    except Exception as e:
+        if max_depth <= 0:
+            return path, type(obj), repr(e)
+
+        if isinstance(obj, dict):
+            for i, (k, v) in enumerate(list(obj.items())[:max_items]):
+                r = assert_picklable(k, f"{path}[key#{i}]", max_depth - 1, max_items, seen)
+                if r:
+                    return r
+                r = assert_picklable(v, f"{path}[{repr(k)[:40]}]", max_depth - 1, max_items, seen)
+                if r:
+                    return r
+            return path, type(obj), repr(e)
+
+        if isinstance(obj, (list, tuple, set)):
+            for i, v in enumerate(list(obj)[:max_items]):
+                r = assert_picklable(v, f"{path}[{i}]", max_depth - 1, max_items, seen)
+                if r:
+                    return r
+            return path, type(obj), repr(e)
+
+        d = getattr(obj, "__dict__", None)
+        if isinstance(d, dict):
+            for k, v in list(d.items())[:max_items]:
+                r = assert_picklable(v, f"{path}.{k}", max_depth - 1, max_items, seen)
+                if r:
+                    return r
+
+        return path, type(obj), repr(e)
