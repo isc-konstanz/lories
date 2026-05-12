@@ -240,6 +240,7 @@ class ComponentPage(Page, Generic[Component]):
             value = round(channel.value, 2)
         if channel.type == bytes:
             value = None
+        # React does not render bare bools (False → empty). Stringify so the channel value is always visible.
         return html.Span(str(value), className="mb-1", style={"margin-right": "0.2rem"})
 
     # noinspection PyMethodMayBeStatic

@@ -236,6 +236,7 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
         return self.is_connected() and self._connected
 
     def is_connected(self) -> bool:
+        """Runtime health predicate; check the handle, not ``self._connected`` (the lifecycle flag)."""
         return True
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
@@ -287,7 +288,7 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
             self._timestamp_connect = pd.NaT
             self._timestamp_disconnect = pd.Timestamp.now(tz.UTC)
 
-            if not self._is_disconnected():
+            if self._connected:
                 self._at_disconnect()
                 self._run_disconnect()
                 self._on_disconnect()
