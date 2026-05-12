@@ -28,6 +28,7 @@ class CameraStream(Configurator, Thread):
 
     __trigger: EventType
     __interrupt: EventType
+    __failed: bool
 
     _memory: SharedMemory
     _buffer: memoryview
@@ -47,6 +48,7 @@ class CameraStream(Configurator, Thread):
         self.__connector = connector
         self.__interrupt = _manager.Event()
         self.__trigger = _manager.Event()
+        self.__failed = False
         # Frames the subprocess has written to shared memory. Compared against
         # the main thread's local consumed counter to surface the drop rate.
         self.__produced = _manager.Value("i", 0)
@@ -56,7 +58,12 @@ class CameraStream(Configurator, Thread):
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self.__context.configure(configs)
+        # Forward the real, unwrapped Configurations (not the DEBUG warn-proxy) to the
+        # nested ProcessContext — its _assert_configs requires an actual _Configurations.
+        self.__context.configure(self.configs)
+
+    def is_failed(self) -> bool:
+        return self.__failed
 
     # noinspection PyProtectedMember
     def start(self):
@@ -64,7 +71,7 @@ class CameraStream(Configurator, Thread):
         _channels = self.__channels.duplicate(context=self.__context)
 
         self.__context.activate()
-        self.__context._submit(
+        future = self.__context._submit(
             _stream,
             _camera,
             _channels,
@@ -73,7 +80,19 @@ class CameraStream(Configurator, Thread):
             self._memory.name,
             self.__produced,
         )
+        # Worker exceptions otherwise vanish silently — the Future is discarded.
+        future.add_done_callback(self._on_stream_done)
         super().start()
+
+    def _on_stream_done(self, future) -> None:
+        exc = future.exception()
+        if exc is not None:
+            self.__failed = True
+            self.__interrupt.set()
+            self._logger.error(
+                f"stream {self.__connector.id} subprocess died: {exc!r}",
+                exc_info=exc,
+            )
 
     def stop(self) -> None:
         self.__interrupt.set()
