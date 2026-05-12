@@ -22,12 +22,14 @@ class Camera(_Camera):
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self.protection = CameraProtector(
-            self,
-            name=f"{self.name} Protection",
-            configs=configs.get_member(CameraProtector.TYPE, defaults={}),
-        )
-        self.components.add(self.protection)
+
+        if configs.has_member(CameraProtector.TYPE, includes=True):
+            self.protection = CameraProtector(
+                self,
+                name=f"{self.name} Protection",
+                configs=configs.get_member(CameraProtector.TYPE),
+            )
+            self.components.add(self.protection)
 
         if configs.get_bool("frame", default=True):
             self.data.add(Camera.FRAME, aggregate="last")
