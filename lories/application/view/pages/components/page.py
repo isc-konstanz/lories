@@ -214,11 +214,73 @@ class ComponentPage(Page, Generic[Component]):
                     style={"maxWidth": "100%", "height": "auto"},
                 )
             )
+        if channel.type == list:
+            value = channel.value
+            if value is None:
+                return html.Span("—", className="text-muted")
+            return self._build_channel_list_table(channel, value)
         if not (channel.has_logger() or channel.type == pd.Series):
             return None
 
         # TODO: Implement a Graph for logged values or pandas.Series types
         return html.Div(html.I("Placeholder", className="text-muted"))
+
+    # noinspection PyMethodMayBeStatic
+    def _build_channel_list_table(self, channel: Channel, value: list) -> dbc.Table:
+        """One row per list element. Index left, value+unit right-aligned.
+        Floats render with fixed 2-decimal precision and tabular-nums so the
+        column reads as a clean vertical list."""
+        unit = (channel.unit or "").strip()
+
+        def _fmt(v):
+            if isinstance(v, float):
+                return f"{v:.3f}"
+            return str(v)
+
+        idx_style = {
+            "padding": "0.15rem 0.5rem",
+            "color": "var(--bs-secondary-color, #6c757d)",
+            "width": "2.5rem",
+        }
+        val_style = {
+            "padding": "0.15rem 0.5rem",
+            "textAlign": "right",
+            "fontVariantNumeric": "tabular-nums",
+        }
+
+        rows = [
+            html.Tr(
+                [
+                    html.Td(str(i), style=idx_style),
+                    html.Td(f"{_fmt(v)} {unit}".rstrip(), style=val_style),
+                ]
+            )
+            for i, v in enumerate(value)
+        ]
+        th_base = {"padding": "0.15rem 0.5rem", "fontWeight": "normal"}
+        header = html.Thead(
+            html.Tr(
+                [
+                    html.Th("Index", style={**th_base, "width": "2.5rem"}),
+                    html.Th("Value", style={**th_base, "textAlign": "right"}),
+                ]
+            )
+        )
+        return dbc.Table(
+            [header, html.Tbody(rows)],
+            size="sm",
+            striped=True,
+            bordered=False,
+            hover=True,
+            className="mb-1",
+            style={
+                "minWidth": "16rem",
+                "width": "auto",
+                "border": "1px solid var(--bs-border-color, #dee2e6)",
+                "borderRadius": "0.25rem",
+                "overflow": "hidden",
+            },
+        )
 
     # noinspection PyMethodMayBeStatic
     def _build_channel_timestamp(self, channel: Channel) -> html.Small:
@@ -231,6 +293,14 @@ class ComponentPage(Page, Generic[Component]):
     def _build_channel_value(self, channel: Channel) -> html.Span:
         # TODO: Implement further type validation
         value = channel.value
+        if channel.type == list:
+            if value is None:
+                return html.Span("—", className="text-muted mb-1", style={"margin-right": "0.2rem"})
+            return html.Span(
+                f"({len(value)} values)",
+                className="text-muted mb-1",
+                style={"margin-right": "0.2rem"},
+            )
         if pd.isna(value):
             return html.Span("—", className="text-muted mb-1", style={"margin-right": "0.2rem"})
         if channel.type == bytes:

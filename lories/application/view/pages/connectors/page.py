@@ -123,6 +123,8 @@ class ConnectorPage(Page, Generic[ConnectorType]):
             value = channel.value
             if channel.type == bytes:
                 value = "(image)"
+            elif channel.type == list:
+                value = "—" if value is None else f"({len(value)} values)"
             elif not pd.isna(value) and channel.type == float:
                 value = round(value, 2)
             header_items.append(html.Span(str(value), className="mb-1", style={"margin-right": "0.2rem"}))
