@@ -7,7 +7,7 @@ lories.connectors.cameras.opencv
 
 import os
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import cv2
 
@@ -32,8 +32,8 @@ class OpenCV(CameraConnector):
 
     _host = Parameter(key="host", type=str, required=True, desc="RTSP camera host")
     _port = Parameter(key="port", type=int, default=554, min=1, max=65535, desc="RTSP camera port")
-    _username = Parameter(key="username", type=str, required=True, desc="RTSP authentication username")
-    _password = Parameter(key="password", type=str, required=True, desc="RTSP authentication password")
+    _username = Parameter(key="username", type=str, desc="RTSP authentication username")
+    _password = Parameter(key="password", type=str, desc="RTSP authentication password")
 
     address = ChannelParameter(
         key="address",
@@ -44,8 +44,8 @@ class OpenCV(CameraConnector):
 
     _host: str
     _port: int
-    _username: str
-    _password: str
+    _username: Optional[str]
+    _password: Optional[str]
 
     _captures: Dict[str, cv2.VideoCapture]
 
