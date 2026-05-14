@@ -30,17 +30,28 @@ class MqttConnector(Connector):
     can limit its scalability and performance in large-scale environments.
     """
 
-    _host = Parameter(key="host", type=str, default="localhost", desc="Broker hostname")
-    _port = Parameter(key="port", type=int, default=1883, min=1, max=65535, desc="Broker port")
+    _host = Parameter(key="host", type=str, default="localhost", desc="MQTT broker hostname")
+    _port = Parameter(key="port", type=int, default=1883, min=1, max=65535, desc="MQTT broker TCP port")
     _transport = SelectParameter(
-        ["tcp", "websockets", "unix"], key="transport", default="tcp", desc="Transport protocol"
+        ["tcp", "websockets", "unix"], key="transport", default="tcp", desc="MQTT transport protocol"
     )
-    _clean_session = Parameter(key="clean_session", type=bool, default=True, desc="MQTT clean session flag")
-    _timeout = Parameter(key="timeout", type=pd.Timedelta, default="60s", min="1s", desc="Connection keepalive")
-    _username = Parameter(key="username", type=str, required=False, desc="MQTT username (optional auth)")
-    _password = Parameter(key="password", type=str, required=False, desc="MQTT password (optional auth)")
+    _clean_session = Parameter(
+        key="clean_session",
+        type=bool,
+        default=True,
+        desc="Start a fresh session and discard any persisted subscriptions on connect",
+    )
+    _timeout = Parameter(
+        key="timeout",
+        type=pd.Timedelta,
+        default="60s",
+        min="1s",
+        desc="Keepalive interval for the broker connection",
+    )
+    _username = Parameter(key="username", type=str, required=False, desc="MQTT authentication username")
+    _password = Parameter(key="password", type=str, required=False, desc="MQTT authentication password")
 
-    topic = ChannelParameter(type=str, desc="MQTT topic this channel subscribes / publishes to")
+    topic = ChannelParameter(type=str, desc="MQTT topic this channel subscribes to or publishes on")
 
     _host: str
     _port: int

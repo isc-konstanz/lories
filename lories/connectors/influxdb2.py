@@ -41,14 +41,14 @@ class InfluxDB2(Database):
     and authentication workflows.
     """
 
-    _host = Parameter(key="host", type=str, default="localhost", desc="InfluxDB host")
-    _port = Parameter(key="port", type=int, default=8086, min=1, max=65535, desc="InfluxDB port")
-    _org = Parameter(key="org", type=str, desc="Organisation name")
-    _bucket = Parameter(key="bucket", type=str, desc="Bucket name")
-    _token = Parameter(key="token", type=str, desc="API token")
-    _timeout = Parameter(key="timeout", type=pd.Timedelta, default="10s", min="0s", desc="Request timeout")
-    _ssl = Parameter(key="ssl", type=bool, default=False, desc="Use HTTPS")
-    _ssl_verify = Parameter(key="ssl_verify", type=bool, default=True, desc="Verify SSL certificate")
+    _host = Parameter(key="host", type=str, default="localhost", desc="InfluxDB server hostname")
+    _port = Parameter(key="port", type=int, default=8086, min=1, max=65535, desc="InfluxDB server TCP port")
+    _org = Parameter(key="org", type=str, required=True, desc="InfluxDB organisation name")
+    _bucket = Parameter(key="bucket", type=str, required=True, desc="InfluxDB bucket name")
+    _token = Parameter(key="token", type=str, required=True, desc="InfluxDB API authentication token")
+    _timeout = Parameter(key="timeout", type=pd.Timedelta, default="10s", min="0s", desc="HTTP request timeout")
+    _ssl = Parameter(key="ssl", type=bool, default=False, desc="Use HTTPS instead of HTTP")
+    _ssl_verify = Parameter(key="ssl_verify", type=bool, default=True, desc="Verify the server's SSL certificate")
 
     # Per-channel parameters
     measurement = ChannelParameter(

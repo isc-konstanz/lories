@@ -13,7 +13,7 @@ import cv2
 
 from lories.connectors import ConnectionError, ConnectorError, register_connector_type
 from lories.connectors.cameras import CameraConnector
-from lories.core.configs.parameters import Parameter
+from lories.core.configs.parameters import ChannelParameter, Parameter
 from lories.typing import Configurations, Resource, Resources
 
 
@@ -30,10 +30,17 @@ class OpenCV(CameraConnector):
     PREVIEW_MAIN: str = "Preview_01_main"
     PREVIEW_SUB: str = "Preview_01_sub"
 
-    _host = Parameter(key="host", type=str, required=True, desc="RTSP camera host")
-    _port = Parameter(key="port", type=int, default=554, min=1, max=65535, desc="RTSP camera port")
-    _username = Parameter(key="username", type=str, required=True, desc="RTSP authentication username")
-    _password = Parameter(key="password", type=str, required=True, desc="RTSP authentication password")
+    _host = Parameter(key="host", type=str, required=True, desc="RTSP camera hostname or IP address")
+    _port = Parameter(key="port", type=int, default=554, min=1, max=65535, desc="RTSP camera TCP port")
+    _username = Parameter(key="username", type=str, required=False, desc="RTSP authentication username")
+    _password = Parameter(key="password", type=str, required=False, desc="RTSP authentication password")
+
+    address = ChannelParameter(
+        key="address",
+        type=str,
+        required=True,
+        desc="Vendor-specific RTSP path appended to 'rtsp://<host>:<port>/' (e.g. 'Streaming/Channels/101')",
+    )
 
     _host: str
     _port: int

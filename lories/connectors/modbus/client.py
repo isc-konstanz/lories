@@ -42,32 +42,84 @@ class ModbusClient(Connector):
     """
 
     # Shared
-    _protocol = SelectParameter(["tcp", "udp", "rtu"], key="protocol", desc="Modbus transport protocol")
-    _endian = SelectParameter(["big", "little"], key="endian", default="big", desc="Byte order")
-    _timeout = Parameter(key="timeout", type=pd.Timedelta, default="3s", min="1s", desc="Timeout")
-    _retries = Parameter(key="retries", type=int, default=3, min=0, desc="Retry attempts")
-    _scale = Parameter(key="scale", type=float, default=1.0, desc="Scale factor applied to all read values")
+    _protocol = SelectParameter(
+        ["tcp", "udp", "rtu"],
+        key="protocol",
+        required=True,
+        desc="Modbus transport protocol (selects tcp/udp/rtu branch)",
+    )
+    _endian = SelectParameter(
+        ["big", "little"], key="endian", default="big", desc="Word order for multi-register values"
+    )
+    _timeout = Parameter(key="timeout", type=pd.Timedelta, default="3s", min="1s", desc="Modbus request timeout")
+    _retries = Parameter(
+        key="retries", type=int, default=3, min=0, desc="Number of retry attempts on failed reads/writes"
+    )
+    _scale = Parameter(
+        key="scale", type=float, default=1.0, desc="Multiplication scale factor applied to all read values"
+    )
     # TCP / UDP
-    _host = Parameter(key="host", type=str, required=False, desc="Remote host (tcp/udp)")
-    _port = Parameter(key="port", type=int, required=False, default=502, min=1, max=65535, desc="Remote port (tcp/udp)")
+    _host = Parameter(
+        key="host", type=str, required=False, desc="Remote device hostname or IP (used by tcp/udp protocols)"
+    )
+    _port = Parameter(
+        key="port",
+        type=int,
+        required=False,
+        default=502,
+        min=1,
+        max=65535,
+        desc="Remote device TCP/UDP port",
+    )
     # Serial
-    _com_port = Parameter(key="com_port", type=str, required=False, desc="Serial device path (e.g. /dev/ttyUSB0)")
-    _baudrate = Parameter(key="baudrate", type=int, required=False, desc="Baud rate (serial)")
-    _bytesize = Parameter(key="bytesize", type=int, required=False, default=8, desc="Byte size (serial)")
-    _stopbits = Parameter(key="stopbits", type=int, required=False, default=1, desc="Stop bits (serial)")
-    _parity = SelectParameter(["N", "E", "O"], key="parity", required=False, default="N", desc="Parity (serial)")
+    _com_port = Parameter(
+        key="com_port",
+        type=str,
+        required=False,
+        desc="Serial device path (e.g. /dev/ttyUSB0; used by rtu protocol)",
+    )
+    _baudrate = Parameter(
+        key="baudrate", type=int, required=False, min=1, desc="Serial baud rate (used by rtu protocol)"
+    )
+    _bytesize = Parameter(
+        key="bytesize",
+        type=int,
+        required=False,
+        default=8,
+        choices=[5, 6, 7, 8],
+        desc="Number of data bits per byte (used by rtu protocol)",
+    )
+    _stopbits = Parameter(
+        key="stopbits",
+        type=int,
+        required=False,
+        default=1,
+        choices=[1, 2],
+        desc="Number of stop bits (used by rtu protocol)",
+    )
+    _parity = SelectParameter(
+        ["N", "E", "O"],
+        key="parity",
+        required=False,
+        default="N",
+        desc="Parity setting: N=none, E=even, O=odd (used by rtu protocol)",
+    )
 
     # Per-channel parameters
-    address = ChannelParameter(type=int, required=True, desc="Register start address (decimal or 0x hex)")
+    address = ChannelParameter(
+        type=int, required=True, desc="Register start address (decimal integer, or '0x...' hex string in TOML)"
+    )
     function = ChannelParameter(
         type=str,
         required=False,
         default="holding_register",
         choices=["holding_register", "input_register", "coil"],
-        desc="Modbus function code",
+        desc="Modbus function code selecting which register table to access",
     )
-    device = ChannelParameter(type=int, required=False, desc="Slave device ID (unit identifier)")
-    data_type = ChannelParameter(type=str, required=False, desc="Override data type (e.g. float32, int16, string)")
+    device = ChannelParameter(type=int, required=False, desc="Slave device ID / unit identifier (defaults to 1)")
+    data_type = ChannelParameter(
+        type=str, required=False, desc="Override register data type (e.g. float32, int16, uint32, string)"
+    )
 
     _protocol: str
     _endian: Literal["big", "little"]

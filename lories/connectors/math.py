@@ -35,16 +35,34 @@ class MathConnector(Connector):
     introduce noticeable computation overhead.
     """
 
-    _mapping = ParameterGroup(key="mapping", required=False, desc="Symbol-to-channel mapping")
+    _mapping = ParameterGroup(
+        key="mapping",
+        required=False,
+        desc="Connector-wide symbol-to-channel mapping merged into each channel's own 'mapping'",
+    )
 
     # Per-channel parameters
     expression = ChannelParameter(
-        type=str, required=False, desc="Math expression (sympy syntax); also accepted as 'expr' or 'math'"
+        type=str,
+        required=False,
+        desc=(
+            "SymPy mathematical expression evaluated for this channel",
+            "(accepted under keys 'expression', 'expr', or 'math')",
+        ),
     )
-    mapping = ChannelParameter(type=None, required=False, default={}, desc="Per-channel symbol-to-channel mapping")
-    listen = ChannelParameter(type=str, required=False, desc="Channel ID whose updates trigger re-evaluation")
+    mapping = ChannelParameter(
+        type=None,
+        required=False,
+        default={},
+        desc="Per-channel symbol-to-channel mapping; overrides the connector-wide mapping",
+    )
+    listen = ChannelParameter(
+        type=str, required=False, desc="Channel ID whose updates trigger re-evaluation of this expression"
+    )
     listener = ChannelParameter(
-        type=bool, required=False, desc="Register as listener (default: True when 'listen' is set)"
+        type=bool,
+        required=False,
+        desc="Re-evaluate on each upstream channel update (defaults to True when 'listen' is set)",
     )
 
     _exprs: Dict[str, ChannelExpr]
