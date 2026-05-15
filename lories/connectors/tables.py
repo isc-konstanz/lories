@@ -28,19 +28,43 @@ class HDFDatabase(Database):
     concurrent write access is limited, and the format can be sensitive to library version mismatches.
     """
 
-    _path = Parameter(key="path", type=str, required=False, desc="Base path for store files")
+    _path = Parameter(
+        key="path",
+        type=str,
+        required=False,
+        desc="Directory path (relative to data dir or absolute) or absolute file path for the HDF5 store",
+    )
     _file = Parameter(key="file", type=str, default=".store.h5", desc="HDF5 store filename")
-    _mode = SelectParameter(["a", "r", "r+", "w"], key="mode", default="a", desc="File open mode")
-    _columns_unique = Parameter(key="columns_unique", type=bool, default=False, desc="Enforce unique column names")
+    _mode = SelectParameter(
+        ["a", "r", "r+", "w"],
+        key="mode",
+        default="a",
+        desc="HDF5 file open mode: a=append, r=read-only, r+=read/write existing, w=truncate",
+    )
+    _columns_unique = Parameter(
+        key="columns_unique",
+        type=bool,
+        default=False,
+        desc="Use channel IDs as column names instead of channel keys (avoids collisions across groups)",
+    )
     _compression_level = Parameter(
-        key="compression_level", type=int, required=False, min=0, max=9, desc="Compression level (0-9)"
+        key="compression_level",
+        type=int,
+        required=False,
+        min=0,
+        max=9,
+        desc="PyTables compression level (0=off, 9=maximum)",
     )
     _compression_lib = Parameter(
-        key="compression_lib", type=str, required=False, desc="Compression library (zlib, lzo, bzip2, blosc)"
+        key="compression_lib",
+        type=str,
+        required=False,
+        choices=["zlib", "lzo", "bzip2", "blosc"],
+        desc="PyTables compression library",
     )
 
     # Per-channel parameters
-    group = ChannelParameter(type=str, required=False, desc="HDF5 group key for organizing channels in the store")
+    group = ChannelParameter(type=str, required=False, desc="HDF5 group key under which this channel is stored")
 
     __store: HDFStore = None
 

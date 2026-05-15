@@ -30,16 +30,16 @@ class OpenCV(CameraConnector):
     PREVIEW_MAIN: str = "Preview_01_main"
     PREVIEW_SUB: str = "Preview_01_sub"
 
-    _host = Parameter(key="host", type=str, required=True, desc="RTSP camera host")
-    _port = Parameter(key="port", type=int, default=554, min=1, max=65535, desc="RTSP camera port")
-    _username = Parameter(key="username", type=str, desc="RTSP authentication username")
-    _password = Parameter(key="password", type=str, desc="RTSP authentication password")
+    _host = Parameter(key="host", type=str, required=True, desc="RTSP camera hostname or IP address")
+    _port = Parameter(key="port", type=int, default=554, min=1, max=65535, desc="RTSP camera TCP port")
+    _username = Parameter(key="username", type=str, required=False, desc="RTSP authentication username")
+    _password = Parameter(key="password", type=str, required=False, desc="RTSP authentication password")
 
     address = ChannelParameter(
         key="address",
         type=str,
         required=True,
-        desc="RTSP path suffix appended to 'rtsp://<host>:<port>/' (vendor-specific, e.g. 'Streaming/Channels/101')",
+        desc="Vendor-specific RTSP path appended to 'rtsp://<host>:<port>/' (e.g. 'Streaming/Channels/101')",
     )
 
     _host: str

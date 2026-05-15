@@ -31,11 +31,22 @@ class RevPiConnector(Connector):
     image interface is Linux-specific and requires direct hardware access, limiting remote or cross-platform usage.
     """
 
-    _cycletime = Parameter(key="cycletime", type=int, required=False, desc="Cycle time override (ms)")
+    _cycletime = Parameter(
+        key="cycletime",
+        type=int,
+        required=False,
+        min=1,
+        desc="Process image polling cycle time in milliseconds (defaults to the RevPiModIO library default)",
+    )
 
     # Per-channel parameters
     address = ChannelParameter(type=str, required=True, desc="RevPi process image I/O address name")
-    listener = ChannelParameter(type=bool, required=False, default=False, desc="Register rising-edge event listener")
+    listener = ChannelParameter(
+        type=bool,
+        required=False,
+        default=False,
+        desc="Register a rising-edge event listener that pushes updates as they occur",
+    )
 
     _core: RevPiModIO
     _cycletime: Optional[int]

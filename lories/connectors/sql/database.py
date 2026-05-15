@@ -42,15 +42,22 @@ class SqlDatabase(Database, Mapping[str, Table]):
     and SQL feature availability vary by backend.
     """
 
-    _host = Parameter(key="host", type=str, desc="Database host")
-    _port = Parameter(key="port", type=int, min=1, max=65535, desc="Database port")
-    _user = Parameter(key="user", type=str, desc="Username")
-    _password = Parameter(key="password", type=str, desc="Password")
-    _database = Parameter(key="database", type=str, desc="Database/schema name")
+    _host = Parameter(key="host", type=str, required=True, desc="Database server hostname")
+    _port = Parameter(key="port", type=int, required=True, min=1, max=65535, desc="Database server TCP port")
+    _user = Parameter(key="user", type=str, required=True, desc="Database authentication username")
+    _password = Parameter(key="password", type=str, required=True, desc="Database authentication password")
+    _database = Parameter(key="database", type=str, required=True, desc="Default database / schema name to connect to")
     _dialect = SelectParameter(
-        ["postgresql", "mysql", "mariadb", "sqlite", "mssql"], key="dialect", desc="SQLAlchemy dialect"
+        ["postgresql", "mysql", "mariadb", "sqlite", "mssql"],
+        key="dialect",
+        required=True,
+        desc="SQLAlchemy database dialect (selects driver and SQL flavour)",
     )
-    _tables = ParameterGroup(key="tables", required=False, desc="Per-table configuration overrides")
+    _tables = ParameterGroup(
+        key="tables",
+        required=False,
+        desc="Per-table configuration overrides keyed by table name (see lories.connectors.sql.Schema)",
+    )
 
     # Per-channel parameters
     schema = ChannelParameter(type=str, required=False, desc="Database schema name for this channel's table")
