@@ -16,6 +16,7 @@ import dash_bootstrap_components as dbc
 from dash import Input, Output, callback, html
 
 import pandas as pd
+from lories.application.view._dash_format import format_bytes_label
 from lories.application.view.pages import Page, PageLayout
 from lories.application.view.pages.widgets import build_configs_editor_modal
 from lories.typing import Channel, Channels, Component, Components, Configurations, Connector, Connectors, Data
@@ -285,8 +286,12 @@ class ComponentPage(Page, Generic[Component]):
     # noinspection PyMethodMayBeStatic
     def _build_channel_timestamp(self, channel: Channel) -> html.Small:
         timestamp = channel.timestamp
-        if not pd.isna(timestamp):
+        if isinstance(timestamp, pd.Timestamp) and not pd.isna(timestamp):
             timestamp = timestamp.isoformat(sep=" ", timespec="seconds")
+        elif timestamp is None or (not isinstance(timestamp, pd.Timestamp) and pd.isna(timestamp)):
+            timestamp = "—"
+        else:
+            timestamp = str(timestamp)
         return html.Small(timestamp, className="text-muted")
 
     # noinspection PyMethodMayBeStatic
@@ -301,13 +306,18 @@ class ComponentPage(Page, Generic[Component]):
                 className="text-muted mb-1",
                 style={"margin-right": "0.2rem"},
             )
-        if pd.isna(value):
+        # ``pd.isna`` returns an ndarray for non-scalar values, which then
+        # blows up the truth-value check. Short-circuit on collections.
+        if value is None or (not isinstance(value, (str, bytes, bytearray, Collection)) and pd.isna(value)):
             return html.Span("—", className="text-muted mb-1", style={"margin-right": "0.2rem"})
         if channel.type == bytes:
-            label = "(streaming)" if bool(channel.get("stream", default=False)) else "(image)"
+            label = format_bytes_label(channel, value)
             return html.Span(label, className="text-muted mb-1", style={"margin-right": "0.2rem"})
         if channel.type == float:
-            value = round(channel.value, 2)
+            # 3 significant figures with trailing zeros preserved (``#``
+            # flag) — reads as "0.00", "0.120", "0.0100" so small values
+            # don't collapse to "0.0" the way ``round(value, 2)`` did.
+            value = f"{channel.value:#.3g}"
         if channel.type == bytes:
             value = None
         # React does not render bare bools (False → empty). Stringify so the channel value is always visible.
