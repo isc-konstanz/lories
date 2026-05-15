@@ -43,15 +43,20 @@ class EntsoeConnector(Connector):
     handling on the client side.
     """
 
-    _country_code = Parameter(key="country_code", type=str, desc="ENTSO-E country code (e.g. DE)")
-    _api_key = Parameter(key="api_key", type=str, desc="ENTSO-E API security token")
+    _country_code = Parameter(
+        key="country_code",
+        type=str,
+        required=True,
+        desc="ENTSO-E bidding zone code (e.g. DE, AT, LU; historical variants DE_AT_LU, DE_LU resolved automatically)",
+    )
+    _api_key = Parameter(key="api_key", type=str, required=True, desc="ENTSO-E Transparency Platform API token")
     _resolution = SelectParameter(
-        ["15min", "30min", "60min"], key="resolution", default="60min", desc="Data resolution"
+        ["15min", "30min", "60min"], key="resolution", default="60min", desc="Time resolution of returned series"
     )
 
     # Per-channel parameters
     method = ChannelParameter(
-        type=str, required=True, choices=["day_ahead"], desc="ENTSO-E query method (e.g. day_ahead)"
+        type=str, required=True, choices=["day_ahead"], desc="ENTSO-E query method to invoke for this channel"
     )
 
     DAY_AHEAD: str = "day_ahead"

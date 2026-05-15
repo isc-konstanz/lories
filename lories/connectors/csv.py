@@ -30,19 +30,63 @@ class CsvDatabase(Database):
     information, and compression, which can lead to parsing ambiguities and inefficient storage for large datasets.
     """
 
-    _dir = Parameter(key="dir", type=str, required=False, desc="Directory path")
-    _file = Parameter(key="file", type=str, required=False, desc="File name override")
-    _index_column = Parameter(key="index_column", type=str, default="timestamp", desc="Index column name")
-    _index_type = Parameter(key="index_type", type=str, default="timestamp", desc="Index column type")
-    _override = Parameter(key="override", type=bool, default=False, desc="Overwrite existing data")
-    _slice = Parameter(key="slice", type=bool, default=False, desc="Slice reads to requested range")
-    _freq = Parameter(key="freq", type=str, default="D", desc="File frequency (D, M, Y, …)")
-    _format = Parameter(key="format", type=str, required=False, desc="Timestamp format string")
-    _suffix = Parameter(key="suffix", type=str, required=False, desc="Filename suffix")
-    _decimal = Parameter(key="decimal", type=str, default=".", desc="Decimal separator")
-    _separator = Parameter(key="separator", type=str, default=",", desc="Column separator")
-    _pretty = Parameter(key="pretty", type=bool, default=False, desc="Pretty-print output")
-    _columns = ParameterGroup(key="columns", required=False, desc="Per-column name overrides")
+    _dir = Parameter(
+        key="dir",
+        type=str,
+        required=False,
+        desc="Directory containing the CSV files (relative to data dir or absolute)",
+    )
+    _file = Parameter(
+        key="file",
+        type=str,
+        required=False,
+        desc="Single CSV file path; overrides directory-based file discovery",
+    )
+    _index_column = Parameter(
+        key="index_column", type=str, default="timestamp", desc="Name of the index (timestamp) column in the CSV"
+    )
+    _index_type = Parameter(
+        key="index_type",
+        type=str,
+        default="timestamp",
+        choices=["timestamp", "unix", "none"],
+        desc="Index column type: 'timestamp' (ISO), 'unix' (epoch seconds), or 'none'",
+    )
+    _override = Parameter(
+        key="override", type=bool, default=False, desc="Overwrite existing rows on write instead of appending"
+    )
+    _slice = Parameter(
+        key="slice",
+        type=bool,
+        default=False,
+        desc="Split output across multiple files using the 'freq' pattern instead of writing a single file",
+    )
+    _freq = Parameter(
+        key="freq",
+        type=str,
+        default="D",
+        desc="File slicing frequency (Y=yearly, M=monthly, D=daily, or pandas freq suffix like h/min/s)",
+    )
+    _format = Parameter(
+        key="format",
+        type=str,
+        required=False,
+        desc="Filename timestamp format (Python strftime, e.g. '%Y%m%d'); inferred from 'freq' if omitted",
+    )
+    _suffix = Parameter(key="suffix", type=str, required=False, desc="Suffix appended to the generated filename")
+    _decimal = Parameter(key="decimal", type=str, default=".", desc="Decimal separator character")
+    _separator = Parameter(key="separator", type=str, default=",", desc="Column separator character")
+    _pretty = Parameter(
+        key="pretty",
+        type=bool,
+        default=False,
+        desc="Pretty-print column headers using channel full names and units",
+    )
+    _columns = ParameterGroup(
+        key="columns",
+        required=False,
+        desc="Per-column name overrides keyed by channel key (maps channel key to CSV column header)",
+    )
 
     # Per-channel parameters
     column = ChannelParameter(
