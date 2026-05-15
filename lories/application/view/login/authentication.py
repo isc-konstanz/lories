@@ -22,7 +22,7 @@ from werkzeug.wrappers import Request, Response
 import pandas as pd
 from lories.application.interface import InterfaceException
 from lories.application.view.login.user import User
-from lories.core import Configurations, Configurator
+from lories.core import ConfigurationError, Configurations, Configurator
 
 RANDOM_STRING_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
@@ -59,8 +59,14 @@ class Authentication(Configurator, Auth):
         self.__groups = None
         self.__users = {}
 
-        # TODO: Read users from file and add user creation and editing via commandline
-        self.add_user("admin", "admin")
+        login_configs = configs.get_member("login", defaults={"enabled": False})
+        users = login_configs.get("users", default=None)
+        if not users:
+            raise ConfigurationError("Login is enabled but no users are configured under [login.users]")
+        for username, password in users.items():
+            if not isinstance(password, str) or password == "":
+                raise ConfigurationError(f"Login user '{username}' has an empty or invalid password")
+            self.add_user(username, password)
 
     def add_user(self, username: str, password: str) -> None:
         user = User.from_password(username, password)
