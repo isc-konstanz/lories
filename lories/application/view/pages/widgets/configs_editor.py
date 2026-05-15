@@ -8,27 +8,34 @@ Config editor modal for Dash pages.
 Renders a per-entity "Edit Configs" button that opens a ``dbc.Modal`` with:
   - Editable input fields for every declared ``_Parameter``
   - Enable/disable toggles for sub-components and connectors
-  - Save  → writes changes to disk via ``configs.write()``
-  - Discard → closes without any changes
+  - Per-row remove button to delete a sub-component / connector
+  - Inline "Add" form (type select + key + name) per section
+  - Save  → writes parameter changes and enable toggles to disk
+  - Discard → closes without applying parameter changes
 
-Sub-component and connector sections show enable/disable toggles only;
-add/remove is not yet supported.
+Add and Remove are immediate actions: they call the live ``RegistratorAccess``
+APIs of the parent and persist to disk independently of the Save button.
 """
 
 from __future__ import annotations
 
+import logging
+import os
 from collections.abc import Mapping
 from typing import Any, Dict, List, Optional, Tuple
 
 import dash_bootstrap_components as dbc
-from dash import ALL, Input, Output, State, callback, ctx, html
+from dash import ALL, Input, Output, State, callback, ctx, html, no_update
 
+from lories.application.view.pages.widgets.configs import build_configs_widget
 from lories.core.configs.parameters import (
     BoolParameter,
     ParameterGroup,
     _EntityParameter,
     _Parameter,
 )
+
+_logger = logging.getLogger(__name__)
 
 
 def build_configs_editor_modal(
@@ -38,22 +45,15 @@ def build_configs_editor_modal(
     *,
     components: Optional[List] = None,
     connectors: Optional[List] = None,
+    components_access=None,
+    connectors_access=None,
 ) -> Tuple[dbc.Button, dbc.Modal]:
     """Return *(open_button, modal)* for editing *configs* in a dialog.
 
-    Parameters
-    ----------
-    entity_id:
-        Unique, already-encoded ID for the entity.  Used as a prefix for all
-        Dash component IDs and callback IDs created here.
-    configs:
-        The live ``Configurations`` instance to read from and write to.
-    configurator_type:
-        The class of the configurator — provides ``__config_parameters__``.
-    components:
-        Optional list of sub-``Component`` objects; shown as toggleable rows.
-    connectors:
-        Optional list of ``Connector`` objects; shown as toggleable rows.
+    When ``components_access`` / ``connectors_access`` (a live
+    ``RegistratorAccess``) is supplied, the matching section gains an inline
+    "Add" form and per-row Remove buttons. Without it, only enable/disable
+    toggles are shown.
     """
     open_button = dbc.Button(
         "Edit",
@@ -75,6 +75,8 @@ def build_configs_editor_modal(
                         entity_id,
                         components,
                         connectors,
+                        components_access,
+                        connectors_access,
                     ),
                 ]
             ),
@@ -101,7 +103,14 @@ def build_configs_editor_modal(
         scrollable=True,
     )
 
-    _register_callbacks(entity_id, configs, components, connectors)
+    _register_callbacks(
+        entity_id,
+        configs,
+        components,
+        connectors,
+        components_access,
+        connectors_access,
+    )
 
     return open_button, modal
 
@@ -112,44 +121,64 @@ def _build_modal_body(
     entity_id: str,
     components: Optional[List],
     connectors: Optional[List],
+    components_access,
+    connectors_access,
 ) -> html.Div:
-    sections = []
+    edit_sections: List[Any] = []
 
-    # Parameters — render directly, no wrapping accordion
     params: Dict[str, _Parameter] = getattr(configurator_type, "__config_parameters__", {})
-    sections.append(_build_param_fields(configs, params, entity_id))
+    edit_sections.append(_build_param_fields(configs, params, entity_id))
 
-    # Components section (keep accordion for these)
-    if components is not None:
-        sections.append(
-            dbc.Accordion(
-                dbc.AccordionItem(
-                    title="Components",
-                    children=_build_entity_toggles(components, entity_id, "comp"),
-                    item_id=f"{entity_id}-editor-comps",
-                ),
-                active_item=f"{entity_id}-editor-comps",
-                always_open=True,
-                className="mb-2",
+    if components is not None or components_access is not None:
+        edit_sections.append(
+            _build_entity_section(
+                entity_id=entity_id,
+                entity_type="comp",
+                title="Components",
+                entities=components if components is not None else list(components_access.values()),
+                access=components_access,
+                params=params,
+                slot_kind="component",
             )
         )
 
-    # Connectors section (keep accordion for these)
-    if connectors is not None:
-        sections.append(
-            dbc.Accordion(
-                dbc.AccordionItem(
-                    title="Connectors",
-                    children=_build_entity_toggles(connectors, entity_id, "conn"),
-                    item_id=f"{entity_id}-editor-conns",
-                ),
-                active_item=f"{entity_id}-editor-conns",
-                always_open=True,
-                className="mb-2",
+    if connectors is not None or connectors_access is not None:
+        edit_sections.append(
+            _build_entity_section(
+                entity_id=entity_id,
+                entity_type="conn",
+                title="Connectors",
+                entities=connectors if connectors is not None else list(connectors_access.values()),
+                access=connectors_access,
+                params=params,
+                slot_kind="connector",
             )
         )
 
-    return html.Div(sections)
+    view_widget = build_configs_widget(
+        configs,
+        configurator_type,
+        prefix=f"{entity_id}-view-",
+    )
+
+    return html.Div(
+        dbc.Tabs(
+            [
+                dbc.Tab(
+                    html.Div(view_widget, className="pt-3"),
+                    label="View",
+                    tab_id=f"{entity_id}-config-tab-view",
+                ),
+                dbc.Tab(
+                    html.Div(edit_sections, className="pt-3"),
+                    label="Edit",
+                    tab_id=f"{entity_id}-config-tab-edit",
+                ),
+            ],
+            active_tab=f"{entity_id}-config-tab-view",
+            id=f"{entity_id}-config-tabs",
+        )
+    )
 
 
 def _build_param_fields(configs, params: Dict[str, _Parameter], entity_id: str) -> html.Div:
@@ -167,21 +196,18 @@ def _build_param_fields(configs, params: Dict[str, _Parameter], entity_id: str) 
 
     rows: List = []
 
-    # Declared parameters
     for key, param in param_by_key.items():
         current_value = configs.get(key) if (configs and key in configs) else None
         if current_value is None and hasattr(param, "default"):
             current_value = param.default
         rows.append(_build_field_row(entity_id, key, param, current_value))
 
-    # Undeclared flat keys (skip nested mappings, group keys, entity slots)
     if configs:
         skip_keys = set(param_by_key) | group_keys | set(entity_params)
         for key, value in configs.items():
             if key not in skip_keys and not isinstance(value, Mapping):
                 rows.append(_build_plain_field_row(entity_id, key, value))
 
-    # ParameterGroup children as indented sub-sections
     for gkey in group_keys:
         if configs and configs.has_member(gkey):
             member = configs.get_member(gkey)
@@ -209,10 +235,6 @@ def _build_param_fields(configs, params: Dict[str, _Parameter], entity_id: str) 
                 )
             )
 
-    # Entity slots (ComponentParameter / ConnectorParameter) — declarative-only.
-    # The actual children live in dynamically-loaded sub-configs, so we just
-    # surface the schema (slot type, multiplicity, fitting registered types,
-    # and recursive child parameters of the expected class).
     for ekey, eparam in entity_params.items():
         rows.append(_build_entity_slot_row(eparam, ekey, entity_id))
 
@@ -419,7 +441,6 @@ def _build_input(
         return dbc.Select(id=field_id, options=options, value=selected, size="sm")
 
     if is_bool or param_type == "bool":
-        # dbc.Checklist(switch=True) value is a list of selected option values
         return dbc.Checklist(
             id=field_id,
             options=[{"label": "", "value": "on"}],
@@ -451,7 +472,6 @@ def _build_input(
         val = ", ".join(str(v) for v in current_value) if isinstance(current_value, list) else str(current_value or "")
         return dbc.Textarea(id=field_id, value=val, size="sm", rows=2)
 
-    # Default: plain text
     return dbc.Input(
         id=field_id,
         value=str(current_value) if current_value is not None else "",
@@ -460,17 +480,167 @@ def _build_input(
     )
 
 
-def _build_entity_toggles(entities: List, entity_id: str, entity_type: str) -> html.Div:
-    """Enable/disable checklist rows for sub-components or connectors."""
+def _build_entity_section(
+    entity_id: str,
+    entity_type: str,
+    title: str,
+    entities: List,
+    access,
+    params: Dict[str, _Parameter],
+    slot_kind: str,
+) -> dbc.Accordion:
+    """Build an accordion section: existing rows + Add form."""
+    type_options = _collect_type_options(access, params, slot_kind)
+
+    children: List[Any] = [
+        html.Div(
+            _build_entity_rows(entities, entity_id, entity_type, can_remove=access is not None),
+            id=f"{entity_id}-{entity_type}-list",
+        ),
+    ]
+
+    if access is not None:
+        children.append(html.Hr(className="mt-3 mb-2"))
+        children.append(
+            html.Div(
+                _build_add_form(entity_id, entity_type, type_options),
+                id=f"{entity_id}-{entity_type}-add-form",
+            )
+        )
+
+    return dbc.Accordion(
+        dbc.AccordionItem(
+            title=title,
+            children=children,
+            item_id=f"{entity_id}-editor-{entity_type}s",
+        ),
+        active_item=f"{entity_id}-editor-{entity_type}s",
+        always_open=True,
+        className="mb-2",
+    )
+
+
+def _collect_type_options(access, params: Dict[str, _Parameter], slot_kind: str) -> List[Dict[str, str]]:
+    """Return only types declared via ``ComponentParameter`` / ``ConnectorParameter`` slots.
+
+    Iterates the configurator's ``__config_parameters__`` for ``_EntityParameter``
+    descriptors of the matching ``slot_kind`` and collects their ``fitting_types``
+    schema. Types not claimed by any declared entity slot are not offered.
+    """
+    fitting: Dict[str, Dict[str, str]] = {}
+    for p in params.values():
+        if not isinstance(p, _EntityParameter):
+            continue
+        schema = p.to_schema()
+        if schema.get("type") != slot_kind:
+            continue
+        for entry in schema.get("fitting_types") or []:
+            if not entry.get("available", True):
+                continue
+            key = entry["key"]
+            if key in fitting:
+                continue
+            cls_name = entry.get("cls")
+            label = f"{key} ({cls_name})" if cls_name else key
+            fitting[key] = {"label": label, "value": key}
+
+    return [fitting[k] for k in sorted(fitting)]
+
+
+def _build_add_form(entity_id: str, entity_type: str, type_options: List[Dict[str, str]]) -> List[Any]:
+    """Inline form: Type select + Key input + Name input + Add button."""
+    initial_value = type_options[0]["value"] if type_options else None
+    slot_kind = "component" if entity_type == "comp" else "connector"
+    placeholder_msg = f"No declared {slot_kind} slots" if not type_options else "Select type…"
+
+    return [
+        html.Small(f"Add new {entity_type}:", className="text-muted d-block mb-1"),
+        dbc.Row(
+            [
+                dbc.Col(
+                    dbc.Select(
+                        id=f"{entity_id}-{entity_type}-add-type",
+                        options=type_options,
+                        value=initial_value,
+                        placeholder=placeholder_msg,
+                        size="sm",
+                    ),
+                    width=4,
+                ),
+                dbc.Col(
+                    dbc.Input(
+                        id=f"{entity_id}-{entity_type}-add-key",
+                        type="text",
+                        placeholder="key (e.g. battery_1)",
+                        size="sm",
+                    ),
+                    width=3,
+                ),
+                dbc.Col(
+                    dbc.Input(
+                        id=f"{entity_id}-{entity_type}-add-name",
+                        type="text",
+                        placeholder="name (optional)",
+                        size="sm",
+                    ),
+                    width=3,
+                ),
+                dbc.Col(
+                    dbc.Button(
+                        "Add",
+                        id=f"{entity_id}-{entity_type}-add-btn",
+                        color="success",
+                        size="sm",
+                        outline=True,
+                        disabled=not type_options,
+                    ),
+                    width=2,
+                    className="d-grid",
+                ),
+            ],
+            className="g-2 align-items-center",
+        ),
+        html.Div(id=f"{entity_id}-{entity_type}-add-feedback", className="mt-2"),
+    ]
+
+
+def _build_entity_rows(
+    entities: List,
+    entity_id: str,
+    entity_type: str,
+    can_remove: bool,
+) -> html.Div:
+    """Per-row layout: name + class + enable toggle + (optional) remove button."""
     if not entities:
         return html.Div(html.I(f"No {entity_type}s.", className="text-muted"))
 
     rows: List = []
     for entity in entities:
         key = entity.key
-        name = entity.name
+        name = getattr(entity, "name", key)
         cls_name = type(entity).__name__
         enabled = entity.configs.enabled if hasattr(entity, "configs") else True
+
+        controls: List[Any] = [
+            dbc.Checklist(
+                id={"type": f"{entity_id}-{entity_type}-toggle", "key": key},
+                options=[{"label": "Enabled", "value": "enabled"}],
+                value=["enabled"] if enabled else [],
+                switch=True,
+                inline=True,
+            ),
+        ]
+        if can_remove:
+            controls.append(
+                dbc.Button(
+                    "Remove",
+                    id={"type": f"{entity_id}-{entity_type}-remove", "key": key},
+                    color="danger",
+                    outline=True,
+                    size="sm",
+                    className="ms-2",
+                )
+            )
 
         rows.append(
             dbc.Row(
@@ -480,18 +650,12 @@ def _build_entity_toggles(entities: List, entity_id: str, entity_type: str) -> h
                             html.Span(name, className="fw-semibold me-2"),
                             html.Small(cls_name, className="text-muted"),
                         ],
-                        width=8,
+                        width=6,
                         className="d-flex align-items-center",
                     ),
                     dbc.Col(
-                        dbc.Checklist(
-                            id={"type": f"{entity_id}-{entity_type}-toggle", "key": key},
-                            options=[{"label": "Enabled", "value": "enabled"}],
-                            value=["enabled"] if enabled else [],
-                            switch=True,
-                            inline=True,
-                        ),
-                        width=4,
+                        controls,
+                        width=6,
                         className="d-flex justify-content-end align-items-center",
                     ),
                 ],
@@ -499,7 +663,52 @@ def _build_entity_toggles(entities: List, entity_id: str, entity_type: str) -> h
             )
         )
 
-    return html.Div(html.Div(rows))
+    return html.Div(rows)
+
+
+def _add_child(access, key: str, type_str: str, name: Optional[str]) -> None:
+    """Add a child via RegistratorAccess.add(...) and persist parent configs."""
+    add_kwargs: Dict[str, Any] = {"type": type_str}
+    if name:
+        add_kwargs["name"] = name
+    access.add(key, **add_kwargs)
+    try:
+        access._registrar.configs.write()
+    except Exception as exc:
+        _logger.debug("Persisting parent configs after add failed: %s", exc)
+
+
+def _remove_child(access, key: str) -> None:
+    """Remove a child: drop from access, pop config member, delete .conf file."""
+    target = None
+    for entity in list(access.values()):
+        if entity.key == key:
+            target = entity
+            break
+    if target is None:
+        raise KeyError(f"No child with key {key!r}")
+
+    access._remove(target)
+
+    try:
+        registrators_configs = access._load_registrators_configs()
+        if registrators_configs.has_member(key):
+            registrators_configs.pop_member(key)
+    except Exception as exc:
+        _logger.debug("Popping config member %r failed: %s", key, exc)
+
+    try:
+        config_path = target.configs.path
+        parent_path = access._registrar.configs.path
+        if config_path and config_path != parent_path and os.path.isfile(config_path):
+            os.remove(config_path)
+    except Exception as exc:
+        _logger.debug("Deleting child config file failed: %s", exc)
+
+    try:
+        access._registrar.configs.write()
+    except Exception as exc:
+        _logger.debug("Persisting parent configs after remove failed: %s", exc)
 
 
 def _register_callbacks(
@@ -507,12 +716,10 @@ def _register_callbacks(
     configs,
     components: Optional[List],
     connectors: Optional[List],
+    components_access,
+    connectors_access,
 ) -> None:
-    """Register open / save / discard callbacks for the modal.
-
-    A single callback handles all three actions; ``ctx.triggered_id`` is used
-    to distinguish them.
-    """
+    """Register open / save / discard + add / remove callbacks for the modal."""
     _id = entity_id
 
     @callback(
@@ -552,35 +759,17 @@ def _register_callbacks(
 
         if triggered == f"{_id}-config-save-btn":
             try:
-                # Apply parameter field values
                 for fid, value in zip(field_ids, field_values):
                     key = fid["key"]
-                    # Checklist bool fields: value is a list (["on"] or [])
                     if isinstance(value, list):
                         value = bool(value)
-                    # Skip empty strings — don't overwrite with nothing
                     if value is None or value == "":
                         continue
                     configs[key] = value
                 configs.write()
 
-                # Apply component enable/disable
-                if components:
-                    comp_map = {c.key: c for c in components}
-                    for cid, value in zip(comp_ids, comp_values):
-                        key = cid["key"]
-                        if key in comp_map and hasattr(comp_map[key], "configs"):
-                            comp_map[key].configs.enabled = bool(value)
-                            comp_map[key].configs.write()
-
-                # Apply connector enable/disable
-                if connectors:
-                    conn_map = {c.key: c for c in connectors}
-                    for cid, value in zip(conn_ids, conn_values):
-                        key = cid["key"]
-                        if key in conn_map and hasattr(conn_map[key], "configs"):
-                            conn_map[key].configs.enabled = bool(value)
-                            conn_map[key].configs.write()
+                _apply_toggles(comp_ids, comp_values, components_access, components)
+                _apply_toggles(conn_ids, conn_values, connectors_access, connectors)
 
                 return False, dbc.Alert(
                     "Configuration saved successfully.",
@@ -598,3 +787,82 @@ def _register_callbacks(
                 )
 
         return is_open, ""
+
+    if components_access is not None:
+        _register_entity_callbacks(_id, "comp", components_access, "component")
+    if connectors_access is not None:
+        _register_entity_callbacks(_id, "conn", connectors_access, "connector")
+
+
+def _apply_toggles(ids: List[Dict[str, str]], values: List[List[str]], access, fallback_list) -> None:
+    """Apply enable/disable toggles for sub-entities."""
+    if not ids:
+        return
+    if access is not None:
+        entity_map = {e.key: e for e in access.values()}
+    elif fallback_list:
+        entity_map = {e.key: e for e in fallback_list}
+    else:
+        return
+
+    for cid, value in zip(ids, values):
+        key = cid["key"]
+        entity = entity_map.get(key)
+        if entity is None or not hasattr(entity, "configs"):
+            continue
+        entity.configs.enabled = bool(value)
+        entity.configs.write()
+
+
+def _register_entity_callbacks(entity_id: str, entity_type: str, access, slot_kind: str) -> None:
+    """Add/Remove callbacks for one entity section."""
+
+    @callback(
+        Output(f"{entity_id}-{entity_type}-list", "children"),
+        Output(f"{entity_id}-{entity_type}-add-feedback", "children"),
+        Output(f"{entity_id}-{entity_type}-add-key", "value"),
+        Output(f"{entity_id}-{entity_type}-add-name", "value"),
+        Input(f"{entity_id}-{entity_type}-add-btn", "n_clicks"),
+        Input({"type": f"{entity_id}-{entity_type}-remove", "key": ALL}, "n_clicks"),
+        State(f"{entity_id}-{entity_type}-add-type", "value"),
+        State(f"{entity_id}-{entity_type}-add-key", "value"),
+        State(f"{entity_id}-{entity_type}-add-name", "value"),
+        prevent_initial_call=True,
+    )
+    def _handle_entity(_add_clicks, remove_clicks, add_type, add_key, add_name):
+        triggered = ctx.triggered_id
+
+        if triggered == f"{entity_id}-{entity_type}-add-btn":
+            if not add_type:
+                return no_update, _alert("Type is required.", "warning"), no_update, no_update
+            if not add_key:
+                return no_update, _alert("Key is required.", "warning"), no_update, no_update
+
+            if any(e.key == add_key for e in access.values()):
+                return no_update, _alert(f"Key '{add_key}' already exists.", "warning"), no_update, no_update
+
+            try:
+                _add_child(access, add_key, add_type, add_name)
+            except Exception as exc:
+                return no_update, _alert(f"Failed to add: {exc}", "danger"), no_update, no_update
+
+            rows = _build_entity_rows(list(access.values()), entity_id, entity_type, can_remove=True)
+            return rows, _alert(f"Added {slot_kind} '{add_key}'.", "success"), "", ""
+
+        if isinstance(triggered, dict) and triggered.get("type") == f"{entity_id}-{entity_type}-remove":
+            if not any(remove_clicks):
+                return no_update, no_update, no_update, no_update
+            key = triggered.get("key")
+            try:
+                _remove_child(access, key)
+            except Exception as exc:
+                return no_update, _alert(f"Failed to remove: {exc}", "danger"), no_update, no_update
+
+            rows = _build_entity_rows(list(access.values()), entity_id, entity_type, can_remove=True)
+            return rows, _alert(f"Removed {slot_kind} '{key}'.", "success"), no_update, no_update
+
+        return no_update, no_update, no_update, no_update
+
+
+def _alert(msg: str, color: str) -> dbc.Alert:
+    return dbc.Alert(msg, color=color, duration=3000, dismissable=True, className="mb-0")
