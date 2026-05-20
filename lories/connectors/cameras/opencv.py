@@ -60,6 +60,10 @@ class OpenCV(CameraConnector):
     _preview_main: str
     _preview_sub: str
 
+    _vendor: str
+    _preview_main: str
+    _preview_sub: str
+
     _captures: Dict[str, cv2.VideoCapture]
 
     def __getstate__(self) -> Dict[str, Any]:
@@ -73,6 +77,9 @@ class OpenCV(CameraConnector):
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
+
+        if not self._host or not self._port:
+            raise ValueError("Camera configuration requires 'host' and 'port'")
 
         if self._vendor not in OpenCV.VENDOR_PATHS:
             raise ValueError(f"Unknown camera vendor '{self._vendor}'. Supported: {sorted(OpenCV.VENDOR_PATHS)}")
