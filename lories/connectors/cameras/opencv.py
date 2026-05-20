@@ -40,7 +40,9 @@ class OpenCV(CameraConnector):
     _port = Parameter(key="port", type=int, default=554, min=1, max=65535, desc="RTSP camera TCP port")
     _username = Parameter(key="username", type=str, required=False, desc="RTSP authentication username")
     _password = Parameter(key="password", type=str, required=False, desc="RTSP authentication password")
-    _vendor = Parameter(key="vendor", type=str, required=False, desc="This provides defaults for RTSP addresses")
+    _vendor = Parameter(
+        key="vendor", type=str, required=False, default="reolink", desc="This provides defaults for RTSP addresses"
+    )
 
     address = ChannelParameter(
         key="address",

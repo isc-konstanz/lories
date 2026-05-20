@@ -42,8 +42,8 @@ class CameraProtector(_CameraProtector):
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self.delay = self._delay.resolve(configs)
-        self.cooldown = self._cooldown.resolve(configs)
+        self.delay = self._delay
+        self.cooldown = self._cooldown
 
         self.data.add(CameraProtector.STATE, aggregate="max")
 
