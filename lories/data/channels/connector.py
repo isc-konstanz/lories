@@ -34,9 +34,14 @@ class ChannelConnector(_ChannelWrapper[Connector]):
 
     # noinspection PyShadowingBuiltins
     def _get_vars(self) -> Dict[str, Any]:
+        # ``self.__configs`` would name-mangle to ``_ChannelConnector__configs``
+        # but the underlying attribute lives on the parent as
+        # ``_ChannelWrapper__configs``, so the direct access raises and falls
+        # through to a buggy ``__getattr__``. Use the public accessor that the
+        # parent already exposes.
         return {
             _Connector.TYPE: self._connector,
-            **self.__configs,
+            **self._copy_configs(),
             "timestamp": self.timestamp,
             "enabled": self.enabled,
         }

@@ -118,9 +118,14 @@ class _ChannelWrapper(ABC, Generic[Registrator]):
         return attr in self._get_attrs()
 
     def __getattr__(self, attr):
-        # __getattr__ gets called when the item is not found via __getattribute__
-        # To avoid recursion, call __getattribute__ directly to get components dict
-        configs = _ChannelWrapper.__getattribute__(self, f"_{_ChannelWrapper.__name__}__configs")
+        # __getattr__ runs when normal __getattribute__ misses. Look up
+        # ``attr`` in the configs dict via the parent's mangled name.
+        # Python's name-mangling strips leading underscores from the
+        # class name first, so ``__configs`` inside ``_ChannelWrapper``
+        # is stored as ``_ChannelWrapper__configs`` (one leading
+        # underscore, not two).
+        classname = _ChannelWrapper.__name__.lstrip("_")
+        configs = _ChannelWrapper.__getattribute__(self, f"_{classname}__configs")
         if attr in configs.keys():
             return configs[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")
