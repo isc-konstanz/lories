@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Any, Collection, Dict, List, Optional, Type
 
+import numpy as np
 import pandas as pd
 import pytz as tz
 from lories._core._channel import ChannelState, _Channel  # noqa
@@ -131,9 +132,21 @@ class Channel(_Channel, Resource):
 
     @staticmethod
     def _is_empty(value: Any) -> bool:
-        if isinstance(value, Collection) and not isinstance(value, str) and not isinstance(value, bytes):
-            return any(pd.isna(value))
-        return pd.isna(value)
+        if value is None:
+            return True
+        if isinstance(value, (str, bytes, bytearray)):
+            return len(value) == 0
+        if isinstance(value, Collection):
+            # A Collection (list / Series / ndarray) is empty only when
+            # every entry is NaN — a single non-NaN value still counts as
+            # usable data. ``.all()`` over the flattened ``pd.isna(...)``
+            # stays scalar even for N-D / nested inputs, and gives the
+            # right answer on a zero-length array (NumPy's vacuous truth).
+            try:
+                return bool(np.asarray(pd.isna(value)).all())
+            except (TypeError, ValueError):
+                return False
+        return bool(pd.isna(value))
 
     def is_listener(self) -> bool:
         listener = self.get(next((k for k in ["listener", "listening", "listen"] if k in self), None), default=None)
