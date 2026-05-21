@@ -331,7 +331,16 @@ class SqlDatabase(Database, Mapping[str, Table]):
                 for table_name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
                     if table_name not in self.__tables:
                         raise DatabaseError(self, f"Table '{table_name}' not available")
-                    table_data = data.loc[:, [r.id for r in table_resources if r.id in data.columns]]
+                    # Composite-PK tables (predictor's ``timestamp_creation``,
+                    # etc.) need every PK column on every emitted row. If the
+                    # LogTask carries only a non-PK channel that advanced since
+                    # the last flush, the partner column is missing from
+                    # ``data`` and ``Table._validate`` would raise on
+                    # ``validate(None)`` for the non-nullable PK. Pull the
+                    # partner's current Series off the live channel so the
+                    # SQL row is always whole.
+                    table_data = self._with_pk_partners(data, table_resources)
+                    table_data = table_data.loc[:, [r.id for r in table_resources if r.id in table_data.columns]]
                     table_data = table_data.dropna(axis="index", how="all")
                     if table_data.empty:
                         continue
@@ -344,6 +353,42 @@ class SqlDatabase(Database, Mapping[str, Table]):
 
         except SQLAlchemyError as e:
             self._raise(e)
+
+    @staticmethod
+    def _with_pk_partners(data: pd.DataFrame, table_resources: Resources) -> pd.DataFrame:
+        """Augment ``data`` with any ``logger.primary = true`` resources for
+        this table that aren't already in the frame, reading their current
+        Series off the *live* channel. Lets a single-channel LogTask still
+        produce a SQL row with every primary-key column filled.
+
+        ``table_resources`` are the connector's stored resources — a
+        ``from_logger()`` snapshot taken at connect-time, so their
+        ``_value`` / ``_state`` / ``_timestamp`` are frozen. Resolve each
+        partner back to the live channel via its shared ``_context``
+        before reading ``is_valid`` / ``to_series``.
+
+        Returns ``data`` unchanged when nothing needs augmenting.
+        """
+        partners: list = []
+        for r in table_resources:
+            if r.id in data.columns:
+                continue
+            if not bool(r.logger.get("primary", default=False)):
+                continue
+            live = r._context.get(r.id) if r._context is not None else None
+            if live is None or not live.is_valid():
+                continue
+            partners.append(live)
+        if not partners:
+            return data
+        augmented = data.copy()
+        for live in partners:
+            # ``to_series`` returns the channel's current Series (or a
+            # one-row Series for scalar values). Reindex to the LogTask's
+            # row timestamps — for the predictor's composite-PK pattern
+            # the two indices coincide, so every row gets its PK value.
+            augmented[live.id] = live.to_series().reindex(augmented.index)
+        return augmented
 
     def delete(
         self,
