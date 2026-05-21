@@ -13,7 +13,7 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple
 import sqlalchemy as sql
 from sqlalchemy import ClauseElement, Dialect, Result, UnaryExpression
 from sqlalchemy.sql import Delete, Insert, Select, and_, asc, between, desc, func, literal, not_, or_, text
-from sqlalchemy.types import BLOB, DATETIME, TIMESTAMP
+from sqlalchemy.types import DATETIME, TIMESTAMP, LargeBinary
 
 import numpy as np
 import pandas as pd
@@ -202,7 +202,7 @@ class Table(sql.Table):
                 )
             if column.type == TIMESTAMP or isinstance(column.type, TIMESTAMP):
                 return func.unix_timestamp(column)
-            if column.type == BLOB or isinstance(column.type, BLOB):
+            if column.type == LargeBinary or isinstance(column.type, LargeBinary):
                 return method(column)
             else:
                 return column
@@ -240,20 +240,25 @@ class Table(sql.Table):
         primary_columns = self.primary_key.columns
         params = self._validate(resources, data.replace(np.nan, None))
 
-        # Handle duplicate primary keys (upsert)
+        # Handle duplicate primary keys (upsert). ``set_={c.name: c}``
+        # would compile to ``col = "table".col`` — i.e. set the existing
+        # row's column to its own value, a no-op that silently strands
+        # any updated bytes / scalar in the new row. Reference the new
+        # row explicitly via the dialect's ``excluded`` / ``inserted``
+        # alias so a second flush of the same PK actually overwrites.
         if self.dialect.name == "postgresql":
             from sqlalchemy.dialects import postgresql
 
             query = postgresql.insert(self).values(params)
             return query.on_conflict_do_update(
                 index_elements=[c.name for c in primary_columns],
-                set_={c.name: c for c in resource_columns},
+                set_={c.name: query.excluded[c.name] for c in resource_columns},
             )
         elif self.dialect.name in ["mariadb", "mysql"]:
             from sqlalchemy.dialects import mysql
 
             query = mysql.insert(self).values(params)
-            return query.on_duplicate_key_update({c.name: c for c in resource_columns})
+            return query.on_duplicate_key_update({c.name: query.inserted[c.name] for c in resource_columns})
         else:
             return sql.insert(self).values(params)
 

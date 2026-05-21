@@ -13,7 +13,7 @@ import datetime as dt
 from typing import Any, AnyStr, Optional, Type, TypeVar
 
 import sqlalchemy as sql
-from sqlalchemy.types import BLOB, BOOLEAN, DATETIME, FLOAT, INTEGER, TIMESTAMP, String, TypeEngine
+from sqlalchemy.types import BOOLEAN, DATETIME, FLOAT, INTEGER, TIMESTAMP, LargeBinary, String, TypeEngine
 
 import numpy as np
 import pandas as pd
@@ -90,7 +90,11 @@ def to_type_engine(type: Type | AnyStr, length: Optional[int] = None) -> Type[Ty
     if type in ["BOOL", "BOOLEAN"]:
         return BOOLEAN
     if type in ["BYTE", "BYTES"]:
-        return BLOB(length=4294967295)
+        # ``LargeBinary`` is the cross-dialect bytes type: it renders BYTEA
+        # on PostgreSQL, BLOB on SQLite, and BLOB/MEDIUMBLOB/LONGBLOB on
+        # MySQL depending on length. Hard-coding ``BLOB`` here used to
+        # break PostgreSQL DDL (``type "blob" does not exist``).
+        return LargeBinary(length=4294967295)
     if type == "DATETIME":
         return DATETIME
     if type == "TIMESTAMP":
