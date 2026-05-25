@@ -11,18 +11,48 @@ from __future__ import annotations
 from typing import Dict, Optional
 
 from revpimodio2 import EventCallback, RevPiModIO, io
+from revpimodio2.io import IntIO
 
 import pandas as pd
 import pytz as tz
 from lories.connectors import Connector, register_connector_type
 from lories.data.channels import Channel
 from lories.typing import Configurations, Resources
-from lories.util import to_bool
+from lories.util import to_bool, to_timedelta
 
 
 # noinspection PyShadowingBuiltins, SpellCheckingInspection
 @register_connector_type("revpi", "revpi_io", "revpi_aio", "revpi_mio", "revpi_ro", "revolutionpi")
 class RevPiConnector(Connector):
+    # Per-channel parameters (kept commented until the Parameter migration
+    # reaches this connector; for now they're read via channel.get()):
+    #
+    # edge = ChannelParameter(
+    #     type=str,
+    #     required=False,
+    #     default=None,
+    #     choices=["rising", "falling", "both"],
+    #     desc=(
+    #         "Edge filter for bit-IO listeners: 'rising' | 'falling' | 'both'. "
+    #         "Only applies to bit-oriented IOs (digital inputs / single bits). "
+    #         "Omit for counter / analog / byte / word IOs — revpimodio2 rejects 'edge' "
+    #         "on non-bit objects and instead fires on any value change. "
+    #         "If 'edge' is configured on a non-bit IO it is ignored (with a warning)."
+    #     ),
+    # )
+    # cooldown = ChannelParameter(
+    #     type=str,
+    #     required=False,
+    #     default=None,
+    #     desc=(
+    #         "Minimum interval between successive RevPiListener firings for this channel "
+    #         "(duration string, e.g. '5s', '500ms', '1min'). Events that arrive within "
+    #         "the cooldown window after the last accepted event are dropped."
+    #     ),
+    # )
+
+    _EDGES = {"rising": io.RISING, "falling": io.FALLING, "both": io.BOTH}
+
     _core: RevPiModIO
     _cycletime: Optional[int]
 
@@ -44,9 +74,28 @@ class RevPiConnector(Connector):
 
         channels = resources.filter(lambda r: isinstance(r, Channel) and to_bool(r.get("listener", False)))
         for channel in channels:
-            channel_listener = RevPiListener(channel)
+            cooldown_raw = channel.get("cooldown", None)
+            cooldown = to_timedelta(cooldown_raw) if cooldown_raw else None
+            channel_listener = RevPiListener(channel, cooldown=cooldown)
             channel_io = self._core.io[channel_listener.address]
-            channel_io.reg_event(channel_listener, edge=io.RISING, as_thread=True, prefire=True)
+
+            event_kwargs = {"as_thread": True, "prefire": True}
+            edge = channel.get("edge", None)
+            if edge is not None:
+                # revpimodio2 raises RuntimeError("parameter 'edge' can be used with bit io objects only")
+                # when 'edge' is passed for an IntIO / StructIO (counters, analog, byte/word IOs).
+                # Detect non-bit IOs and silently drop the kwarg instead of crashing the connector.
+                if isinstance(channel_io, IntIO):
+                    self._logger.warning(
+                        f"Ignoring edge='{edge}' on non-bit IO '{channel_listener.address}' "
+                        f"({type(channel_io).__name__}) for channel '{channel.id}' — "
+                        f"revpimodio2 only supports edge filtering on bit IOs. "
+                        f"Listener will fire on any value change."
+                    )
+                else:
+                    event_kwargs["edge"] = self._EDGES[str(edge).lower()]
+
+            channel_io.reg_event(channel_listener, **event_kwargs)
             self._listeners[channel.id] = channel_listener
 
         # Handle SIGINT / SIGTERM to exit program cleanly
@@ -92,11 +141,23 @@ class RevPiListener:
     address: str
 
     _channel: Channel
+    _cooldown: Optional[pd.Timedelta]
+    _last_fired: Optional[pd.Timestamp]
 
-    def __init__(self, channel: Channel):
+    def __init__(
+        self,
+        channel: Channel,
+        cooldown: Optional[pd.Timedelta] = None,
+    ):
         self._channel = channel
         self.address = channel.address
+        self._cooldown = cooldown
+        self._last_fired = None
 
     def __call__(self, event: EventCallback) -> None:
         now = pd.Timestamp.now(tz=tz.UTC).floor(freq="s")
+        if self._cooldown is not None and self._last_fired is not None:
+            if now - self._last_fired < self._cooldown:
+                return
         self._channel.set(now, event.iovalue)
+        self._last_fired = now
