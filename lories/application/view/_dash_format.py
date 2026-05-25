@@ -15,7 +15,7 @@ from typing import Any
 
 # Channel units that the UI should render as image previews. Compared
 # case-insensitively after stripping whitespace.
-_IMAGE_UNITS: frozenset[str] = frozenset(
+IMAGE_UNITS: frozenset[str] = frozenset(
     {
         "png",
         "jpg",
@@ -55,7 +55,7 @@ def format_bytes_label(channel: Any, value: Any) -> str:
         return "(streaming)"
 
     unit = (getattr(channel, "unit", "") or "").strip().lower()
-    if unit in _IMAGE_UNITS:
+    if unit in IMAGE_UNITS:
         return "(image)"
 
     try:

@@ -16,7 +16,7 @@ import dash_bootstrap_components as dbc
 from dash import Input, Output, callback, html
 
 import pandas as pd
-from lories.application.view._dash_format import format_bytes_label
+from lories.application.view._dash_format import IMAGE_UNITS, format_bytes_label
 from lories.application.view.pages import Page, PageLayout
 from lories.application.view.pages.widgets import build_configs_editor_modal
 from lories.typing import Channel, Channels, Component, Components, Configurations, Connector, Connectors, Data
@@ -206,25 +206,140 @@ class ComponentPage(Page, Generic[Component]):
                     )
                 )
             value = channel.value
-            if value is None or not isinstance(value, (bytes, bytearray)):
-                return None
-            encoded = base64.b64encode(value).decode("ascii")
-            return html.Div(
-                html.Img(
-                    src=f"data:image/jpeg;base64,{encoded}",
-                    style={"maxWidth": "100%", "height": "auto"},
-                )
-            )
+            # Multi-row channel values (e.g. the soil predictor publishes a
+            # length-N pd.Series of PNG bytes — one frame per save tick)
+            # go through the same timestamp/value table as float Series.
+            # The table renderer detects bytes values and emits ``<img>``
+            # cells when the channel unit is an image format, or a size
+            # summary otherwise.
+            if isinstance(value, pd.Series):
+                return self._build_channel_series_table(channel, value)
+            return self._build_bytes_img(value)
         if channel.type == list:
             value = channel.value
             if value is None:
                 return html.Span("—", className="text-muted")
             return self._build_channel_list_table(channel, value)
+        # Multi-row Series values (predictor trajectories, timestamp_creation
+        # series, etc.) render as a two-column timestamp/value table so the
+        # full horizon is readable when the channel accordion is expanded.
+        value = channel.value
+        if isinstance(value, pd.Series):
+            return self._build_channel_series_table(channel, value)
         if not (channel.has_logger() or channel.type == pd.Series):
             return None
 
         # TODO: Implement a Graph for logged values or pandas.Series types
         return html.Div(html.I("Placeholder", className="text-muted"))
+
+    # noinspection PyMethodMayBeStatic
+    def _build_bytes_img(self, value) -> Optional[html.Div]:
+        """Render one bytes blob as an inline ``<img>`` block. Returns
+        ``None`` for empty / non-bytes input."""
+        if not isinstance(value, (bytes, bytearray)) or len(value) == 0:
+            return None
+        encoded = base64.b64encode(value).decode("ascii")
+        return html.Div(
+            html.Img(
+                src=f"data:image/jpeg;base64,{encoded}",
+                style={"maxWidth": "100%", "height": "auto"},
+            )
+        )
+
+    # noinspection PyMethodMayBeStatic
+    def _build_channel_series_table(self, channel: Channel, series: pd.Series) -> dbc.Table:
+        """Two-column timestamp / value table for a multi-row channel value.
+        Float values render with 3-significant-figure precision (same as
+        the accordion header); timestamps as ``YYYY-MM-DD HH:MM:SS``.
+        Image-unit bytes are rendered as inline ``<img>`` cells; other
+        bytes get a length summary so opaque blobs don't print as garbage."""
+        unit = (channel.unit or "").strip()
+        unit_is_image = unit.lower() in IMAGE_UNITS
+
+        def _fmt_value(v):
+            """Returns either a string (for text cells) or a Dash component
+            (for image cells). Callers wrap text returns in a Td with the
+            channel unit; component returns go straight into the Td."""
+            if v is None:
+                return "—"
+            if isinstance(v, (bytes, bytearray, memoryview)):
+                if unit_is_image and len(v) > 0:
+                    encoded = base64.b64encode(bytes(v)).decode("ascii")
+                    return html.Img(
+                        src=f"data:image/jpeg;base64,{encoded}",
+                        style={"maxWidth": "100%", "height": "auto"},
+                    )
+                return f"({len(v):,} bytes)"
+            if isinstance(v, float):
+                # NaN turns into a clean em-dash so missing-by-design rows
+                # (e.g. predictor diagnostics at the IC row) don't print "nan".
+                if pd.isna(v):
+                    return "—"
+                return f"{v:#.3g}"
+            if isinstance(v, pd.Timestamp):
+                return v.isoformat(sep=" ", timespec="seconds")
+            return str(v)
+
+        def _fmt_index(idx):
+            if isinstance(idx, pd.Timestamp):
+                return idx.isoformat(sep=" ", timespec="seconds")
+            return str(idx)
+
+        idx_style = {
+            "padding": "0.15rem 0.5rem",
+            "color": "var(--bs-secondary-color, #6c757d)",
+            "whiteSpace": "nowrap",
+            "verticalAlign": "top",
+        }
+        val_style_text = {
+            "padding": "0.15rem 0.5rem",
+            "textAlign": "right",
+            "fontVariantNumeric": "tabular-nums",
+        }
+        val_style_image = {
+            "padding": "0.25rem 0.5rem",
+        }
+
+        def _value_td(v):
+            formatted = _fmt_value(v)
+            if isinstance(formatted, str):
+                label = f"{formatted} {unit}".rstrip() if unit and not unit_is_image else formatted
+                return html.Td(label, style=val_style_text)
+            return html.Td(formatted, style=val_style_image)
+
+        rows = [
+            html.Tr(
+                [
+                    html.Td(_fmt_index(idx), style=idx_style),
+                    _value_td(v),
+                ]
+            )
+            for idx, v in series.items()
+        ]
+        th_base = {"padding": "0.15rem 0.5rem", "fontWeight": "normal"}
+        header = html.Thead(
+            html.Tr(
+                [
+                    html.Th("Timestamp", style=th_base),
+                    html.Th("Value", style={**th_base, "textAlign": "right"}),
+                ]
+            )
+        )
+        return dbc.Table(
+            [header, html.Tbody(rows)],
+            size="sm",
+            striped=True,
+            bordered=False,
+            hover=True,
+            className="mb-1",
+            style={
+                "minWidth": "20rem",
+                "width": "auto",
+                "border": "1px solid var(--bs-border-color, #dee2e6)",
+                "borderRadius": "0.25rem",
+                "overflow": "hidden",
+            },
+        )
 
     # noinspection PyMethodMayBeStatic
     def _build_channel_list_table(self, channel: Channel, value: list) -> dbc.Table:
@@ -313,6 +428,30 @@ class ComponentPage(Page, Generic[Component]):
         if channel.type == bytes:
             label = format_bytes_label(channel, value)
             return html.Span(label, className="text-muted mb-1", style={"margin-right": "0.2rem"})
+        # Multi-row channel values (e.g. forecast trajectories the soil
+        # predictor publishes as a length-N ``pd.Series`` indexed by target
+        # timestamp) cannot go through scalar format specifiers — ``f"{s:#.3g}"``
+        # raises ``TypeError: unsupported format string passed to
+        # Series.__format__``. Render a length summary plus the most recent
+        # entry so the accordion header stays informative.
+        if isinstance(value, pd.Series):
+            latest = value.dropna()
+            if latest.empty:
+                summary = f"({len(value)} values)"
+            else:
+                last = latest.iloc[-1]
+                if channel.type == float and isinstance(last, (int, float)):
+                    formatted = f"{last:#.3g}"
+                elif isinstance(last, pd.Timestamp):
+                    formatted = last.isoformat(sep=" ", timespec="seconds")
+                else:
+                    formatted = str(last)
+                summary = f"({len(value)} values, latest={formatted})"
+            return html.Span(
+                summary,
+                className="text-muted mb-1",
+                style={"margin-right": "0.2rem"},
+            )
         if channel.type == float:
             # 3 significant figures with trailing zeros preserved (``#``
             # flag) — reads as "0.00", "0.120", "0.0100" so small values
