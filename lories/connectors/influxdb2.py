@@ -45,7 +45,7 @@ class InfluxDB2(Database):
     _port = Parameter(key="port", type=int, default=8086, min=1, max=65535, desc="InfluxDB server TCP port")
     _org = Parameter(key="org", type=str, required=True, desc="InfluxDB organisation name")
     _bucket = Parameter(key="bucket", type=str, required=True, desc="InfluxDB bucket name")
-    _token = Parameter(key="token", type=str, required=True, desc="InfluxDB API authentication token")
+    _token = Parameter(key="token", type=str, required=True, desc="InfluxDB API authentication token", secret=True)
     _timeout = Parameter(key="timeout", type=pd.Timedelta, default="10s", min="0s", desc="HTTP request timeout")
     _ssl = Parameter(key="ssl", type=bool, default=False, desc="Use HTTPS instead of HTTP")
     _ssl_verify = Parameter(key="ssl_verify", type=bool, default=True, desc="Verify the server's SSL certificate")
