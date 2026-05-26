@@ -96,12 +96,17 @@ def get_members(
                 raise AttributeError
         except (AttributeError, ResourceError):
             continue
-        if (
-            (private or "__" not in attr)
-            and (filter is None or filter(attr, member))
-            and member not in members.values()
-        ):
-            members[attr] = member
+        if (private or "__" not in attr) and (filter is None or filter(attr, member)):
+            try:
+                duplicate = member in members.values()
+            except (ValueError, TypeError):
+                # Array-like / unhashable values (e.g. numpy arrays) raise on `==` /
+                # `in`. Fall back to identity-based dedup, which is what the check
+                # was effectively guarding against anyway (attribute aliases on the
+                # same instance pointing at one underlying object).
+                duplicate = any(v is member for v in members.values())
+            if not duplicate:
+                members[attr] = member
         processed.add(attr)
     return dict(sorted(members.items()))
 
