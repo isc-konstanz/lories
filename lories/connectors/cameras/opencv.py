@@ -15,6 +15,13 @@ from lories.connectors import ConnectionError, ConnectorError, register_connecto
 from lories.connectors.cameras import CameraConnector
 from lories.typing import Configurations, Resource, Resources
 
+# Silence OpenCV WARNs globally. The FFmpeg interrupt callback logs
+# "Stream timeout triggered after Xms" via CV_LOG_WARNING on every RTSP
+# stall; we surface real disconnects via ConnectionError. Must be set at
+# runtime — OPENCV_VIDEOIO_LOG_LEVEL is read once during videoio init and
+# os.environ writes after `import cv2` have no effect.
+cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_ERROR)
+
 
 @register_connector_type("opencv")
 class OpenCV(CameraConnector):
@@ -62,13 +69,6 @@ class OpenCV(CameraConnector):
             "rtsp_transport;tcp|"  # use TCP only
             "max_delay;500000"  # 0.5 sec max internal delay
         )
-        # Silence OpenCV's videoio module WARNs (the FFmpeg interrupt
-        # callback prints "Stream timeout triggered after Xms" to stderr
-        # whenever the RTSP demuxer stalls — expected on flaky networks,
-        # and we surface real disconnects via ConnectionError anyway).
-        # Scoped to videoio so cv2 calls in data.processors.motion keep
-        # their core/imgproc warnings.
-        os.environ["OPENCV_VIDEOIO_LOG_LEVEL"] = "ERROR"
         self._captures = {}
 
     def connect(self, resources: Resources) -> None:
