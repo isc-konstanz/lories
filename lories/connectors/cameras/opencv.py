@@ -60,12 +60,7 @@ class OpenCV(CameraConnector):
 
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
             "rtsp_transport;tcp|"  # use TCP only
-            "max_delay;500000|"  # 0.5 sec max internal delay
-            # FFmpeg socket read timeout (microseconds). Without this, FFmpeg
-            # falls back to its 30 s default and CAP_PROP_READ_TIMEOUT_MSEC is
-            # not always honored by the FFmpeg backend, so disconnects sit in
-            # the demuxer for 30 s before our own handling can react.
-            "stimeout;3000000"
+            "max_delay;500000"  # 0.5 sec max internal delay
         )
         self._captures = {}
 
@@ -78,7 +73,11 @@ class OpenCV(CameraConnector):
             address = resource.get("address", default=OpenCV.PREVIEW_SUB if streaming else OpenCV.PREVIEW_MAIN)
 
             if address not in self._captures:
+                # TODO: Make timeouts configurable
                 capture = cv2.VideoCapture()
+                capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                capture.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 3000)
+                capture.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 3000)
                 self._captures[address] = capture
             else:
                 capture = self._captures.get(address)
@@ -91,24 +90,7 @@ class OpenCV(CameraConnector):
         auth = f"{self._username}:{self._password}@" if self._username and self._password else ""
         address = f"{self._host}:{self._port}/{address}"
         url = f"rtsp://{auth}{address}"
-        # Pass timeouts via the params overload — set() on an unopened
-        # VideoCapture is not propagated into the FFmpeg backend, so the
-        # OpenCV interrupt callback falls back to its 30 s default. The
-        # params overload applies them at open time, where they stick.
-        # BUFFERSIZE is intentionally omitted: the FFmpeg backend rejects
-        # it in the params whitelist and ignores it post-open anyway
-        # (the RTSP demuxer keeps its own FIFO).
-        # TODO: Make timeouts configurable
-        capture.open(
-            url,
-            cv2.CAP_FFMPEG,
-            [
-                cv2.CAP_PROP_OPEN_TIMEOUT_MSEC,
-                3000,
-                cv2.CAP_PROP_READ_TIMEOUT_MSEC,
-                3000,
-            ],
-        )
+        capture.open(url, apiPreference=cv2.CAP_FFMPEG)
 
         if not capture.isOpened():
             raise ConnectionError(self, f"Cannot open RTSP stream: 'rtsp://#:#@{address}'")
