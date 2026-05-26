@@ -49,7 +49,7 @@ class MqttConnector(Connector):
         desc="Keepalive interval for the broker connection",
     )
     _username = Parameter(key="username", type=str, required=False, desc="MQTT authentication username")
-    _password = Parameter(key="password", type=str, required=False, desc="MQTT authentication password")
+    _password = Parameter(key="password", type=str, required=False, desc="MQTT authentication password", secret=True)
 
     topic = ChannelParameter(type=str, desc="MQTT topic this channel subscribes to or publishes on")
 

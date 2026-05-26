@@ -45,7 +45,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
     _host = Parameter(key="host", type=str, required=True, desc="Database server hostname")
     _port = Parameter(key="port", type=int, required=True, min=1, max=65535, desc="Database server TCP port")
     _user = Parameter(key="user", type=str, required=True, desc="Database authentication username")
-    _password = Parameter(key="password", type=str, required=True, desc="Database authentication password")
+    _password = Parameter(key="password", type=str, required=True, desc="Database authentication password", secret=True)
     _database = Parameter(key="database", type=str, required=True, desc="Default database / schema name to connect to")
     _dialect = SelectParameter(
         ["postgresql", "mysql", "mariadb", "sqlite", "mssql"],

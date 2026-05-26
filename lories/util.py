@@ -292,6 +292,8 @@ def to_timedelta(freq: str) -> relativedelta | pd.Timedelta:
         return pd.Timedelta(hours=freq_val)
     elif freq.endswith("min"):
         return pd.Timedelta(minutes=freq_val)
+    elif freq.endswith("ms"):
+        return pd.Timedelta(milliseconds=freq_val)
     elif freq.endswith("s"):
         return pd.Timedelta(seconds=freq_val)
     else:
@@ -394,6 +396,8 @@ def parse_freq(freq: str) -> Optional[str]:
         return _parse_freq("min")
     elif unit_part.lower() in ["s", "sec", "secs"]:
         return _parse_freq("s")
+    elif unit_part.lower() in ["ms", "milli", "millis", "millisecond", "milliseconds"]:
+        return _parse_freq("ms")
     else:
         raise ValueError(f"Invalid frequency: {freq}")
 
