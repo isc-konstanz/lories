@@ -15,7 +15,7 @@ from revpimodio2 import EventCallback, RevPiModIO, io
 import pandas as pd
 import pytz as tz
 from lories.connectors import Connector, register_connector_type
-from lories.core.configs.parameters import ChannelParameter, Parameter
+from lories.core.configs.parameters import ChannelParameter, DurationParameter
 from lories.data.channels import Channel
 from lories.typing import Resources
 from lories.util import to_bool
@@ -31,12 +31,14 @@ class RevPiConnector(Connector):
     image interface is Linux-specific and requires direct hardware access, limiting remote or cross-platform usage.
     """
 
-    _cycletime = Parameter(
+    _cycletime = DurationParameter(
         key="cycletime",
-        type=int,
         required=False,
-        min=1,
-        desc="Process image polling cycle time in milliseconds (defaults to the RevPiModIO library default)",
+        min="1ms",
+        desc=(
+            "Process image polling cycle interval as a duration string (e.g. '200ms', '1s'). "
+            "Defaults to the RevPiModIO library default."
+        ),
     )
 
     # Per-channel parameters
@@ -49,7 +51,7 @@ class RevPiConnector(Connector):
     )
 
     _core: RevPiModIO
-    _cycletime: Optional[int]
+    _cycletime: Optional[pd.Timedelta]
 
     _listeners: Dict[str, RevPiListener]
 
@@ -60,8 +62,8 @@ class RevPiConnector(Connector):
     def connect(self, resources: Resources) -> None:
         super().connect(resources)
         self._core = RevPiModIO(autorefresh=True)
-        if self._cycletime:
-            self._core.cycletime = self._cycletime
+        if self._cycletime is not None:
+            self._core.cycletime = self._cycletime // pd.Timedelta("1ms")
 
         channels = resources.filter(lambda r: isinstance(r, Channel) and to_bool(r.get("listener", False)))
         for channel in channels:
