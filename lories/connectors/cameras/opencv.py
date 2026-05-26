@@ -95,6 +95,9 @@ class OpenCV(CameraConnector):
         # VideoCapture is not propagated into the FFmpeg backend, so the
         # OpenCV interrupt callback falls back to its 30 s default. The
         # params overload applies them at open time, where they stick.
+        # BUFFERSIZE is intentionally omitted: the FFmpeg backend rejects
+        # it in the params whitelist and ignores it post-open anyway
+        # (the RTSP demuxer keeps its own FIFO).
         # TODO: Make timeouts configurable
         capture.open(
             url,
@@ -104,8 +107,6 @@ class OpenCV(CameraConnector):
                 3000,
                 cv2.CAP_PROP_READ_TIMEOUT_MSEC,
                 3000,
-                cv2.CAP_PROP_BUFFERSIZE,
-                1,
             ],
         )
 
