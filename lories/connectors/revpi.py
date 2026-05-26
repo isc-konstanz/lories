@@ -15,9 +15,10 @@ from revpimodio2.io import IntIO
 
 import pandas as pd
 import pytz as tz
+from lories import Configurations
 from lories.connectors import Connector, register_connector_type
 from lories.data.channels import Channel
-from lories.typing import Configurations, Resources
+from lories.typing import Resources
 from lories.util import to_bool, to_timedelta
 
 
