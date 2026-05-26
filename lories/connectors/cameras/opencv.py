@@ -60,7 +60,12 @@ class OpenCV(CameraConnector):
 
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
             "rtsp_transport;tcp|"  # use TCP only
-            "max_delay;500000"  # 0.5 sec max internal delay
+            "max_delay;500000|"  # 0.5 sec max internal delay
+            # FFmpeg socket read timeout (microseconds). Without this, FFmpeg
+            # falls back to its 30 s default and CAP_PROP_READ_TIMEOUT_MSEC is
+            # not always honored by the FFmpeg backend, so disconnects sit in
+            # the demuxer for 30 s before our own handling can react.
+            "stimeout;3000000"
         )
         self._captures = {}
 
