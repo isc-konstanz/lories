@@ -13,31 +13,47 @@ from lories.components import register_component_type
 from lories.components.cameras._core import _Camera
 from lories.components.cameras.protection import CameraProtector
 from lories.core import Configurations
+from lories.core.configs.parameters import BoolParameter, ParameterGroup
 
 
 # noinspection SpellCheckingInspection
 @register_component_type("camera")
 class Camera(_Camera):
+    _channels = ParameterGroup(
+        key="channels",
+        desc="Channels exposed by this camera",
+        children=[
+            BoolParameter(key="stream", default=False, desc="Expose a live MJPEG stream channel"),
+            BoolParameter(key="motion", default=False, desc="Run motion detection on the stream"),
+        ],
+    )
+    _preview = BoolParameter(
+        key="preview",
+        default=False,
+        desc="Render the live preview in the dashboard",
+    )
+
+    preview: bool = False
     protection: Optional[CameraProtector] = None
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
+        self.preview = self._preview
+        self.protection = CameraProtector(
+            self,
+            name=f"{self.name} Protection",
+            configs=configs.get_member(CameraProtector.TYPE, defaults={}),
+        )
+        self.components.add(self.protection)
 
-        if configs.has_member(CameraProtector.TYPE, includes=True):
-            self.protection = CameraProtector(
-                self,
-                name=f"{self.name} Protection",
-                configs=configs.get_member(CameraProtector.TYPE),
-            )
-            self.components.add(self.protection)
+        channels = self._channels
 
-        if configs.get_bool("frame", default=True):
-            self.data.add(Camera.FRAME, aggregate="last")
+        self.data.add(Camera.FRAME, aggregate="last")
 
-        if configs.get_bool("stream", default=False):
+        if channels.get("stream", False):
             self.data.add(Camera.STREAM, aggregate="last", freq=None, stream=True)
 
-        if configs.get_bool("motion", default=False):
+        if channels.get("motion", False):
             self.data.add(
                 Camera.MOTION,
                 aggregate="last",

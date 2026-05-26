@@ -18,8 +18,9 @@ from urllib3.exceptions import MaxRetryError
 
 import pandas as pd
 import pytz as tz
-from lories.connectors import ConnectionError, Connector, ConnectorError
+from lories.connectors import ConnectionError, Connector, ConnectorError, register_connector_type
 from lories.core.configs import ConfigurationError
+from lories.core.configs.parameters import ChannelParameter, Parameter, SelectParameter
 from lories.typing import Configurations, Resources, Timestamp
 from lories.util import parse_freq
 
@@ -32,14 +33,38 @@ except ImportError:
 
 
 # noinspection SpellCheckingInspection
+@register_connector_type("entsoe")
 class EntsoeConnector(Connector):
+    """
+    ENTSO-E (European Network of Transmission System Operators for Electricity) provides a Transparency Platform
+    API for accessing European electricity market data, including day-ahead prices, generation forecasts, and
+    cross-border flows. The REST API delivers standardized data across all EU member states. However, rate limits,
+    occasional data gaps, and historical changes in bidding zone codes (e.g. the DE/AT/LU split) require careful
+    handling on the client side.
+    """
+
+    _country_code = Parameter(
+        key="country_code",
+        type=str,
+        required=True,
+        desc="ENTSO-E bidding zone code (e.g. DE, AT, LU; historical variants DE_AT_LU, DE_LU resolved automatically)",
+    )
+    _api_key = Parameter(key="api_key", type=str, required=True, desc="ENTSO-E Transparency Platform API token")
+    _resolution = SelectParameter(
+        ["15min", "30min", "60min"], key="resolution", default="60min", desc="Time resolution of returned series"
+    )
+
+    # Per-channel parameters
+    method = ChannelParameter(
+        type=str, required=True, choices=["day_ahead"], desc="ENTSO-E query method to invoke for this channel"
+    )
+
     DAY_AHEAD: str = "day_ahead"
     METHODS: list = [DAY_AHEAD]
 
     resolution: Literal["60min", "30min", "15min"] = "60min"
 
     country_code: str
-    _api_key: str
 
     _client: Optional[EntsoePandasClient]
 
@@ -50,11 +75,9 @@ class EntsoeConnector(Connector):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        self.resolution = self._validate_resolution(configs.get("resolution", default=EntsoeConnector.resolution))
-        self.country_code = self._validate_country_code(configs.get("country_code").upper())
-        self._api_key = configs.get("api_key", default=None)
-        if self._api_key is None:
-            raise ConfigurationError("Missing security token")
+        self._client = None
+        self.resolution = self._validate_resolution(self._resolution)
+        self.country_code = self._validate_country_code(self._country_code.upper())
 
     # noinspection PyTypeChecker
     def _validate_resolution(self, resolution: str) -> Literal["60min", "30min", "15min"]:

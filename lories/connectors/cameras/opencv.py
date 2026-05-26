@@ -13,6 +13,7 @@ import cv2
 
 from lories.connectors import ConnectionError, ConnectorError, register_connector_type
 from lories.connectors.cameras import CameraConnector
+from lories.core.configs.parameters import ChannelParameter, Parameter
 from lories.typing import Configurations, Resource, Resources
 
 
@@ -35,11 +36,29 @@ class OpenCV(CameraConnector):
     }
     DEFAULT_VENDOR: str = "reolink"
 
+    _host = Parameter(key="host", type=str, required=True, desc="RTSP camera hostname or IP address")
+    _port = Parameter(key="port", type=int, default=554, min=1, max=65535, desc="RTSP camera TCP port")
+    _username = Parameter(key="username", type=str, required=False, desc="RTSP authentication username")
+    _password = Parameter(key="password", type=str, required=False, desc="RTSP authentication password")
+    _vendor = Parameter(
+        key="vendor", type=str, required=False, default="reolink", desc="This provides defaults for RTSP addresses"
+    )
+
+    address = ChannelParameter(
+        key="address",
+        type=str,
+        required=True,
+        desc="Vendor-specific RTSP path appended to 'rtsp://<host>:<port>/' (e.g. 'Streaming/Channels/101')",
+    )
+
     _host: str
     _port: int
-
     _username: Optional[str]
     _password: Optional[str]
+
+    _vendor: str
+    _preview_main: str
+    _preview_sub: str
 
     _vendor: str
     _preview_main: str
@@ -59,20 +78,12 @@ class OpenCV(CameraConnector):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        self._host = configs.get("host")
-        self._port = configs.get_int("port", default=554)
-
-        self._username = configs.get("username", default=None)
-        self._password = configs.get("password", default=None)
-
         if not self._host or not self._port:
             raise ValueError("Camera configuration requires 'host' and 'port'")
 
-        vendor = configs.get("vendor", default=OpenCV.DEFAULT_VENDOR).lower()
-        if vendor not in OpenCV.VENDOR_PATHS:
-            raise ValueError(f"Unknown camera vendor '{vendor}'. Supported: {sorted(OpenCV.VENDOR_PATHS)}")
-        self._vendor = vendor
-        self._preview_main, self._preview_sub = OpenCV.VENDOR_PATHS[vendor]
+        if self._vendor not in OpenCV.VENDOR_PATHS:
+            raise ValueError(f"Unknown camera vendor '{self._vendor}'. Supported: {sorted(OpenCV.VENDOR_PATHS)}")
+        self._preview_main, self._preview_sub = OpenCV.VENDOR_PATHS[self._vendor]
 
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
             "rtsp_transport;tcp|"  # use TCP only

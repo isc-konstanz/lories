@@ -16,12 +16,18 @@ from pathlib import Path
 from typing import Optional
 
 import dash
+import dash_bootstrap_components as dbc
 from dash import Dash, dcc, html
 from dash_bootstrap_components import themes
 
 from lories.application import Application
 from lories.application.interface import Interface, register_interface_type
 from lories.application.view import LoginPage, PageFooter, PageHeader, View
+from lories.application.view.pages.docs import DocsPage
+from lories.application.view.snapshot import register_snapshot_routes
+from lories.application.view.stream import register_stream_routes
+from lories.components.cameras._core import _Camera
+from lories.core.configs.parameters import Parameter
 from lories.typing import Configurations
 
 logging.getLogger("werkzeug").setLevel(logging.WARNING)
@@ -30,7 +36,11 @@ logging.getLogger("werkzeug").setLevel(logging.WARNING)
 # noinspection PyProtectedMember
 @register_interface_type("dash")
 class ViewInterface(Interface, Dash):
-    _proxy: Optional[str] = None
+    _proxy = Parameter(key="proxy", type=str, required=False, default=None, desc="Reverse proxy URL prefix path")
+    _host = Parameter(key="host", type=str, default="127.0.0.1", desc="Host address to bind to")
+    _port = Parameter(key="port", type=int, default=8050, desc="TCP port number")
+
+    _proxy: Optional[str]
     _host: str
     _port: int
 
@@ -98,18 +108,68 @@ class ViewInterface(Interface, Dash):
         if login.enabled:
             login_page = LoginPage(self, context, configs)
             self.view.append(login_page)
+        self._login_required = bool(login.enabled)
 
     # noinspection PyUnresolvedReferences
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self._proxy = configs.get("proxy", default=None)
-        self._host = configs.get("host", default="127.0.0.1")
-        self._port = configs.get_int("port", default=8050)
 
         self.view.create_pages(self.context.components)
+        self.view.create_connector_pages(self.context.connectors)
+        for component in self.context.components.values():
+            self.view.create_connector_pages(component.connectors)
+        docs_page = DocsPage()
+        self.view.append(docs_page)
         self.view.create_layout(self.view.layout)
+        self.view.header.menu.append(dbc.NavItem(dbc.NavLink(docs_page.title, href=docs_page.path)))
         self.view.register()
         self.layout = self.create_layout
+
+        register_stream_routes(
+            self.server,
+            self._find_channel,
+            require_login=self._login_required,
+        )
+        register_snapshot_routes(
+            self.server,
+            self._find_component,
+            require_login=self._login_required,
+        )
+
+    def _find_channel(self, channel_id: str):
+        """Resolve a fully-qualified channel id by walking the component tree.
+
+        Channels owned by a ``_Camera`` whose ``preview`` flag is off are
+        hidden from HTTP — the camera is not published to clients.
+        """
+
+        def visit(component):
+            data = getattr(component, "data", None)
+            if data is not None and channel_id in data:
+                if isinstance(component, _Camera) and not getattr(component, "preview", False):
+                    return None
+                return data[channel_id]
+            for sub in getattr(component, "components", {}).values():
+                channel = visit(sub)
+                if channel is not None:
+                    return channel
+            return None
+
+        return visit(self.context)
+
+    def _find_component(self, component_id: str):
+        """Resolve a fully-qualified component id by walking the component tree."""
+
+        def visit(component):
+            if getattr(component, "id", None) == component_id:
+                return component
+            for sub in getattr(component, "components", {}).values():
+                found = visit(sub)
+                if found is not None:
+                    return found
+            return None
+
+        return visit(self.context)
 
     def start(self) -> None:
         self.run(

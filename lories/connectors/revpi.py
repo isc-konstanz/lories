@@ -15,8 +15,8 @@ from revpimodio2.io import IntIO
 
 import pandas as pd
 import pytz as tz
-from lories import Configurations
 from lories.connectors import Connector, register_connector_type
+from lories.core.configs.parameters import ChannelParameter, Parameter
 from lories.data.channels import Channel
 from lories.typing import Resources
 from lories.util import to_bool, to_timedelta
@@ -25,32 +25,29 @@ from lories.util import to_bool, to_timedelta
 # noinspection PyShadowingBuiltins, SpellCheckingInspection
 @register_connector_type("revpi", "revpi_io", "revpi_aio", "revpi_mio", "revpi_ro", "revolutionpi")
 class RevPiConnector(Connector):
-    # Per-channel parameters (kept commented until the Parameter migration
-    # reaches this connector; for now they're read via channel.get()):
-    #
-    # edge = ChannelParameter(
-    #     type=str,
-    #     required=False,
-    #     default=None,
-    #     choices=["rising", "falling", "both"],
-    #     desc=(
-    #         "Edge filter for bit-IO listeners: 'rising' | 'falling' | 'both'. "
-    #         "Only applies to bit-oriented IOs (digital inputs / single bits). "
-    #         "Omit for counter / analog / byte / word IOs — revpimodio2 rejects 'edge' "
-    #         "on non-bit objects and instead fires on any value change. "
-    #         "If 'edge' is configured on a non-bit IO it is ignored (with a warning)."
-    #     ),
-    # )
-    # cooldown = ChannelParameter(
-    #     type=str,
-    #     required=False,
-    #     default=None,
-    #     desc=(
-    #         "Minimum interval between successive RevPiListener firings for this channel "
-    #         "(duration string, e.g. '5s', '500ms', '1min'). Events that arrive within "
-    #         "the cooldown window after the last accepted event are dropped."
-    #     ),
-    # )
+    """
+    Revolution Pi is a KUNBUS open-source industrial PC platform based on the Raspberry Pi Compute Module. It
+    exposes digital and analog I/O through a shared process image, accessible via the revpimodio2 library. The
+    modular hardware design supports various I/O expansion modules (DIO, AIO, MIO, RO). However, the process
+    image interface is Linux-specific and requires direct hardware access, limiting remote or cross-platform usage.
+    """
+
+    _cycletime = Parameter(
+        key="cycletime",
+        type=int,
+        required=False,
+        min=1,
+        desc="Process image polling cycle time in milliseconds (defaults to the RevPiModIO library default)",
+    )
+
+    # Per-channel parameters
+    address = ChannelParameter(type=str, required=True, desc="RevPi process image I/O address name")
+    listener = ChannelParameter(
+        type=bool,
+        required=False,
+        default=False,
+        desc="Register a rising-edge event listener that pushes updates as they occur",
+    )
 
     _EDGES = {"rising": io.RISING, "falling": io.FALLING, "both": io.BOTH}
 
@@ -62,10 +59,6 @@ class RevPiConnector(Connector):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._listeners = {}
-
-    def configure(self, configs: Configurations) -> None:
-        super().configure(configs)
-        self._cycletime = configs.get_int("cycletime", default=None)
 
     def connect(self, resources: Resources) -> None:
         super().connect(resources)
