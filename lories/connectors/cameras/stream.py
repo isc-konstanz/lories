@@ -96,9 +96,12 @@ class CameraStream(Configurator, Thread):
 
     def stop(self) -> None:
         self.__interrupt.set()
-        self.__context.deactivate()
+        # Join the consumer thread before tearing down the manager — its loop
+        # calls trigger.wait() through the Manager IPC, which raises EOFError
+        # if the manager process dies first.
         if self.is_alive():
             self.join()
+        self.__context.deactivate()
 
         # Release the memoryview before closing the shared memory segment,
         # otherwise SharedMemory.close() raises "BufferError: memoryview has
@@ -112,35 +115,39 @@ class CameraStream(Configurator, Thread):
         last_report = time()
         last_produced = 0
         last_consumed = 0
-        while not self.__interrupt.is_set():
-            self.__trigger.wait(1)
+        try:
+            while not self.__interrupt.is_set():
+                self.__trigger.wait(1)
 
-            if self.__interrupt.is_set():
-                break
-            if not self.__trigger.is_set():
-                continue
-            length = int.from_bytes(self._buffer[0:4], "little")
-            data = bytes(self._buffer[4 : 4 + length])
-            for channel in channels:
-                channel.value = data
-            self.__trigger.clear()
-            consumed += 1
+                if self.__interrupt.is_set():
+                    break
+                if not self.__trigger.is_set():
+                    continue
+                length = int.from_bytes(self._buffer[0:4], "little")
+                data = bytes(self._buffer[4 : 4 + length])
+                for channel in channels:
+                    channel.value = data
+                self.__trigger.clear()
+                consumed += 1
 
-            now = time()
-            if now - last_report >= 5.0:
-                produced = int(self.__produced.value)
-                dp = produced - last_produced
-                dc = consumed - last_consumed
-                drop = (dp - dc) / dp if dp > 0 else 0.0
-                self._logger.debug(
-                    f"stream {self.__connector.id}: "
-                    f"produced={dp / (now - last_report):.1f}/s "
-                    f"consumed={dc / (now - last_report):.1f}/s "
-                    f"dropped={drop:.0%}"
-                )
-                last_report = now
-                last_produced = produced
-                last_consumed = consumed
+                now = time()
+                if now - last_report >= 5.0:
+                    produced = int(self.__produced.value)
+                    dp = produced - last_produced
+                    dc = consumed - last_consumed
+                    drop = (dp - dc) / dp if dp > 0 else 0.0
+                    self._logger.debug(
+                        f"stream {self.__connector.id}: "
+                        f"produced={dp / (now - last_report):.1f}/s "
+                        f"consumed={dc / (now - last_report):.1f}/s "
+                        f"dropped={drop:.0%}"
+                    )
+                    last_report = now
+                    last_produced = produced
+                    last_consumed = consumed
+        except (EOFError, BrokenPipeError, ConnectionResetError):
+            # Manager IPC torn down — treat as shutdown signal.
+            return
 
 
 def _stream(
