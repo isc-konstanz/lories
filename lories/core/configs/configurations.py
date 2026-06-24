@@ -20,7 +20,7 @@ from typing import Any, Collection, Iterable, Iterator, List, Mapping, Optional
 
 import pandas as pd
 from lories._core import _Configurations  # noqa
-from lories._core.typing import Timestamp  # noqa
+from lories._core.typing import Duration, Timestamp  # noqa
 from lories.core.configs.directories import Directories, Directory
 from lories.core.configs.errors import ConfigurationError, ConfigurationUnavailableError
 from lories.util import is_bool, to_bool, to_date, to_float, to_int, to_timedelta, update_recursive
@@ -171,7 +171,7 @@ class Configurations(_Configurations):
     def get_date(self, key: str, default: Timestamp = None, **kwargs) -> pd.Timestamp:
         return to_date(self._get(key, default), **kwargs)
 
-    def get_duration(self, key: str, default: pd.Timedelta = None) -> pd.Timedelta | relativedelta:
+    def get_duration(self, key: str, default: Optional[Duration] = None) -> Optional[Duration]:
         value = self._get(key, default)
         if value is None or isinstance(value, (pd.Timedelta, relativedelta)):
             return value
