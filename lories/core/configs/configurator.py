@@ -212,8 +212,7 @@ class Configurator(_Configurator, metaclass=ConfiguratorMeta):
             else:
                 if key not in declared_flat and key not in declared_sections:
                     logger.debug(
-                        f"{_WH}%s (module: %s, file: %s): "
-                        f"config key '{_WK}%s{_WH}' has no Parameter declaration{_WR}",
+                        f"{_WH}%s (module: %s, file: %s): config key '{_WK}%s{_WH}' has no Parameter declaration{_WR}",
                         cls.__name__,
                         cls.__module__,
                         cls_file,

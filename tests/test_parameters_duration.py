@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Seam 3 — duration utilities: ms round-trip + B8 (get_duration rejects bare ints clearly) (issue 05)."""
+
 from __future__ import annotations
 
 import pytest
@@ -10,8 +11,8 @@ from lories.core.configs.errors import ConfigurationError
 from lories.core.configs.parameters.duration import DurationParameter
 from lories.util import parse_freq, to_timedelta
 
-
 # ---------------------------------------------------------------- ms round-trip
+
 
 @pytest.mark.parametrize(
     "text,expected",
@@ -37,6 +38,7 @@ def test_get_duration_ms_via_config(write_conf):
 
 
 # ---------------------------------------------------------------- B8
+
 
 def test_get_duration_rejects_int(write_conf):
     configs = write_conf("interval = 10\n")  # bare int from TOML

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Seam 1 — config-load lifecycle: resolve, defaults, required, groups, inheritance, to_schema (issue 01)."""
+
 from __future__ import annotations
 
 import pytest

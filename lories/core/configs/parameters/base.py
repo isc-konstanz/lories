@@ -75,9 +75,7 @@ class _Parameter(ABC):
         }
 
     def __repr__(self) -> str:
-        return (
-            f"{type(self).__name__}(" f"name={self.name!r}, key={self._resolve_key()!r}, " f"required={self.required})"
-        )
+        return f"{type(self).__name__}(name={self.name!r}, key={self._resolve_key()!r}, required={self.required})"
 
 
 class _TypedParameter(_Parameter, ABC):

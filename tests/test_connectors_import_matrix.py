@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Seam 4 — optional-dep import matrix; pins the B4 contract by inspecting bookkeeping, not reloading (issue 06)."""
+
 from __future__ import annotations
 
 import sys
@@ -33,9 +34,7 @@ def test_every_connector_imported_or_recorded(connectors):
     recorded = set(connectors._unavailable) | set(connectors._mocked)
     for name in connectors.CONNECTORS:
         imported = sys.modules.get(f"lories.connectors.{name}") is not None
-        assert imported or name in recorded, (
-            f"{name} is neither imported nor recorded unavailable/mocked"
-        )
+        assert imported or name in recorded, f"{name} is neither imported nor recorded unavailable/mocked"
 
 
 def test_dependency_free_connectors_are_real(connectors):
@@ -56,9 +55,7 @@ def test_mocked_connectors_fail_clearly(connectors):
         if mod is None:
             continue
         flagged = [
-            obj
-            for obj in vars(mod).values()
-            if isinstance(obj, type) and getattr(obj, "__available__", True) is False
+            obj for obj in vars(mod).values() if isinstance(obj, type) and getattr(obj, "__available__", True) is False
         ]
         assert flagged, f"{name} loaded against a mock but no class is flagged unavailable"
         assert all("not installed" in getattr(obj, "__import_error__", "") for obj in flagged)

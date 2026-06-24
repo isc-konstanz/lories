@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """B3 — configure behaves identically at INFO and DEBUG (issue 03; the dropped proxy Heisenbug)."""
+
 from __future__ import annotations
 
 import logging

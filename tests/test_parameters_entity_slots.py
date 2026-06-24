@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """B1 — declared entity slots survive ``configure`` instead of being clobbered to None (issue 02, HIGH)."""
+
 from __future__ import annotations
 
 from lories.core.configs.configurator import Configurator
@@ -31,7 +32,7 @@ def test_entity_slot_survives_configure(write_conf):
 
 def test_parameter_group_result_is_bound(write_conf):
     """Documented B1 decision: ``ParameterGroup`` results ARE set on the instance."""
-    configs = write_conf("label = \"x\"\n[group]\nn = 7\n")
+    configs = write_conf('label = "x"\n[group]\nn = 7\n')
     holder = Holder()
     holder.configure(configs)
     assert holder.group == {"n": 7}

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Shared fixtures for the parameters / descriptor-layer test suite."""
+
 from __future__ import annotations
 
 import pytest

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Seam 2 — descriptor edge cases: B2 (channel bool), B6 (ConnectType.get), B7 (bare group child) (issue 04)."""
+
 from __future__ import annotations
 
 import pytest
@@ -10,8 +11,8 @@ from lories.core.configs.parameters import Parameter, ParameterGroup
 from lories.core.configs.parameters.channel_parameter import ChannelParameter
 from lories.util import to_bool
 
-
 # ---------------------------------------------------------------- B2
+
 
 @pytest.mark.parametrize(
     "raw,expected",
@@ -47,6 +48,7 @@ def test_channel_parameter_rejects_non_bool_string():
 
 # ---------------------------------------------------------------- B6
 
+
 def test_connect_type_from_bool():
     assert ConnectType.get(True) is ConnectType.AUTO
     assert ConnectType.get(False) is ConnectType.NONE
@@ -60,6 +62,7 @@ def test_connect_type_rejects_strings(value):
 
 
 # ---------------------------------------------------------------- B7
+
 
 def test_group_child_with_key_ok():
     group = ParameterGroup(children=[Parameter(key="user", type=str)])
