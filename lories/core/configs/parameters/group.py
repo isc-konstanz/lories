@@ -59,14 +59,24 @@ class ParameterGroup(_Parameter):
             for child in children:
                 if child.name is None:
                     child.name = child.key
-                self.children[child._resolve_key()] = child
+                self._add_resolved_child(child)
 
     def add_child(self, name: str, param: _Parameter) -> "ParameterGroup":
         """Register *param* as a child of this group under *name*."""
         if param.name is None:
             param.name = name
-        self.children[param._resolve_key()] = param
+        self._add_resolved_child(param)
         return self
+
+    def _add_resolved_child(self, child: _Parameter) -> None:
+        """Store *child* under its resolved key; reject a child with neither key nor name (B7)."""
+        key = child._resolve_key()
+        if key is None:
+            raise _config_error(
+                f"ParameterGroup child {child!r} has neither a 'key' nor a 'name' — "
+                "every child must resolve to a non-None config key"
+            )
+        self.children[key] = child
 
     def resolve(self, configs: "_Configurations") -> Optional[Dict[str, Any]]:
         """Validate the sub-section and recursively resolve all children.

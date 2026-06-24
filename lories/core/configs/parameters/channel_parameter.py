@@ -104,7 +104,7 @@ class ChannelParameter:
             return raw
         try:
             if self.type is bool:
-                return to_bool(raw, any_str=True)
+                return to_bool(raw)
             return self.type(raw)
         except (ValueError, TypeError) as exc:
             raise ConfigurationError(

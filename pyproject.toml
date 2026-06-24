@@ -151,3 +151,7 @@ select = [
 [tool.ruff.lint.isort]
 extra-standard-library = ["dateutil"]
 known-first-party = ["lories", "numpy", "pandas", "pytz"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib"
