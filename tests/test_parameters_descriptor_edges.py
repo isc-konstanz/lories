@@ -61,6 +61,13 @@ def test_connect_type_rejects_strings(value):
         ConnectType.get(value)
 
 
+@pytest.mark.parametrize("value", [1, 0, None, 1.5])
+def test_connect_type_rejects_non_bool(value):
+    """Only a real ``bool`` is accepted — ints/None/floats are not silently coerced (catches a re-widened contract)."""
+    with pytest.raises(ValueError):
+        ConnectType.get(value)
+
+
 # ---------------------------------------------------------------- B7
 
 
@@ -79,3 +86,10 @@ def test_group_rejects_bare_child():
     """A child with neither key nor name resolves to None and would collide; it is rejected."""
     with pytest.raises(ConfigurationError, match="neither"):
         ParameterGroup(children=[Parameter(type=str)])
+
+
+def test_group_add_child_rejects_bare():
+    """The bare-child guard fires on the ``add_child`` path too, not only at construction."""
+    group = ParameterGroup()
+    with pytest.raises(ConfigurationError, match="neither"):
+        group.add_child(None, Parameter(type=str))

@@ -43,3 +43,18 @@ def test_optional_group_absent_binds_none(write_conf):
     holder = Holder()
     holder.configure(configs)
     assert holder.group is None
+
+
+def test_entity_slot_survives_with_group_present(write_conf):
+    """The entity-slot skip must coexist with group binding: child kept, group bound, param resolved."""
+    configs = write_conf('label = "y"\n[group]\nn = 3\n')
+    holder = Holder()
+
+    sentinel = object()
+    holder.child = sentinel
+
+    holder.configure(configs)
+
+    assert holder.child is sentinel  # entity slot NOT clobbered (not under-skipped)
+    assert holder.group == {"n": 3}  # group STILL bound (not over-skipped)
+    assert holder.label == "y"

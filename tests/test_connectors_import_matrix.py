@@ -7,8 +7,9 @@ import sys
 
 import pytest
 
-# Connectors with no optional third-party dependency — always available.
-DEPENDENCY_FREE = ("virtual", "math", "csv")
+# Connectors with no optional third-party dependency — available even on a minimal
+# install. (``math`` is intentionally excluded: it imports ``sympy``, the ``math`` extra.)
+DEPENDENCY_FREE = ("virtual", "csv")
 
 
 @pytest.fixture(scope="module")
