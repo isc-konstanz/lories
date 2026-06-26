@@ -9,7 +9,7 @@ lories.data.retention
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Iterable, Iterator, Literal, MutableSequence, Optional
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, Literal, MutableSequence, Optional
 
 import tzlocal
 
@@ -20,11 +20,8 @@ from lories.data.util import hash_data, resample
 from lories.util import floor_date, parse_freq, slice_range, to_bool, to_timedelta, to_timezone
 
 # FIXME: Remove this once Python >= 3.11 is a requirement (LiteralString is a 3.11+ typing symbol)
-try:
+if TYPE_CHECKING:
     from typing import LiteralString
-
-except ImportError:
-    from typing_extensions import LiteralString
 
 
 class Retention:
