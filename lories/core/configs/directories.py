@@ -13,7 +13,7 @@ from collections.abc import Mapping
 from pathlib import Path, PosixPath, WindowsPath
 from typing import Dict, Optional
 
-# FIXME: Remove this once Python >= 3.9 is a requirement
+# FIXME: Remove this once Python >= 3.11 is a requirement (LiteralString is a 3.11+ typing symbol)
 try:
     from typing import LiteralString
 

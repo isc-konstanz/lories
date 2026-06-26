@@ -9,17 +9,10 @@ lories.core.register.registry
 from __future__ import annotations
 
 import builtins
-from typing import Callable, Collection, Dict, Generic, Mapping, Optional, Type
+from typing import Callable, Collection, Dict, Generic, Mapping, Optional, Type, get_args
 
 from lories._core._registrator import Registrator  # noqa
 from lories.core.register.registration import Registration, RegistrationError, RegistrationFactory
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import get_args
-
-except ImportError:
-    from typing_extensions import get_args
 
 
 # noinspection PyShadowingBuiltins
