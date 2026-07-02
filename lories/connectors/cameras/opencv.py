@@ -126,7 +126,7 @@ class OpenCV(CameraConnector):
     def read_frame(self, resource: Resource) -> bytes:
         streaming = self._is_streaming(resource)
 
-        address = resource.get("address")
+        address = resource.get("address", default=OpenCV.PREVIEW_SUB if streaming else OpenCV.PREVIEW_MAIN)
         capture = self._captures.get(address, None)
         try:
             if not streaming and not capture.isOpened():

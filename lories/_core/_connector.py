@@ -27,9 +27,9 @@ class ConnectType(Enum):
     def get(cls, value: str | bool) -> ConnectType:
         if isinstance(value, str):
             value = value.lower()
-            if value.upper() in ["auto", "true"]:
+            if value in ["auto", "true"]:
                 return ConnectType.AUTO
-            if value.upper() == ["none", "false"]:
+            if value in ["none", "false"]:
                 return ConnectType.NONE
         if isinstance(value, bool):
             if value:

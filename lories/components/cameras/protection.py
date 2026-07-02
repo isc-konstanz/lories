@@ -55,7 +55,7 @@ class CameraProtector(_CameraProtector):
             )
         camera.data.register(self._on_motion_detect, _Camera.MOTION, how="any", unique=False)
 
-    def close(self, delay: int = 0) -> None:
+    def close(self, delay: float = 0) -> None:
         if delay > 0:
             if self._timer is not None:
                 self._timer.cancel()

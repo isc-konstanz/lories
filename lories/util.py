@@ -337,7 +337,7 @@ def to_int(value: str | int) -> Optional[int]:
 
 
 def is_bool(value: str | bool) -> bool:
-    if issubclass(type(value), (np.bool, bool)):
+    if issubclass(type(value), (np.bool_, bool)):
         return True
     if isinstance(value, str) and any(value.lower() == b for b in ["true", "false", "yes", "no", "y", "n"]):
         return True
@@ -356,7 +356,7 @@ def to_bool(value: str | bool, any_str: bool = False) -> Optional[bool]:
             return True
         if value.lower() in ["false", "no", "n"]:
             return False
-    if issubclass(type(value), (np.bool, bool, np.integer, int)):
+    if issubclass(type(value), (np.bool_, bool, np.integer, int)):
         return bool(value)
     raise TypeError(f"Expected str or bool, not '{type(value)}': {value}")
 
