@@ -150,17 +150,13 @@ class Databases(ConnectorContext, Configurator):
 
         channels = channels.apply(build_rotation).filter(lambda c: c.rotate is not None or len(c.retentions) > 0)
         for database in self.values():
-            database_channels = channels.filter(lambda c: c.rotation.database.id == database.id)
+            # Rotation deletes in place from each channel's own logger database; unlike
+            # replication there is no separate target, so select by logger, not a
+            # non-existent `rotation` attribute (see filter on `c.replication` above).
+            database_channels = channels.filter(lambda c: c.has_logger(database.id))
             if len(database_channels) == 0:
                 continue
 
-            database_channels = database_channels.apply(
-                lambda c: c.duplicate(
-                    context=self.context,
-                    connector=database.id,
-                    rotation=c.rotation,
-                )
-            )
             self.__connect(database, channels=database_channels)
             try:
                 for rotation, rotation_channels in database_channels.groupby(lambda c: c.rotate):
