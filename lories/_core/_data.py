@@ -55,6 +55,7 @@ class _DataContext(_Context[Channel]):
         channels: Optional[ChannelsArgument] = None,
         how: Literal["any", "all"] = "any",
         unique: bool = False,
+        interval: Optional[str | pd.Timedelta] = None,
     ) -> None:
         pass
 

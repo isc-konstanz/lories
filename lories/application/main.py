@@ -191,8 +191,9 @@ class Application(_Application, DataContext, TaskContext):
         channels: Optional[ChannelsArgument] = None,
         how: Literal["any", "all"] = "any",
         unique: bool = False,
+        interval: Optional[str | pd.Timedelta] = None,
     ) -> None:
-        self._listeners.register(function, self._filter_by_args(channels), how=how, unique=unique)
+        self._listeners.register(function, self._filter_by_args(channels), how=how, unique=unique, interval=interval)
 
     # noinspection PyTypeChecker
     @property

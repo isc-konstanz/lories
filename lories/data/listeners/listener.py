@@ -20,6 +20,7 @@ from lories._core._channel import Channel  # noqa
 from lories._core._channels import Channels  # noqa
 from lories._core._listener import _Listener  # noqa
 from lories.core import ResourceError
+from lories.util import to_timedelta
 
 # FIXME: Remove this once Python >= 3.9 is a requirement
 try:
@@ -36,12 +37,14 @@ class Listener(_Listener):
 
     _how: str
     _unique: bool
+    _interval: Optional[pd.Timedelta] = None
 
     _function: Callable[[pd.DataFrame], None]
     channels: Channels
 
     __start: pd.Timestamp = pd.NaT
     __complete: pd.Timestamp = pd.NaT
+    __overlap_warned: bool = False
 
     def __init__(
         self,
@@ -51,6 +54,7 @@ class Listener(_Listener):
         channels: Channels,
         how: Literal["any", "all"] = "any",
         unique: bool = False,
+        interval: Optional[str | pd.Timedelta] = None,
     ) -> None:
         super().__init__(id=id, key=key)
         self.__lock = Lock()
@@ -58,6 +62,7 @@ class Listener(_Listener):
 
         self._how = how
         self._unique = unique
+        self._interval = to_timedelta(interval) if isinstance(interval, str) else interval
         self._function = function
         self.channels = channels
 
@@ -80,6 +85,7 @@ class Listener(_Listener):
             raise ListenerError(self, str(e))
         finally:
             self.__complete = timestamp
+            self.__overlap_warned = False
             self.__lock.release()
             self._logger.debug(f"Listener '{self.id}' finished after {round(self.runtime, 3)} seconds")
             return self
@@ -101,9 +107,25 @@ class Listener(_Listener):
     def locked(self) -> bool:
         return self.__lock.locked()
 
+    def _should_warn_overlap(self) -> bool:
+        if self.__overlap_warned:
+            return False
+        self.__overlap_warned = True
+        return True
+
     def has_update(self) -> bool:
+        cooldown = None
+        if self._interval is not None and not pd.isna(self.timestamp):
+            cooldown = self.timestamp + self._interval
+
         def _has_update(channel: Channel) -> bool:
-            return channel.is_valid() and (pd.isna(self.timestamp) or self.timestamp < channel.timestamp)
+            if not channel.is_valid():
+                return False
+            if pd.isna(self.timestamp):
+                return True
+            if cooldown is not None and channel.timestamp < cooldown:
+                return False
+            return self.timestamp < channel.timestamp
 
         if self._how == "any":
             return any(_has_update(c) for c in self.channels)
