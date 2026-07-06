@@ -113,6 +113,10 @@ class ViewInterface(Interface, Dash):
     # noinspection PyUnresolvedReferences
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
+        self._proxy = configs.get("proxy", default=None)
+        self._host = configs.get("host", default="127.0.0.1")
+        self._port = configs.get_int("port", default=8050)
+        self._reload = configs.get_bool("reload", default=False)
 
         self.view.create_pages(self.context.components)
         self.view.create_connector_pages(self.context.connectors)
@@ -177,6 +181,7 @@ class ViewInterface(Interface, Dash):
             port=self._port,
             proxy=self._proxy,
             debug=self._logger.getEffectiveLevel() <= logging.DEBUG,
+            use_reloader=self._reload,
         )
 
     # noinspection PyUnresolvedReferences
