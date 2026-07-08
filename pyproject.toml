@@ -84,7 +84,7 @@ cameras = [
 dash = [
     "dash",
     "dash-auth",
-    "dash-bootstrap-component",
+    "dash-bootstrap-components",
     "flask-bcrypt",
     "flask-login",
 ]
