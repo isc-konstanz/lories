@@ -233,6 +233,34 @@ class Table(sql.Table):
         query = query.where(and_(*self._primary_clauses(resources, start, end)))
         return query.order_by(*self._primary_order(order_by))
 
+    def read_latest(
+        self,
+        resources: Resources,
+        order_by: Literal["asc", "desc"] = "asc",
+    ) -> Select:
+        # `read(...).limit(1)` caps the whole table to a single row, so on a table
+        # holding several surrogate groups only one group's row is returned and every
+        # other requesting channel goes NaN. Union one limited subquery per group
+        # instead, so each group keeps its own latest (or earliest) row.
+        columns = self.__get_columns(resources)
+        groups = list(self._groupby(resources))
+        if len(groups) <= 1:
+            query = sql.select(*columns)
+            query = query.where(and_(*self._primary_clauses(resources)))
+            return query.order_by(*self._primary_order(order_by)).limit(1)
+
+        group_queries = []
+        for i, (_, group_resources) in enumerate(groups):
+            group_query = sql.select(*columns)
+            group_query = group_query.where(and_(*self._primary_clauses(group_resources)))
+            group_query = group_query.order_by(*self._primary_order(order_by)).limit(1)
+            # A UNION branch cannot carry its own ORDER BY/LIMIT; wrap it as a subquery first.
+            group_subquery = group_query.subquery(name=f"latest_group_{i}")
+            group_queries.append(sql.select(*group_subquery.columns))
+
+        union = sql.union_all(*group_queries).subquery(name="latest_per_group")
+        return sql.select(*union.columns)
+
     # noinspection PyUnresolvedReferences
     def write(self, resources: Resources, data: pd.DataFrame) -> Insert:
         resources = resources.filter(lambda r: r.id in data.columns)
