@@ -76,7 +76,6 @@ class TaskContext(_TaskContext, Activator):
         super().deactivate()
 
     def interrupt(self, *_) -> None:
-        # FIXME: Add cancel_futures argument again, once Python >= 3.9 is a requirement
         if self.__executor is not None:
             self.__executor.shutdown(wait=True, cancel_futures=True)
 

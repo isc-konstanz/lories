@@ -11,7 +11,7 @@ from __future__ import annotations
 import datetime as dt
 from abc import abstractmethod
 from functools import wraps
-from typing import Any, Optional, overload
+from typing import Any, Literal, Optional, overload
 
 import tzlocal
 
@@ -25,13 +25,6 @@ from lories.core.typing import Timestamp
 from lories.data.util import hash_data
 from lories.data.validation import validate_index, validate_timezone
 from lories.util import convert_timezone, to_date, to_timezone
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 class DatabaseMeta(ConnectorMeta):
