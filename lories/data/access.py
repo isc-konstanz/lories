@@ -163,9 +163,10 @@ class DataAccess(_DataAccess, Configurator):
         channels: Optional[ChannelsArgument] = None,
         how: Literal["any", "all"] = "any",
         unique: bool = False,
+        interval: Optional[str | pd.Timedelta] = None,
     ) -> None:
         channels = self._filter_by_args(channels)
-        self.__context.register(function, channels=channels, how=how, unique=unique)
+        self.__context.register(function, channels=channels, how=how, unique=unique, interval=interval)
 
     def has_logged(
         self,
