@@ -8,7 +8,7 @@ lories.data.access
 
 from __future__ import annotations
 
-from typing import Any, Callable, Collection, Iterable, Optional, Type, overload
+from typing import Any, Callable, Collection, Iterable, Literal, Optional, Type, overload
 
 import pandas as pd
 from lories._core import _Context, _Registrator  # noqa
@@ -19,13 +19,6 @@ from lories.core.typing import ChannelsArgument, Registrator, Timestamp
 from lories.data.channels import Channel, Channels
 from lories.data.context import DataContext as _DataAccess
 from lories.util import get_context, update_recursive
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 # noinspection PyProtectedMember, PyShadowingBuiltins
@@ -170,9 +163,10 @@ class DataAccess(_DataAccess, Configurator):
         channels: Optional[ChannelsArgument] = None,
         how: Literal["any", "all"] = "any",
         unique: bool = False,
+        interval: Optional[str | pd.Timedelta] = None,
     ) -> None:
         channels = self._filter_by_args(channels)
-        self.__context.register(function, channels=channels, how=how, unique=unique)
+        self.__context.register(function, channels=channels, how=how, unique=unique, interval=interval)
 
     def has_logged(
         self,

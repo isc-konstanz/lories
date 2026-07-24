@@ -24,6 +24,9 @@ from .access import ComponentAccess  # noqa: F401
 from . import component  # noqa: F401
 from .component import Component  # noqa: F401
 
+from . import generic  # noqa: F401
+from .generic import GenericComponent  # noqa: F401
+
 from . import weather  # noqa: F401
 from .weather import (  # noqa: F401
     Weather,

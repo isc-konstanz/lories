@@ -13,7 +13,7 @@ import dateutil.parser
 import re
 from dateutil.relativedelta import relativedelta
 from pydoc import locate
-from typing import Any, Callable, Collection, Dict, List, Mapping, Optional, Tuple, Type, TypeVar
+from typing import Any, Callable, Collection, Dict, List, Literal, Mapping, Optional, Tuple, Type, TypeVar
 
 import tzlocal
 
@@ -23,13 +23,6 @@ import pytz as tz
 from lories._core._configurations import Configurations  # noqa
 from lories._core.typing import Timestamp, Timezone  # noqa
 from lories.core.errors import ResourceError
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 # noinspection SpellCheckingInspection
 INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "

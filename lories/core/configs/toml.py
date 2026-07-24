@@ -16,7 +16,8 @@ except ModuleNotFoundError:
 
 
 def load_toml(conf_path: str) -> Mapping[str, Any]:
-    with open(conf_path, mode="r") as conf_file:
+    # TOML; load identically on Windows (default cp1252) and Linux
+    with open(conf_path, mode="r", encoding="utf-8") as conf_file:
         conf_string = conf_file.read()
         conf_string = re.sub(r"^;+", "#", conf_string, flags=re.MULTILINE)
 

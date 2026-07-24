@@ -30,7 +30,7 @@ class Differentiator(Processor):
             raise ProcessingError("Currently unable to differentiate values other than float or int")
         try:
             if self._last is None or (increasing and self._last > value):
-                return None
+                return Processor.SKIP
             return (value - self._last) * factor
         finally:
             self._last = value
