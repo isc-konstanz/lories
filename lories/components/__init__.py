@@ -24,14 +24,20 @@ from .access import ComponentAccess  # noqa: F401
 from . import component  # noqa: F401
 from .component import Component  # noqa: F401
 
+from . import generic  # noqa: F401
+from .generic import GenericComponent  # noqa: F401
+
 from . import weather  # noqa: F401
 from .weather import (  # noqa: F401
     Weather,
     WeatherForecast,
 )
 
-from . import camera  # noqa: F401
-from .camera import Camera  # noqa: F401
+from . import cameras  # noqa: F401
+from .cameras import Camera  # noqa: F401
 
 from . import tariff  # noqa: F401
 from .tariff import Tariff  # noqa: F401
+
+from . import environment  # noqa: F401
+from .environment import Environment  # noqa: F401

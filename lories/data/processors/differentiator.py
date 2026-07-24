@@ -17,6 +17,8 @@ from lories.util import is_float
 
 @register_processor_type("differentiator", "difference", "diff")
 class Differentiator(Processor):
+    TYPE: str = "differentiator"
+
     _last: Optional[float]
 
     def __init__(self, **kwargs) -> None:
@@ -28,7 +30,7 @@ class Differentiator(Processor):
             raise ProcessingError("Currently unable to differentiate values other than float or int")
         try:
             if self._last is None or (increasing and self._last > value):
-                return None
+                return Processor.SKIP
             return (value - self._last) * factor
         finally:
             self._last = value

@@ -22,3 +22,12 @@ from .differentiator import Differentiator  # noqa: F401
 
 from . import integrator  # noqa: F401
 from .integrator import Integrator  # noqa: F401
+
+try:
+    import cv2  # noqa: F401
+except ImportError:
+    # opencv-python is an optional dependency
+    pass
+else:
+    from . import motion  # noqa: F401
+    from .motion import MotionDetector  # noqa: F401

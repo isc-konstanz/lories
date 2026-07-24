@@ -48,12 +48,13 @@ CONNECTORS = [
     "influxdb2",
     "tables",
     "cameras",
-    "serial",
+    "serial.sdi12",
+    "serial.i2c",
     "modbus",
     "mqtt",
     "revpi",
     "entsoe",
-    "opcua"
+    "opcua",
 ]
 
 for import_connector in CONNECTORS:

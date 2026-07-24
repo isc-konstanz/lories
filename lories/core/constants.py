@@ -18,13 +18,15 @@ from lories._core import _Constant  # noqa
 class _ConstantsMeta(ABCMeta):
     _instance = None
 
-    def __call__(cls, *args, **kwargs):
+    def __call__(cls, constants=(), _singleton: bool = True, **kwargs):
+        if not _singleton:
+            return super(_ConstantsMeta, cls).__call__(constants, **kwargs)
         if cls._instance is None:
-            cls._instance = super(_ConstantsMeta, cls).__call__(*args, **kwargs)
+            cls._instance = super(_ConstantsMeta, cls).__call__(constants, **kwargs)
         return cls._instance
 
 
-# noinspection PyShadowingNames
+# noinspection PyShadowingNames, PyArgumentList
 class Constants(MutableSequence[_Constant], metaclass=_ConstantsMeta):
     _constants: List[_Constant]
 
@@ -32,10 +34,10 @@ class Constants(MutableSequence[_Constant], metaclass=_ConstantsMeta):
         self._constants = [*constants]
 
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({', '.join(str(c) for c in self._constants)})"
+        return f"{type(self).__name__}({', '.join(c.id for c in self._constants)})"
 
     def __str__(self) -> str:
-        return f"{type(self).__name__}:\n\t" + "\n\t".join(f"{c.key} = {repr(c)}" for c in self._constants)
+        return f"{type(self).__name__}:\n\t" + "\n\t".join(f"{c.id} = {repr(c)}" for c in self._constants)
 
     def __contains__(self, constant: str | _Constant) -> bool:
         if isinstance(constant, str):
@@ -44,11 +46,15 @@ class Constants(MutableSequence[_Constant], metaclass=_ConstantsMeta):
 
     def __getitem__(self, index: Iterable[str] | str | int):
         if isinstance(index, str):
+            constants = []
             for constant in self._constants:
-                if constant.key == index:
-                    return constant
+                if constant.key == index or constant.id == index:
+                    constants.append(constant)
+            if len(constants) == 0:
+                return constants[0]
+            return type(self)(constants, _singleton=False)
         if isinstance(index, Iterable):
-            return type(self)([r for r in self._constants if r.key == index])
+            return type(self)([r for r in self._constants if r.key == index], _singleton=False)
         raise KeyError(index)
 
     def __setitem__(self, index: int, constant: _Constant) -> None:
@@ -64,7 +70,7 @@ class Constants(MutableSequence[_Constant], metaclass=_ConstantsMeta):
         return len(self._constants)
 
     def __add__(self, other):
-        return type(self)([*self, *other])
+        return type(self)([*self, *other], _singleton=False)
 
     def insert(self, index: int, constant: _Constant):
         self._constants.insert(index, constant)
@@ -74,4 +80,4 @@ class Constants(MutableSequence[_Constant], metaclass=_ConstantsMeta):
 
     # noinspection PyShadowingBuiltins
     def filter(self, filter: Callable[[_Constant], bool]):
-        return type(self)([constant for constant in self._constants if filter(constant)])
+        return type(self)([constant for constant in self._constants if filter(constant)], _singleton=False)

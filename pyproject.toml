@@ -77,6 +77,9 @@ mqtt = [
 revpi = [
     "revpimodio2",
 ]
+cameras = [
+    "opencv-python ~= 4.12",
+]
 dash = [
     "dash",
     "dash-auth",
@@ -127,6 +130,11 @@ tag_prefix = "v"
 
 [project.scripts]
 lories = "lories.__main__:main"
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: heavy or integration tests (deselect with '-m \"not slow\"')",
+]
 
 [tool.ruff]
 indent-width = 4

@@ -59,6 +59,7 @@ class _ListenerContext(_Context[Listener]):
         channels: Channels,
         how: Literal["any", "all"] = "any",
         unique: bool = False,
+        interval: Optional[str | pd.Timedelta] = None,
     ) -> None: ...
 
     @abstractmethod

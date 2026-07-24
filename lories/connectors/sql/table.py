@@ -247,13 +247,13 @@ class Table(sql.Table):
             query = postgresql.insert(self).values(params)
             return query.on_conflict_do_update(
                 index_elements=[c.name for c in primary_columns],
-                set_={c.name: c for c in resource_columns},
+                set_={c.name: query.excluded[c.name] for c in resource_columns},
             )
         elif self.dialect.name in ["mariadb", "mysql"]:
             from sqlalchemy.dialects import mysql
 
             query = mysql.insert(self).values(params)
-            return query.on_duplicate_key_update({c.name: c for c in resource_columns})
+            return query.on_duplicate_key_update({c.name: query.inserted[c.name] for c in resource_columns})
         else:
             return sql.insert(self).values(params)
 
