@@ -13,7 +13,7 @@ import os
 from abc import abstractmethod
 from copy import deepcopy
 from logging import Logger
-from typing import Any, Collection, Dict, Generic, Mapping, Optional, Sequence, Type
+from typing import Any, Collection, Dict, Generic, Mapping, Optional, Sequence, Type, get_args, get_origin
 
 from lories._core._configurator import Configurator  # noqa
 from lories._core._registrator import Registrator  # noqa
@@ -21,13 +21,6 @@ from lories._core._registrator import _RegistratorContext as Context  # noqa
 from lories.core.configs import Configurations, Directories, Directory
 from lories.core.errors import ResourceError
 from lories.util import update_recursive
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import get_args, get_origin
-
-except ImportError:
-    from typing_extensions import get_args, get_origin
 
 # FIXME: Remove this once Python >= 3.12 is a requirement
 try:

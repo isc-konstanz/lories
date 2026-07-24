@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from abc import ABC
 from collections import OrderedDict
-from typing import Any, Dict, Generic, List, Optional, Sequence, Type, TypeVar
+from typing import Any, Dict, Generic, List, Optional, Sequence, Type, TypeVar, get_args, get_origin
 
 from lories._core._channel import Channel  # noqa
 from lories._core._connector import Connector, _Connector  # noqa
@@ -19,13 +19,6 @@ from lories._core._registrator import Registrator, _Registrator, _RegistratorCon
 from lories._core._tasks import TaskContext, _TaskContext  # noqa
 from lories.core.errors import ResourceError, ResourceUnavailableError
 from lories.util import to_bool, update_recursive
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import get_args, get_origin
-
-except ImportError:
-    from typing_extensions import get_args, get_origin
 
 # FIXME: Remove this once Python >= 3.12 is a requirement
 try:

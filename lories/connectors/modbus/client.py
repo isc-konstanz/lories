@@ -8,7 +8,7 @@ lories.connectors.modbus.client
 
 from __future__ import annotations
 
-from typing import Mapping
+from typing import Literal, Mapping
 
 from pymodbus import FramerType, ModbusException
 from pymodbus.client import ModbusBaseSyncClient, ModbusSerialClient, ModbusTcpClient, ModbusUdpClient
@@ -20,13 +20,6 @@ from lories.connectors import ConnectionError, Connector, ConnectorError, regist
 from lories.connectors.modbus import ModbusRegister
 from lories.core.configs import ConfigurationError
 from lories.typing import Configurations, Resources
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 @register_connector_type("modbus")

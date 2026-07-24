@@ -8,7 +8,7 @@ lories.connectors.sql.table
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Literal, Optional, Tuple
 
 import sqlalchemy as sql
 from sqlalchemy import ClauseElement, Dialect, Result, UnaryExpression
@@ -22,13 +22,6 @@ from lories.connectors.sql.columns import Column, DatetimeColumn, SurrogateKeyCo
 from lories.connectors.sql.index import DatetimeIndexType
 from lories.core import ResourceError, Resources
 from lories.typing import Resource, Timestamp
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 class Table(sql.Table):
@@ -247,13 +240,13 @@ class Table(sql.Table):
             query = postgresql.insert(self).values(params)
             return query.on_conflict_do_update(
                 index_elements=[c.name for c in primary_columns],
-                set_={c.name: c for c in resource_columns},
+                set_={c.name: query.excluded[c.name] for c in resource_columns},
             )
         elif self.dialect.name in ["mariadb", "mysql"]:
             from sqlalchemy.dialects import mysql
 
             query = mysql.insert(self).values(params)
-            return query.on_duplicate_key_update({c.name: c for c in resource_columns})
+            return query.on_duplicate_key_update({c.name: query.inserted[c.name] for c in resource_columns})
         else:
             return sql.insert(self).values(params)
 
