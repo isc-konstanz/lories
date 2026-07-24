@@ -62,8 +62,9 @@ class ListenerContext(_ListenerContext):
         channels: Channels,
         how: Literal["any", "all"] = "any",
         unique: bool = False,
+        interval: Optional[str | pd.Timedelta] = None,
     ) -> Listener:
-        return Listener(id, key, function, channels, how, unique)
+        return Listener(id, key, function, channels, how, unique, interval=interval)
 
     # noinspection PyShadowingBuiltins, PyProtectedMember
     def _update(
@@ -89,6 +90,7 @@ class ListenerContext(_ListenerContext):
         channels: Channels,
         how: Literal["any", "all"] = "any",
         unique: bool = False,
+        interval: Optional[str | pd.Timedelta] = None,
     ) -> None:
         key = function.__name__
         try:
@@ -99,7 +101,7 @@ class ListenerContext(_ListenerContext):
         if self._contains(id):
             self._update(id, channels, how, unique)
         else:
-            self._add(self._create(id, key, function, channels, how=how, unique=unique))
+            self._add(self._create(id, key, function, channels, how=how, unique=unique, interval=interval))
 
     def notify(self, *channels: Channel) -> Collection[Listener]:
         listeners = []
@@ -107,10 +109,12 @@ class ListenerContext(_ListenerContext):
             ids = listener.channels.ids
             if any(c.id in ids for c in channels) and listener.has_update():
                 if listener.locked():
-                    self._logger.warning(
-                        f"Listener '{listener.id}' not finished after {round(listener.runtime, 3)} seconds. "
-                        f"Please verify your configurations"
-                    )
+                    if listener._should_warn_overlap():
+                        self._logger.warning(
+                            f"Listener '{listener.id}' not finished after {round(listener.runtime, 3)} seconds. "
+                            f"Please verify your configurations"
+                        )
+                    continue
                 listeners.append(listener)
         return listeners
 

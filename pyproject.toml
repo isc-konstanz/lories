@@ -130,6 +130,11 @@ tag_prefix = "v"
 [project.scripts]
 lories = "lories.__main__:main"
 
+[tool.pytest.ini_options]
+markers = [
+    "slow: heavy or integration tests (deselect with '-m \"not slow\"')",
+]
+
 [tool.ruff]
 indent-width = 4
 line-length = 120
