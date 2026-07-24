@@ -10,20 +10,13 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Callable
-from typing import Collection, Optional, TypeAlias, TypeVar
+from typing import Collection, Literal, Optional, TypeAlias, TypeVar
 
 import pandas as pd
 from lories._core._channel import Channel
 from lories._core._channels import Channels
 from lories._core._context import _Context
 from lories._core._entity import _Entity
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 class _Listener(_Entity):

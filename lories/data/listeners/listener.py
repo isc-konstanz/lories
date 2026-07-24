@@ -12,7 +12,7 @@ import logging
 from collections.abc import Callable
 from logging import Logger
 from threading import Lock
-from typing import Any, Dict, Optional, TypeVar
+from typing import Any, Dict, Literal, Optional, TypeVar
 
 import pandas as pd
 import pytz as tz
@@ -21,13 +21,6 @@ from lories._core._channels import Channels  # noqa
 from lories._core._listener import _Listener  # noqa
 from lories.core import ResourceError
 from lories.util import to_timedelta
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 # noinspection PyShadowingBuiltins

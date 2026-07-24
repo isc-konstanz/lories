@@ -8,7 +8,7 @@ lories.connectors.entsoe
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 
 # TODO: Add to requirements
 from entsoe import EntsoePandasClient
@@ -22,13 +22,6 @@ from lories.connectors import ConnectionError, Connector, ConnectorError
 from lories.core.configs import ConfigurationError
 from lories.typing import Configurations, Resources, Timestamp
 from lories.util import parse_freq
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 # noinspection SpellCheckingInspection

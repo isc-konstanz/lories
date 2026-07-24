@@ -9,19 +9,12 @@ lories._core._database
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Any, Optional, TypeVar, overload
+from typing import Any, Literal, Optional, TypeVar, overload
 
 import pandas as pd
 from lories._core._connector import _Connector
 from lories._core._resources import Resources
 from lories._core.typing import Timestamp
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 class _Database(_Connector):

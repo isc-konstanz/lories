@@ -8,18 +8,13 @@ lories.connectors.modbus.register
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pymodbus.client import ModbusBaseClient
 
 from lories.core.configs import ConfigurationError
 from lories.typing import Resource
 from lories.util import to_int
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 FunctionType = Literal["holding_register", "input_register", "coil"]
 DataType = ModbusBaseClient.DATATYPE
