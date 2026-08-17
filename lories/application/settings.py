@@ -59,7 +59,7 @@ class Settings(Configurations):
                 shutil.copy(logging_default, logging_file)
 
         if os.path.isfile(logging_file):
-            logging.config.fileConfig(logging_file)
+            logging.config.fileConfig(logging_file, disable_existing_loggers=False)
             for handler in logging.getLoggerClass().root.handlers:
                 if isinstance(handler, logging.FileHandler):
                     self.dirs.log = os.path.dirname(handler.baseFilename)

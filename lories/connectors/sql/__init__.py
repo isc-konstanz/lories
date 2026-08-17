@@ -20,3 +20,5 @@ from .table import Table  # noqa: F401
 from .schema import Schema  # noqa: F401
 
 from .database import SqlDatabase  # noqa: F401
+
+from .timescale import TimescaleDatabase  # noqa: F401
