@@ -62,6 +62,7 @@ from .location import (  # noqa: F401
 )
 
 from .components import (  # noqa: F401
+    RemoteMirror,
     Tariff,
     Weather,
 )

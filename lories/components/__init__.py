@@ -41,3 +41,6 @@ from .tariff import Tariff  # noqa: F401
 
 from . import environment  # noqa: F401
 from .environment import Environment  # noqa: F401
+
+from . import remote_mirror  # noqa: F401
+from .remote_mirror import RemoteMirror  # noqa: F401

@@ -269,6 +269,35 @@ class SqlDatabase(Database, Mapping[str, Table]):
         results = sorted(results, key=lambda d: min(d.index))
         return pd.concat(results, axis="columns")
 
+    def read_groups(self, resources: Resources) -> list[dict[str, Any]]:
+        """Discover the distinct surrogate-key groups present for ``resources``' table(s).
+
+        Runs a ``SELECT DISTINCT`` over each table's surrogate-key columns (see
+        :meth:`lories.connectors.sql.table.Table.read_groups`) and returns the surrogate
+        resource-attribute dicts, so a caller can enumerate one resource per group even when
+        the values (e.g. an append-per-run ``timestamp_creation``) are not known ahead of time.
+        Tables without surrogate keys contribute nothing.
+        """
+        groups: list[dict[str, Any]] = []
+        try:
+            for table_schema, schema_resources in resources.groupby("schema"):
+                for table_name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
+                    table_key = table_name if table_schema is None else f"{table_schema}.{table_name}"
+                    if table_key not in self.__tables:
+                        raise DatabaseError(self, f"Table '{table_key}' not available")
+
+                    table = self.get(table_key)
+                    select = table.read_groups()
+                    if select is None:
+                        continue
+                    result = self.connection.execute(select)
+                    for group in table.extract_groups(result):
+                        if group not in groups:
+                            groups.append(group)
+        except SQLAlchemyError as e:
+            self._raise(e)
+        return groups
+
     # noinspection PyUnresolvedReferences, PyTypeChecker
     def read_first(self, resources: Resources) -> pd.DataFrame:
         results = []
