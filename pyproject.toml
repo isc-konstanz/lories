@@ -132,6 +132,8 @@ tag_prefix = "v"
 lories = "lories.__main__:main"
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib"
 markers = [
     "slow: heavy or integration tests (deselect with '-m \"not slow\"')",
 ]
@@ -156,7 +158,3 @@ select = [
 [tool.ruff.lint.isort]
 extra-standard-library = ["dateutil"]
 known-first-party = ["lories", "numpy", "pandas", "pytz"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts = "--import-mode=importlib"
