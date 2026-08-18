@@ -8,7 +8,8 @@ lories.application.view.pages.components.camera
 
 from __future__ import annotations
 
-from typing import List
+import base64
+from typing import Optional
 
 import dash_bootstrap_components as dbc
 from dash import Input, Output, callback, dcc, html
@@ -87,23 +88,54 @@ class CameraPage(ComponentPage[Camera]):
         )
 
     def _build_stream(self) -> html.Div:
+        has_stream = Camera.STREAM in self.data
+        inference = getattr(self._component, "inference", None)
+        show_toggle = has_stream and inference is not None and inference.is_enabled()
+        predictions_id = f"{self.id}-live-predictions"
+
         @callback(
             Output(f"{self.id}-stream", "children"),
             Input(f"{self.id}-stream-update", "n_intervals"),
+            Input(predictions_id, "value"),
         )
-        def _update_stream(*_) -> List[html.P] | dbc.Spinner:
-            return dbc.Spinner(html.Div(id=f"{self.id}-stream-loader"))
+        def _update_stream(_n_intervals: int, show_predictions: bool) -> html.Img | dbc.Spinner:
+            frame = self._stream_frame(show_predictions)
+            if frame is None:
+                return dbc.Spinner(html.Div(id=f"{self.id}-stream-loader"))
+            encoded = base64.b64encode(frame).decode("ascii")
+            return html.Img(src=f"data:image/jpeg;base64,{encoded}", style={"max-width": "100%", "height": "auto"})
 
         return html.Div(
             [
                 html.Div(
-                    _update_stream(),
+                    _update_stream(0, False),
                     id=f"{self.id}-stream",
                 ),
                 dcc.Interval(
                     id=f"{self.id}-stream-update",
-                    interval=60000,
+                    interval=1000,
                     n_intervals=0,
+                ),
+                dbc.Switch(
+                    id=predictions_id,
+                    label="Live Predictions",
+                    value=False,
+                    style={"display": "block" if show_toggle else "none"},
                 ),
             ]
         )
+
+    def _stream_frame(self, show_predictions: bool) -> Optional[bytes]:
+        if Camera.STREAM not in self.data:
+            return None
+        stream = self.data.stream
+        if not stream.is_valid():
+            return None
+
+        if show_predictions:
+            inference = getattr(self._component, "inference", None)
+            if inference is not None:
+                preview = getattr(inference.data, "preview", None)
+                if preview is not None and preview.is_valid():
+                    return preview.value
+        return stream.value
