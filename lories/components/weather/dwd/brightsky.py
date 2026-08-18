@@ -123,6 +123,11 @@ class Brightsky(Connector):
         # Convert global horizontal irradiance from kWh/m^2 to W/m^2
         data["solar"] = data["solar"] * hours * 1000
 
+        # Convert wind speeds from km/h to m/s
+        for wind_column in ["wind_speed", "wind_gust_speed"]:
+            if wind_column in data.columns:
+                data[wind_column] = data[wind_column] / 3.6
+
         if data[Weather.CLOUD_COVER].isna().any():
             data[Weather.CLOUD_COVER] = data[Weather.CLOUD_COVER].interpolate(method="linear")
 
