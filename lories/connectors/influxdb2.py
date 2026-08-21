@@ -9,7 +9,7 @@ lories.connectors.influxdb2
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Literal, Optional, Tuple
 
 from influxdb_client import BucketRetentionRules, InfluxDBClient
 from influxdb_client.client.exceptions import InfluxDBError
@@ -22,13 +22,6 @@ from lories.connectors import ConnectionError, Database, DatabaseError, register
 from lories.core.configs.parameters import ChannelParameter, Parameter
 from lories.data.util import hash_value
 from lories.typing import Configurations, Resource, Resources, Timestamp
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 @register_connector_type("influxdb2", "influxdb_v2")

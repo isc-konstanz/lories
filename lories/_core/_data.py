@@ -10,20 +10,13 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Callable
-from typing import Any, List, Optional, Tuple, TypeAlias, TypeVar, overload
+from typing import Any, List, Literal, Optional, Tuple, TypeAlias, TypeVar, overload
 
 import pandas as pd
 from lories._core._channel import Channel, _Channel
 from lories._core._channels import Channels, ChannelsArgument
 from lories._core._context import _Context
 from lories._core.typing import Timestamp
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 class _DataContext(_Context[Channel]):
@@ -55,6 +48,7 @@ class _DataContext(_Context[Channel]):
         channels: Optional[ChannelsArgument] = None,
         how: Literal["any", "all"] = "any",
         unique: bool = False,
+        interval: Optional[str | pd.Timedelta] = None,
     ) -> None:
         pass
 

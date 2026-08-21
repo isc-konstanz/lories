@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import Any, Dict, Iterator, List, Mapping, Optional
+from typing import Any, Dict, Iterator, List, Literal, Mapping, Optional
 
 import tzlocal
 
@@ -19,13 +19,6 @@ import pytz as tz
 from lories import ConfigurationError, Resource, ResourceError, Resources
 from lories.connectors import Database
 from lories.util import floor_date, parse_freq, slice_range, to_bool, to_timedelta, to_timezone
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 class Replication:

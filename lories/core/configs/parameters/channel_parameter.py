@@ -104,7 +104,7 @@ class ChannelParameter:
             return raw
         try:
             if self.type is bool:
-                return to_bool(raw, any_str=True)
+                return to_bool(raw)
             return self.type(raw)
         except (ValueError, TypeError) as exc:
             raise ConfigurationError(
@@ -121,6 +121,4 @@ class ChannelParameter:
                 raise ConfigurationError(f"Validation failed for '{key}' (value={value!r}): {exc}") from exc
 
     def __repr__(self) -> str:
-        return (
-            f"{type(self).__name__}(" f"name={self.name!r}, key={self._resolve_key()!r}, " f"required={self.required})"
-        )
+        return f"{type(self).__name__}(name={self.name!r}, key={self._resolve_key()!r}, required={self.required})"

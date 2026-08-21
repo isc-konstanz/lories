@@ -14,12 +14,13 @@ import shutil
 import tempfile
 from collections import OrderedDict
 from copy import deepcopy
+from dateutil.relativedelta import relativedelta
 from pathlib import Path
 from typing import Any, Collection, Iterable, Iterator, List, Mapping, Optional
 
 import pandas as pd
 from lories._core import _Configurations  # noqa
-from lories._core.typing import Timestamp  # noqa
+from lories._core.typing import Duration, Timestamp  # noqa
 from lories.core.configs.directories import Directories, Directory
 from lories.core.configs.errors import ConfigurationError, ConfigurationUnavailableError
 from lories.util import is_bool, to_bool, to_date, to_float, to_int, to_timedelta, update_recursive
@@ -170,10 +171,15 @@ class Configurations(_Configurations):
     def get_date(self, key: str, default: Timestamp = None, **kwargs) -> pd.Timestamp:
         return to_date(self._get(key, default), **kwargs)
 
-    def get_duration(self, key: str, default: pd.Timedelta = None) -> pd.Timedelta:
+    def get_duration(self, key: str, default: Optional[Duration] = None) -> Optional[Duration]:
         value = self._get(key, default)
-        if value is None or not isinstance(value, str):
+        if value is None or isinstance(value, (pd.Timedelta, relativedelta)):
             return value
+        if not isinstance(value, str):
+            raise ConfigurationError(
+                f"Invalid duration for '{key}': durations must be strings such as "
+                f"'10s', '500ms' or '1h', not {type(value).__name__} ({value!r})"
+            )
         return to_timedelta(value)
 
     def __contains__(self, key: str) -> bool:

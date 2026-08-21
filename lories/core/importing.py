@@ -32,7 +32,7 @@ class MockModule(ModuleType):
                 "__module__": self._mock_name,
                 "__doc__": f"Unavailable — `{self._mock_name}` is not installed.",
                 "__init__": lambda self_, *a, **kw: (_ for _ in ()).throw(
-                    RuntimeError(f"'{self._mock_name}' is not installed. " f"pip install {self._mock_name}")
+                    RuntimeError(f"'{self._mock_name}' is not installed. pip install {self._mock_name}")
                 ),
             },
         )

@@ -11,14 +11,11 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from pathlib import Path, PosixPath, WindowsPath
-from typing import Dict, Optional
+from typing import TYPE_CHECKING, Dict, Optional
 
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
+# FIXME: Remove this once Python >= 3.11 is a requirement (LiteralString is a 3.11+ typing symbol)
+if TYPE_CHECKING:
     from typing import LiteralString
-
-except ImportError:
-    from typing_extensions import LiteralString
 
 
 class Directories:

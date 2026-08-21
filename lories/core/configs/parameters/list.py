@@ -98,7 +98,7 @@ class ListParameter(_TypedParameter):
                 coerced = item if isinstance(item, self.item_type) else self.item_type(item)
             except (TypeError, ValueError) as exc:
                 raise _config_error(
-                    f"Cannot convert element [{i}] of '{key}' " f"({item!r}) to {self.item_type.__name__}: {exc}"
+                    f"Cannot convert element [{i}] of '{key}' ({item!r}) to {self.item_type.__name__}: {exc}"
                 ) from exc
 
             if self.item_validator is not None:
@@ -106,7 +106,7 @@ class ListParameter(_TypedParameter):
                     self.item_validator(coerced)
                 except (ValueError, TypeError) as exc:
                     raise _config_error(
-                        f"Element [{i}] of '{key}' (value={coerced!r}) " f"failed item validation: {exc}"
+                        f"Element [{i}] of '{key}' (value={coerced!r}) failed item validation: {exc}"
                     ) from exc
 
             result.append(coerced)

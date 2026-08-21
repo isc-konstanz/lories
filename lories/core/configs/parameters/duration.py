@@ -11,17 +11,15 @@ which internally uses ``lories.util.to_timedelta``.
 from __future__ import annotations
 
 from dateutil.relativedelta import relativedelta
-from typing import TYPE_CHECKING, Any, Callable, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
 import pandas as pd
+from lories._core.typing import Duration
 from lories.core.configs.parameters.base import _UNSET, _config_error, _TypedParameter
 from lories.util import to_timedelta
 
 if TYPE_CHECKING:
     from lories._core._configurations import _Configurations
-
-
-Duration = Union[pd.Timedelta, relativedelta]
 
 
 def _coerce(value: Any) -> Optional[Duration]:

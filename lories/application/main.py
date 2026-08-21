@@ -17,8 +17,8 @@ from collections.abc import Callable
 from concurrent import futures
 from concurrent.futures import Future
 from functools import partial
-from threading import Event, Thread
-from typing import Optional, Sequence, Type
+from threading import Event, Thread, current_thread
+from typing import Literal, Optional, Sequence, Type
 
 import pandas as pd
 import pytz as tz
@@ -44,13 +44,6 @@ from lories.simulation import Results
 from lories.system import System
 from lories.util import floor_date, slice_range, to_bool, to_timedelta, validate_key
 
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
-
 
 # noinspection PyProtectedMember
 class Application(_Application, DataContext, TaskContext):
@@ -63,7 +56,10 @@ class Application(_Application, DataContext, TaskContext):
     _interface: Optional[Interface] = None
 
     __runner: Thread
+    __interface_runner: Optional[Thread] = None
     __interrupt: Event
+
+    _shutdown_timeout: float = 30
 
     _action = Parameter(key="action", type=str, required=False, default="start", desc="CLI action to perform")
     _interval = Parameter(
@@ -96,8 +92,8 @@ class Application(_Application, DataContext, TaskContext):
 
     def __init__(self, settings: Settings, **kwargs) -> None:
         super().__init__(configs=settings, key=validate_key(settings["name"]), name=settings["name"], **kwargs)
-        signal.signal(signal.SIGINT, self.interrupt)
-        signal.signal(signal.SIGTERM, self.terminate)
+        signal.signal(signal.SIGINT, self._request_stop)
+        signal.signal(signal.SIGTERM, self._request_stop)
         self.__interrupt = Event()
         self.__interrupt.set()
 
@@ -114,7 +110,7 @@ class Application(_Application, DataContext, TaskContext):
         if settings.get("action").lower() == "start":
             self._interface = Interface(self, settings.get_member(Interface.TYPE))
 
-        self.__runner = Thread(name=self.name, target=self.run, daemon=True)
+        self.__runner = Thread(name=self.name, target=self.__run_guarded, daemon=True)
 
     # noinspection PyArgumentList
     def __contains__(self, item: str | Channel | Connector | Component) -> bool:
@@ -134,6 +130,7 @@ class Application(_Application, DataContext, TaskContext):
         super().configure(settings)
         self._logger.debug(f"Setting up {type(self).__name__}: {self.name}")
         self._interval = settings.get_int("interval", default=1)
+        self._shutdown_timeout = settings.get_int("shutdown_timeout", default=30)
         components = []
         try:
             system_dirs = settings.dirs.to_dict()
@@ -191,11 +188,16 @@ class Application(_Application, DataContext, TaskContext):
         self._components.deactivate(chain_filters(filter))
         self._connectors.disconnect(chain_filters(filter))
 
+    def _request_stop(self, *_) -> None:
+        self.__interrupt.set()
+
     def interrupt(self, *_) -> None:
         self.__interrupt.set()
         super().interrupt()
-        if self.__runner.is_alive():
-            self.__runner.join()
+        if self.__runner.is_alive() and current_thread() is not self.__runner:
+            self.__runner.join(timeout=self._shutdown_timeout)
+            if self.__runner.is_alive():
+                self._logger.warning(f"Runner thread did not stop within {self._shutdown_timeout}s of shutdown")
 
     def register(
         self,
@@ -203,8 +205,9 @@ class Application(_Application, DataContext, TaskContext):
         channels: Optional[ChannelsArgument] = None,
         how: Literal["any", "all"] = "any",
         unique: bool = False,
+        interval: Optional[str | pd.Timedelta] = None,
     ) -> None:
-        self._listeners.register(function, self._filter_by_args(channels), how=how, unique=unique)
+        self._listeners.register(function, self._filter_by_args(channels), how=how, unique=unique, interval=interval)
 
     # noinspection PyTypeChecker
     @property
@@ -312,11 +315,23 @@ class Application(_Application, DataContext, TaskContext):
         self.__interrupt.clear()
         self.__runner.start()
 
-        _has_interface = self._has_interface()
-        if _has_interface:
+        if self._has_interface() and self._interface.reload:
+            # reloader needs the main thread; dev only, not systemd-safe
             self._interface.start()
-        else:
-            self.__runner.join()
+            return
+
+        if self._has_interface():
+            self.__interface_runner = Thread(name=f"{self.name}.interface", target=self._interface.start, daemon=True)
+            self.__interface_runner.start()
+
+        self.__interrupt.wait()
+
+    def __run_guarded(self) -> None:
+        # wake the main thread even if run() crashes
+        try:
+            self.run()
+        finally:
+            self.__interrupt.set()
 
     # noinspection PyShadowingBuiltins
     def run(self, **kwargs) -> None:
@@ -342,7 +357,7 @@ class Application(_Application, DataContext, TaskContext):
                 _sleep(interval, self.__interrupt.wait)
 
             except KeyboardInterrupt:
-                self.interrupt()
+                self.__interrupt.set()
                 break
 
         self.__notify()
