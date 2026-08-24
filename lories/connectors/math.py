@@ -18,6 +18,7 @@ import pandas as pd
 import pytz as tz
 from lories.connectors import Connector, register_connector_type
 from lories.core import ConfigurationError
+from lories.core.configs.parameters import ChannelParameter, ParameterGroup
 from lories.data import Channel, DataContext
 from lories.typing import Resource, Resources
 from lories.util import get_context, to_bool
@@ -26,14 +27,51 @@ from lories.util import get_context, to_bool
 # noinspection SpellCheckingInspection
 @register_connector_type("math")
 class MathConnector(Connector):
+    """
+    The Math connector evaluates symbolic mathematical expressions at runtime using the SymPy computer algebra
+    library. It maps free symbols in an expression to live channel values, enabling computed or derived channels
+    such as unit conversions, aggregations, or physical formulas. Expressions can be triggered reactively via
+    listeners or evaluated on demand during read cycles. However, complex expressions with many symbols may
+    introduce noticeable computation overhead.
+    """
+
+    _mapping = ParameterGroup(
+        key="mapping",
+        required=False,
+        desc="Connector-wide symbol-to-channel mapping merged into each channel's own 'mapping'",
+    )
+
+    # Per-channel parameters
+    expression = ChannelParameter(
+        type=str,
+        required=False,
+        desc=(
+            "SymPy mathematical expression evaluated for this channel",
+            "(accepted under keys 'expression', 'expr', or 'math')",
+        ),
+    )
+    mapping = ChannelParameter(
+        type=None,
+        required=False,
+        default={},
+        desc="Per-channel symbol-to-channel mapping; overrides the connector-wide mapping",
+    )
+    listen = ChannelParameter(
+        type=str, required=False, desc="Channel ID whose updates trigger re-evaluation of this expression"
+    )
+    listener = ChannelParameter(
+        type=bool,
+        required=False,
+        desc="Re-evaluate on each upstream channel update (defaults to True when 'listen' is set)",
+    )
+
     _exprs: Dict[str, ChannelExpr]
 
     def connect(self, resources: Resources) -> None:
         self._exprs = {}
 
-        mapping = self.configs.get("mapping", default={})
         for resource in resources:
-            resource_mappings = deepcopy(mapping)
+            resource_mappings = deepcopy(self._mapping)
             resource_mappings.update(resource.get("mapping", default={}))
 
             self._exprs[resource.id] = self._build_expr(resource, **resource_mappings)

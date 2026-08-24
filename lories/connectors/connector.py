@@ -9,6 +9,8 @@ lories.connectors.connector
 from __future__ import annotations
 
 import datetime as dt
+import inspect
+import logging
 from collections import OrderedDict
 from collections.abc import Callable
 from functools import wraps
@@ -25,12 +27,35 @@ from lories.connectors.errors import ConnectionError, ConnectorError
 from lories.core import Resource, ResourceError, Resources
 from lories.core.configs.configurator import Configurator, ConfiguratorMeta
 from lories.core.configs.errors import ConfigurationError
+from lories.core.configs.parameters import Parameter
+from lories.core.configs.parameters.channel_parameter import ChannelParameter
 from lories.core.register.registrator import Registrator
 from lories.data.channels import Channel, Channels, ChannelState
 from lories.data.validation import validate_index
+from lories.io.shell import ANSI_KEY as _WK
+from lories.io.shell import ANSI_RESET as _WR
+from lories.io.shell import ANSI_WARN as _WH
 
 
 class ConnectorMeta(ConfiguratorMeta):
+    __channel_parameters__: Dict[str, ChannelParameter]
+
+    def __new__(mcls, name, bases, namespace):
+        # Inherit channel parameters from all parent classes (left-to-right MRO).
+        channel_params: Dict[str, ChannelParameter] = {}
+        for base in bases:
+            channel_params.update(getattr(base, "__channel_parameters__", {}))
+
+        # Collect ChannelParameter descriptors declared in this class body.
+        for attr, value in namespace.items():
+            if isinstance(value, ChannelParameter):
+                if value.name is None:
+                    value.name = attr
+                channel_params[attr] = value
+
+        namespace["__channel_parameters__"] = channel_params
+        return super().__new__(mcls, name, bases, namespace)
+
     # noinspection PyProtectedMember
     def __call__(cls, *args, **kwargs):
         connector = super().__call__(*args, **kwargs)
@@ -44,6 +69,8 @@ class ConnectorMeta(ConfiguratorMeta):
 
 # noinspection PyAbstractClass
 class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
+    _connect = Parameter(key="connect", type=bool, default=True, desc="Connect on activation")
+
     _connected: bool = False
     _connect_type: ConnectType = ConnectType.AUTO
 
@@ -55,6 +82,9 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
 
     _lock_timeout: int = 60
     _lock: Lock
+
+    _WARN_UNDECLARED_CHANNEL_CONFIGS: bool = True
+    _CHANNEL_CONFIGS_RESERVED_KEYS: frozenset = frozenset({"enabled"})
 
     def __init__(
         self,
@@ -143,7 +173,44 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self._connect_type = ConnectType.get(configs.get("connect", default=True))
+        self._connect_type = ConnectType.get(self._connect)
+
+    @classmethod
+    def _warn_undeclared_channel_configs(cls, resources: Resources) -> None:
+        if not cls._WARN_UNDECLARED_CHANNEL_CONFIGS:
+            return
+        logger = logging.getLogger(cls.__module__)
+        if not logger.isEnabledFor(logging.DEBUG):
+            return
+
+        declared: frozenset = frozenset(p._resolve_key() for p in cls.__channel_parameters__.values())
+
+        try:
+            cls_file = inspect.getfile(cls)
+        except (TypeError, OSError):
+            cls_file = "<unknown file>"
+
+        for resource in resources:
+            channel_connector = getattr(resource, "connector", None)
+            if channel_connector is None or not getattr(channel_connector, "enabled", False):
+                continue
+            registrator = channel_connector._get_registrator()
+            if registrator is not None and not isinstance(registrator, cls):
+                continue
+            for key in channel_connector._copy_configs():
+                if key in cls._CHANNEL_CONFIGS_RESERVED_KEYS:
+                    continue
+                if key not in declared:
+                    logger.debug(
+                        f"{_WH}%s (module: %s, file: %s): "
+                        f"channel '%s' uses config key '{_WK}%s{_WH}' "
+                        f"with no ChannelParameter declaration{_WR}",
+                        cls.__name__,
+                        cls.__module__,
+                        cls_file,
+                        resource.id,
+                        key,
+                    )
 
     def _is_disconnected(self) -> bool:
         return not self._is_connected()
@@ -169,6 +236,7 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
         return self.is_connected() and self._connected
 
     def is_connected(self) -> bool:
+        """Runtime health predicate; check the handle, not ``self._connected`` (the lifecycle flag)."""
         return True
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
@@ -205,7 +273,7 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
             self._lock.release()
 
     def _at_connect(self, resources: Resources) -> None:
-        pass
+        type(self)._warn_undeclared_channel_configs(resources)
 
     def _on_connect(self, resources: Resources) -> None:
         pass
@@ -220,7 +288,7 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
             self._timestamp_connect = pd.NaT
             self._timestamp_disconnect = pd.Timestamp.now(tz.UTC)
 
-            if not self._is_disconnected():
+            if self._connected:
                 self._at_disconnect()
                 self._run_disconnect()
                 self._on_disconnect()

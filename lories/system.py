@@ -15,13 +15,14 @@ import pandas as pd
 from lories import Configurations
 from lories.components import Component, ComponentContext, ComponentUnavailableError, Weather
 from lories.core.typing import Timestamp
-from lories.location import Location, LocationUnavailableException
+from lories.location import Location, LocationUnavailableException, location_parameter_group
 from lories.simulation import Results
 
 
 class System(Component):
     TYPE: str = "system"
 
+    _location_section = location_parameter_group()
     _location: Optional[Location] = None
 
     @classmethod

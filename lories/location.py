@@ -12,6 +12,7 @@ from typing import Optional
 
 import pytz as tz
 from lories.core import ResourceError, ResourceUnavailableError  # noqa
+from lories.core.configs.parameters import Parameter, ParameterGroup
 from lories.util import to_timezone
 
 
@@ -75,6 +76,33 @@ class Location:
         if self._altitude is None:
             return 0.0
         return self._altitude
+
+
+def location_parameter_group(
+    key: str = Location.TYPE,
+    required: bool = False,
+    desc: str = "Geographic location of the system / component",
+) -> ParameterGroup:
+    """Standard ``[location]`` schema shared by ``System`` and ``Weather``.
+
+    Declares the section so docs / configs editor can render it; runtime
+    construction of the ``Location`` object stays in each component's
+    ``localize()`` method, which still needs the section-level ``enabled``
+    flag and the context fallback that a plain dict cannot express.
+    """
+    return ParameterGroup(
+        key=key,
+        required=required,
+        desc=desc,
+        children=[
+            Parameter(key="latitude", type=float, required=False, desc="Latitude in decimal degrees (north positive)"),
+            Parameter(key="longitude", type=float, required=False, desc="Longitude in decimal degrees (east positive)"),
+            Parameter(key="timezone", type=str, default="UTC", desc="IANA timezone name (e.g. 'Europe/Berlin')"),
+            Parameter(key="altitude", type=float, required=False, desc="Altitude above sea level in metres"),
+            Parameter(key="country", type=str, required=False, desc="Country (ISO 3166-1 name or code)"),
+            Parameter(key="state", type=str, required=False, desc="State or region"),
+        ],
+    )
 
 
 class LocationException(ResourceError):

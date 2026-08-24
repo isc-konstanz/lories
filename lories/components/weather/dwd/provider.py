@@ -14,6 +14,7 @@ import pandas as pd
 from lories import Constant
 from lories.components.weather import Weather, WeatherForecast, WeatherProvider, register_weather_type
 from lories.components.weather.dwd import Brightsky
+from lories.core.configs.parameters import ConnectorParameter
 from lories.typing import Configurations
 
 CHANNELS = [
@@ -55,6 +56,20 @@ CHANNEL_AGGREGATE_ALIAS = {
 # noinspection SpellCheckingInspection
 @register_weather_type("dwd", "brightsky")
 class DeutscherWetterDienst(WeatherProvider):
+    """
+    Weather provider that retrieves observations and forecasts from the Deutscher Wetterdienst (DWD)
+    via the Bright Sky open API. DWD is the German national meteorological service, offering free
+    access to a comprehensive set of weather parameters including solar irradiance, temperature, wind,
+    precipitation, and cloud cover at hourly resolution. The Bright Sky API aggregates DWD open data
+    into a convenient REST interface without requiring registration or API keys.
+    """
+
+    _brightsky = ConnectorParameter(
+        cls=Brightsky,
+        key="brightsky",
+        desc="Bright Sky API connector fetching DWD observation and forecast records",
+    )
+
     # noinspection PyUnresolvedReferences
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)

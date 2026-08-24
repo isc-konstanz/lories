@@ -14,11 +14,32 @@ from lories._core import ChannelState  # noqa
 from lories.connectors import ConnectionError, register_connector_type
 from lories.connectors.serial.i2c._i2c import _I2CConnector
 from lories.connectors.serial.i2c.bme280_sensor import Bme280Sensor
+from lories.core.configs.parameters import ChannelParameter
 from lories.typing import Resources
 
 
 @register_connector_type("i2c")
 class I2CConnector(_I2CConnector):
+    """
+    I2C (Inter-Integrated Circuit) is a two-wire serial bus protocol commonly used to connect
+    low-speed sensors and peripherals on embedded systems and single-board computers such as the
+    Raspberry Pi. This connector uses the smbus2 library to communicate over the I2C bus and
+    supports named sensor drivers (e.g. BME280) as well as raw register read/write access.
+    It falls back to a mock implementation when smbus2 is unavailable (e.g. on Windows or in
+    development environments).
+    """
+
+    # Per-channel parameters
+    sensor = ChannelParameter(
+        type=str, required=False, choices=["bme280"], desc="Sensor type (e.g. 'bme280'); omit for raw register access"
+    )
+    address = ChannelParameter(type=int, required=False, desc="I2C device address")
+    register = ChannelParameter(type=int, required=False, desc="Register address (raw mode)")
+    length = ChannelParameter(type=int, required=False, default=1, desc="Number of bytes to read (raw mode)")
+    measurement = ChannelParameter(
+        type=str, required=False, desc="Sensor measurement key (e.g. 'temperature', 'humidity', 'pressure')"
+    )
+
     _sensors: dict
 
     def connect(self, resources: Resources) -> None:

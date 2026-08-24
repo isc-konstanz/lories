@@ -94,7 +94,11 @@ class MotionDetector(Processor):
         if not isinstance(value, (bytes, bytearray)):
             return Processor.SKIP
 
-        arr = np.frombuffer(value, dtype=np.uint8)
+        # .copy() detaches the array from the bytes buffer. np.frombuffer alone
+        # leaves a (bytes <-> memoryview <-> ndarray) cycle that surfaces as
+        # "Exception ignored in tp_clear of memoryview" when the channel value
+        # gets reassigned mid-decode.
+        arr = np.frombuffer(value, dtype=np.uint8).copy()
         bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
         if bgr is None:
             self._reset_background_model()

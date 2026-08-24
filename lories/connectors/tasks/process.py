@@ -47,11 +47,12 @@ class ProcessContext(TaskContext):
         self._connectors = ConnectorContext(self)
         self._connectors._add(*(connector.duplicate(context=self._connectors) for connector in connectors))
 
-    def _build(self, configs: Configurations) -> Executor:
+    def _build(self) -> Executor:
         get_cpu_count = getattr(os, "process_cpu_count", os.cpu_count)
         max_workers_default = max(int((get_cpu_count() or 1) / 2), 1)
+        workers_max = (self._tasks_section or {}).get("workers_max")
         return ProcessPoolExecutor(
-            max_workers=configs.get_int("workers_max", default=max_workers_default),
+            max_workers=workers_max if workers_max is not None else max_workers_default,
             mp_context=self._context,
         )
 

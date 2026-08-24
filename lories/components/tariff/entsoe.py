@@ -12,32 +12,42 @@ import pandas as pd
 from lories import Constant
 from lories.components.tariff import Tariff, TariffProvider, register_tariff_type
 from lories.connectors.entsoe import EntsoeConnector
+from lories.core.configs.parameters import Parameter
 from lories.typing import Configurations
 
 
 # noinspection SpellCheckingInspection
 @register_tariff_type("entsoe", "entso_e")
 class EntsoeProvider(TariffProvider):
+    """
+    Tariff provider that consumes day-ahead electricity prices published on the ENTSO-E Transparency
+    Platform. ENTSO-E exposes hourly wholesale market prices for European bidding zones, typically
+    available by 13:00 CET for the following day. The provider converts day-ahead prices from €/MWh to
+    ct/kWh and applies a configurable offset to account for taxes, levies, or margin adjustments.
+
+    The connector is **not** created implicitly; it must be configured by the user (e.g. via a
+    ``[connectors.<id>]`` section of type ``entsoe``) and referenced by id through the ``connector``
+    parameter, matching how channels in the rest of the framework bind to connectors.
+    """
+
     PRICE_DAY_AHEAD = Constant(float, "price_day_ahead", name="Day-Ahead Tariff Price", unit="€/MWh")
 
-    _offset: float = 0
+    _connector = Parameter(
+        key="connector", type=str, required=True, desc="ID of the ENTSO-E connector to source prices from"
+    )
+    _offset = Parameter(key="offset", type=float, default=0.0, desc="Constant offset added to import price (ct/kWh)")
+
+    _connector: str
+    _offset: float
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self._offset = configs.get_float("offset", default=0)
 
-        entsoe_connector = EntsoeConnector(
-            self,
-            key="entsoe_connector",
-            name="ENTSO-e Connector",
-            configs=configs,
-        )
-        self.connectors.add(entsoe_connector)
         self.data.add(
             EntsoeProvider.PRICE_DAY_AHEAD,
             method=EntsoeConnector.DAY_AHEAD,
             aggregate="mean",
-            connector=entsoe_connector.id,
+            connector=self._connector,
             logger={"enabled": False},
         )
 

@@ -14,7 +14,6 @@ from itertools import chain
 from typing import Any, Collection, Generic, Iterator, List, Optional, Tuple, Type, TypeVar
 
 import dash_bootstrap_components as dbc
-from dash import html
 
 import pandas as pd
 from lories.application.view.pages import Page, PageLayout
@@ -91,13 +90,12 @@ class PageGroup(Page, MutableSequence[P], Generic[P]):
         return self._pages
 
     def create_layout(self, layout: PageLayout) -> None:
+        super().create_layout(layout)
         layout.container.class_name = "card-container"
 
         layout.menu = dbc.NavItem(dbc.NavLink(self.name, href=self.path))
         layout.card.add_title(self.name)
         layout.card.add_footer(href=self.path)
-
-        layout.append(dbc.Row(dbc.Col(html.H4(f"{self.name}:"))))
 
         for page in self.sort():
             if page.layout.has_card_items():

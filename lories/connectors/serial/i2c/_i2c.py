@@ -18,7 +18,7 @@ from lories.typing import Resources
 
 # noinspection PyAbstractClass
 class _I2CConnector(Connector):
-    _port = Parameter(key="port", type=int, default=1, desc="I2C bus number")
+    _port = Parameter(key="port", type=int, default=1, desc="I2C bus number (e.g. 1 for /dev/i2c-1)")
 
     _bus: Optional[SMBus]
     _port: int

@@ -21,6 +21,7 @@ from lories._core import _TaskContext  # noqa
 from lories.connectors import Connector, ConnectorError
 from lories.connectors.tasks import CheckTask, LogTask, ReadTask, WriteTask
 from lories.core.activator import Activator
+from lories.core.configs.parameters import Parameter, ParameterGroup
 from lories.core.errors import ResourceError, ResourceUnavailableError
 from lories.core.typing import Channel, Channels, Configurations, Registrator, Timestamp
 from lories.data.channels import ChannelState
@@ -29,6 +30,20 @@ from lories.data.channels import ChannelState
 # noinspection PyShadowingBuiltins
 class TaskContext(_TaskContext, Activator):
     TYPE: str = "tasks"
+
+    _tasks_section = ParameterGroup(
+        key=TYPE,
+        desc="Task executor settings",
+        children=[
+            Parameter(
+                key="workers_max",
+                type=int,
+                required=False,
+                min=1,
+                desc="Maximum number of executor workers (defaults to a value derived from the CPU count)",
+            ),
+        ],
+    )
 
     _task_prefix: str = ""
 
@@ -55,18 +70,19 @@ class TaskContext(_TaskContext, Activator):
 
         return self.__executor.submit(fn, *args, **kwargs)
 
-    def _build(self, configs: Configurations) -> Executor:
+    def _build(self) -> Executor:
         get_cpu_count = getattr(os, "process_cpu_count", os.cpu_count)
         max_workers_default = min(32, (get_cpu_count() or 1) + 4)
+        workers_max = (self._tasks_section or {}).get("workers_max")
         return ThreadPoolExecutor(
             thread_name_prefix=self._task_prefix,
-            max_workers=configs.get_int("workers_max", default=max_workers_default),
+            max_workers=workers_max if workers_max is not None else max_workers_default,
         )
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
         if self.is_enabled():
-            self.__executor = self._build(configs.get_member(TaskContext.TYPE, defaults={}))
+            self.__executor = self._build()
 
     def activate(self) -> None:
         super().activate()

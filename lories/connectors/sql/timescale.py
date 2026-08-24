@@ -14,7 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from lories.connectors import DatabaseError, register_connector_type
 from lories.connectors.sql import SqlDatabase, Table
 from lories.connectors.sql.columns import DatetimeColumn
-from lories.core.configs import ConfigurationError
+from lories.core.configs.parameters import BoolParameter, Parameter, SelectParameter
 from lories.typing import Configurations, Resources
 
 
@@ -27,20 +27,39 @@ class TimescaleDatabase(SqlDatabase):
     the connected tables to hypertables partitioned by their datetime primary key.
     """
 
+    _dialect = SelectParameter(
+        ["postgresql"],
+        key="dialect",
+        default="postgresql",
+        desc="Fixed to the PostgreSQL dialect; TimescaleDB is a PostgreSQL extension",
+    )
+    _chunk_interval = Parameter(
+        key="chunk_interval",
+        type=str,
+        default="7 days",
+        desc="Hypertable chunk time interval as a PostgreSQL INTERVAL string",
+    )
+    _create_extension = BoolParameter(
+        key="create_extension",
+        default=True,
+        desc="Run CREATE EXTENSION IF NOT EXISTS timescaledb on connect (needs privileges)",
+    )
+    _migrate_data = BoolParameter(
+        key="migrate_data",
+        default=False,
+        desc="Allow converting existing populated tables (locks and rewrites the table)",
+    )
+
     chunk_interval: str
     create_extension: bool
     migrate_data: bool
 
     def configure(self, configs: Configurations) -> None:
-        configs.set("dialect", "postgresql", replace=False)
-        dialect = configs.get("dialect")
-        if dialect.lower() != "postgresql":
-            raise ConfigurationError(f"TimescaleDB requires the 'postgresql' dialect, not: {dialect}")
         super().configure(configs)
 
-        self.chunk_interval = configs.get("chunk_interval", default="7 days")
-        self.create_extension = configs.get_bool("create_extension", default=True)
-        self.migrate_data = configs.get_bool("migrate_data", default=False)
+        self.chunk_interval = self._chunk_interval
+        self.create_extension = self._create_extension
+        self.migrate_data = self._migrate_data
 
     def connect(self, resources: Resources) -> None:
         super().connect(resources)

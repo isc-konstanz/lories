@@ -75,7 +75,15 @@ class PageCard(dbc.Card, MutableSequence[PageCardItem]):
     def has_items(self) -> bool:
         return len(self.items) > 0
 
+    def has_title(self) -> bool:
+        return any(getattr(c, "className", None) == "card-title" for c in getattr(self._body, "children", []) or [])
+
+    def has_footer(self) -> bool:
+        return any(isinstance(c, dbc.CardFooter) for c in self.children or [])
+
     def add_title(self, title: str) -> None:
+        if self.has_title():
+            return
         self._body.children.insert(0, html.H4(title, className="card-title"))
 
     def add_header(self, *children: Any, **kwargs) -> None:
@@ -83,6 +91,8 @@ class PageCard(dbc.Card, MutableSequence[PageCardItem]):
         self.children.insert(0, dbc.CardHeader(children, **kwargs))
 
     def add_footer(self, *children: Any, href: Optional[str] = None, **kwargs) -> None:
+        if self.has_footer():
+            return
         children = list(children)
         if href is not None and len(href) > 0:
             children.append(dbc.Button("More", class_name="card-button", href=href))

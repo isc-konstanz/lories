@@ -11,20 +11,50 @@ from __future__ import annotations
 from typing import Dict, Optional
 
 from revpimodio2 import EventCallback, RevPiModIO, io
+from revpimodio2.io import IntIO
 
 import pandas as pd
 import pytz as tz
 from lories.connectors import Connector, register_connector_type
+from lories.core.configs.parameters import ChannelParameter, DurationParameter
 from lories.data.channels import Channel
-from lories.typing import Configurations, Resources
-from lories.util import to_bool
+from lories.typing import Resources
+from lories.util import to_bool, to_timedelta
 
 
 # noinspection PyShadowingBuiltins, SpellCheckingInspection
 @register_connector_type("revpi", "revpi_io", "revpi_aio", "revpi_mio", "revpi_ro", "revolutionpi")
 class RevPiConnector(Connector):
+    """
+    Revolution Pi is a KUNBUS open-source industrial PC platform based on the Raspberry Pi Compute Module. It
+    exposes digital and analog I/O through a shared process image, accessible via the revpimodio2 library. The
+    modular hardware design supports various I/O expansion modules (DIO, AIO, MIO, RO). However, the process
+    image interface is Linux-specific and requires direct hardware access, limiting remote or cross-platform usage.
+    """
+
+    _cycletime = DurationParameter(
+        key="cycletime",
+        required=False,
+        min="1ms",
+        desc=(
+            "Process image polling cycle interval as a duration string (e.g. '200ms', '1s'). "
+            "Defaults to the RevPiModIO library default."
+        ),
+    )
+
+    # Per-channel parameters
+    address = ChannelParameter(type=str, required=True, desc="RevPi process image I/O address name")
+    listener = ChannelParameter(
+        type=bool,
+        required=False,
+        default=False,
+        desc="Register a rising-edge event listener that pushes updates as they occur",
+    )
+
+    _EDGES = {"rising": io.RISING, "falling": io.FALLING, "both": io.BOTH}
+
     _core: RevPiModIO
-    _cycletime: Optional[int]
+    _cycletime: Optional[pd.Timedelta]
 
     _listeners: Dict[str, RevPiListener]
 
@@ -32,21 +62,36 @@ class RevPiConnector(Connector):
         super().__init__(*args, **kwargs)
         self._listeners = {}
 
-    def configure(self, configs: Configurations) -> None:
-        super().configure(configs)
-        self._cycletime = configs.get_int("cycletime", default=None)
-
     def connect(self, resources: Resources) -> None:
         super().connect(resources)
         self._core = RevPiModIO(autorefresh=True)
-        if self._cycletime:
-            self._core.cycletime = self._cycletime
+        if self._cycletime is not None:
+            self._core.cycletime = self._cycletime // pd.Timedelta("1ms")
 
         channels = resources.filter(lambda r: isinstance(r, Channel) and to_bool(r.get("listener", False)))
         for channel in channels:
-            channel_listener = RevPiListener(channel)
+            cooldown_raw = channel.get("cooldown", None)
+            cooldown = to_timedelta(cooldown_raw) if cooldown_raw else None
+            channel_listener = RevPiListener(channel, cooldown=cooldown)
             channel_io = self._core.io[channel_listener.address]
-            channel_io.reg_event(channel_listener, edge=io.RISING, as_thread=True, prefire=True)
+
+            event_kwargs = {"as_thread": True, "prefire": True}
+            edge = channel.get("edge", None)
+            if edge is not None:
+                # revpimodio2 raises RuntimeError("parameter 'edge' can be used with bit io objects only")
+                # when 'edge' is passed for an IntIO / StructIO (counters, analog, byte/word IOs).
+                # Detect non-bit IOs and silently drop the kwarg instead of crashing the connector.
+                if isinstance(channel_io, IntIO):
+                    self._logger.warning(
+                        f"Ignoring edge='{edge}' on non-bit IO '{channel_listener.address}' "
+                        f"({type(channel_io).__name__}) for channel '{channel.id}' — "
+                        f"revpimodio2 only supports edge filtering on bit IOs. "
+                        f"Listener will fire on any value change."
+                    )
+                else:
+                    event_kwargs["edge"] = self._EDGES[str(edge).lower()]
+
+            channel_io.reg_event(channel_listener, **event_kwargs)
             self._listeners[channel.id] = channel_listener
 
         # Handle SIGINT / SIGTERM to exit program cleanly
@@ -92,11 +137,23 @@ class RevPiListener:
     address: str
 
     _channel: Channel
+    _cooldown: Optional[pd.Timedelta]
+    _last_fired: Optional[pd.Timestamp]
 
-    def __init__(self, channel: Channel):
+    def __init__(
+        self,
+        channel: Channel,
+        cooldown: Optional[pd.Timedelta] = None,
+    ):
         self._channel = channel
         self.address = channel.address
+        self._cooldown = cooldown
+        self._last_fired = None
 
     def __call__(self, event: EventCallback) -> None:
         now = pd.Timestamp.now(tz=tz.UTC).floor(freq="s")
+        if self._cooldown is not None and self._last_fired is not None:
+            if now - self._last_fired < self._cooldown:
+                return
         self._channel.set(now, event.iovalue)
+        self._last_fired = now

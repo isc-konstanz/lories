@@ -16,6 +16,13 @@ from .directories import (  # noqa: F401
     Directories,
 )
 
+from .parameters import (  # noqa: F401
+    Parameter,
+    ParameterGroup,
+    ComponentParameter,
+    ConnectorParameter,
+)
+
 from .configurations import Configurations  # noqa: F401
 
 from .configurator import Configurator  # noqa: F401

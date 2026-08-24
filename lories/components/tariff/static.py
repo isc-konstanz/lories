@@ -13,19 +13,27 @@ from typing import Optional
 import pandas as pd
 from lories.components import ComponentError
 from lories.components.tariff import Tariff, register_tariff_type
+from lories.core.configs.parameters import Parameter
 from lories.typing import Configurations, Timestamp
 
 
 # noinspection SpellCheckingInspection
 @register_tariff_type("static")
 class StaticTariff(Tariff):
+    """
+    A static tariff provider that returns constant import and export prices for any requested time range.
+    It is useful for fixed-rate energy contracts where prices do not vary over time, or as a fallback
+    when no dynamic pricing source is available.
+    """
+
+    _price_import = Parameter(key="import", type=float, required=True, desc="Import tariff price (ct/kWh)")
+    _price_export = Parameter(key="export", type=float, default=0.0, desc="Export tariff price (ct/kWh)")
+
     _price_import: float
     _price_export: float
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self._price_import = configs.get_float("import")
-        self._price_export = configs.get_float("export", default=0)
 
     def get(
         self,

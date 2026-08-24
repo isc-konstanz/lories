@@ -8,6 +8,7 @@ lories.core.typing
 from typing import TypeAlias
 
 from ..._core.typing import (  # noqa
+    Duration,
     Timestamp,
     Timezone,
 )
@@ -63,6 +64,7 @@ ContextArgument: TypeAlias = RegistratorContext
 __all__ = [
     "Timestamp",
     "Timezone",
+    "Duration",
     "Entity",
     "Context",
     "ContextArgument",

@@ -15,7 +15,7 @@ from lories.components import Component, ComponentError, register_component_type
 from lories.core import Constant, ResourceError
 from lories.core.activator import ActivatorMeta
 from lories.core.register import Registry
-from lories.location import Location, LocationUnavailableException
+from lories.location import Location, LocationUnavailableException, location_parameter_group
 from lories.typing import Configurations, ContextArgument
 
 
@@ -57,6 +57,14 @@ class WeatherMeta(ActivatorMeta):
 # noinspection SpellCheckingInspection
 @register_component_type("weather")
 class Weather(Component, metaclass=WeatherMeta):
+    """
+    A weather component provides meteorological observations and forecasts including solar irradiance,
+    temperature, humidity, wind, precipitation, and cloud cover. It requires a geographic location
+    (latitude, longitude) either from its own configuration or inherited from the parent context.
+    Concrete weather providers fetch data from external services and populate the defined channels,
+    which downstream components such as photovoltaic simulators or load forecasters consume.
+    """
+
     GHI = Constant(float, "ghi", "Global Horizontal Irradiance", "W/m2")
     DNI = Constant(float, "dni", "Direct Normal Irradiance", "W/m2")
     DHI = Constant(float, "dhi", "Diffuse Horizontal Irradiance", "W/m2")
@@ -65,8 +73,8 @@ class Weather(Component, metaclass=WeatherMeta):
     TEMP_DEW_POINT = Constant(float, "dew_point", "Dewpoint Temperature", "°C")
     HUMIDITY_REL = Constant(float, "humidity_relative", "Relative Humidity", "%")
     PRESSURE_SEA = Constant(float, "pressure_sea", "Atmospheric Pressure", "hPa")
-    WIND_SPEED = Constant(float, "wind_speed", "Wind Speed", "km/h")
-    WIND_SPEED_GUST = Constant(float, "wind_speed_gust", "Wind Gust Speed", "km/h")
+    WIND_SPEED = Constant(float, "wind_speed", "Wind Speed", "m/s")
+    WIND_SPEED_GUST = Constant(float, "wind_speed_gust", "Wind Gust Speed", "m/s")
     WIND_DIRECTION = Constant(float, "wind_direction", "Wind Direction", "°")
     WIND_DIRECTION_GUST = Constant(float, "wind_direction_gust", "Wind Gust Direction", "°")
     CLOUD_COVER = Constant(float, "cloud_cover", "Total Cloud Cover", "%")
@@ -81,6 +89,8 @@ class Weather(Component, metaclass=WeatherMeta):
     PRECIPITATION_PROB = Constant(float, "precipitation_probability", "Precipitation Probability", "%")
     PRECIPITABLE_WATER = Constant(float, "precipitable_water", "Precipitable Water", "cm")
     SNOW_FRACTION = Constant(float, "snow_fraction", "Snow Fraction", "1/0")
+
+    _location_section = location_parameter_group()
 
     location: Location
 

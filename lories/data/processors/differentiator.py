@@ -30,10 +30,7 @@ class Differentiator(Processor):
             raise ProcessingError("Currently unable to differentiate values other than float or int")
         try:
             if self._last is None or (increasing and self._last > value):
-                # No delta can be formed yet (first sample, or counter reset with
-                # increasing=True) — drop the frame instead of returning None,
-                # which the channel would reject as an invalid value for a valid
-                # state, failing the whole connector read.
+                # No delta can be formed yet (first sample or counter reset).
                 return Processor.SKIP
             return (value - self._last) * factor
         finally:

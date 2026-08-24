@@ -8,28 +8,30 @@ lories.components.cameras.protection
 from __future__ import annotations
 
 from threading import Timer
-from typing import Any, Optional
+from typing import Optional
 
 import pandas as pd
 from lories.components.cameras._core import _Camera, _CameraProtector
 from lories.core import Configurations, ResourceError
-from lories.util import to_timedelta
-
-
-def _seconds(value: Any) -> float:
-    """Accept duration strings like '10s' / '5min' or numeric seconds."""
-    if isinstance(value, str):
-        return to_timedelta(value).total_seconds()
-    return float(value)
+from lories.core.configs.parameters import DurationParameter
 
 
 class CameraProtector(_CameraProtector):
+    _delay = DurationParameter(
+        key="delay",
+        default="10min",
+        desc="Duration the shutter stays closed before auto-opening",
+    )
+    _cooldown = DurationParameter(
+        key="cooldown",
+        default="30s",
+        # Covers the shutter movement during which the camera sees itself.
+        desc="Window after a close where motion is ignored before it can re-trigger",
+    )
+
     _timer: Optional[Timer] = None
-
-    delay: float = 600.0  # Seconds the shutter stays closed before auto-opening.
-    cooldown: float = 30.0  # Seconds after a close before motion can re-trigger;
-    # covers the shutter movement during which the camera sees itself.
-
+    delay: pd.Timedelta
+    cooldown: pd.Timedelta
     _cooldown_until: pd.Timestamp = pd.NaT
 
     @classmethod
@@ -40,8 +42,8 @@ class CameraProtector(_CameraProtector):
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self.delay = _seconds(configs.get("delay", default=CameraProtector.delay))
-        self.cooldown = _seconds(configs.get("cooldown", default=CameraProtector.cooldown))
+        self.delay = self._delay
+        self.cooldown = self._cooldown
 
         self.data.add(CameraProtector.STATE, aggregate="max")
 
@@ -54,23 +56,36 @@ class CameraProtector(_CameraProtector):
                 f"to enable the {_Camera.MOTION!s} channel"
             )
         camera.data.register(self._on_motion_detect, _Camera.MOTION, how="any", unique=False)
+        self.data.get(CameraProtector.STATE).value = False
 
-    def close(self, delay: int = 0) -> None:
-        if delay > 0:
+    def close(self, delay: Optional[pd.Timedelta] = None) -> None:
+        if delay is not None and delay.total_seconds() > 0:
             if self._timer is not None:
                 self._timer.cancel()
 
-            self._timer = Timer(self.delay, self.open)
+            self._timer = Timer(delay.total_seconds(), self.open)
             self._timer.daemon = True
             self._timer.start()
 
-        self.data.get(CameraProtector.STATE).write(True)
+        state = self.data.get(CameraProtector.STATE)
+        state.value = True
+        state.write(True)
         self._logger.info(f"Closed camera protection '{self.id}'")
 
     def open(self) -> None:
         self._timer = None
-        self.data.get(CameraProtector.STATE).write(False)
+        state = self.data.get(CameraProtector.STATE)
+        state.value = False
+        state.write(False)
         self._logger.info(f"Opened camera protection '{self.id}'")
+
+    def is_in_cooldown(self) -> bool:
+        return pd.notna(self._cooldown_until) and pd.Timestamp.now(tz="UTC") < self._cooldown_until
+
+    def trigger(self) -> None:
+        """Manually run the protection cycle: close now, auto-open after ``delay``."""
+        self._cooldown_until = pd.Timestamp.now(tz="UTC") + self.cooldown
+        self.close(delay=self.delay)
 
     def _on_motion_detect(self, data: pd.DataFrame) -> None:
         # The motion processor returns SKIP on no-motion frames, so this listener
@@ -80,5 +95,5 @@ class CameraProtector(_CameraProtector):
             remaining = (self._cooldown_until - now).total_seconds()
             self._logger.info(f"Motion ignored, '{self.id}' cooldown active for another {remaining:.1f}s")
             return
-        self._cooldown_until = now + pd.Timedelta(seconds=self.cooldown)
+        self._cooldown_until = now + self.cooldown
         self.close(delay=self.delay)

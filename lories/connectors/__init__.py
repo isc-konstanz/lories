@@ -38,6 +38,12 @@ from ..data import databases  # noqa: F401
 from ..data.databases import Databases  # noqa: F401
 
 import importlib
+import logging
+import sys
+
+from lories.core.importing import inject_mock as _inject_mock
+
+_logger = logging.getLogger(__name__)
 
 CONNECTORS = [
     "virtual",
@@ -57,12 +63,40 @@ CONNECTORS = [
     "opcua",
 ]
 
-for import_connector in CONNECTORS:
-    try:
-        importlib.import_module(f".{import_connector}", "lories.connectors")
+_unavailable: dict[str, str] = {}
+_mocked: dict[str, str] = {}
 
-    except ModuleNotFoundError:
-        # TODO: Implement meaningful logging here
-        pass
+for _connector in CONNECTORS:
+    _attempts = 0
+    _missing_dep = None
+    while True:
+        try:
+            importlib.import_module(f".{_connector}", "lories.connectors")
+            if _attempts > 0:
+                _mocked[_connector] = _missing_dep
+            break
+
+        except ImportError as e:
+            _missing_dep = e.name or str(e).split("'")[1]
+
+            if _attempts > 0:
+                _logger.warning("Connector '%s' unavailable (missing: %s)", _connector, _missing_dep)
+                _unavailable[_connector] = _missing_dep
+                break
+
+            _logger.debug("Retrying '%s' with mock for missing dep '%s'", _connector, _missing_dep)
+            _inject_mock(_missing_dep)
+            sys.modules.pop(f"lories.connectors.{_connector}", None)
+            _attempts += 1
+
+for _connector, _dep in _mocked.items():
+    _mod = sys.modules.get(f"lories.connectors.{_connector}")
+    if _mod is None:
+        continue
+    _mod_name = f"lories.connectors.{_connector}"
+    for _obj in vars(_mod).values():
+        if isinstance(_obj, type) and _obj.__module__ == _mod_name:
+            _obj.__available__ = False
+            _obj.__import_error__ = f"'{_dep}' is not installed."
 
 del importlib

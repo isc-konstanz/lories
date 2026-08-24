@@ -43,6 +43,7 @@ class Component(_Component, Registrator, Activator):
         self.__data = DataAccess(self)
 
     def _at_configure(self, configs: Configurations) -> None:
+        super()._at_configure(configs)
         self.__data.configure(configs.get_member(DataAccess.TYPE, ensure_exists=True))
 
     def _on_configure(self, configs: Configurations) -> None:
