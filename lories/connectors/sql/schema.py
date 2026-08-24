@@ -23,12 +23,26 @@ from lories.connectors.sql.columns.datetime import is_datetime
 from lories.connectors.sql.index import DatetimeIndexType
 from lories.connectors.sql.table import Table
 from lories.core import ConfigurationError, Configurator, ResourceError
+from lories.core.configs.parameters import Parameter
 from lories.typing import Configurations, Resource, Resources
 from lories.util import to_bool, to_timezone
 
 
 class Schema(Configurator, MetaData):
+    """
+    Declarative database schema resolved from the ``[tables]`` configuration section. Table definitions are
+    dynamic sub-sections keyed by table name and are resolved against the ``Configurations`` API at connect
+    time, since they merge shared ``[index]``/``[columns]`` defaults with per-table overrides.
+    """
+
     dialect: Dialect
+
+    _create = Parameter(
+        key="create",
+        type=bool,
+        default=True,
+        desc="Create missing tables on connect (creating missing columns is not yet implemented)",
+    )
 
     _created: bool = False
 
@@ -153,7 +167,7 @@ class Schema(Configurator, MetaData):
                     column_schema = next(c for c in columns if c["name"] == column.name)  # noqa F841
                     # TODO: Implement column validation
                 else:
-                    if self.configs.get_bool("create", default=True):
+                    if self._create:
                         raise ResourceError(f"Not yet implemented to create missing column: {column.name}")
                     else:
                         raise ResourceError(f"Unable to find configured column: {column.name}")

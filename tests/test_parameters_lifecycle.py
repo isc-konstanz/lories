@@ -122,6 +122,7 @@ def test_to_schema_shapes():
         "has_default": False,
         "choices": None,
         "type": "str",
+        "secret": False,
     }
     assert schema["auth"]["type"] == "group"
     assert set(schema["auth"]["children"]) == {"username", "password"}

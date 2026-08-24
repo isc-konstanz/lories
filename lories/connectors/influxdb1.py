@@ -36,7 +36,9 @@ class InfluxDB1(Database):
     _host = Parameter(key="host", type=str, default="localhost", desc="InfluxDB server hostname")
     _port = Parameter(key="port", type=int, default=8086, min=1, max=65535, desc="InfluxDB server TCP port")
     _user = Parameter(key="user", type=str, default="admin", desc="InfluxDB authentication username")
-    _password = Parameter(key="password", type=str, default="admin", desc="InfluxDB authentication password", secret=True)
+    _password = Parameter(
+        key="password", type=str, default="admin", desc="InfluxDB authentication password", secret=True
+    )
     _database = Parameter(key="database", type=str, default="lories", desc="InfluxDB database name")
     _timeout = Parameter(key="timeout", type=pd.Timedelta, default="10s", min="1s", desc="HTTP request timeout")
 

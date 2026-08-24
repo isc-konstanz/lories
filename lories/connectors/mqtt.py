@@ -81,17 +81,6 @@ class MqttConnector(Connector):
 
         if self._username is not None and self._password is not None:
             self._client.username_pw_set(self._username, self._password)
-        # elif ...
-        #     self._client.tls_set(
-        #         ca_certs=configs.get("ca_certs", default=None),
-        #         certfile=configs.get("certfile", default=None),
-        #         keyfile=configs.get("keyfile", default=None),
-        #         cert_reqs=configs.get("cert_reqs", default=None),
-        #         tls_version=configs.get("tls_version", default=None),
-        #         ciphers=configs.get("ciphers", default=None),
-        #         keyfile_password=configs.get("keyfile_password", default=None),
-        #         alpn_protocols=configs.get("alpn_protocols", default=None),
-        #     )
 
         self._client.on_connect = self._on_connect_mqtt
         self._client.on_disconnect = self._on_disconnect_mqtt

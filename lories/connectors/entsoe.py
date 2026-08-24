@@ -42,7 +42,9 @@ class EntsoeConnector(Connector):
         required=True,
         desc="ENTSO-E bidding zone code (e.g. DE, AT, LU; historical variants DE_AT_LU, DE_LU resolved automatically)",
     )
-    _api_key = Parameter(key="api_key", type=str, required=True, desc="ENTSO-E Transparency Platform API token", secret=True)
+    _api_key = Parameter(
+        key="api_key", type=str, required=True, desc="ENTSO-E Transparency Platform API token", secret=True
+    )
     _resolution = SelectParameter(
         ["15min", "30min", "60min"], key="resolution", default="60min", desc="Time resolution of returned series"
     )
