@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# ruff: noqa: E402  -- OPENCV_LOG_LEVEL must be set before `import cv2`
 """
 lories.connectors.cameras.opencv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -8,6 +9,14 @@ lories.connectors.cameras.opencv
 import os
 import time
 from typing import Any, Dict
+
+# Silence OpenCV WARNs at videoio init. The FFmpeg interrupt callback
+# logs "Stream timeout triggered after Xms" via CV_LOG_WARNING on every
+# RTSP stall; we surface real disconnects via ConnectionError. The env
+# var is read once during cv2 init, so it must precede `import cv2`.
+# (Older builds — e.g. the OpenCV on isc-agri — don't expose the
+# cv2.utils.logging Python API, so the env var is the portable path.)
+os.environ.setdefault("OPENCV_LOG_LEVEL", "ERROR")
 
 import cv2
 
