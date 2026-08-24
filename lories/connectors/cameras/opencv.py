@@ -8,7 +8,7 @@ lories.connectors.cameras.opencv
 
 import os
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 # Silence OpenCV WARNs at videoio init. The FFmpeg interrupt callback
 # logs "Stream timeout triggered after Xms" via CV_LOG_WARNING on every
@@ -48,12 +48,9 @@ class OpenCV(CameraConnector):
     _host = Parameter(key="host", type=str, required=True, desc="RTSP camera hostname or IP address")
     _port = Parameter(key="port", type=int, default=554, min=1, max=65535, desc="RTSP camera TCP port")
     _username = Parameter(key="username", type=str, required=False, desc="RTSP authentication username")
-    _password = Parameter(key="password", type=str, required=False, desc="RTSP authentication password", secret=True)
+    _password = Parameter(key="password", type=str, required=False, desc="RTSP authentication password")
     _vendor = Parameter(
-        key="vendor",
-        type=str,
-        default=DEFAULT_VENDOR,
-        desc="Camera vendor, selecting the default RTSP stream paths: reolink | hikvision | dahua | axis",
+        key="vendor", type=str, required=False, default="reolink", desc="This provides defaults for RTSP addresses"
     )
 
     address = ChannelParameter(
@@ -68,8 +65,12 @@ class OpenCV(CameraConnector):
 
     _host: str
     _port: int
-    _username: str
-    _password: str
+    _username: Optional[str]
+    _password: Optional[str]
+
+    _vendor: str
+    _preview_main: str
+    _preview_sub: str
 
     _vendor: str
     _preview_main: str
@@ -89,11 +90,12 @@ class OpenCV(CameraConnector):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        vendor = self._vendor.lower()
-        if vendor not in OpenCV.VENDOR_PATHS:
-            raise ValueError(f"Unknown camera vendor '{vendor}'. Supported: {sorted(OpenCV.VENDOR_PATHS)}")
-        self._vendor = vendor
-        self._preview_main, self._preview_sub = OpenCV.VENDOR_PATHS[vendor]
+        if not self._host or not self._port:
+            raise ValueError("Camera configuration requires 'host' and 'port'")
+
+        if self._vendor not in OpenCV.VENDOR_PATHS:
+            raise ValueError(f"Unknown camera vendor '{self._vendor}'. Supported: {sorted(OpenCV.VENDOR_PATHS)}")
+        self._preview_main, self._preview_sub = OpenCV.VENDOR_PATHS[self._vendor]
 
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
             "rtsp_transport;tcp|"  # use TCP only

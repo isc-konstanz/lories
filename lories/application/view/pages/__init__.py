@@ -48,5 +48,8 @@ from .components.weather import WeatherPage  # noqa: F401
 from .components import system  # noqa: F401
 from .components.system import SystemPage  # noqa: F401
 
+from .components import camera  # noqa: F401
+from .components.camera import CameraPage  # noqa: F401
+
 from . import docs  # noqa: F401
 from .docs import DocsPage  # noqa: F401

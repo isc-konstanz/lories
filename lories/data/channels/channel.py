@@ -138,7 +138,7 @@ class Channel(_Channel, Resource):
             return len(value) == 0
         if isinstance(value, Collection):
             try:
-                return bool(np.asarray(pd.isna(value)).all())
+                return bool(np.asarray(pd.isna(value)).any())
             except (TypeError, ValueError):
                 return False
         return bool(pd.isna(value))

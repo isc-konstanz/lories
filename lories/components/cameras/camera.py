@@ -33,23 +33,20 @@ class Camera(_Camera):
         desc="Render the live preview in the dashboard",
     )
 
-    preview: bool
+    preview: bool = False
     protection: Optional[CameraProtector] = None
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
+        self.preview = self._preview
+        self.protection = CameraProtector(
+            self,
+            name=f"{self.name} Protection",
+            configs=configs.get_member(CameraProtector.TYPE, defaults={}),
+        )
+        self.components.add(self.protection)
 
-        if configs.has_member(CameraProtector.TYPE, includes=True):
-            self.protection = CameraProtector(
-                self,
-                name=f"{self.name} Protection",
-                configs=configs.get_member(CameraProtector.TYPE),
-            )
-            self.components.add(self.protection)
-
-        # ParameterGroup.resolve returns None when the [channels] section is
-        # absent and the group has children; treat that as "use all defaults".
-        channels = self._channels.resolve(configs) or {}
+        channels = self._channels
 
         self.data.add(Camera.FRAME, aggregate="last")
 

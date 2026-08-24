@@ -103,6 +103,10 @@ class CameraStream(Configurator, Thread):
             self.join()
         self.__context.deactivate()
 
+        # Release the memoryview before closing the shared memory segment,
+        # otherwise SharedMemory.close() raises "BufferError: memoryview has
+        # 1 exported buffer" during GC.
+        self._buffer.release()
         self._memory.close()
         self._memory.unlink()
 
@@ -182,6 +186,10 @@ def _stream(
             if sleep_seconds > 0:
                 sleep(sleep_seconds)
     finally:
+        # Match the main-process release: drop the memoryview before
+        # closing the shared memory mapping in this subprocess.
+        buffer.release()
+        memory.close()
         camera.disconnect()
 
 
