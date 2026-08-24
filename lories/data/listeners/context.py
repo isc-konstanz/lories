@@ -12,7 +12,7 @@ import logging
 import time
 from collections.abc import Callable
 from threading import Lock
-from typing import Collection, Optional
+from typing import Collection, Literal, Optional
 
 import pandas as pd
 from lories._core._application import _Application  # noqa
@@ -22,13 +22,6 @@ from lories._core._listener import _ListenerContext  # noqa
 from lories._core._tasks import TaskContext, _TaskContext  # noqa
 from lories.core import ResourceError
 from lories.data.listeners import Listener
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 # noinspection PyShadowingBuiltins

@@ -9,7 +9,7 @@ lories.connectors.sql.database
 from __future__ import annotations
 
 from collections import OrderedDict
-from typing import Any, Dict, Iterator, Mapping, Optional
+from typing import Any, Dict, Iterator, Literal, Mapping, Optional
 
 from sqlalchemy import Connection, Dialect, Engine, create_engine, event, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -23,13 +23,6 @@ from lories.core.configs.parameters import ChannelParameter, Parameter, Paramete
 from lories.data.util import hash_value
 from lories.typing import Configurations, Resources, Timestamp
 from lories.util import to_timezone
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 @register_connector_type("sql")

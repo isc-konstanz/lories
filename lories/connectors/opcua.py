@@ -40,7 +40,9 @@ class OpcUaConnector(Connector):
         key="settings", type=List[str], default=[], desc="Extra OPC UA node-id prefixes (e.g. 'ns=2')"
     )
     _username = Parameter(key="username", type=str, required=False, desc="Optional username for authentication")
-    _password = Parameter(key="password", type=str, required=False, desc="Optional password for authentication", secret=True)
+    _password = Parameter(
+        key="password", type=str, required=False, desc="Optional password for authentication", secret=True
+    )
 
     # Per-channel parameters
     address = ChannelParameter(type=str, required=False, desc="OPC UA node string identifier (defaults to channel id)")

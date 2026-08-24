@@ -39,10 +39,12 @@ class ViewInterface(Interface, Dash):
     _proxy = Parameter(key="proxy", type=str, required=False, default=None, desc="Reverse proxy URL prefix path")
     _host = Parameter(key="host", type=str, default="127.0.0.1", desc="Host address to bind to")
     _port = Parameter(key="port", type=int, default=8050, desc="TCP port number")
+    _reload = Parameter(key="reload", type=bool, default=False, desc="Enable the development server auto-reloader")
 
     _proxy: Optional[str]
     _host: str
     _port: int
+    _reload: bool
 
     def __init__(self, context: Application, configs: Configurations) -> None:
         def get_custom_path(key: str, default: Optional[str] = None) -> str:
@@ -113,10 +115,6 @@ class ViewInterface(Interface, Dash):
     # noinspection PyUnresolvedReferences
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-        self._proxy = configs.get("proxy", default=None)
-        self._host = configs.get("host", default="127.0.0.1")
-        self._port = configs.get_int("port", default=8050)
-        self._reload = configs.get_bool("reload", default=False)
 
         self.view.create_pages(self.context.components)
         self.view.create_connector_pages(self.context.connectors)

@@ -8,7 +8,7 @@ lories.connectors.entsoe
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 
 # TODO: Add to requirements
 from entsoe import EntsoePandasClient
@@ -23,13 +23,6 @@ from lories.core.configs import ConfigurationError
 from lories.core.configs.parameters import ChannelParameter, Parameter, SelectParameter
 from lories.typing import Configurations, Resources, Timestamp
 from lories.util import parse_freq
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 # noinspection SpellCheckingInspection
@@ -49,7 +42,9 @@ class EntsoeConnector(Connector):
         required=True,
         desc="ENTSO-E bidding zone code (e.g. DE, AT, LU; historical variants DE_AT_LU, DE_LU resolved automatically)",
     )
-    _api_key = Parameter(key="api_key", type=str, required=True, desc="ENTSO-E Transparency Platform API token", secret=True)
+    _api_key = Parameter(
+        key="api_key", type=str, required=True, desc="ENTSO-E Transparency Platform API token", secret=True
+    )
     _resolution = SelectParameter(
         ["15min", "30min", "60min"], key="resolution", default="60min", desc="Time resolution of returned series"
     )

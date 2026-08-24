@@ -18,7 +18,7 @@ from concurrent import futures
 from concurrent.futures import Future
 from functools import partial
 from threading import Event, Thread, current_thread
-from typing import Optional, Sequence, Type
+from typing import Literal, Optional, Sequence, Type
 
 import pandas as pd
 import pytz as tz
@@ -43,13 +43,6 @@ from lories.data.tasks import TaskContext, chain_filters
 from lories.simulation import Results
 from lories.system import System
 from lories.util import floor_date, slice_range, to_bool, to_timedelta, validate_key
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 # noinspection PyProtectedMember

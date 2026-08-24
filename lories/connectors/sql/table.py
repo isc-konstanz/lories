@@ -8,7 +8,7 @@ lories.connectors.sql.table
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Literal, Optional, Tuple
 
 import sqlalchemy as sql
 from sqlalchemy import ClauseElement, Dialect, Result, UnaryExpression
@@ -22,13 +22,6 @@ from lories.connectors.sql.columns import Column, DatetimeColumn, SurrogateKeyCo
 from lories.connectors.sql.index import DatetimeIndexType
 from lories.core import ResourceError, Resources
 from lories.typing import Resource, Timestamp
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 class Table(sql.Table):

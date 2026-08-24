@@ -17,7 +17,6 @@ from .directories import (  # noqa: F401
 )
 
 from .parameters import (  # noqa: F401
-    _Parameter,
     Parameter,
     ParameterGroup,
     ComponentParameter,
