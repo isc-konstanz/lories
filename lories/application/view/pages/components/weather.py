@@ -8,7 +8,7 @@ lories.application.view.pages.components.weather
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 import dash_bootstrap_components as dbc
 import plotly.graph_objs as go
@@ -16,19 +16,16 @@ from dash import Input, Output, callback, dcc, html
 
 import pandas as pd
 import pytz as tz
-from lories.application.view.pages import ComponentPage, PageLayout, register_component_group, register_component_page
-from lories.components.weather import WeatherForecast as Forecast
-from lories.components.weather import WeatherProvider as Weather
+from lories.application.view.pages import ComponentPage, PageLayout, register_component_page
+from lories.components.weather import Weather, WeatherForecast
 from lories.util import floor_date
 
 
 @register_component_page(Weather)
-@register_component_group(Weather, name="Weather")
 class WeatherPage(ComponentPage[Weather]):
-    # noinspection PyProtectedMember
     @property
-    def forecast(self) -> Forecast:
-        return self._component.forecast
+    def forecast(self) -> Optional[WeatherForecast]:
+        return getattr(self._component, "forecast", None)
 
     def create_layout(self, layout: PageLayout) -> None:
         super().create_layout(layout)
@@ -37,10 +34,11 @@ class WeatherPage(ComponentPage[Weather]):
         layout.card.append(current, focus=True)
         layout.append(dbc.Row(dbc.Col(current, width="auto")))
 
-        if self.forecast.is_enabled():
-            forecast = self._build_forecast()
-            layout.card.append(forecast)
-            layout.append(dbc.Row(dbc.Col(forecast, width="auto")))
+        forecast = self.forecast
+        if forecast is not None and forecast.is_enabled():
+            forecast_widget = self._build_forecast()
+            layout.card.append(forecast_widget)
+            layout.append(dbc.Row(dbc.Col(forecast_widget, width="auto")))
 
     def _build_current(self) -> html.Div:
         @callback(
