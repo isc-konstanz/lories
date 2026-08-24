@@ -30,135 +30,6 @@ from lories.io.shell import ANSI_WARN as _WH
 from lories.util import get_members
 
 
-class _WarnOnGetConfigurations:
-    """Proxy around *configs* that logs DEBUG for every ``get*`` / ``get_member``
-    call whose key has no matching ``Parameter`` / ``ParameterGroup`` declaration.
-    Only instantiated when the class logger is at DEBUG level.
-    """
-
-    __slots__ = (
-        "_configs",
-        "_declared_keys",
-        "_param_map",
-        "_logger",
-        "_cls_name",
-        "_cls_module",
-        "_cls_file",
-        "_section_path",
-    )
-
-    def __init__(
-        self,
-        configs: _Configurations,
-        declared_keys: frozenset,
-        param_map: dict,
-        logger: logging.Logger,
-        cls_name: str,
-        cls_module: str,
-        cls_file: str,
-        section_path: str = "",
-    ) -> None:
-        object.__setattr__(self, "_configs", configs)
-        object.__setattr__(self, "_declared_keys", declared_keys)
-        object.__setattr__(self, "_param_map", param_map)
-        object.__setattr__(self, "_logger", logger)
-        object.__setattr__(self, "_cls_name", cls_name)
-        object.__setattr__(self, "_cls_module", cls_module)
-        object.__setattr__(self, "_cls_file", cls_file)
-        object.__setattr__(self, "_section_path", section_path)
-
-    def _check_key(self, key: str) -> None:
-        if key not in object.__getattribute__(self, "_declared_keys"):
-            _logger = object.__getattribute__(self, "_logger")
-            _cls_name = object.__getattribute__(self, "_cls_name")
-            _cls_module = object.__getattribute__(self, "_cls_module")
-            _cls_file = object.__getattribute__(self, "_cls_file")
-            _section_path = object.__getattribute__(self, "_section_path")
-            display_key = f"[{_section_path}].{key}" if _section_path else key
-            _logger.debug(
-                f"{_WH}%s (module: %s, file: %s): "
-                f"configs.get('{_WK}%s{_WH}') called but no Parameter declared{_WR}",
-                _cls_name,
-                _cls_module,
-                _cls_file,
-                display_key,
-            )
-
-    def get(self, key, default=None):
-        _configs = object.__getattribute__(self, "_configs")
-        if isinstance(key, str):
-            self._check_key(key)
-        else:
-            for k in key:
-                self._check_key(k)
-        return _configs.get(key, default)
-
-    def get_int(self, key: str, default=None):
-        self._check_key(key)
-        return object.__getattribute__(self, "_configs").get_int(key, default)
-
-    def get_float(self, key: str, default=None):
-        self._check_key(key)
-        return object.__getattribute__(self, "_configs").get_float(key, default)
-
-    def get_bool(self, key: str, default=None):
-        self._check_key(key)
-        return object.__getattribute__(self, "_configs").get_bool(key, default)
-
-    def get_date(self, key: str, default=None, **kwargs):
-        self._check_key(key)
-        return object.__getattribute__(self, "_configs").get_date(key, default, **kwargs)
-
-    def get_duration(self, key: str, default=None):
-        self._check_key(key)
-        return object.__getattribute__(self, "_configs").get_duration(key, default)
-
-    def get_member(self, key: str, defaults=None, ensure_exists: bool = False):
-        _configs = object.__getattribute__(self, "_configs")
-        _param_map = object.__getattribute__(self, "_param_map")
-        _section_path = object.__getattribute__(self, "_section_path")
-
-        kw = {"ensure_exists": ensure_exists}
-        if defaults is not None:
-            kw["defaults"] = defaults
-        sub = _configs.get_member(key, **kw)
-
-        param = _param_map.get(key)
-        if isinstance(param, ParameterGroup) and param.children:
-            child_map = {p._resolve_key(): p for p in param.children.values()}
-            child_keys = frozenset(child_map.keys())
-            new_path = f"{_section_path}.{key}" if _section_path else key
-            return _WarnOnGetConfigurations(
-                sub,
-                child_keys,
-                child_map,
-                object.__getattribute__(self, "_logger"),
-                object.__getattribute__(self, "_cls_name"),
-                object.__getattribute__(self, "_cls_module"),
-                object.__getattribute__(self, "_cls_file"),
-                new_path,
-            )
-        return sub
-
-    def __getattr__(self, attr: str):
-        return getattr(object.__getattribute__(self, "_configs"), attr)
-
-    def __contains__(self, key: str) -> bool:
-        return key in object.__getattribute__(self, "_configs")
-
-    def __iter__(self):
-        return iter(object.__getattribute__(self, "_configs"))
-
-    def __len__(self) -> int:
-        return len(object.__getattribute__(self, "_configs"))
-
-    def __getitem__(self, key: str):
-        return object.__getattribute__(self, "_configs")[key]
-
-    def __setitem__(self, key: str, value) -> None:
-        object.__getattribute__(self, "_configs")[key] = value
-
-
 class ConfiguratorMeta(ABCMeta):
     __config_parameters__: Dict[str, _Parameter]
 
@@ -204,7 +75,6 @@ class Configurator(_Configurator, metaclass=ConfiguratorMeta):
     _logger: Logger
 
     _CONFIGS_RESERVED_KEYS: frozenset = frozenset({"enabled", "disabled", "name", "key", "id"})
-    _WARN_UNDECLARED_GET: bool = True
 
     def __init__(
         self,
@@ -342,8 +212,7 @@ class Configurator(_Configurator, metaclass=ConfiguratorMeta):
             else:
                 if key not in declared_flat and key not in declared_sections:
                     logger.debug(
-                        f"{_WH}%s (module: %s, file: %s): "
-                        f"config key '{_WK}%s{_WH}' has no Parameter declaration{_WR}",
+                        f"{_WH}%s (module: %s, file: %s): config key '{_WK}%s{_WH}' has no Parameter declaration{_WR}",
                         cls.__name__,
                         cls.__module__,
                         cls_file,
@@ -353,26 +222,6 @@ class Configurator(_Configurator, metaclass=ConfiguratorMeta):
     @classmethod
     def _build_logger(cls) -> Logger:
         return logging.getLogger(cls.__module__)
-
-    @classmethod
-    def _build_get_warn_proxy(cls, configs: _Configurations) -> _WarnOnGetConfigurations:
-        param_map: dict = {p._resolve_key(): p for p in cls.__config_parameters__.values()}
-        declared_keys: frozenset = frozenset(param_map.keys()) | cls._CONFIGS_RESERVED_KEYS
-
-        try:
-            cls_file = inspect.getfile(cls)
-        except (TypeError, OSError):
-            cls_file = "<unknown file>"
-
-        return _WarnOnGetConfigurations(
-            configs,
-            declared_keys,
-            param_map,
-            logging.getLogger(cls.__module__),
-            cls.__name__,
-            cls.__module__,
-            cls_file,
-        )
 
     def _get_vars(self) -> Dict[str, Any]:
         def _is_var(attr: str, var: Any) -> bool:
@@ -432,18 +281,17 @@ class Configurator(_Configurator, metaclass=ConfiguratorMeta):
 
         self._assert_configs(configs)
         self._at_configure(configs)
-        _run_configs = (
-            type(self)._build_get_warn_proxy(configs)
-            if type(self)._WARN_UNDECLARED_GET and logging.getLogger(type(self).__module__).isEnabledFor(logging.DEBUG)
-            else configs
-        )
-        self._run_configure(_run_configs, *args, **kwargs)
+        self._run_configure(configs, *args, **kwargs)
         self._on_configure(configs)
         self.__configs = configs  # always store the real Configurations object
         self._configured = True
 
     def _at_configure(self, configs: Configurations) -> None:
+        """Bind declared parameters onto the instance; overrides MUST call ``super()``."""
         for attr, param in type(self).__config_parameters__.items():
+            # entity slots are loaded later via Component/ConnectorAccess; skip so resolve()==None doesn't clobber
+            if isinstance(param, _EntityParameter):
+                continue
             setattr(self, attr, param.resolve(configs))
 
     def _on_configure(self, configs: Configurations) -> None:
@@ -466,12 +314,7 @@ class Configurator(_Configurator, metaclass=ConfiguratorMeta):
 
         self._assert_configs(configs)
         self._at_update(configs)
-        _run_configs = (
-            type(self)._build_get_warn_proxy(configs)
-            if type(self)._WARN_UNDECLARED_GET and logging.getLogger(type(self).__module__).isEnabledFor(logging.DEBUG)
-            else configs
-        )
-        self._run_update(_run_configs, *args, **kwargs)
+        self._run_update(configs, *args, **kwargs)
         self._on_update(configs)
         self.__configs = configs
 

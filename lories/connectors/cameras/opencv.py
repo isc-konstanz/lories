@@ -56,8 +56,11 @@ class OpenCV(CameraConnector):
     address = ChannelParameter(
         key="address",
         type=str,
-        required=True,
-        desc="Vendor-specific RTSP path appended to 'rtsp://<host>:<port>/' (e.g. 'Streaming/Channels/101')",
+        required=False,
+        desc=(
+            "Vendor-specific RTSP path appended to 'rtsp://<host>:<port>/' (e.g. 'Streaming/Channels/101'). "
+            "Defaults to the configured vendor's main or sub stream path."
+        ),
     )
 
     _host: str

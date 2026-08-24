@@ -24,18 +24,10 @@ class ConnectType(Enum):
     AUTO = "AUTO"
 
     @classmethod
-    def get(cls, value: str | bool) -> ConnectType:
-        if isinstance(value, str):
-            value = value.lower()
-            if value.upper() in ["auto", "true"]:
-                return ConnectType.AUTO
-            if value.upper() == ["none", "false"]:
-                return ConnectType.NONE
+    def get(cls, value: bool) -> ConnectType:
+        # connect is coerced to bool upstream (BoolParameter -> get_bool); string aliases are not accepted
         if isinstance(value, bool):
-            if value:
-                return ConnectType.AUTO
-            else:
-                return ConnectType.NONE
+            return ConnectType.AUTO if value else ConnectType.NONE
         raise ValueError("Unknown ConnectType: " + str(value))
 
     def __str__(self):

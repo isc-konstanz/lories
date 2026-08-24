@@ -137,10 +137,6 @@ class Channel(_Channel, Resource):
         if isinstance(value, (str, bytes, bytearray)):
             return len(value) == 0
         if isinstance(value, Collection):
-            # ``pd.isna`` can return an N-D ndarray (e.g. a list of arrays or
-            # a 2-D numpy value); the previous ``any(pd.isna(...))`` then
-            # tripped numpy's ambiguous-truth check on multi-dim rows. Flatten
-            # via ``np.asarray(...).any()`` so the result is always a scalar.
             try:
                 return bool(np.asarray(pd.isna(value)).any())
             except (TypeError, ValueError):

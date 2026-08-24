@@ -11,19 +11,12 @@ from __future__ import annotations
 import hashlib
 import re
 from copy import copy, deepcopy
-from typing import Optional, Tuple
+from typing import Literal, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import pytz as tz
 from pandas.tseries.frequencies import to_offset
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 # noinspection PyShadowingBuiltins

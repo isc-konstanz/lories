@@ -177,6 +177,7 @@ class ViewInterface(Interface, Dash):
             port=self._port,
             proxy=self._proxy,
             debug=self._logger.getEffectiveLevel() <= logging.DEBUG,
+            use_reloader=self._reload,
         )
 
     # noinspection PyUnresolvedReferences
