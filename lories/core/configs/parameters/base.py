@@ -116,6 +116,7 @@ class _TypedParameter(_Parameter, ABC):
             return self.default if self._has_default else None
 
         value = self._get_typed(configs, k)
+        value = self._normalize(value)
         self._validate(k, value)
         return value
 
@@ -123,6 +124,19 @@ class _TypedParameter(_Parameter, ABC):
     def _get_typed(self, configs: "_Configurations", key: str) -> Any:
         """Read *key* from *configs* with the appropriate typed accessor."""
         ...
+
+    def _normalize(self, value: Any) -> Any:
+        """Map a string value case-insensitively onto its declared choice.
+
+        Lets config files spell a choice in any casing while the resolved
+        value stays the canonical element of ``choices``.  Values without a
+        string match (or parameters without choices) pass through unchanged.
+        """
+        if self.choices is not None and isinstance(value, str):
+            for choice in self.choices:
+                if isinstance(choice, str) and choice.lower() == value.lower():
+                    return choice
+        return value
 
     def _validate(self, key: str, value: Any) -> None:
         """Run choices check and custom validator (if any)."""
