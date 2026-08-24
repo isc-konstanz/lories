@@ -15,17 +15,31 @@ import requests
 
 import numpy as np
 import pandas as pd
-from lories import ConfigurationError
 from lories.components.weather import Weather
-from lories.connectors import Connector
+from lories.connectors import Connector, register_connector_type
+from lories.core.configs.parameters import Parameter
 from lories.location import Location
 from lories.typing import Configurations, Resources, Timestamp
 
 
+@register_connector_type("brightsky")
 class Brightsky(Connector):
+    """
+    Connector for the Bright Sky API, an open REST interface that re-publishes Deutscher Wetterdienst (DWD)
+    open weather data without requiring registration or API keys. It serves observations, current conditions
+    and forecasts for any geographic location, returning hourly records covering solar irradiance, temperature,
+    wind, precipitation, cloud cover and related parameters. This connector queries the ``/weather`` endpoint
+    for the location bound to the parent weather component, converts global horizontal irradiance from
+    kWh/m² to W/m², interpolates missing cloud cover values, and groups records by source type
+    (``forecast``, ``current``, ``historical``) so resources can subscribe to the appropriate slice.
+    """
+
+    address = Parameter(key="address", type=str, default="https://api.brightsky.dev/", desc="Brightsky API base URL")
+    horizon = Parameter(key="horizon", type=int, default=10, min=-1, max=10, desc="Forecast horizon (days)")
+
     location: Location
-    address: str = "https://api.brightsky.dev/"
-    horizon: int = 10
+    address: str
+    horizon: int
 
     def __init__(self, context: Weather, location: Location, **kwargs) -> None:
         super().__init__(context, context.configs.get_member("brightsky", defaults={}), **kwargs)
@@ -33,11 +47,6 @@ class Brightsky(Connector):
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
-
-        self.address = configs.get("address", default=Brightsky.address)
-        self.horizon = configs.get_int("horizon", default=Brightsky.horizon)
-        if -1 > self.horizon > 10:
-            raise ConfigurationError(f"Invalid forecast horizon: {self.horizon}")
 
     def read(
         self,
@@ -122,6 +131,11 @@ class Brightsky(Connector):
 
         # Convert global horizontal irradiance from kWh/m^2 to W/m^2
         data["solar"] = data["solar"] * hours * 1000
+
+        # Convert wind speeds from km/h to m/s
+        for wind_column in ["wind_speed", "wind_gust_speed"]:
+            if wind_column in data.columns:
+                data[wind_column] = data[wind_column] / 3.6
 
         if data[Weather.CLOUD_COVER].isna().any():
             data[Weather.CLOUD_COVER] = data[Weather.CLOUD_COVER].interpolate(method="linear")

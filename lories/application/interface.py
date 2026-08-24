@@ -61,6 +61,8 @@ class Interface(Configurator, metaclass=InterfaceMeta):
 
     __context: _DataContext
 
+    _reload: bool = False
+
     # noinspection PyUnresolvedReferences
     def __init__(self, context: DataContext, configs: Configurations, **kwargs) -> None:
         super().__init__(configs, **kwargs)
@@ -81,6 +83,10 @@ class Interface(Configurator, metaclass=InterfaceMeta):
     @property
     def context(self) -> DataContext:
         return self.__context
+
+    @property
+    def reload(self) -> bool:
+        return self._reload
 
     def start(self, *args, **kwargs) -> None:
         pass

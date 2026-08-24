@@ -15,16 +15,43 @@ from revpimodio2 import EventCallback, RevPiModIO, io
 import pandas as pd
 import pytz as tz
 from lories.connectors import Connector, register_connector_type
+from lories.core.configs.parameters import ChannelParameter, DurationParameter
 from lories.data.channels import Channel
-from lories.typing import Configurations, Resources
+from lories.typing import Resources
 from lories.util import to_bool
 
 
 # noinspection PyShadowingBuiltins, SpellCheckingInspection
 @register_connector_type("revpi", "revpi_io", "revpi_aio", "revpi_mio", "revpi_ro", "revolutionpi")
 class RevPiConnector(Connector):
+    """
+    Revolution Pi is a KUNBUS open-source industrial PC platform based on the Raspberry Pi Compute Module. It
+    exposes digital and analog I/O through a shared process image, accessible via the revpimodio2 library. The
+    modular hardware design supports various I/O expansion modules (DIO, AIO, MIO, RO). However, the process
+    image interface is Linux-specific and requires direct hardware access, limiting remote or cross-platform usage.
+    """
+
+    _cycletime = DurationParameter(
+        key="cycletime",
+        required=False,
+        min="1ms",
+        desc=(
+            "Process image polling cycle interval as a duration string (e.g. '200ms', '1s'). "
+            "Defaults to the RevPiModIO library default."
+        ),
+    )
+
+    # Per-channel parameters
+    address = ChannelParameter(type=str, required=True, desc="RevPi process image I/O address name")
+    listener = ChannelParameter(
+        type=bool,
+        required=False,
+        default=False,
+        desc="Register a rising-edge event listener that pushes updates as they occur",
+    )
+
     _core: RevPiModIO
-    _cycletime: Optional[int]
+    _cycletime: Optional[pd.Timedelta]
 
     _listeners: Dict[str, RevPiListener]
 
@@ -32,15 +59,11 @@ class RevPiConnector(Connector):
         super().__init__(*args, **kwargs)
         self._listeners = {}
 
-    def configure(self, configs: Configurations) -> None:
-        super().configure(configs)
-        self._cycletime = configs.get_int("cycletime", default=None)
-
     def connect(self, resources: Resources) -> None:
         super().connect(resources)
         self._core = RevPiModIO(autorefresh=True)
-        if self._cycletime:
-            self._core.cycletime = self._cycletime
+        if self._cycletime is not None:
+            self._core.cycletime = self._cycletime // pd.Timedelta("1ms")
 
         channels = resources.filter(lambda r: isinstance(r, Channel) and to_bool(r.get("listener", False)))
         for channel in channels:

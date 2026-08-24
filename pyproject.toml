@@ -23,7 +23,6 @@ urls.issues = "https://github.com/isc-konstanz/lories/issues"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -32,7 +31,7 @@ classifiers = [
 ]
 
 readme = "README.md"
-requires-python = ">= 3.9"
+requires-python = ">= 3.10"
 license = "LGPL-3.0-or-later"
 license-files = ["LICEN[CS]E*"]
 dynamic = ["version"]
@@ -41,6 +40,7 @@ dependencies = [
     "tomli >= 1.1; python_version < '3.11'",
     "numpy >= 1.21",
     "pandas >= 1.3",
+    "pytz >= 2020.1",
     "tzlocal >= 5.1",
     "requests >= 2.31",
 ]
@@ -83,7 +83,7 @@ cameras = [
 dash = [
     "dash",
     "dash-auth",
-    "dash-bootstrap-component",
+    "dash-bootstrap-components",
     "flask-bcrypt",
     "flask-login",
 ]
@@ -131,10 +131,17 @@ tag_prefix = "v"
 [project.scripts]
 lories = "lories.__main__:main"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib"
+markers = [
+    "slow: heavy or integration tests (deselect with '-m \"not slow\"')",
+]
+
 [tool.ruff]
 indent-width = 4
 line-length = 120
-target-version = "py37"
+target-version = "py310"
 exclude = ["lories/_version.py"]
 
 [tool.ruff.lint]

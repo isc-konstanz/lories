@@ -14,6 +14,7 @@ from typing import Mapping, Optional, Tuple
 import pandas as pd
 from lories.connectors import ConnectionError, Database, register_connector_type
 from lories.core.configs import ConfigurationError
+from lories.core.configs.parameters import ChannelParameter, Parameter, ParameterGroup
 from lories.io import csv
 from lories.typing import Configurations, Resources, Timestamp
 from lories.util import ceil_date, floor_date, parse_freq
@@ -22,6 +23,76 @@ from lories.util import ceil_date, floor_date, parse_freq
 # noinspection PyShadowingBuiltins
 @register_connector_type("csv")
 class CsvDatabase(Database):
+    """
+    CSV (Comma-Separated Values) is a plain-text file format for tabular data, where each line represents a row
+    and values are separated by a delimiter (typically a comma). Its simplicity and broad tool support make it a
+    common choice for data exchange, logging, and archival. However, CSV lacks a standardized schema, type
+    information, and compression, which can lead to parsing ambiguities and inefficient storage for large datasets.
+    """
+
+    _dir = Parameter(
+        key="dir",
+        type=str,
+        required=False,
+        desc="Directory containing the CSV files (relative to data dir or absolute)",
+    )
+    _file = Parameter(
+        key="file",
+        type=str,
+        required=False,
+        desc="Single CSV file path; overrides directory-based file discovery",
+    )
+    _index_column = Parameter(
+        key="index_column", type=str, default="timestamp", desc="Name of the index (timestamp) column in the CSV"
+    )
+    _index_type = Parameter(
+        key="index_type",
+        type=str,
+        default="timestamp",
+        choices=["timestamp", "unix", "none"],
+        desc="Index column type: 'timestamp' (ISO), 'unix' (epoch seconds), or 'none'",
+    )
+    _override = Parameter(
+        key="override", type=bool, default=False, desc="Overwrite existing rows on write instead of appending"
+    )
+    _slice = Parameter(
+        key="slice",
+        type=bool,
+        default=False,
+        desc="Split output across multiple files using the 'freq' pattern instead of writing a single file",
+    )
+    _freq = Parameter(
+        key="freq",
+        type=str,
+        default="D",
+        desc="File slicing frequency (Y=yearly, M=monthly, D=daily, or pandas freq suffix like h/min/s)",
+    )
+    _format = Parameter(
+        key="format",
+        type=str,
+        required=False,
+        desc="Filename timestamp format (Python strftime, e.g. '%Y%m%d'); inferred from 'freq' if omitted",
+    )
+    _suffix = Parameter(key="suffix", type=str, required=False, desc="Suffix appended to the generated filename")
+    _decimal = Parameter(key="decimal", type=str, default=".", desc="Decimal separator character")
+    _separator = Parameter(key="separator", type=str, default=",", desc="Column separator character")
+    _pretty = Parameter(
+        key="pretty",
+        type=bool,
+        default=False,
+        desc="Pretty-print column headers using channel full names and units",
+    )
+    _columns = ParameterGroup(
+        key="columns",
+        required=False,
+        desc="Per-column name overrides keyed by channel key (maps channel key to CSV column header)",
+    )
+
+    # Per-channel parameters
+    column = ChannelParameter(
+        key="column", type=str, required=False, desc="Output column name in CSV file (defaults to the channel key)"
+    )
+
     _data: Optional[pd.DataFrame] = None
     _data_path: Optional[str] = None
     _data_dir: str
@@ -46,14 +117,14 @@ class CsvDatabase(Database):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        data_dir = configs.get("dir", default=None)
+        data_dir = self._dir
         if data_dir is not None:
             if "~" in data_dir:
                 data_dir = os.path.expanduser(data_dir)
             if not os.path.isabs(data_dir):
                 data_dir = os.path.join(configs.dirs.data, data_dir)
 
-        data_path = configs.get("file", default=None)
+        data_path = self._file
         if data_path is not None:
             if not os.path.isabs(data_path):
                 if data_dir is None:
@@ -68,19 +139,18 @@ class CsvDatabase(Database):
         self._data_dir = data_dir
         self._data_path = data_path
 
-        self.index_column = configs.get("index_column", default=CsvDatabase.index_column)
-        self.index_type = configs.get("index_type", default=CsvDatabase.index_type).lower()
+        self.index_column = self._index_column
+        self.index_type = self._index_type.lower()
         if self.index_type not in ["timestamp", "unix", "none", None]:
             raise ConfigurationError(f"Unknown index type: {self.index_type}")
 
-        self.override = configs.get_bool("override", default=CsvDatabase.override)
-        self.slice = configs.get_bool("slice", default=CsvDatabase.slice)
+        self.override = self._override
+        self.slice = self._slice
 
-        self.freq = parse_freq(configs.get("freq", default=CsvDatabase.freq))
+        self.freq = parse_freq(self._freq)
 
-        format = configs.get("format", default=CsvDatabase.format)
-        if format is not None:
-            self.format = format
+        if self._format is not None:
+            self.format = self._format
         elif self.freq == "Y":
             self.format = "%Y"
         elif self.freq == "M":
@@ -92,15 +162,15 @@ class CsvDatabase(Database):
         else:
             raise ConfigurationError(f"Invalid frequency: {self.freq}")
 
-        self.suffix = configs.get("suffix", default=CsvDatabase.suffix)
+        self.suffix = self._suffix
         if self.suffix is not None:
             self.format += f"_{self.suffix}"
 
-        self.decimal = configs.get("decimal", CsvDatabase.decimal)
-        self.separator = configs.get("separator", CsvDatabase.separator)
+        self.decimal = self._decimal
+        self.separator = self._separator
 
-        self.pretty = configs.get_bool("pretty", default=False)
-        self.columns = configs.get("columns", default=CsvDatabase.columns)
+        self.pretty = self._pretty
+        self.columns = self._columns or CsvDatabase.columns
 
     def _build_columns(self, resources: Optional[Resources] = None) -> Mapping[str, str]:
         columns = {r.id: self.columns[r.key] for r in resources if r.key in self.columns}
