@@ -14,53 +14,87 @@ from typing import Optional, Sequence
 
 import pandas as pd
 from lories.connectors import ConnectionError, Database, register_connector_type
+from lories.core.configs.parameters import ChannelParameter, Parameter, SelectParameter
 from lories.typing import Configurations, Resources, Timestamp
 from pandas import HDFStore
 
 
 @register_connector_type("tables", "hdfstore")
 class HDFDatabase(Database):
+    """
+    HDF5 (Hierarchical Data Format version 5) is a binary file format designed for storing and organizing large
+    amounts of numerical data efficiently. Using the PyTables-backed pandas HDFStore, it supports fast columnar
+    reads, on-disk querying, and optional compression. However, HDF5 files are not easily human-readable,
+    concurrent write access is limited, and the format can be sensitive to library version mismatches.
+    """
+
+    _path = Parameter(
+        key="path",
+        type=str,
+        required=False,
+        desc="Directory path (relative to data dir or absolute) or absolute file path for the HDF5 store",
+    )
+    _file = Parameter(key="file", type=str, default=".store.h5", desc="HDF5 store filename")
+    _mode = SelectParameter(
+        ["a", "r", "r+", "w"],
+        key="mode",
+        default="a",
+        desc="HDF5 file open mode: a=append, r=read-only, r+=read/write existing, w=truncate",
+    )
+    _columns_unique = Parameter(
+        key="columns_unique",
+        type=bool,
+        default=False,
+        desc="Use channel IDs as column names instead of channel keys (avoids collisions across groups)",
+    )
+    _compression_level = Parameter(
+        key="compression_level",
+        type=int,
+        required=False,
+        min=0,
+        max=9,
+        desc="PyTables compression level (0=off, 9=maximum)",
+    )
+    _compression_lib = Parameter(
+        key="compression_lib",
+        type=str,
+        required=False,
+        choices=["zlib", "lzo", "bzip2", "blosc"],
+        desc="PyTables compression library",
+    )
+
+    # Per-channel parameters
+    group = ChannelParameter(type=str, required=False, desc="HDF5 group key under which this channel is stored")
+
     __store: HDFStore = None
 
     _store_dir: str
     _store_path: str
 
-    _mode: str = "a"
-
-    _columns_unique: bool = True
-
-    _compression_level: int | None = None
-    _compression_lib = None
+    _mode: str
+    _columns_unique: bool
+    _compression_level: int | None
+    _compression_lib: str | None
 
     # noinspection PyTypeChecker
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        store_dir = configs.get("path", default=None)
-        if store_dir is not None:
-            if "~" in store_dir:
-                store_dir = os.path.expanduser(store_dir)
-            if not os.path.isabs(store_dir):
-                store_dir = os.path.join(configs.dirs.data, store_dir)
+        if self._path is not None:
+            path = self._path
+            if "~" in path:
+                path = os.path.expanduser(path)
+            if os.path.isabs(path):
+                store_dir = os.path.dirname(path)
+                store_path = path
+            else:
+                store_dir = os.path.join(configs.dirs.data, path)
+                store_path = os.path.join(store_dir, self._file)
         else:
             store_dir = configs.dirs.data
-
-        store_path = configs.get("path", default=None)
-        if store_path is not None:
-            if not os.path.isabs(store_path):
-                store_path = os.path.join(store_dir, store_path)
-            else:
-                store_dir = os.path.dirname(store_path)
-        else:
-            store_file = configs.get("file", default=".store.h5")
-            store_path = os.path.join(store_dir, store_file)
+            store_path = os.path.join(store_dir, self._file)
         self._store_dir = store_dir
         self._store_path = store_path
-
-        self._mode = configs.get("mode", default="a")
-        self._columns_unique = configs.get_bool("columns_unique", default=False)
-        self._compression_level = configs.get_int("compression_level", None)
-        self._compression_lib = configs.get("compression_lib", None)
 
     def is_connected(self) -> bool:
         return self.__store is not None and self.__store.is_open

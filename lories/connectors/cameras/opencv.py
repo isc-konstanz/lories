@@ -7,12 +7,13 @@ lories.connectors.cameras.opencv
 
 import os
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import cv2
 
 from lories.connectors import ConnectionError, ConnectorError, register_connector_type
 from lories.connectors.cameras import CameraConnector
+from lories.core.configs.parameters import ChannelParameter, Parameter
 from lories.typing import Configurations, Resource, Resources
 
 
@@ -35,11 +36,31 @@ class OpenCV(CameraConnector):
     }
     DEFAULT_VENDOR: str = "reolink"
 
+    _host = Parameter(key="host", type=str, required=True, desc="RTSP camera hostname or IP address")
+    _port = Parameter(key="port", type=int, default=554, min=1, max=65535, desc="RTSP camera TCP port")
+    _username = Parameter(key="username", type=str, required=False, desc="RTSP authentication username")
+    _password = Parameter(key="password", type=str, required=False, desc="RTSP authentication password", secret=True)
+    _vendor = Parameter(
+        key="vendor",
+        type=str,
+        default=DEFAULT_VENDOR,
+        desc="Camera vendor, selecting the default RTSP stream paths: reolink | hikvision | dahua | axis",
+    )
+
+    address = ChannelParameter(
+        key="address",
+        type=str,
+        required=False,
+        desc=(
+            "Vendor-specific RTSP path appended to 'rtsp://<host>:<port>/' (e.g. 'Streaming/Channels/101'). "
+            "Defaults to the configured vendor's main or sub stream path."
+        ),
+    )
+
     _host: str
     _port: int
-
-    _username: Optional[str]
-    _password: Optional[str]
+    _username: str
+    _password: str
 
     _vendor: str
     _preview_main: str
@@ -59,16 +80,7 @@ class OpenCV(CameraConnector):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        self._host = configs.get("host")
-        self._port = configs.get_int("port", default=554)
-
-        self._username = configs.get("username", default=None)
-        self._password = configs.get("password", default=None)
-
-        if not self._host or not self._port:
-            raise ValueError("Camera configuration requires 'host' and 'port'")
-
-        vendor = configs.get("vendor", default=OpenCV.DEFAULT_VENDOR).lower()
+        vendor = self._vendor.lower()
         if vendor not in OpenCV.VENDOR_PATHS:
             raise ValueError(f"Unknown camera vendor '{vendor}'. Supported: {sorted(OpenCV.VENDOR_PATHS)}")
         self._vendor = vendor

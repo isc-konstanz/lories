@@ -15,14 +15,33 @@ import pandas as pd
 import pytz as tz
 from lories.connectors import Connector, ConnectorError, register_connector_type
 from lories.core.configs import ConfigurationError
+from lories.core.configs.parameters import ChannelParameter
 from lories.typing import Channel, Resource, Resources, Timestamp
 
 
 # noinspection PyShadowingBuiltins
 @register_connector_type("virtual", "random", "dummy")
 class VirtualConnector(Connector):
+    """
+    The Virtual connector provides in-memory channels for testing, simulation, and soft-sensor prototyping. It
+    supports simple value storage with read/write semantics and optional random-walk value generation within
+    configurable bounds. Since all state is held in memory, data does not persist across restarts, making it
+    suitable for development and simulation scenarios rather than production data acquisition.
+    """
+
     VIRTUAL: str = "virtual"
     RANDOM: str = "random"
+
+    # Per-channel parameters
+    generator = ChannelParameter(
+        type=str,
+        required=False,
+        default=None,
+        desc="Generator type: 'random' for random values, omit to store/replay",
+    )
+    min = ChannelParameter(type=float, required=False, desc="Minimum value (required when generator='random')")
+    max = ChannelParameter(type=float, required=False, desc="Maximum value (required when generator='random')")
+    default = ChannelParameter(type=float, required=False, desc="Initial stored value")
 
     _data: pd.Series
 

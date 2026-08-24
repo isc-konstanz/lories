@@ -83,6 +83,11 @@ class ParameterGroup(_Parameter):
 
         Returns a ``{key: value}`` dict of resolved children, or ``None``
         when the group is optional and absent.
+
+        When no children are declared, the group is treated as a *dynamic
+        mapping* and the raw sub-section is returned verbatim — letting
+        callers expose dicts of arbitrary user-defined keys (e.g. CSV
+        column overrides, math symbol→channel mappings).
         """
         k = self._resolve_key()
 
@@ -91,9 +96,11 @@ class ParameterGroup(_Parameter):
                 raise _config_error(
                     f"Missing required configuration section '[{k}]'" + (f" — {self.desc}" if self.desc else "")
                 )
-            return None
+            return {} if not self.children else None
 
         member = configs.get_member(k)
+        if not self.children:
+            return {key: member[key] for key in member}
         return {key: child.resolve(member) for key, child in self.children.items()}
 
     def to_schema(self) -> dict:
