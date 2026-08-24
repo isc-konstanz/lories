@@ -57,6 +57,7 @@ CONNECTORS = [
     "serial.sdi12",
     "serial.i2c",
     "modbus",
+    "sunspec",
     "mqtt",
     "revpi",
     "entsoe",
