@@ -243,6 +243,6 @@ class DataAccess(_DataAccess, Configurator):
     ) -> None:
         if data is None:
             raise ResourceError(f"Invalid data to write '{self.id}': {data}")
-        data.rename(columns={c.key: c.id for c in channels}, inplace=True)
         channels = self._filter_by_args(channels)
+        data.rename(columns={c.key: c.id for c in channels}, inplace=True)
         self.__context.write(data, channels=channels, timeout=timeout, **kwargs)

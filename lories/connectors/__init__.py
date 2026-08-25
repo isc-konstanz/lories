@@ -37,6 +37,9 @@ from ..data.database import Database  # noqa: F401
 from ..data import databases  # noqa: F401
 from ..data.databases import Databases  # noqa: F401
 
+from . import inference  # noqa: F401
+from .inference import InferenceConnector  # noqa: F401
+
 import importlib
 import logging
 import sys
@@ -54,6 +57,8 @@ CONNECTORS = [
     "influxdb2",
     "tables",
     "cameras",
+    "inference.torch",
+    "inference.onnx",
     "serial.sdi12",
     "serial.i2c",
     "modbus",

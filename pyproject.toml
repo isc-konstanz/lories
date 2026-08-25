@@ -80,6 +80,13 @@ revpi = [
 cameras = [
     "opencv-python ~= 4.12",
 ]
+models = [
+    "torch >= 2.6",
+    "torchvision >= 0.15",
+]
+onnx = [
+    "onnxruntime",
+]
 dash = [
     "dash",
     "dash-auth",
