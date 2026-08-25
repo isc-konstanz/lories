@@ -35,11 +35,24 @@ def validate_index(data: pd.DataFrame | pd.Series) -> pd.DataFrame | pd.Series:
     return data
 
 
-def validate_timezone(data: pd.DataFrame | pd.Series, timezone: Timezone) -> pd.DataFrame | pd.Series:
+def validate_timezone(data: pd.DataFrame | pd.Series, timezone: Timezone, convert: bool = True) -> pd.DataFrame | pd.Series:
+    # Timezone-naive data is always localized to the passed timezone; already aware data is
+    # converted only when `convert` is set, otherwise its timezone is kept as delivered.
     if isinstance(data, pd.DatetimeIndex):
-        data = data.tz_convert(timezone)
-    elif pd.api.types.is_datetime64_dtype(data.values):
-        data = data.dt.tz_convert(timezone)
+        if data.tz is None:
+            data = data.tz_localize(timezone)
+        elif convert:
+            data = data.tz_convert(timezone)
+    elif pd.api.types.is_datetime64_any_dtype(data):
+        if data.dt.tz is None:
+            data = data.dt.tz_localize(timezone)
+        elif convert:
+            data = data.dt.tz_convert(timezone)
     elif data.map(lambda i: isinstance(i, (pd.Timestamp, dt.datetime))).all():
-        data = data.map(lambda i: i.astimezone(timezone))
+        def _validate(i):
+            if i.tzinfo is None:
+                return pd.Timestamp(i).tz_localize(timezone)
+            return i.astimezone(timezone) if convert else i
+
+        data = data.map(_validate)
     return data

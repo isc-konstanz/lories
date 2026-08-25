@@ -82,3 +82,71 @@ def test_non_unique_index_raises():
     idx = pd.DatetimeIndex(["2024-01-01", "2024-01-01"])
     with pytest.raises(ResourceError):
         validate_index(pd.Series([1, 2], index=idx))
+
+
+# ------------------------------------------------------- validate_timezone conversion is opt-in
+
+FIXED_PLUS_1 = pd.date_range("2025-06-01 00:00", periods=3, freq="h", tz="+01:00")
+
+
+def test_aware_index_converted_by_default():
+    out = validate_timezone(pd.DatetimeIndex(FIXED_PLUS_1), "Europe/Berlin")
+    assert str(out.tz) == "Europe/Berlin"
+    assert out[0] == FIXED_PLUS_1[0]  # same instant, different label
+
+
+def test_aware_index_kept_without_convert():
+    # The results-cache regression: data stored with the weather file's fixed +01:00 offset
+    # must come back from a database read unchanged unless a timezone was configured.
+    out = validate_timezone(pd.DatetimeIndex(FIXED_PLUS_1), "Europe/Berlin", convert=False)
+    assert out.equals(pd.DatetimeIndex(FIXED_PLUS_1))
+    assert out.tz == FIXED_PLUS_1.tz
+
+
+def test_naive_index_localized_with_and_without_convert():
+    naive = pd.date_range("2025-06-01 00:00", periods=3, freq="h")
+    for convert in (True, False):
+        out = validate_timezone(pd.DatetimeIndex(naive), "Europe/Berlin", convert=convert)
+        assert str(out.tz) == "Europe/Berlin"
+        assert out[0] == pd.Timestamp("2025-06-01 00:00", tz="Europe/Berlin")
+
+
+def test_aware_series_convert_flag():
+    aware = pd.Series(FIXED_PLUS_1)
+    assert str(validate_timezone(aware, "Europe/Berlin").dt.tz) == "Europe/Berlin"
+    kept = validate_timezone(aware, "Europe/Berlin", convert=False)
+    assert kept.dt.tz == FIXED_PLUS_1.tz
+
+
+def test_naive_series_localized_without_convert():
+    naive = pd.Series(pd.date_range("2025-06-01 00:00", periods=3, freq="h"))
+    out = validate_timezone(naive, "Europe/Berlin", convert=False)
+    assert str(out.dt.tz) == "Europe/Berlin"
+
+
+def test_object_series_of_timestamps_convert_flag():
+    mixed = pd.Series([pd.Timestamp("2025-06-01 00:00", tz="+01:00"), pd.Timestamp("2025-06-01 01:00")], dtype=object)
+    out = validate_timezone(mixed, "Europe/Berlin", convert=False)
+    assert out[0] == pd.Timestamp("2025-06-01 00:00", tz="+01:00")
+    assert out[0].tzinfo is not None and out[0].utcoffset() == pd.Timedelta(hours=1)  # kept as stored
+    assert str(out[1].tzinfo) == "Europe/Berlin"  # naive entries are localized
+
+
+def test_database_validate_keeps_stored_timezone_unless_configured():
+    # Database._validate drives the flag from whether 'timezone' was explicitly configured.
+    from lories.connectors.tables import HDFDatabase
+    from lories.core.resource import Resource
+    from lories.core.resources import Resources
+    from lories.util import to_timezone
+
+    database = HDFDatabase.__new__(HDFDatabase)
+    database.timezone = to_timezone("Europe/Berlin")
+    resources = Resources([Resource(id="unit_test.value", key="value", name="value", type=float)])
+    data = pd.DataFrame({"unit_test.value": [1.0, 2.0, 3.0]}, index=FIXED_PLUS_1)
+
+    kept = database._validate(resources, data.copy())
+    assert kept.index.tz == FIXED_PLUS_1.tz  # class default: not configured -> keep stored tz
+
+    database._timezone_configured = True
+    converted = database._validate(resources, data.copy())
+    assert str(converted.index.tz) == "Europe/Berlin"

@@ -46,10 +46,17 @@ class DatabaseMeta(ConnectorMeta):
 class Database(_Database, Connector, metaclass=DatabaseMeta):
     timezone: tz.BaseTzInfo
 
+    # Whether a timezone was explicitly configured for this database. Only then are
+    # timezone-aware reads converted to it; otherwise data keeps the timezone it was
+    # stored with, and self.timezone (falling back to the local zone) is only used to
+    # localize timezone-naive data and for file/range arithmetic.
+    _timezone_configured: bool = False
+
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
         timezone = configs.get("timezone", None)
+        self._timezone_configured = timezone is not None
         if timezone is None:
             timezone = tzlocal.get_localzone_name()
         self.timezone = to_timezone(timezone)
@@ -272,7 +279,7 @@ class Database(_Database, Connector, metaclass=DatabaseMeta):
     def _validate(self, resources: Resources, data: pd.DataFrame) -> pd.DataFrame:
         if not data.empty:
             data = validate_index(data)
-            data.index = validate_timezone(data.index, self.timezone)
+            data.index = validate_timezone(data.index, self.timezone, convert=self._timezone_configured)
             for resource in resources:
                 if resource.id not in data:
                     continue
@@ -280,7 +287,7 @@ class Database(_Database, Connector, metaclass=DatabaseMeta):
                     resource_data = data[resource.id]
                     if pd.api.types.is_string_dtype(resource_data.values):
                         resource_data = pd.to_datetime(resource_data)
-                    data[resource.id] = validate_timezone(resource_data, self.timezone)
+                    data[resource.id] = validate_timezone(resource_data, self.timezone, convert=self._timezone_configured)
         return data
 
     @staticmethod
