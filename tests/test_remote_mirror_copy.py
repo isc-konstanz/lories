@@ -134,9 +134,7 @@ def _build_application(tmp_dir: str, mode: str = "pull", source: str = "remote",
         '[connectors.local]\ntype = "sqlite_mirror"\ntimezone = "UTC"\n\n'
         "[components.sched]\n"
         'type = "remote_mirror"\n'
-        f'source = "{source}"\n'
-        f'target = "{target}"\n'
-        f'mode = "{mode}"\n'
+        f'source = "{source}"\n' + (f'target = "{target}"\n' if target is not None else "") + f'mode = "{mode}"\n'
         "full = true\n"
     )
     with open(os.path.join(conf_dir, "settings.conf"), "w") as file:
@@ -243,6 +241,55 @@ def test_push_mode_copies_local_to_remote():
     assert rows == len(creations) * len(future)
 
 
+def test_pull_without_target_defaults_to_logger_database():
+    from sqlalchemy import text
+
+    import pandas as pd
+    from lories.data.channels import Channels
+
+    _register_sqlite_mirror_database()
+    app = _build_application(tempfile.mkdtemp(prefix="mirror_logger_"), target=None)
+
+    mirror = app.components["sched"]
+    mirror.data.add("value", table="mirror", column="value", type="float", logger={"connector": "local"})
+    declared = Channels(list(mirror.data.values()))
+
+    source = app.connectors.get("remote")
+    creations = [3001, 3002]
+    future = pd.date_range("2027-01-01 00:00", periods=3, freq="1h", tz="UTC")
+
+    seed_resources = Channels(
+        [channel.duplicate(id=f"{channel.id}.{c}", creation=c) for channel in declared for c in creations]
+    )
+    source.connect(seed_resources)
+    seed_frame = pd.DataFrame(index=future)
+    for channel in declared:
+        for creation in creations:
+            seed_frame[f"{channel.id}.{creation}"] = float(creation)
+    source.write(seed_frame)
+    source.disconnect()
+
+    mirror._mirror_once()
+
+    local = app.connectors.get("local")
+    with local.engine.connect() as connection:
+        rows = connection.execute(text("SELECT COUNT(*) FROM mirror")).scalar()
+    assert rows == len(creations) * len(future)
+
+
+def test_missing_target_without_logger_raises():
+    from lories.components import ComponentError
+
+    _register_sqlite_mirror_database()
+    app = _build_application(tempfile.mkdtemp(prefix="mirror_nolog_"), target=None)
+
+    mirror = app.components["sched"]
+    mirror.data.add("value", table="mirror", column="value", type="float")
+
+    with pytest.raises(ComponentError):
+        mirror._mirror_once()
+
+
 def test_source_equal_target_raises():
     from lories.components import ComponentError
 
@@ -261,7 +308,7 @@ def test_empty_channel_set_is_a_noop():
     app = _build_application(tempfile.mkdtemp(prefix="mirror_empty_"))
 
     mirror = app.components["sched"]
-    # No channels declared: _mirror_once resolves the databases then returns without connecting.
+    # No channels declared: _mirror_once returns before resolving or connecting the databases.
     mirror._mirror_once()
 
     assert app.connectors.get("local").engine is None

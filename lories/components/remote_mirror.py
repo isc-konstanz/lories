@@ -7,10 +7,6 @@ A ``remote_mirror`` component mirrors channel data between a remote ``Database``
 connector and a local one, either "pull"-ing from the remote into the local
 database or "push"-ing the local database's data to the remote one.
 
-This module only declares the component's registration, its full config
-surface and the lifecycle stubs; the copy engine and its scheduling are
-implemented by later units.
-
 """
 
 from __future__ import annotations
@@ -21,10 +17,9 @@ from typing import Optional
 
 import pytz
 from lories.components import Component, ComponentError, register_component_type
-from lories.core import ConfigurationError
+from lories.core.configs.parameters import Parameter, SelectParameter
 from lories.data.channels import Channels
 from lories.scheduler import TickScheduler
-from lories.typing import Configurations
 
 logger = logging.getLogger(__name__)
 
@@ -38,40 +33,82 @@ class RemoteMirror(Component):
     inherited ``[<component>.data]`` configuration block; this class does not hardcode
     any channels itself.
 
+    Usage::
+
+        [components.mirror]
+        type = "remote_mirror"
+        source = "remote_db"    # connector id of the remote database
+        mode = "pull"           # copy remote -> local ("push" for the reverse)
+        interval = 15           # run every 15 minutes
+
+        [components.mirror.data.channels.power]
+        table = "power"
+        column = "value"
+        type = "float"
+        logger = "local_db"     # with no 'target' set, this logger database is the local side
+
+    An explicit ``target = "<connector id>"`` on the component overrides the
+    logger-database default, e.g. to mirror into an archive database the
+    channels do not log to.
+
     """
 
+    source = Parameter(
+        key="source",
+        type=str,
+        required=True,
+        desc="Connector id of the remote database to mirror from/to",
+    )
+    target = Parameter(
+        key="target",
+        type=str,
+        required=False,
+        desc="Connector id of the local database; defaults to the mirrored channels' logger database",
+    )
+    mode = SelectParameter(
+        ["pull", "push"],
+        key="mode",
+        default="pull",
+        desc="Copy direction: 'pull' copies remote to local, 'push' local to remote",
+    )
+    full = Parameter(
+        key="full",
+        type=bool,
+        default=True,
+        desc="Copy the full history from the source's first record instead of resuming after the target's last",
+    )
+    force = Parameter(
+        key="force",
+        type=bool,
+        default=False,
+        desc="Rewrite time slices even when source and target checksums match",
+    )
+    slice = Parameter(
+        key="slice",
+        type=str,
+        default="D",
+        desc="Chunk size the copy is sliced and checksummed by (pandas freq, e.g. 'D', 'h')",
+    )
+    freq = Parameter(
+        key="freq",
+        type=str,
+        default="D",
+        desc="Frequency the copied range is floored and the prior-step validation window sized by (pandas freq)",
+    )
+    interval = Parameter(key="interval", type=int, default=60, desc="Mirror schedule interval (minutes)")
+    offset = Parameter(key="offset", type=int, default=0, desc="Mirror schedule offset within interval (minutes)")
+
     source: str
-    target: Optional[str] = None
-    mode: str = "pull"
-    full: bool = True
-    force: bool = False
-    slice: str = "D"
-    freq: str = "D"
-    interval: int = 60
-    offset: int = 0
+    target: Optional[str]
+    mode: str
+    full: bool
+    force: bool
+    slice: str
+    freq: str
+    interval: int
+    offset: int
 
     _scheduler: Optional[TickScheduler] = None
-
-    def configure(self, configs: Configurations) -> None:
-        super().configure(configs)
-
-        self.source = configs.get("source")
-        if not self.source:
-            raise ConfigurationError(f"Missing 'source' database id for remote mirror '{self.id}'")
-
-        # A later unit may default an unset target to the channels' logger connector.
-        self.target = configs.get("target", default=RemoteMirror.target)
-
-        self.mode = configs.get("mode", default=RemoteMirror.mode)
-        if self.mode not in ("pull", "push"):
-            raise ConfigurationError(f"Invalid remote mirror mode '{self.mode}' for '{self.id}'")
-
-        self.full = configs.get_bool("full", default=RemoteMirror.full)
-        self.force = configs.get_bool("force", default=RemoteMirror.force)
-        self.slice = configs.get("slice", default=RemoteMirror.slice)
-        self.freq = configs.get("freq", default=RemoteMirror.freq)
-        self.interval = configs.get_int("interval", default=RemoteMirror.interval)
-        self.offset = configs.get_int("offset", default=RemoteMirror.offset)
 
     def activate(self) -> None:
         super().activate()
@@ -103,11 +140,11 @@ class RemoteMirror(Component):
         """
         from lories.data.replication import replicate
 
-        source, target = self._resolve_copy_databases()
         channels = Channels(list(self.data.values()))
         if len(channels) == 0:
             logger.debug(f"Remote mirror '{self.id}': no channels to mirror")
             return
+        source, target = self._resolve_copy_databases(channels)
 
         # Connect the source with the declared channels first: enough to build the table and
         # discover the live surrogate groups, which the enumerated resource-set is built from.
@@ -131,11 +168,12 @@ class RemoteMirror(Component):
         finally:
             source.disconnect()
 
-    def _resolve_copy_databases(self):
+    def _resolve_copy_databases(self, channels: Channels):
         """Resolve the (copy-from, copy-to) databases for the configured ``mode``.
 
         ``source`` is the remote database and ``target`` the local one; ``pull`` copies
-        remote -> local, ``push`` copies local -> remote.
+        remote -> local, ``push`` copies local -> remote. An unset ``target`` defaults
+        to the logger database shared by all mirrored ``channels``.
         """
         # The mirrored databases are registered on the shared connector context (system level),
         # not on the component's own scoped access, so resolve through `.context`.
@@ -143,14 +181,40 @@ class RemoteMirror(Component):
         remote = connectors.get(self.source)
         if remote is None:
             raise ComponentError(self, f"Remote mirror '{self.id}' source database '{self.source}' not available")
-        if not self.target:
-            raise ComponentError(self, f"Remote mirror '{self.id}' requires a configured target database")
-        local = connectors.get(self.target)
-        if local is None:
-            raise ComponentError(self, f"Remote mirror '{self.id}' target database '{self.target}' not available")
-        if self.source == self.target:
+        if self.target:
+            local = connectors.get(self.target)
+            if local is None:
+                raise ComponentError(self, f"Remote mirror '{self.id}' target database '{self.target}' not available")
+        else:
+            local = self._resolve_logger_database(channels)
+        if local is remote:
             raise ComponentError(self, f"Remote mirror '{self.id}' source and target must differ: '{self.source}'")
         return (remote, local) if self.mode == "pull" else (local, remote)
+
+    # noinspection PyProtectedMember
+    def _resolve_logger_database(self, channels: Channels):
+        """Return the single logger database every mirrored channel logs to.
+
+        The fallback target means "mirror into where these channels are logged", so a
+        channel without a logger database — or channels logging to different ones —
+        is a configuration mistake rather than something to silently paper over.
+        """
+        databases = set()
+        for channel in channels:
+            if not channel.logger.is_database():
+                raise ComponentError(
+                    self,
+                    f"Remote mirror '{self.id}' has no target database configured "
+                    f"and channel '{channel.id}' does not log to one",
+                )
+            databases.add(channel.logger._connector)
+        if len(databases) > 1:
+            ids = ", ".join(sorted(database.id for database in databases))
+            raise ComponentError(
+                self,
+                f"Remote mirror '{self.id}' channels log to different databases ({ids}); configure an explicit target",
+            )
+        return next(iter(databases))
 
     def _enumerate_resources(self, source, channels: Channels) -> Channels:
         """Duplicate each mirrored channel once per surrogate group present on ``source``.
