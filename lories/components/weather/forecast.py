@@ -16,9 +16,10 @@ import pytz as tz
 from lories.components.weather import Weather
 from lories.core.configs.parameters import Parameter
 from lories.core.errors import ResourceError
+from lories.core.schedule import validate_tick_schedule
 from lories.core.typing import Component, Configurations
 from lories.location import Location
-from lories.util import floor_date, to_date, to_timezone
+from lories.util import to_date, to_timezone
 
 
 class WeatherForecast(Weather):
@@ -32,8 +33,10 @@ class WeatherForecast(Weather):
     TYPE: str = "weather_forecast"
     TYPE: str = "forecast"
 
-    interval = Parameter(key="interval", type=int, default=60, desc="Forecast schedule interval (minutes)")
-    offset = Parameter(key="offset", type=int, default=0, desc="Forecast schedule offset within interval (minutes)")
+    interval = Parameter(key="interval", type=int, default=60, min=1, desc="Forecast schedule interval (minutes)")
+    offset = Parameter(
+        key="offset", type=int, default=0, min=0, desc="Forecast schedule offset within interval (minutes)"
+    )
 
     interval: int
     offset: int
@@ -48,6 +51,13 @@ class WeatherForecast(Weather):
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
+        # The descriptors bound and bounds-checked interval/offset; the shared
+        # vocabulary covers the cross-field constraint (0 <= offset < interval).
+        validate_tick_schedule(
+            pd.Timedelta(minutes=self.interval),
+            pd.Timedelta(minutes=self.offset),
+            section_name=WeatherForecast.TYPE,
+        )
 
     def localize(self, configs: Configurations) -> None:
         # Do nothing, as context was already validated as WeatherProvider, that does have a location
@@ -103,11 +113,10 @@ class WeatherForecast(Weather):
             start = pd.Timestamp.now(tz=timezone)
 
         if forecast.empty or start < forecast.index[0] or end > forecast.index[-1]:
-            start_schedule = floor_date(start, self.location.timezone, freq=f"{self.interval}T")
-            start_schedule += pd.Timedelta(minutes=self.offset)
-            if start_schedule > start:
-                start_schedule -= pd.Timedelta(minutes=self.interval)
-
+            # NOTE: a dead start_schedule slot computation (slot_floor of
+            # `start`) was removed here; the logged read below never used it.
+            # If the read should start at the schedule slot covering `start`,
+            # use lories.core.schedule.slot_floor - operator decision.
             logged = self.data.from_logger(start=start, end=end, unique=False)
             if not logged.empty:
                 forecast = logged if forecast.empty else forecast.combine_first(logged)
