@@ -5,8 +5,10 @@ lories.scheduler
 
 A small, self-contained scheduler that runs a callback on an interval/offset-aligned cadence.
 It is the domain-agnostic skeleton of the sparcs field-simulation tick: an aligned slot loop, an
-interrupt ``Event`` for prompt shutdown, a bounded join, and a non-blocking lock that skips
-(never queues) a slot while the previous run is still in flight.
+interrupt ``Event`` for prompt shutdown, and a bounded join. Slots are never queued: the next
+slot is computed from the moment a run finishes, so slots missed by a slow run are skipped.
+Guarding against overlap across scheduler instances (e.g. a restart while a timed-out run is
+still in flight) is the callback owner's responsibility.
 """
 
 from __future__ import annotations
@@ -52,7 +54,6 @@ class TickScheduler:
         self._join_timeout = join_timeout
 
         self._interrupt = threading.Event()
-        self._lock = threading.Lock()
         self._thread: Optional[threading.Thread] = None
 
     def is_running(self) -> bool:
@@ -104,14 +105,7 @@ class TickScheduler:
             slot = self._next_slot(self._now())
 
     def _run_slot(self) -> None:
-        if not self._lock.acquire(blocking=False):
-            logger.warning("Tick scheduler '%s': previous run still active; skipping slot", self._name)
-            return
         try:
             self._on_slot()
-        except Exception as e:
-            logger.error("Tick scheduler '%s' run failed: %s", self._name, e)
-            if logger.getEffectiveLevel() <= logging.DEBUG:
-                logger.exception(e)
-        finally:
-            self._lock.release()
+        except Exception:
+            logger.exception("Tick scheduler '%s' run failed", self._name)

@@ -225,18 +225,35 @@ class Table(sql.Table):
         query = query.where(and_(*self._primary_clauses(resources, start, end)))
         return query.order_by(*self._primary_order(order_by))
 
-    def read_groups(self) -> Optional[Select]:
+    def read_groups(
+        self,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
+    ) -> Optional[Select]:
         """Select the distinct surrogate-key value combinations present in the table.
 
         Returns ``None`` for tables without surrogate keys (a single implicit group);
         otherwise a ``SELECT DISTINCT`` over the surrogate-key columns, one row per group.
         Unlike :meth:`read`, this does not filter by resource, so it discovers groups whose
         values are not known ahead of time (e.g. an append-per-run ``timestamp_creation``).
+        ``start``/``end`` bound the discovery on the datetime index, so a windowed caller
+        only sees groups with records in that window.
         """
         surrogate_keys = [c for c in self.primary_key.columns if isinstance(c, SurrogateKeyColumn)]
         if len(surrogate_keys) == 0:
             return None
-        return sql.select(*surrogate_keys).distinct()
+        select = sql.select(*surrogate_keys).distinct()
+        primary_index = self.primary_index
+        if self.__is_datetime_index(primary_index):
+            if start is not None and end is not None:
+                select = select.where(
+                    between(primary_index, primary_index.validate(start), primary_index.validate(end))
+                )
+            elif start is not None:
+                select = select.where(primary_index >= primary_index.validate(start))
+            elif end is not None:
+                select = select.where(primary_index <= primary_index.validate(end))
+        return select
 
     def extract_groups(self, result: Result[Any]) -> List[Dict[str, Any]]:
         """Map a :meth:`read_groups` result to surrogate resource-attribute dicts.

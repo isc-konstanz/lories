@@ -99,10 +99,10 @@ def _register_irrigation_database():
         def read_last(self, resources):
             return self._exec(self.table.read(resources, order_by="desc").limit(1), resources)
 
-        def read_groups(self, resources):
-            select = self.table.read_groups()
+        def read_groups(self, resources, start=None, end=None):
+            select = self.table.read_groups(start, end)
             if select is None:
-                return []
+                return None
             return self.table.extract_groups(self._connection.execute(select))
 
         def write(self, data: pd.DataFrame) -> None:

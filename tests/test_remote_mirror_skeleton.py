@@ -18,6 +18,8 @@ type = "remote_mirror"
 source = "remote_db"
 target = "local_db"
 mode = "push"
+window = "forecast"
+horizon = "12h"
 full = false
 force = true
 slice = "H"
@@ -56,6 +58,7 @@ def _build_application(tmp_dir: str):
 
 
 def test_remote_mirror_config_surface_resolves():
+    import pandas as pd
     from lories.components import RemoteMirror
 
     tmp_dir = tempfile.mkdtemp(prefix="remote_mirror_test_")
@@ -67,6 +70,8 @@ def test_remote_mirror_config_surface_resolves():
     assert full.source == "remote_db"
     assert full.target == "local_db"
     assert full.mode == "push"
+    assert full.window == "forecast"
+    assert full.horizon == pd.Timedelta(hours=12)
     assert full.full is False
     assert full.force is True
     assert full.slice == "H"
@@ -80,8 +85,11 @@ def test_remote_mirror_config_surface_resolves():
     assert defaults.source == "remote_db_only"
     assert defaults.target is None
     assert defaults.mode == "pull"
+    assert defaults.window == "all"
+    assert defaults.horizon is None
     assert defaults.full is True
-    assert defaults.force is False
+    # Tri-state: unset resolves at copy time (true for the "forecast" window, false otherwise).
+    assert defaults.force is None
     assert defaults.slice == "D"
     assert defaults.freq == "D"
     assert defaults.interval == 60

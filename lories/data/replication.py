@@ -232,7 +232,17 @@ def replicate(
     freq: str = "D",
     full: bool = True,
     force: bool = False,
+    start: Optional[pd.Timestamp] = None,
+    end: Optional[pd.Timestamp] = None,
 ) -> None:
+    """Copy ``resources``' data from ``source`` to ``target`` in checksummed time slices.
+
+    Without explicit bounds the copied range is derived from the databases: ``end`` is the
+    source's last record and ``start`` either the source's first record (``full``) or the
+    target's last (resume). An explicit ``start`` or ``end`` pins that side of the range
+    instead (e.g. a forecast window from now on); an explicit ``start`` also replaces the
+    resume logic, so the prior-step validation for resumed copies is skipped.
+    """
     if source is None or target is None or len(resources) == 0:
         return
 
@@ -246,15 +256,20 @@ def replicate(
     if timezone is None:
         timezone = to_timezone(tzlocal.get_localzone_name())
     now = pd.Timestamp.now(tz=timezone)
-    end = source.read_last_index(resources)
     if end is None:
-        end = now
-    if not full:
-        end = floor_date(end, freq=freq)
+        end = source.read_last_index(resources)
+        if end is None:
+            end = now
+        if not full:
+            end = floor_date(end, freq=freq)
 
-    start = target.read_last_index(resources) if not full else None
     if start is None:
-        start = source.read_first_index(resources)
+        start = target.read_last_index(resources) if not full else None
+        if start is None:
+            start = source.read_first_index(resources)
+            target_empty = True
+    else:
+        # The caller pinned the range start; there is no prior resumed step to validate.
         target_empty = True
 
     if any(t is None for t in [start, end]) or start >= end:

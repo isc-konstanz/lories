@@ -60,6 +60,32 @@ def test_exception_in_callback_does_not_kill_the_loop():
         scheduler.stop()
 
 
+def test_exception_logs_traceback_at_error(caplog):
+    import logging
+
+    calls = []
+
+    def flaky() -> None:
+        calls.append(1)
+        raise RuntimeError("boom")
+
+    scheduler = TickScheduler(flaky, interval=timedelta(seconds=0.02), name="traceback")
+    with caplog.at_level(logging.ERROR, logger="lories.scheduler"):
+        scheduler.start()
+        try:
+            deadline = time.monotonic() + 2.0
+            while len(calls) == 0 and time.monotonic() < deadline:
+                time.sleep(0.02)
+        finally:
+            scheduler.stop()
+
+    failures = [r for r in caplog.records if "run failed" in r.getMessage()]
+    assert len(failures) >= 1
+    # The traceback must be attached at ERROR level, not gated behind DEBUG.
+    assert all(r.exc_info is not None for r in failures)
+    assert failures[0].levelno == logging.ERROR
+
+
 def test_rejects_non_positive_interval():
     import pytest
 

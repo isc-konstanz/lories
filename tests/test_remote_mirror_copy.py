@@ -98,10 +98,10 @@ def _register_sqlite_mirror_database():
         def read_last(self, resources):
             return self._exec(self.table.read(resources, order_by="desc").limit(1), resources)
 
-        def read_groups(self, resources):
-            select = self.table.read_groups()
+        def read_groups(self, resources, start=None, end=None):
+            select = self.table.read_groups(start, end)
             if select is None:
-                return []
+                return None
             return self.table.extract_groups(self._connection.execute(select))
 
         def write(self, data: pd.DataFrame) -> None:
@@ -109,7 +109,9 @@ def _register_sqlite_mirror_database():
             subset = data.loc[:, columns].dropna(axis="index", how="all")
             if subset.empty:
                 return
-            self._connection.execute(self.table.write(self.resources, subset))
+            # Real dialects (mysql/postgres) upsert on duplicate primary keys; sqlite's
+            # equivalent is INSERT OR REPLACE, keeping repeated mirror runs re-writable.
+            self._connection.execute(self.table.write(self.resources, subset).prefix_with("OR REPLACE"))
             self._connection.commit()
 
         def delete(self, resources, start=None, end=None) -> None:
@@ -119,7 +121,9 @@ def _register_sqlite_mirror_database():
     return SqliteMirrorDatabase
 
 
-def _build_application(tmp_dir: str, mode: str = "pull", source: str = "remote", target: str = "local"):
+def _build_application(
+    tmp_dir: str, mode: str = "pull", source: str = "remote", target: str = "local", extra: str = ""
+):
     from lories.application import Settings
     from lories.application.main import Application
 
@@ -135,7 +139,7 @@ def _build_application(tmp_dir: str, mode: str = "pull", source: str = "remote",
         "[components.sched]\n"
         'type = "remote_mirror"\n'
         f'source = "{source}"\n' + (f'target = "{target}"\n' if target is not None else "") + f'mode = "{mode}"\n'
-        "full = true\n"
+        "full = true\n" + extra
     )
     with open(os.path.join(conf_dir, "settings.conf"), "w") as file:
         file.write(settings_text)
@@ -301,6 +305,142 @@ def test_source_equal_target_raises():
 
     with pytest.raises(ComponentError):
         mirror._mirror_once()
+
+
+def _seed_past_and_future(app, creations=(3001, 3002)):
+    """Seed the source with a past-only creation group and a group spanning past and future.
+
+    Returns (channel, now, past_index, future_index): group ``creations[0]`` has only the past
+    rows, group ``creations[1]`` the same past rows plus all future rows.
+    """
+    import pandas as pd
+    from lories.data.channels import Channels
+
+    mirror = app.components["sched"]
+    mirror.data.add("value", table="mirror", column="value", type="float")
+    channel = list(mirror.data.values())[0]
+
+    now = pd.Timestamp.now(tz="UTC")
+    past = pd.DatetimeIndex([now - pd.Timedelta(hours=3), now - pd.Timedelta(hours=2)])
+    future = pd.DatetimeIndex([now + pd.Timedelta(hours=1), now + pd.Timedelta(hours=2)])
+
+    source = app.connectors.get("remote")
+    seed_resources = Channels([channel.duplicate(id=f"{channel.id}.{c}", creation=c) for c in creations])
+    source.connect(seed_resources)
+    frame_past = pd.DataFrame(index=past)
+    frame_past[f"{channel.id}.{creations[0]}"] = float(creations[0])
+    frame_past[f"{channel.id}.{creations[1]}"] = float(creations[1])
+    source.write(frame_past)
+    frame_future = pd.DataFrame(index=future)
+    frame_future[f"{channel.id}.{creations[1]}"] = float(creations[1])
+    source.write(frame_future)
+    source.disconnect()
+    return channel, now, past, future
+
+
+def test_forecast_window_copies_only_future_rows_and_groups():
+    from sqlalchemy import text
+
+    _register_sqlite_mirror_database()
+    app = _build_application(tempfile.mkdtemp(prefix="mirror_forecast_"), extra='window = "forecast"\n')
+    _, _, past, future = _seed_past_and_future(app)
+
+    app.components["sched"]._mirror_once()
+
+    target = app.connectors.get("local")
+    with target.engine.connect() as connection:
+        rows = connection.execute(text("SELECT COUNT(*) FROM mirror")).scalar()
+        groups = sorted(
+            row[0] for row in connection.execute(text("SELECT DISTINCT timestamp_creation FROM mirror")).fetchall()
+        )
+
+    # Only the group with future rows is discovered, and only its future rows are copied.
+    assert rows == len(future)
+    assert groups == [3002]
+
+
+def test_historical_window_copies_only_past_rows():
+    from sqlalchemy import text
+
+    _register_sqlite_mirror_database()
+    app = _build_application(tempfile.mkdtemp(prefix="mirror_hist_"), extra='window = "historical"\n')
+    _, _, past, future = _seed_past_and_future(app)
+
+    app.components["sched"]._mirror_once()
+
+    target = app.connectors.get("local")
+    with target.engine.connect() as connection:
+        rows = connection.execute(text("SELECT COUNT(*) FROM mirror")).scalar()
+        groups = sorted(
+            row[0] for row in connection.execute(text("SELECT DISTINCT timestamp_creation FROM mirror")).fetchall()
+        )
+
+    # Both groups have past rows; none of the future rows crosses over.
+    assert rows == 2 * len(past)
+    assert groups == [3001, 3002]
+
+
+def test_forecast_window_propagates_source_deletions_by_default():
+    from sqlalchemy import text
+
+    import pandas as pd
+    from lories.data.channels import Channels
+
+    _register_sqlite_mirror_database()
+    # 'force' stays unset: the forecast window must default to an exact (deletion-propagating) mirror.
+    app = _build_application(tempfile.mkdtemp(prefix="mirror_cancel_"), extra='window = "forecast"\n')
+
+    mirror = app.components["sched"]
+    mirror.data.add("value", table="mirror", column="value", type="float")
+    channel = list(mirror.data.values())[0]
+
+    now = pd.Timestamp.now(tz="UTC")
+    future = pd.DatetimeIndex([now + pd.Timedelta(hours=h) for h in (1, 2, 3)])
+    source = app.connectors.get("remote")
+    seed_resources = Channels([channel.duplicate(id=f"{channel.id}.4001", creation=4001)])
+    source.connect(seed_resources)
+    frame = pd.DataFrame(index=future)
+    frame[f"{channel.id}.4001"] = 4001.0
+    source.write(frame)
+    source.disconnect()
+
+    mirror._mirror_once()
+    target = app.connectors.get("local")
+    with target.engine.connect() as connection:
+        assert connection.execute(text("SELECT COUNT(*) FROM mirror")).scalar() == 3
+
+    # Cancel the middle future record in the source; the next run must remove it from the target.
+    with source.engine.begin() as connection:
+        connection.execute(
+            text("DELETE FROM mirror WHERE value = 4001.0 AND logged = :ts"),
+            {"ts": future[1].tz_localize(None).to_pydatetime()},
+        )
+    mirror._mirror_once()
+
+    with target.engine.connect() as connection:
+        rows = connection.execute(text("SELECT COUNT(*) FROM mirror")).scalar()
+    assert rows == 2
+
+
+def test_copy_in_flight_skips_next_run():
+    _register_sqlite_mirror_database()
+    app = _build_application(tempfile.mkdtemp(prefix="mirror_overlap_"))
+
+    mirror = app.components["sched"]
+    mirror.data.add("value", table="mirror", column="value", type="float")
+
+    assert mirror._copy_lock.acquire(blocking=False)
+    try:
+        mirror._mirror_once()
+        # The run skipped before resolving or connecting the databases.
+        assert app.connectors.get("local").engine is None
+        assert app.connectors.get("remote").engine is None
+    finally:
+        mirror._copy_lock.release()
+
+    # With the lock released the same call proceeds into the copy (and connects the source).
+    mirror._mirror_once()
+    assert app.connectors.get("remote").engine is not None
 
 
 def test_empty_channel_set_is_a_noop():
