@@ -297,7 +297,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
 
                         table = self.get(table_key)
                         if start is None and end is None:
-                            select = table.read(table_resources, order_by="desc").limit(1)
+                            select = table.read_latest(table_resources, order_by="desc")
                         else:
                             select = table.read(table_resources, start, end)
 
@@ -327,7 +327,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
                             raise DatabaseError(self, f"Table '{table_name}' not available")
 
                         table = self.get(table_name)
-                        select = table.read(table_resources, order_by="asc").limit(1)
+                        select = table.read_latest(table_resources, order_by="asc")
                         result = connection.execute(select)
                         if result.rowcount > 0:
                             result_data = table.extract(table_resources, result)
@@ -354,7 +354,7 @@ class SqlDatabase(Database, Mapping[str, Table]):
                             raise DatabaseError(self, f"Table '{table_name}' not available")
 
                         table = self.get(table_name)
-                        select = table.read(table_resources, order_by="desc").limit(1)
+                        select = table.read_latest(table_resources, order_by="desc")
                         result = connection.execute(select)
                         if result.rowcount > 0:
                             result_data = table.extract(table_resources, result)

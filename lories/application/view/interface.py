@@ -39,10 +39,12 @@ class ViewInterface(Interface, Dash):
     _proxy = Parameter(key="proxy", type=str, required=False, default=None, desc="Reverse proxy URL prefix path")
     _host = Parameter(key="host", type=str, default="127.0.0.1", desc="Host address to bind to")
     _port = Parameter(key="port", type=int, default=8050, desc="TCP port number")
+    _reload = Parameter(key="reload", type=bool, default=False, desc="Enable the development server auto-reloader")
 
     _proxy: Optional[str]
     _host: str
     _port: int
+    _reload: bool
 
     def __init__(self, context: Application, configs: Configurations) -> None:
         def get_custom_path(key: str, default: Optional[str] = None) -> str:
