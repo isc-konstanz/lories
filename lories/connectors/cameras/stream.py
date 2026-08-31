@@ -9,14 +9,15 @@ from __future__ import annotations
 
 from multiprocessing.shared_memory import SharedMemory
 from multiprocessing.synchronize import Event as EventType
-from threading import Event, Thread
+from threading import Thread
 from time import sleep, time
+from typing import FrozenSet, Iterable
 
 from lories.connectors.cameras._core import _CameraConnector as CameraConnector
 from lories.connectors.errors import ConnectorError
 from lories.connectors.tasks.process import ProcessContext
 from lories.core import Configurations, Configurator, ResourceUnavailableError
-from lories.data import Channels
+from lories.data import Channel, Channels
 
 
 class CameraStream(Configurator, Thread):
@@ -32,7 +33,7 @@ class CameraStream(Configurator, Thread):
 
     _memory: SharedMemory
     _buffer: memoryview
-    _suspended: Event
+    _muted: FrozenSet[str]
 
     # noinspection PyProtectedMember
     def __init__(
@@ -50,7 +51,7 @@ class CameraStream(Configurator, Thread):
         self.__interrupt = _manager.Event()
         self.__trigger = _manager.Event()
         self.__failed = False
-        self._suspended = Event()
+        self._muted = frozenset()
         # Frames the subprocess has written to shared memory. Compared against
         # the main thread's local consumed counter to surface the drop rate.
         self.__produced = _manager.Value("i", 0)
@@ -67,22 +68,28 @@ class CameraStream(Configurator, Thread):
     def is_failed(self) -> bool:
         return self.__failed
 
-    def is_suspended(self) -> bool:
-        return self._suspended.is_set()
+    @staticmethod
+    def _ids(channels: Iterable[Channel | str]) -> FrozenSet[str]:
+        return frozenset(channel if isinstance(channel, str) else channel.id for channel in channels)
 
-    def suspend(self) -> None:
-        """Keep draining frames but publish none, so no processor or listener runs."""
-        self._suspended.set()
+    def is_muted(self, channel: Channel | str) -> bool:
+        return (channel if isinstance(channel, str) else channel.id) in self._muted
 
-    def resume(self) -> None:
-        self._suspended.clear()
+    def mute(self, *channels: Channel | str) -> None:
+        """Stop publishing frames to these channels, so their processors and listeners idle; the rest stay live."""
+        self._muted = self._muted | self._ids(channels)
 
-    def _publish(self, channels: Channels, data: bytes) -> bool:
-        if self._suspended.is_set():
-            return False
+    def unmute(self, *channels: Channel | str) -> None:
+        self._muted = self._muted - self._ids(channels)
+
+    def _publish(self, channels: Channels, data: bytes) -> int:
+        published = 0
         for channel in channels:
+            if channel.id in self._muted:
+                continue
             channel.value = data
-        return True
+            published += 1
+        return published
 
     # noinspection PyProtectedMember
     def start(self):

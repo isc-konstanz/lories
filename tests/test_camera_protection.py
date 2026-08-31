@@ -12,6 +12,7 @@ close it again.
 from __future__ import annotations
 
 import logging
+from types import SimpleNamespace
 
 import pandas as pd
 from lories.components.cameras.protection import CameraProtector
@@ -45,17 +46,20 @@ class _FakeData:
         return self._state
 
 
+_MOTION = SimpleNamespace(id="camera.motion")
+
+
 class _FakeCamera:
-    """The slice of the camera connector the protector drives: the stream mute."""
+    """The slice of the camera connector the protector drives: the per-channel mute."""
 
     def __init__(self) -> None:
-        self.suspended = False
+        self.muted = set()
 
-    def suspend(self) -> None:
-        self.suspended = True
+    def mute(self, *channels) -> None:
+        self.muted.update(channel.id for channel in channels)
 
-    def resume(self) -> None:
-        self.suspended = False
+    def unmute(self, *channels) -> None:
+        self.muted.difference_update(channel.id for channel in channels)
 
 
 class _Protector(CameraProtector):
@@ -77,8 +81,8 @@ class _Protector(CameraProtector):
     def data(self):
         return self._fake_data
 
-    def _camera_connector(self):
-        return self.camera
+    def _motion_stream(self):
+        return (self.camera, _MOTION) if self.camera is not None else None
 
     def _now(self) -> pd.Timestamp:
         return self.clock
@@ -137,13 +141,13 @@ def test_trigger_runs_the_same_cycle():
     assert not protector.is_in_cooldown()
 
 
-def test_camera_stream_is_muted_while_closed():
+def test_motion_channel_is_muted_while_closed():
     protector = _Protector(cooldown=10)
     protector._on_motion_detect(_motion(T0))
-    assert protector.camera.suspended
+    assert protector.camera.muted == {"camera.motion"}
     protector.clock = T0 + _seconds(60)
     protector.open()
-    assert not protector.camera.suspended
+    assert protector.camera.muted == set()
     assert protector.is_in_cooldown()
 
 

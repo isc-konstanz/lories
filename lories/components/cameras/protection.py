@@ -8,13 +8,14 @@ lories.components.cameras.protection
 from __future__ import annotations
 
 from threading import Timer
-from typing import Optional
+from typing import Optional, Tuple
 
 import pandas as pd
 from lories.components.cameras._core import _Camera, _CameraProtector
 from lories.connectors.cameras.camera import CameraConnector
 from lories.core import Configurations, ResourceError
 from lories.core.configs.parameters import DurationParameter
+from lories.data import Channel
 
 
 class CameraProtector(_CameraProtector):
@@ -22,9 +23,9 @@ class CameraProtector(_CameraProtector):
     Closes a shutter in front of the camera on motion and re-opens it after ``delay``.
 
     The camera sees the shutter it drives, so the cycle has to be blind to its own
-    movement: the camera stream is muted while the shutter is closed (no frames are
-    published, so the motion detector never sees the shutter), and ``cooldown`` starts
-    when the shutter opens, covering the opening movement.
+    movement: the motion channel is muted while the shutter is closed (the live stream
+    stays up, but no frames reach the motion detector or its listener), and ``cooldown``
+    starts when the shutter opens, covering the opening movement.
     """
 
     _delay = DurationParameter(
@@ -80,7 +81,7 @@ class CameraProtector(_CameraProtector):
             self._timer.daemon = True
             self._timer.start()
 
-        self._suspend_camera()
+        self._mute_motion()
         state = self.data.get(CameraProtector.STATE)
         state.value = True
         state.write(True)
@@ -90,31 +91,37 @@ class CameraProtector(_CameraProtector):
         self._timer = None
         # Arm before the shutter starts moving; the motion listener runs on another thread.
         self._cooldown_until = self._now() + self.cooldown
-        self._resume_camera()
+        self._unmute_motion()
         state = self.data.get(CameraProtector.STATE)
         state.value = False
         state.write(False)
         self._logger.info(f"Opened camera protection '{self.id}'")
 
-    def _camera_connector(self) -> Optional[CameraConnector]:
+    def _motion_stream(self) -> Optional[Tuple[CameraConnector, Channel]]:
+        """The camera connector streaming the motion channel, with that channel."""
         camera = self.context
         if _Camera.MOTION not in camera.data:
             return None
-        connector = camera.data.get(_Camera.MOTION).connector
+        channel = camera.data.get(_Camera.MOTION)
+        connector = channel.connector
         if connector is None or not connector.enabled:
             return None
         connector = connector._connector
-        return connector if isinstance(connector, CameraConnector) else None
+        if not isinstance(connector, CameraConnector):
+            return None
+        return connector, channel
 
-    def _suspend_camera(self) -> None:
-        connector = self._camera_connector()
-        if connector is not None:
-            connector.suspend()
+    def _mute_motion(self) -> None:
+        stream = self._motion_stream()
+        if stream is not None:
+            connector, channel = stream
+            connector.mute(channel)
 
-    def _resume_camera(self) -> None:
-        connector = self._camera_connector()
-        if connector is not None:
-            connector.resume()
+    def _unmute_motion(self) -> None:
+        stream = self._motion_stream()
+        if stream is not None:
+            connector, channel = stream
+            connector.unmute(channel)
 
     def is_closed(self) -> bool:
         state = self.data.get(CameraProtector.STATE)

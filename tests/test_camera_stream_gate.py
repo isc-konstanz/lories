@@ -3,21 +3,20 @@
 tests.test_camera_stream_gate
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A suspended camera stream keeps draining frames but publishes none, so no
-processor or listener runs; the connector forwards the flag to its stream and
-tolerates having none.
+A muted channel stops receiving stream frames, so its processors and listeners
+idle while the other channels of the same stream stay live; the connector
+forwards the mute to its stream and tolerates having none.
 """
 
 from __future__ import annotations
-
-from threading import Event
 
 from lories.connectors.cameras.camera import CameraConnector
 from lories.connectors.cameras.stream import CameraStream
 
 
 class _FakeChannel:
-    def __init__(self) -> None:
+    def __init__(self, id: str) -> None:
+        self.id = id
         self.values = []
 
     @property
@@ -32,32 +31,35 @@ class _FakeChannel:
 def _stream() -> CameraStream:
     # __init__ spawns a Manager process and allocates shared memory the gate never touches.
     stream = object.__new__(CameraStream)
-    stream._suspended = Event()
+    stream._muted = frozenset()
     return stream
 
 
-def test_suspended_stream_drains_without_publishing():
+def test_muted_channel_idles_while_siblings_stay_live():
     stream = _stream()
-    channels = [_FakeChannel(), _FakeChannel()]
-    assert stream._publish(channels, b"one")
-    stream.suspend()
-    assert stream.is_suspended()
-    assert not stream._publish(channels, b"two")
-    stream.resume()
-    assert not stream.is_suspended()
-    assert stream._publish(channels, b"three")
-    assert all(channel.values == [b"one", b"three"] for channel in channels)
+    live = _FakeChannel("camera.stream")
+    motion = _FakeChannel("camera.motion")
+    assert stream._publish([live, motion], b"one") == 2
+
+    stream.mute(motion)
+    assert stream.is_muted(motion) and not stream.is_muted(live)
+    assert stream._publish([live, motion], b"two") == 1
+
+    stream.unmute("camera.motion")
+    assert stream._publish([live, motion], b"three") == 2
+    assert live.values == [b"one", b"two", b"three"]
+    assert motion.values == [b"one", b"three"]
 
 
 class _FakeStream:
     def __init__(self) -> None:
         self.calls = []
 
-    def suspend(self) -> None:
-        self.calls.append("suspend")
+    def mute(self, *channels) -> None:
+        self.calls.append(("mute", set(channels)))
 
-    def resume(self) -> None:
-        self.calls.append("resume")
+    def unmute(self, *channels) -> None:
+        self.calls.append(("unmute", set(channels)))
 
 
 class _Connector(CameraConnector):
@@ -67,12 +69,12 @@ class _Connector(CameraConnector):
 
 def test_connector_forwards_to_its_stream_and_tolerates_none():
     connector = object.__new__(_Connector)
-    connector.suspend()
-    assert connector.is_suspended()
+    connector.mute("camera.motion")
+    assert connector.is_muted("camera.motion")
 
     stream = _FakeStream()
     connector._stream = stream
-    connector.resume()
-    assert not connector.is_suspended()
-    connector.suspend()
-    assert stream.calls == ["resume", "suspend"]
+    connector.unmute("camera.motion")
+    assert not connector.is_muted("camera.motion")
+    connector.mute("camera.motion")
+    assert stream.calls == [("unmute", {"camera.motion"}), ("mute", {"camera.motion"})]
