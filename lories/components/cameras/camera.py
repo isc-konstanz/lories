@@ -67,7 +67,8 @@ class Camera(_Camera):
 
     def is_muted(self) -> bool:
         """
-        Whether the protection shutter is closed. Stream channels derived from the camera are muted
-        automatically; consumers that poll frames on their own schedule should check this and skip.
+        Whether the protection is active: the shutter is closed or its cooldown is still running.
+        Stream channels derived from the camera are muted automatically for that whole span;
+        consumers that poll frames on their own schedule should check this and skip.
         """
-        return self.has_protection() and self.protection.is_closed()
+        return self.has_protection() and (self.protection.is_closed() or self.protection.is_in_cooldown())

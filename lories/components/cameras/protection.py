@@ -25,9 +25,9 @@ class CameraProtector(_CameraProtector):
 
     The camera sees the shutter it drives, so the cycle has to be blind to its own
     movement: every stream channel derived from the camera (all but the raw ``stream``
-    view channel) is muted while the shutter is closed, so no frames reach the motion
-    detector or any other consumer, and ``cooldown`` starts when the shutter opens,
-    covering the opening movement.
+    view channel) is muted while the shutter is closed and until the ``cooldown`` after
+    it opens has passed, so no frames of the shutter reach the motion detector or any
+    other consumer.
     """
 
     _delay = DurationParameter(
@@ -42,6 +42,7 @@ class CameraProtector(_CameraProtector):
     )
 
     _timer: Optional[Timer] = None
+    _unmute_timer: Optional[Timer] = None
     delay: pd.Timedelta
     cooldown: pd.Timedelta
     _cooldown_until: pd.Timestamp = pd.NaT
@@ -83,9 +84,15 @@ class CameraProtector(_CameraProtector):
             self._timer.daemon = True
             self._timer.start()
 
-        self._mute_consumers()
+        if self._unmute_timer is not None:
+            # A trigger during the cooldown must not let the pending unmute fire while closed.
+            self._unmute_timer.cancel()
+            self._unmute_timer = None
+
+        # State first: a concurrently running unmute re-checks it after unmuting.
         state = self.data.get(CameraProtector.STATE)
         state.value = True
+        self._mute_consumers()
         state.write(True)
         self._logger.info(f"Closed camera protection '{self.id}'")
 
@@ -93,11 +100,19 @@ class CameraProtector(_CameraProtector):
         self._timer = None
         # Arm before the shutter starts moving; the motion listener runs on another thread.
         self._cooldown_until = self._now() + self.cooldown
-        self._unmute_consumers()
         state = self.data.get(CameraProtector.STATE)
         state.value = False
         state.write(False)
         self._logger.info(f"Opened camera protection '{self.id}'")
+
+        # Consumers stay muted until the cooldown ends, so none of them sees the shutter opening.
+        cooldown = self.cooldown.total_seconds()
+        if cooldown > 0:
+            self._unmute_timer = Timer(cooldown, self._unmute_consumers)
+            self._unmute_timer.daemon = True
+            self._unmute_timer.start()
+        else:
+            self._unmute_consumers()
 
     @staticmethod
     def _is_consumer(channel: Channel) -> bool:
@@ -123,8 +138,14 @@ class CameraProtector(_CameraProtector):
             connector.mute(channel)
 
     def _unmute_consumers(self) -> None:
+        self._unmute_timer = None
+        if self.is_closed():
+            return
         for connector, channel in self._consumer_streams():
             connector.unmute(channel)
+        if self.is_closed():
+            # A close() slipped in between the check and the unmute; it set its state before muting.
+            self._mute_consumers()
 
     def is_closed(self) -> bool:
         state = self.data.get(CameraProtector.STATE)
