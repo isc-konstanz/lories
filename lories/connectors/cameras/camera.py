@@ -18,6 +18,7 @@ from lories.util import to_bool
 # noinspection PyAbstractClass
 class CameraConnector(_CameraConnector):
     _stream: Optional[CameraStream] = None
+    _suspended: bool = False
     __stream_lock: bool = False
     __streaming: bool = False
 
@@ -46,6 +47,20 @@ class CameraConnector(_CameraConnector):
             return self._stream is not None and not self._stream.is_failed()
         return True
 
+    def is_suspended(self) -> bool:
+        return self._suspended
+
+    def suspend(self) -> None:
+        """Mute the stream: frames are still drained but no channel is updated until :meth:`resume`."""
+        self._suspended = True
+        if self._stream is not None:
+            self._stream.suspend()
+
+    def resume(self) -> None:
+        self._suspended = False
+        if self._stream is not None:
+            self._stream.resume()
+
     # noinspection PyMethodMayBeStatic
     def _is_streaming(self, channel: Channel) -> bool:
         return to_bool(channel.get("stream", default=False)) or to_bool(channel.get("listener", default=False))
@@ -71,6 +86,8 @@ class CameraConnector(_CameraConnector):
         if self.__streaming:
             self._stream = CameraStream(self, stream_channels, stream_configs)
             self._stream.configure(stream_configs)
+            if self._suspended:
+                self._stream.suspend()
             self._stream.start()
 
     def disconnect(self) -> None:

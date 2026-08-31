@@ -45,6 +45,19 @@ class _FakeData:
         return self._state
 
 
+class _FakeCamera:
+    """The slice of the camera connector the protector drives: the stream mute."""
+
+    def __init__(self) -> None:
+        self.suspended = False
+
+    def suspend(self) -> None:
+        self.suspended = True
+
+    def resume(self) -> None:
+        self.suspended = False
+
+
 class _Protector(CameraProtector):
     """A ``CameraProtector`` without the component plumbing the cycle never touches, on a manual clock."""
 
@@ -57,11 +70,15 @@ class _Protector(CameraProtector):
         self.cooldown = _seconds(cooldown)
         self.clock = T0
         self.shutter = _FakeState()
+        self.camera = _FakeCamera()
         self._fake_data = _FakeData(self.shutter)
 
     @property
     def data(self):
         return self._fake_data
+
+    def _camera_connector(self):
+        return self.camera
 
     def _now(self) -> pd.Timestamp:
         return self.clock
@@ -118,3 +135,21 @@ def test_trigger_runs_the_same_cycle():
     assert protector.is_in_cooldown()
     protector.clock = T0 + _seconds(15)
     assert not protector.is_in_cooldown()
+
+
+def test_camera_stream_is_muted_while_closed():
+    protector = _Protector(cooldown=10)
+    protector._on_motion_detect(_motion(T0))
+    assert protector.camera.suspended
+    protector.clock = T0 + _seconds(60)
+    protector.open()
+    assert not protector.camera.suspended
+    assert protector.is_in_cooldown()
+
+
+def test_cycle_runs_without_a_camera_connector():
+    protector = _Protector()
+    protector.camera = None
+    protector._on_motion_detect(_motion(T0))
+    protector.open()
+    assert protector.shutter.writes == [True, False]

@@ -12,6 +12,7 @@ from typing import Optional
 
 import pandas as pd
 from lories.components.cameras._core import _Camera, _CameraProtector
+from lories.connectors.cameras.camera import CameraConnector
 from lories.core import Configurations, ResourceError
 from lories.core.configs.parameters import DurationParameter
 
@@ -21,8 +22,9 @@ class CameraProtector(_CameraProtector):
     Closes a shutter in front of the camera on motion and re-opens it after ``delay``.
 
     The camera sees the shutter it drives, so the cycle has to be blind to its own
-    movement: motion while the shutter is closed is ignored, and ``cooldown`` starts
-    when the shutter opens, covering the opening movement and the scene reacquisition.
+    movement: the camera stream is muted while the shutter is closed (no frames are
+    published, so the motion detector never sees the shutter), and ``cooldown`` starts
+    when the shutter opens, covering the opening movement.
     """
 
     _delay = DurationParameter(
@@ -78,6 +80,7 @@ class CameraProtector(_CameraProtector):
             self._timer.daemon = True
             self._timer.start()
 
+        self._suspend_camera()
         state = self.data.get(CameraProtector.STATE)
         state.value = True
         state.write(True)
@@ -87,10 +90,31 @@ class CameraProtector(_CameraProtector):
         self._timer = None
         # Arm before the shutter starts moving; the motion listener runs on another thread.
         self._cooldown_until = self._now() + self.cooldown
+        self._resume_camera()
         state = self.data.get(CameraProtector.STATE)
         state.value = False
         state.write(False)
         self._logger.info(f"Opened camera protection '{self.id}'")
+
+    def _camera_connector(self) -> Optional[CameraConnector]:
+        camera = self.context
+        if _Camera.MOTION not in camera.data:
+            return None
+        connector = camera.data.get(_Camera.MOTION).connector
+        if connector is None or not connector.enabled:
+            return None
+        connector = connector._connector
+        return connector if isinstance(connector, CameraConnector) else None
+
+    def _suspend_camera(self) -> None:
+        connector = self._camera_connector()
+        if connector is not None:
+            connector.suspend()
+
+    def _resume_camera(self) -> None:
+        connector = self._camera_connector()
+        if connector is not None:
+            connector.resume()
 
     def is_closed(self) -> bool:
         state = self.data.get(CameraProtector.STATE)

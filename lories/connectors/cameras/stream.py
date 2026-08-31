@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from multiprocessing.shared_memory import SharedMemory
 from multiprocessing.synchronize import Event as EventType
-from threading import Thread
+from threading import Event, Thread
 from time import sleep, time
 
 from lories.connectors.cameras._core import _CameraConnector as CameraConnector
@@ -32,6 +32,7 @@ class CameraStream(Configurator, Thread):
 
     _memory: SharedMemory
     _buffer: memoryview
+    _suspended: Event
 
     # noinspection PyProtectedMember
     def __init__(
@@ -49,6 +50,7 @@ class CameraStream(Configurator, Thread):
         self.__interrupt = _manager.Event()
         self.__trigger = _manager.Event()
         self.__failed = False
+        self._suspended = Event()
         # Frames the subprocess has written to shared memory. Compared against
         # the main thread's local consumed counter to surface the drop rate.
         self.__produced = _manager.Value("i", 0)
@@ -64,6 +66,23 @@ class CameraStream(Configurator, Thread):
 
     def is_failed(self) -> bool:
         return self.__failed
+
+    def is_suspended(self) -> bool:
+        return self._suspended.is_set()
+
+    def suspend(self) -> None:
+        """Keep draining frames but publish none, so no processor or listener runs."""
+        self._suspended.set()
+
+    def resume(self) -> None:
+        self._suspended.clear()
+
+    def _publish(self, channels: Channels, data: bytes) -> bool:
+        if self._suspended.is_set():
+            return False
+        for channel in channels:
+            channel.value = data
+        return True
 
     # noinspection PyProtectedMember
     def start(self):
@@ -125,8 +144,7 @@ class CameraStream(Configurator, Thread):
                     continue
                 length = int.from_bytes(self._buffer[0:4], "little")
                 data = bytes(self._buffer[4 : 4 + length])
-                for channel in channels:
-                    channel.value = data
+                self._publish(channels, data)
                 self.__trigger.clear()
                 consumed += 1
 
