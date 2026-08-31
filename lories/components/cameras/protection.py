@@ -8,7 +8,7 @@ lories.components.cameras.protection
 from __future__ import annotations
 
 from threading import Timer
-from typing import Optional, Tuple
+from typing import Optional, Sequence, Tuple
 
 import pandas as pd
 from lories.components.cameras._core import _Camera, _CameraProtector
@@ -16,6 +16,7 @@ from lories.connectors.cameras.camera import CameraConnector
 from lories.core import Configurations, ResourceError
 from lories.core.configs.parameters import DurationParameter
 from lories.data import Channel
+from lories.util import to_bool
 
 
 class CameraProtector(_CameraProtector):
@@ -23,9 +24,10 @@ class CameraProtector(_CameraProtector):
     Closes a shutter in front of the camera on motion and re-opens it after ``delay``.
 
     The camera sees the shutter it drives, so the cycle has to be blind to its own
-    movement: the motion channel is muted while the shutter is closed (the live stream
-    stays up, but no frames reach the motion detector or its listener), and ``cooldown``
-    starts when the shutter opens, covering the opening movement.
+    movement: every stream channel derived from the camera (all but the raw ``stream``
+    view channel) is muted while the shutter is closed, so no frames reach the motion
+    detector or any other consumer, and ``cooldown`` starts when the shutter opens,
+    covering the opening movement.
     """
 
     _delay = DurationParameter(
@@ -81,7 +83,7 @@ class CameraProtector(_CameraProtector):
             self._timer.daemon = True
             self._timer.start()
 
-        self._mute_motion()
+        self._mute_consumers()
         state = self.data.get(CameraProtector.STATE)
         state.value = True
         state.write(True)
@@ -91,36 +93,37 @@ class CameraProtector(_CameraProtector):
         self._timer = None
         # Arm before the shutter starts moving; the motion listener runs on another thread.
         self._cooldown_until = self._now() + self.cooldown
-        self._unmute_motion()
+        self._unmute_consumers()
         state = self.data.get(CameraProtector.STATE)
         state.value = False
         state.write(False)
         self._logger.info(f"Opened camera protection '{self.id}'")
 
-    def _motion_stream(self) -> Optional[Tuple[CameraConnector, Channel]]:
-        """The camera connector streaming the motion channel, with that channel."""
-        camera = self.context
-        if _Camera.MOTION not in camera.data:
-            return None
-        channel = camera.data.get(_Camera.MOTION)
-        connector = channel.connector
-        if connector is None or not connector.enabled:
-            return None
-        connector = connector._connector
-        if not isinstance(connector, CameraConnector):
-            return None
-        return connector, channel
+    @staticmethod
+    def _is_consumer(channel: Channel) -> bool:
+        # The raw view channel stays live; everything else streamed off the camera is a consumer.
+        return to_bool(channel.get("stream", default=False)) and channel.key != _Camera.STREAM
 
-    def _mute_motion(self) -> None:
-        stream = self._motion_stream()
-        if stream is not None:
-            connector, channel = stream
+    def _consumer_streams(self) -> Sequence[Tuple[CameraConnector, Channel]]:
+        """The camera's derived stream channels, each with the connector streaming it."""
+        streams = []
+        for channel in self.context.data:
+            if not self._is_consumer(channel):
+                continue
+            connector = channel.connector
+            if connector is None or not connector.enabled:
+                continue
+            connector = connector._connector
+            if isinstance(connector, CameraConnector):
+                streams.append((connector, channel))
+        return streams
+
+    def _mute_consumers(self) -> None:
+        for connector, channel in self._consumer_streams():
             connector.mute(channel)
 
-    def _unmute_motion(self) -> None:
-        stream = self._motion_stream()
-        if stream is not None:
-            connector, channel = stream
+    def _unmute_consumers(self) -> None:
+        for connector, channel in self._consumer_streams():
             connector.unmute(channel)
 
     def is_closed(self) -> bool:

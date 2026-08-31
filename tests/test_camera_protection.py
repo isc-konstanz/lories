@@ -15,6 +15,7 @@ import logging
 from types import SimpleNamespace
 
 import pandas as pd
+from lories.components.cameras.camera import Camera
 from lories.components.cameras.protection import CameraProtector
 
 T0 = pd.Timestamp("2026-01-01T12:00:00Z")
@@ -47,6 +48,7 @@ class _FakeData:
 
 
 _MOTION = SimpleNamespace(id="camera.motion")
+_APPLES = SimpleNamespace(id="camera.apples")
 
 
 class _FakeCamera:
@@ -81,8 +83,8 @@ class _Protector(CameraProtector):
     def data(self):
         return self._fake_data
 
-    def _motion_stream(self):
-        return (self.camera, _MOTION) if self.camera is not None else None
+    def _consumer_streams(self):
+        return [(self.camera, _MOTION), (self.camera, _APPLES)] if self.camera is not None else []
 
     def _now(self) -> pd.Timestamp:
         return self.clock
@@ -141,10 +143,10 @@ def test_trigger_runs_the_same_cycle():
     assert not protector.is_in_cooldown()
 
 
-def test_motion_channel_is_muted_while_closed():
+def test_consumer_channels_are_muted_while_closed():
     protector = _Protector(cooldown=10)
     protector._on_motion_detect(_motion(T0))
-    assert protector.camera.muted == {"camera.motion"}
+    assert protector.camera.muted == {"camera.motion", "camera.apples"}
     protector.clock = T0 + _seconds(60)
     protector.open()
     assert protector.camera.muted == set()
@@ -157,3 +159,24 @@ def test_cycle_runs_without_a_camera_connector():
     protector._on_motion_detect(_motion(T0))
     protector.open()
     assert protector.shutter.writes == [True, False]
+
+
+def _channel(key: str, stream: bool) -> SimpleNamespace:
+    return SimpleNamespace(key=key, get=lambda attr, default=None: stream if attr == "stream" else default)
+
+
+def test_consumers_are_all_stream_channels_but_the_raw_view():
+    assert CameraProtector._is_consumer(_channel("motion", True))
+    assert CameraProtector._is_consumer(_channel("apples", True))
+    assert not CameraProtector._is_consumer(_channel("stream", True))
+    assert not CameraProtector._is_consumer(_channel("frame", False))
+
+
+def test_camera_is_muted_while_its_protection_is_closed():
+    camera = object.__new__(Camera)
+    camera.protection = SimpleNamespace(is_enabled=lambda: True, is_closed=lambda: True)
+    assert camera.is_muted()
+    camera.protection.is_closed = lambda: False
+    assert not camera.is_muted()
+    camera.protection = None
+    assert not camera.is_muted()
