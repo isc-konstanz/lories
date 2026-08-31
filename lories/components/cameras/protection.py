@@ -17,6 +17,14 @@ from lories.core.configs.parameters import DurationParameter
 
 
 class CameraProtector(_CameraProtector):
+    """
+    Closes a shutter in front of the camera on motion and re-opens it after ``delay``.
+
+    The camera sees the shutter it drives, so the cycle has to be blind to its own
+    movement: motion while the shutter is closed is ignored, and ``cooldown`` starts
+    when the shutter opens, covering the opening movement and the scene reacquisition.
+    """
+
     _delay = DurationParameter(
         key="delay",
         default="10min",
@@ -25,8 +33,7 @@ class CameraProtector(_CameraProtector):
     _cooldown = DurationParameter(
         key="cooldown",
         default="30s",
-        # Covers the shutter movement during which the camera sees itself.
-        desc="Window after a close where motion is ignored before it can re-trigger",
+        desc="Window after the shutter opens where motion is ignored, covering the shutter movement",
     )
 
     _timer: Optional[Timer] = None
@@ -58,6 +65,10 @@ class CameraProtector(_CameraProtector):
         camera.data.register(self._on_motion_detect, _Camera.MOTION, how="any", unique=False)
         self.data.get(CameraProtector.STATE).value = False
 
+    @staticmethod
+    def _now() -> pd.Timestamp:
+        return pd.Timestamp.now(tz="UTC")
+
     def close(self, delay: Optional[pd.Timedelta] = None) -> None:
         if delay is not None and delay.total_seconds() > 0:
             if self._timer is not None:
@@ -74,26 +85,36 @@ class CameraProtector(_CameraProtector):
 
     def open(self) -> None:
         self._timer = None
+        # Arm before the shutter starts moving; the motion listener runs on another thread.
+        self._cooldown_until = self._now() + self.cooldown
         state = self.data.get(CameraProtector.STATE)
         state.value = False
         state.write(False)
         self._logger.info(f"Opened camera protection '{self.id}'")
 
-    def is_in_cooldown(self) -> bool:
-        return pd.notna(self._cooldown_until) and pd.Timestamp.now(tz="UTC") < self._cooldown_until
+    def is_closed(self) -> bool:
+        state = self.data.get(CameraProtector.STATE)
+        return state.is_valid() and bool(state.value)
+
+    def is_in_cooldown(self, now: Optional[pd.Timestamp] = None) -> bool:
+        if now is None:
+            now = self._now()
+        return pd.notna(self._cooldown_until) and now < self._cooldown_until
 
     def trigger(self) -> None:
         """Manually run the protection cycle: close now, auto-open after ``delay``."""
-        self._cooldown_until = pd.Timestamp.now(tz="UTC") + self.cooldown
         self.close(delay=self.delay)
 
     def _on_motion_detect(self, data: pd.DataFrame) -> None:
         # The motion processor returns SKIP on no-motion frames, so this listener
         # only fires when an actual detection lands on the channel.
         now = data.index[-1]
-        if pd.notna(self._cooldown_until) and now < self._cooldown_until:
+        if self.is_closed():
+            # The camera only sees the shutter while closed; re-closing would restart the delay.
+            self._logger.debug(f"Motion ignored, '{self.id}' is closed")
+            return
+        if self.is_in_cooldown(now):
             remaining = (self._cooldown_until - now).total_seconds()
             self._logger.info(f"Motion ignored, '{self.id}' cooldown active for another {remaining:.1f}s")
             return
-        self._cooldown_until = now + self.cooldown
         self.close(delay=self.delay)
