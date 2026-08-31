@@ -11,12 +11,13 @@ from multiprocessing.shared_memory import SharedMemory
 from multiprocessing.synchronize import Event as EventType
 from threading import Thread
 from time import sleep, time
+from typing import FrozenSet, Iterable
 
 from lories.connectors.cameras._core import _CameraConnector as CameraConnector
 from lories.connectors.errors import ConnectorError
 from lories.connectors.tasks.process import ProcessContext
 from lories.core import Configurations, Configurator, ResourceUnavailableError
-from lories.data import Channels
+from lories.data import Channel, Channels
 
 
 class CameraStream(Configurator, Thread):
@@ -32,6 +33,7 @@ class CameraStream(Configurator, Thread):
 
     _memory: SharedMemory
     _buffer: memoryview
+    _muted: FrozenSet[str]
 
     # noinspection PyProtectedMember
     def __init__(
@@ -49,6 +51,7 @@ class CameraStream(Configurator, Thread):
         self.__interrupt = _manager.Event()
         self.__trigger = _manager.Event()
         self.__failed = False
+        self._muted = frozenset()
         # Frames the subprocess has written to shared memory. Compared against
         # the main thread's local consumed counter to surface the drop rate.
         self.__produced = _manager.Value("i", 0)
@@ -64,6 +67,29 @@ class CameraStream(Configurator, Thread):
 
     def is_failed(self) -> bool:
         return self.__failed
+
+    @staticmethod
+    def _ids(channels: Iterable[Channel | str]) -> FrozenSet[str]:
+        return frozenset(channel if isinstance(channel, str) else channel.id for channel in channels)
+
+    def is_muted(self, channel: Channel | str) -> bool:
+        return (channel if isinstance(channel, str) else channel.id) in self._muted
+
+    def mute(self, *channels: Channel | str) -> None:
+        """Stop publishing frames to these channels, so their processors and listeners idle; the rest stay live."""
+        self._muted = self._muted | self._ids(channels)
+
+    def unmute(self, *channels: Channel | str) -> None:
+        self._muted = self._muted - self._ids(channels)
+
+    def _publish(self, channels: Channels, data: bytes) -> int:
+        published = 0
+        for channel in channels:
+            if channel.id in self._muted:
+                continue
+            channel.value = data
+            published += 1
+        return published
 
     # noinspection PyProtectedMember
     def start(self):
@@ -125,8 +151,7 @@ class CameraStream(Configurator, Thread):
                     continue
                 length = int.from_bytes(self._buffer[0:4], "little")
                 data = bytes(self._buffer[4 : 4 + length])
-                for channel in channels:
-                    channel.value = data
+                self._publish(channels, data)
                 self.__trigger.clear()
                 consumed += 1
 
