@@ -13,7 +13,7 @@ from lories.components import register_component_type
 from lories.components.cameras._core import _Camera
 from lories.components.cameras.protection import CameraProtector
 from lories.core import Configurations
-from lories.core.configs.parameters import BoolParameter, ParameterGroup
+from lories.core.configs.parameters import BoolParameter, IntParameter, ParameterGroup
 
 
 # noinspection SpellCheckingInspection
@@ -32,6 +32,12 @@ class Camera(_Camera):
         default=False,
         desc="Render the live preview in the dashboard",
     )
+    _min_size = IntParameter(
+        key="min_size",
+        default=0,
+        min=0,
+        desc="Skip captured frames smaller than this many bytes (0 disables)",
+    )
 
     preview: bool = False
     protection: Optional[CameraProtector] = None
@@ -48,7 +54,10 @@ class Camera(_Camera):
 
         channels = self._channels
 
-        self.data.add(Camera.FRAME, aggregate="last")
+        frame_configs = {}
+        if self._min_size > 0:
+            frame_configs["processors"] = {"size": {"processor": "size", "min_size": self._min_size}}
+        self.data.add(Camera.FRAME, aggregate="last", **frame_configs)
 
         if channels.get("stream", False):
             self.data.add(Camera.STREAM, aggregate="last", freq=None, stream=True)
