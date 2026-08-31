@@ -183,6 +183,8 @@ def _stream(
     memory_name: str,
     produced,
     fps: int = 30,
+    retries: int = 3,
+    retry_backoff: float = 2.0,
 ) -> None:
     camera.connect(channels)
 
@@ -193,6 +195,7 @@ def _stream(
 
     memory = SharedMemory(name=memory_name)
     buffer = memory.buf
+    failures = 0
     try:
         while not interrupt.is_set():
             now = time()
@@ -200,7 +203,31 @@ def _stream(
                 interrupt.set()
                 return
 
-            payload = camera.read_frame(source)
+            try:
+                payload = camera.read_frame(source)
+                failures = 0
+            except ConnectorError as e:
+                # Transient RTSP corruption (packet loss, h264 decode errors)
+                # surfaces as a single failed grab/retrieve. Reopen the capture
+                # in place instead of dying: a dead subprocess costs a full
+                # ProcessContext respawn plus the framework reconnect interval.
+                # A camera that stays unreachable exhausts the retry budget and
+                # still fails through to the framework's reconnect handling.
+                failures += 1
+                if failures > retries:
+                    raise
+                camera._logger.warning(f"stream read failed ({failures}/{retries}), reopening capture: {e}")
+                camera.disconnect()
+                if interrupt.wait(retry_backoff):
+                    return
+                try:
+                    camera.connect(channels)
+                except ConnectorError as e:
+                    # The reopen attempt itself failed; the next cycle's read
+                    # raises against the closed capture and advances the counter.
+                    camera._logger.debug(f"stream capture reopen failed: {e}")
+                continue
+
             length = len(payload)
             buffer[0:4] = length.to_bytes(4, "little")
             buffer[4 : 4 + length] = payload
