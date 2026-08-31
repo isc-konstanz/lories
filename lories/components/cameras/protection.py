@@ -92,7 +92,11 @@ class CameraProtector(_CameraProtector):
         # State first: a concurrently running unmute re-checks it after unmuting.
         state = self.data.get(CameraProtector.STATE)
         state.value = True
-        self._mute_consumers()
+        try:
+            self._mute_consumers()
+        except Exception as e:
+            # Muting is secondary; the shutter must close regardless.
+            self._logger.error(f"Failed to mute the consumers of camera protection '{self.id}': {e}", exc_info=True)
         state.write(True)
         self._logger.info(f"Closed camera protection '{self.id}'")
 
@@ -122,9 +126,8 @@ class CameraProtector(_CameraProtector):
     def _consumer_streams(self) -> Sequence[Tuple[CameraConnector, Channel]]:
         """The camera's derived stream channels, each with the connector streaming it."""
         streams = []
-        for channel in self.context.data:
-            if not self._is_consumer(channel):
-                continue
+        # Iterating the data access yields channel ids; filter() yields the channels.
+        for channel in self.context.data.filter(self._is_consumer):
             connector = channel.connector
             if connector is None or not connector.enabled:
                 continue
@@ -147,14 +150,18 @@ class CameraProtector(_CameraProtector):
         self._unmute_timer = None
         if self.is_closed():
             return
-        streams = self._consumer_streams()
-        for connector, channel in streams:
-            connector.unmute(channel)
-        if streams:
-            self._logger.info(f"Unmuted camera consumers, '{self.id}' cooldown over")
-        if self.is_closed():
-            # A close() slipped in between the check and the unmute; it set its state before muting.
-            self._mute_consumers()
+        try:
+            streams = self._consumer_streams()
+            for connector, channel in streams:
+                connector.unmute(channel)
+            if streams:
+                self._logger.info(f"Unmuted camera consumers, '{self.id}' cooldown over")
+            if self.is_closed():
+                # A close() slipped in between the check and the unmute; it set its state before muting.
+                self._mute_consumers()
+        except Exception as e:
+            # Runs on the cooldown timer thread, where an exception would only kill that thread.
+            self._logger.error(f"Failed to unmute the consumers of camera protection '{self.id}': {e}", exc_info=True)
 
     def is_closed(self) -> bool:
         state = self.data.get(CameraProtector.STATE)
