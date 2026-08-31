@@ -198,12 +198,24 @@ def test_zero_cooldown_unmutes_at_open():
     assert protector._unmute_timer is None
 
 
-def test_cycle_runs_without_a_camera_connector():
+def test_cycle_runs_without_a_camera_connector(caplog):
     protector = _Protector(cooldown=0)
     protector.camera = None
-    protector._on_motion_detect(_motion(T0))
-    protector.open()
+    with caplog.at_level(logging.WARNING, logger="lories.components.cameras.protection"):
+        protector._on_motion_detect(_motion(T0))
+        protector.open()
     assert protector.shutter.writes == [True, False]
+    assert "no stream consumers to mute" in caplog.text
+
+
+def test_mute_and_unmute_are_logged(caplog):
+    protector = _Protector(cooldown=0)
+    with caplog.at_level(logging.INFO, logger="lories.components.cameras.protection"):
+        protector.trigger()
+        protector.open()
+    assert "Muted camera consumers" in caplog.text
+    assert "camera.motion" in caplog.text
+    assert "Unmuted camera consumers" in caplog.text
 
 
 def _channel(key: str, stream: bool) -> SimpleNamespace:

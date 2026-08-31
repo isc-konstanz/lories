@@ -134,15 +134,24 @@ class CameraProtector(_CameraProtector):
         return streams
 
     def _mute_consumers(self) -> None:
-        for connector, channel in self._consumer_streams():
+        streams = self._consumer_streams()
+        if not streams:
+            self._logger.warning(f"Found no stream consumers to mute for camera protection '{self.id}'")
+            return
+        for connector, channel in streams:
             connector.mute(channel)
+        muted = [channel.id for _, channel in streams]
+        self._logger.info(f"Muted camera consumers while '{self.id}' is closed: {muted}")
 
     def _unmute_consumers(self) -> None:
         self._unmute_timer = None
         if self.is_closed():
             return
-        for connector, channel in self._consumer_streams():
+        streams = self._consumer_streams()
+        for connector, channel in streams:
             connector.unmute(channel)
+        if streams:
+            self._logger.info(f"Unmuted camera consumers, '{self.id}' cooldown over")
         if self.is_closed():
             # A close() slipped in between the check and the unmute; it set its state before muting.
             self._mute_consumers()
