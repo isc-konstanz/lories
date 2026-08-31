@@ -8,8 +8,6 @@ lories.connectors.sunspec.client
 
 from __future__ import annotations
 
-from contextlib import nullcontext
-from threading import Lock
 from typing import Any, Dict, List, Optional, Tuple
 
 from sunspec2.device import ModelError
@@ -18,10 +16,14 @@ from sunspec2.modbus.client import (
     SunSpecModbusClientDeviceRTU,
     SunSpecModbusClientDeviceTCP,
     SunSpecModbusClientError,
-    SunSpecModbusClientTimeout,
     SunSpecModbusValueError,
 )
-from sunspec2.modbus.modbus import ModbusClientError
+from sunspec2.modbus.modbus import (
+    ModbusClientError,
+    ModbusClientTimeout,
+    modbus_rtu_client,
+    modbus_rtu_client_remove,
+)
 
 import pandas as pd
 import pytz as tz
@@ -30,17 +32,6 @@ from lories.connectors import ConnectionError, Connector, ConnectorError, regist
 from lories.core.configs import ConfigurationError
 from lories.core.configs.parameters import ChannelParameter, Parameter, SelectParameter
 from lories.typing import Configurations, Resource, Resources
-
-# One lock per serial port: pysunspec2 hands every RTU device on the same port the same
-# unsynchronized serial client, and the framework's per-connector lock does not span the
-# connector instances sharing that port.
-_serial_locks: Dict[str, Lock] = {}
-_serial_locks_guard = Lock()
-
-
-def _serial_port_lock(com_port: str) -> Lock:
-    with _serial_locks_guard:
-        return _serial_locks.setdefault(com_port, Lock())
 
 
 @register_connector_type("sunspec")
@@ -51,11 +42,20 @@ class SunSpecClient(Connector):
     models over Modbus TCP or RTU. This connector uses the pysunspec2 reference library to scan
     the device's well-known base addresses for the 'SunS' marker, walk the model chain, and bind
     channels to model points by name instead of raw register addresses. Scale-factor registers
-    are applied automatically and not-implemented points are reported as unavailable. Channels
-    address a value with `model` (numeric id or group name), `point` (name, or a dotted path
-    with 1-based indices into repeating groups, e.g. "module.2.DCW"), and optionally `instance`
-    when a model occurs repeatedly on the device (e.g. multiple meters). Writing a channel
-    writes the corresponding point, which covers the standard control models.
+    are applied automatically and not-implemented points are reported as unavailable.
+
+    One connector owns one transport endpoint: a serial port for `rtu`, a host and port for
+    `tcp`. Several SunSpec devices behind that endpoint are addressed by the per-channel
+    `device` key, the Modbus unit identifier, exactly as the `modbus` connector groups channels
+    by its own `device` key. A channel further addresses a value with `model` (numeric id or
+    group name), `point` (name, or a dotted path with 1-based indices into repeating groups,
+    e.g. "module.2.DCW"), and optionally `instance` when a model occurs repeatedly on that one
+    device (e.g. multiple meters). Writing a channel writes the corresponding point, which
+    covers the standard control models.
+
+    Units are scanned lazily on their first read rather than at connect, and a unit that stops
+    answering is benched for the reconnect interval without disturbing its siblings on the same
+    transport, so an inverter that sleeps overnight cannot stop a meter beside it from logging.
     """
 
     # Shared
@@ -64,14 +64,6 @@ class SunSpecClient(Connector):
         key="protocol",
         required=True,
         desc="Modbus transport protocol (selects tcp/rtu branch)",
-    )
-    _device_id = Parameter(
-        key="device_id",
-        type=int,
-        default=1,
-        min=1,
-        max=247,
-        desc="Modbus unit identifier / slave id of the SunSpec device",
     )
     _timeout = Parameter(key="timeout", type=pd.Timedelta, default="3s", min="1s", desc="Modbus request timeout")
     # TCP
@@ -104,6 +96,11 @@ class SunSpecClient(Connector):
     )
 
     # Per-channel parameters
+    device = ChannelParameter(
+        type=int,
+        required=True,
+        desc="Modbus unit identifier / slave id of the SunSpec device this channel reads from",
+    )
     model = ChannelParameter(
         type=str,
         required=True,
@@ -122,7 +119,6 @@ class SunSpecClient(Connector):
     )
 
     _protocol: str
-    _device_id: int
     _timeout: pd.Timedelta
     _host: str
     _port: int
@@ -130,10 +126,14 @@ class SunSpecClient(Connector):
     _baudrate: int
     _parity: str
 
-    __device: Optional[SunSpecModbusClientDevice] = None
+    # The shared pysunspec2 serial client for _com_port, rtu only. Every RTU device on a port
+    # gets handed this same object, and pysunspec2 requires those requests to be single
+    # threaded, which the connector's own lock provides now that one connector owns the port.
+    __client: Optional[Any] = None
     __healthy: bool = False
-    __points: Dict[str, Any]
-    __models: Dict[str, Any]
+    __devices: Optional[Dict[int, SunSpecModbusClientDevice]] = None
+    __resolved: Optional[Dict[int, Dict[str, Optional[Tuple[Any, Any]]]]] = None
+    __unavailable: Optional[Dict[int, pd.Timestamp]] = None
 
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
@@ -148,43 +148,32 @@ class SunSpecClient(Connector):
             raise ConnectorError(self, f"Unknown sunspec protocol type '{self._protocol}'")
 
     def is_connected(self) -> bool:
-        # The RTU device's own is_connected() is a hardcoded True stub, so a local health
-        # flag (cleared on transport errors) must drive the framework's reconnect gate
-        return self.__device is not None and self.__healthy and self.__device.is_connected()
-
-    def __transport_lock(self):
-        if self._protocol == "rtu":
-            return _serial_port_lock(self._com_port)
-        return nullcontext()
+        # Transport health only. A single unit that stops answering is benched, not reported
+        # here, and the RTU device's own is_connected() is a hardcoded True stub, so a local
+        # flag cleared on transport errors must drive the framework's reconnect gate
+        return self.__healthy
 
     def connect(self, resources: Resources) -> None:
         super().connect(resources)
+        self.__devices = {}
+        self.__resolved = {}
+        self.__unavailable = {}
         try:
-            with self.__transport_lock():
-                if self._protocol == "tcp":
-                    self._logger.info(f"Connecting to SunSpec device {self._host}:{self._port}#{self._device_id}")
-                    self.__device = SunSpecModbusClientDeviceTCP(
-                        slave_id=self._device_id,
-                        ipaddr=self._host,
-                        ipport=self._port,
-                        timeout=self._timeout.total_seconds(),
-                    )
-                else:
-                    self._logger.info(f"Connecting to SunSpec device {self._com_port}#{self._device_id}")
-                    # The RTU device opens the (shared) serial port on construction; its connect() is a no-op
-                    self.__device = SunSpecModbusClientDeviceRTU(
-                        slave_id=self._device_id,
-                        name=self._com_port,
-                        baudrate=self._baudrate,
-                        parity=self._parity,
-                        timeout=self._timeout.total_seconds(),
-                    )
-                self.__device.connect()
-                # scan() would disconnect afterward if it opened the connection itself
-                self.__device.scan(connect=False, full_model_read=True)
+            if self._protocol == "rtu":
+                self._logger.info(f"Opening SunSpec serial transport {self._com_port}")
+                # Opens the port. pysunspec2 keys these clients by port name process-wide and
+                # rejects a mismatched baudrate or parity, so the transport settings stay
+                # connector-level while the unit id lives on the channel.
+                self.__client = modbus_rtu_client(
+                    name=self._com_port,
+                    baudrate=self._baudrate,
+                    parity=self._parity,
+                    timeout=self._timeout.total_seconds(),
+                )
+            else:
+                self._logger.info(f"Using SunSpec gateway {self._host}:{self._port}")
 
         except (SunSpecModbusClientError, ModbusClientError) as e:
-            # A failed connect never reaches disconnect(), so release the transport here
             self.__close()
             raise ConnectionError(self, e)
         except IOError as e:
@@ -192,24 +181,10 @@ class SunSpecClient(Connector):
             raise ConnectorError(self, e)
         self.__healthy = True
 
-        models = sorted(mid for mid in self.__device.models.keys() if isinstance(mid, int))
-        self._logger.info(f"Discovered SunSpec models: {models}")
-        common = self.__device.models.get("common")
-        if common:
-            info = {key: common[0].points[key].cvalue for key in ("Mn", "Md", "SN", "Vr") if key in common[0].points}
-            info = {key: value for key, value in info.items() if value}
-            if info:
-                self._logger.info("SunSpec device identity: " + ", ".join(f"{k}={v}" for k, v in info.items()))
-
-        self.__points = {}
-        self.__models = {}
-        for resource in resources:
-            try:
-                model, point = self._resolve_point(resource)
-                self.__models[resource.id] = model
-                self.__points[resource.id] = point
-            except ConfigurationError as e:
-                self._logger.warning(f"Invalid SunSpec point configuration for resource '{resource.id}': {e}")
+        units = sorted(u for u in {self._resource_device(r) for r in resources} if u is not None)
+        # Scanning is deferred to the first read of each unit, so a device that is asleep at
+        # startup cannot keep the transport, or its siblings, from coming up
+        self._logger.info(f"SunSpec transport connected, units to scan on first read: {units}")
 
     def disconnect(self) -> None:
         super().disconnect()
@@ -217,27 +192,156 @@ class SunSpecClient(Connector):
 
     def __close(self) -> None:
         self.__healthy = False
-        if self.__device is None:
-            return
+        for device_id in list((self.__devices or {}).keys()):
+            self.__close_device(self.__devices.pop(device_id))
+        if self.__resolved is not None:
+            self.__resolved.clear()
+        if self.__unavailable is not None:
+            self.__unavailable.clear()
+
+        if self.__client is not None:
+            try:
+                # Closing every device already dropped the port's last reference, but a
+                # connector that never scanned a unit still holds the client it opened
+                self.__client.close()
+                modbus_rtu_client_remove(self._com_port)
+            except (SunSpecModbusClientError, ModbusClientError, IOError) as e:
+                self._logger.warning(f"Error closing SunSpec serial transport: {e}")
+            finally:
+                self.__client = None
+
+    def __close_device(self, device: SunSpecModbusClientDevice) -> None:
         try:
-            with self.__transport_lock():
-                if self._protocol == "rtu":
-                    # Deregisters from the shared serial client, closing the port with its last device
-                    self.__device.close()
-                else:
-                    self.__device.disconnect()
+            if self._protocol == "rtu":
+                # Deregisters from the shared serial client, closing the port with its last device
+                device.close()
+            else:
+                device.disconnect()
         except (SunSpecModbusClientError, ModbusClientError, IOError) as e:
             self._logger.warning(f"Error closing SunSpec device: {e}")
-        finally:
-            self.__device = None
+
+    # ------------------------------------------------------------------ units
+
+    # noinspection PyMethodMayBeStatic
+    def _resource_device(self, resource: Resource) -> Optional[int]:
+        """Return the Modbus unit id of a resource, or None when it is missing or unusable."""
+        value = resource.get("device")
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    def __device(self, device_id: int) -> Optional[SunSpecModbusClientDevice]:
+        """Return the scanned device for a unit id, scanning it if it is due, else None."""
+        device = self.__devices.get(device_id)
+        if device is not None:
+            return device
+
+        failed_at = self.__unavailable.get(device_id)
+        if failed_at is not None and failed_at + self._interval_reconnect > pd.Timestamp.now(tz.UTC):
+            # Benched: spend no bus time on a unit that is not answering, so its siblings
+            # keep the transport to themselves
+            return None
+
+        try:
+            device = self.__scan(device_id)
+        except SunSpecModbusClientError as e:
+            # scan() swallows the underlying timeout and reports a failed base-address probe,
+            # so a silent unit and a non-SunSpec unit both land here. Neither is a reason to
+            # drop the transport.
+            self._logger.warning(
+                f"SunSpec device {device_id} did not scan, retrying in {self._interval_reconnect}: {e}"
+            )
+            self.__bench(device_id)
+            return None
+        except ModbusClientTimeout as e:
+            self._logger.warning(
+                f"SunSpec device {device_id} timed out scanning, retrying in {self._interval_reconnect}: {e}"
+            )
+            self.__bench(device_id)
+            return None
+
+        self.__unavailable.pop(device_id, None)
+        self.__devices[device_id] = device
+        return device
+
+    def __scan(self, device_id: int) -> SunSpecModbusClientDevice:
+        if self._protocol == "tcp":
+            self._logger.info(f"Scanning SunSpec device {self._host}:{self._port}#{device_id}")
+            device = SunSpecModbusClientDeviceTCP(
+                slave_id=device_id,
+                ipaddr=self._host,
+                ipport=self._port,
+                timeout=self._timeout.total_seconds(),
+            )
+        else:
+            self._logger.info(f"Scanning SunSpec device {self._com_port}#{device_id}")
+            # The RTU device registers itself on the shared serial client for this port on
+            # construction; its connect() is a no-op
+            device = SunSpecModbusClientDeviceRTU(
+                slave_id=device_id,
+                name=self._com_port,
+                baudrate=self._baudrate,
+                parity=self._parity,
+                timeout=self._timeout.total_seconds(),
+            )
+        try:
+            device.connect()
+            # scan() would disconnect afterward if it opened the connection itself
+            device.scan(connect=False, full_model_read=True)
+        except BaseException:
+            # A failed scan never reaches disconnect(), so release the device here. For rtu
+            # this also restores the shared client's reference count.
+            self.__close_device(device)
+            raise
+
+        models = sorted(mid for mid in device.models.keys() if isinstance(mid, int))
+        self._logger.info(f"Discovered SunSpec models on device {device_id}: {models}")
+        common = device.models.get("common")
+        if common:
+            info = {key: common[0].points[key].cvalue for key in ("Mn", "Md", "SN", "Vr") if key in common[0].points}
+            info = {key: value for key, value in info.items() if value}
+            if info:
+                self._logger.info(
+                    f"SunSpec device {device_id} identity: " + ", ".join(f"{k}={v}" for k, v in info.items())
+                )
+        return device
+
+    def __bench(self, device_id: int) -> None:
+        """Drop a unit's cached scan and hold it out of the bus for the reconnect interval."""
+        device = self.__devices.pop(device_id, None)
+        if device is not None:
+            self.__close_device(device)
+        self.__resolved.pop(device_id, None)
+        self.__unavailable[device_id] = pd.Timestamp.now(tz.UTC)
+
+    def __resolve(
+        self,
+        device_id: int,
+        device: SunSpecModbusClientDevice,
+        resource: Resource,
+    ) -> Optional[Tuple[Any, Any]]:
+        """Resolve a resource to its (model, point) on an already scanned device, cached."""
+        resolved = self.__resolved.setdefault(device_id, {})
+        if resource.id in resolved:
+            return resolved[resource.id]
+        try:
+            model_point = self._resolve_point(device, resource)
+        except ConfigurationError as e:
+            self._logger.warning(f"Invalid SunSpec point configuration for resource '{resource.id}': {e}")
+            model_point = None
+        resolved[resource.id] = model_point
+        return model_point
 
     # noinspection PyShadowingBuiltins
-    def _resolve_point(self, resource: Resource) -> Tuple[Any, Any]:
+    def _resolve_point(self, device: SunSpecModbusClientDevice, resource: Resource) -> Tuple[Any, Any]:
         model_key = resource.get("model")
         key = str(model_key).strip()
         if key.isdigit():
             key = int(key)
-        models = self.__device.models
+        models = device.models
         if key not in models:
             discovered = sorted(mid for mid in models.keys() if isinstance(mid, int))
             raise ConfigurationError(f"SunSpec model '{model_key}' not present on device (discovered: {discovered})")
@@ -278,83 +382,162 @@ class SunSpecClient(Connector):
             raise ConfigurationError(f"SunSpec point '{path}' not found in model '{model_key}'")
         return model, point
 
+    # ------------------------------------------------------------------ read / write
+
     def read(self, resources: Resources) -> pd.DataFrame:
         timestamp = pd.Timestamp.now(tz.UTC).floor(freq="s")
         data = pd.DataFrame(index=[timestamp], columns=resources.ids)
         try:
-            blocks: Dict[int, Tuple[Any, List[Resource]]] = {}
-            for resource in resources:
-                model = self.__models.get(resource.id)
-                if model is None:
-                    data.at[timestamp, resource.id] = ChannelState.NOT_AVAILABLE
-                    continue
-                blocks.setdefault(id(model), (model, []))[1].append(resource)
-
-            for model, block_resources in blocks.values():
-                try:
-                    # One block read per model keeps values and their scale factors consistent
-                    with self.__transport_lock():
-                        model.read()
-                except (SunSpecModbusClientTimeout, ModbusClientError):
-                    raise
-                except SunSpecModbusClientError as e:
-                    self._logger.warning(f"Error reading SunSpec model block: {e}")
-                    for resource in block_resources:
-                        data.at[timestamp, resource.id] = ChannelState.UNKNOWN_ERROR
+            for device_id, unit_resources in resources.groupby(self._resource_device):
+                if device_id is None:
+                    for resource in unit_resources:
+                        self._logger.warning(
+                            f"Missing or invalid SunSpec channel config key 'device' for resource '{resource.id}'"
+                        )
+                        data.at[timestamp, resource.id] = ChannelState.ARGUMENT_SYNTAX_ERROR
                     continue
 
-                for resource in block_resources:
-                    try:
-                        value = self.__points[resource.id].cvalue
-                    except ModelError as e:
-                        self._logger.warning(f"Error resolving SunSpec value for '{resource.id}': {e}")
-                        data.at[timestamp, resource.id] = ChannelState.UNKNOWN_ERROR
-                        continue
-                    if value is None:
+                device = self.__device(device_id)
+                if device is None:
+                    for resource in unit_resources:
                         data.at[timestamp, resource.id] = ChannelState.NOT_AVAILABLE
-                        continue
-                    if isinstance(value, str):
-                        value = value.rstrip("\x00").strip()
-                    data.at[timestamp, resource.id] = value
+                    continue
+
+                self.__read_device(timestamp, data, device_id, device, unit_resources)
             return data
 
-        except (SunSpecModbusClientTimeout, ModbusClientError) as e:
+        except ModbusClientTimeout as e:
+            # A timeout that escaped the per-unit handling still describes one device, not the
+            # transport, so leave the connector connected
+            raise ConnectorError(self, e)
+        except ModbusClientError as e:
             self.__healthy = False
             raise ConnectionError(self, e)
         except SunSpecModbusClientError as e:
             raise ConnectorError(self, e)
         except IOError as e:
-            raise ConnectorError(self, e)
+            self.__healthy = False
+            raise ConnectionError(self, e)
+
+    def __read_device(
+        self,
+        timestamp: pd.Timestamp,
+        data: pd.DataFrame,
+        device_id: int,
+        device: SunSpecModbusClientDevice,
+        resources: Resources,
+    ) -> None:
+        blocks: Dict[int, Tuple[Any, List[Resource]]] = {}
+        for resource in resources:
+            model_point = self.__resolve(device_id, device, resource)
+            if model_point is None:
+                data.at[timestamp, resource.id] = ChannelState.NOT_AVAILABLE
+                continue
+            model, _ = model_point
+            blocks.setdefault(id(model), (model, []))[1].append(resource)
+
+        pending = list(blocks.values())
+        for index, (model, block_resources) in enumerate(pending):
+            try:
+                # One block read per model keeps values and their scale factors consistent
+                model.read()
+            except ModbusClientTimeout as e:
+                # This unit stopped answering. Bench it and degrade only its own channels;
+                # the other units on this transport are untouched.
+                self._logger.warning(
+                    f"SunSpec device {device_id} timed out reading, benching for {self._interval_reconnect}: {e}"
+                )
+                self.__bench(device_id)
+                for _, unread in pending[index:]:
+                    for resource in unread:
+                        data.at[timestamp, resource.id] = ChannelState.UNKNOWN_ERROR
+                return
+            except SunSpecModbusClientError as e:
+                self._logger.warning(f"Error reading SunSpec model block of device {device_id}: {e}")
+                for resource in block_resources:
+                    data.at[timestamp, resource.id] = ChannelState.UNKNOWN_ERROR
+                continue
+
+            for resource in block_resources:
+                try:
+                    value = self.__resolved[device_id][resource.id][1].cvalue
+                except ModelError as e:
+                    self._logger.warning(f"Error resolving SunSpec value for '{resource.id}': {e}")
+                    data.at[timestamp, resource.id] = ChannelState.UNKNOWN_ERROR
+                    continue
+                if value is None:
+                    data.at[timestamp, resource.id] = ChannelState.NOT_AVAILABLE
+                    continue
+                if isinstance(value, str):
+                    value = value.rstrip("\x00").strip()
+                data.at[timestamp, resource.id] = value
 
     def write(self, data: pd.DataFrame) -> None:
         try:
-            for channel in self.channels:
-                if channel.id not in data.columns:
-                    continue
-                channel_data = data.loc[:, channel.id].dropna(axis="index", how="all")
-                if channel_data.empty:
-                    continue
-                point = self.__points.get(channel.id)
-                if point is None:
-                    self._logger.warning(f"Cannot write unresolved SunSpec channel '{channel.id}'")
-                    continue
-                value = channel_data.iloc[-1]
-                if hasattr(value, "item"):
-                    # Unwrap numpy scalars, which pysunspec2's register packing rejects
-                    value = value.item()
-                try:
-                    point.cvalue = value
-                    with self.__transport_lock():
-                        point.write()
-
-                except (SunSpecModbusValueError, ModelError, TypeError, ValueError) as e:
-                    self._logger.warning(f"Invalid value writing SunSpec channel '{channel.id}': {e}")
+            for device_id, unit_channels in self.channels.groupby(self._resource_device):
+                if device_id is None:
+                    for channel in unit_channels:
+                        if channel.id in data.columns:
+                            self._logger.warning(
+                                f"Missing or invalid SunSpec channel config key 'device' for channel '{channel.id}'"
+                            )
                     continue
 
-        except (SunSpecModbusClientTimeout, ModbusClientError) as e:
+                write_channels = unit_channels.filter(lambda c: c.id in data.columns)
+                if len(write_channels) == 0:
+                    continue
+
+                device = self.__device(device_id)
+                if device is None:
+                    self._logger.warning(
+                        f"Cannot write to unavailable SunSpec device {device_id}: "
+                        f"{', '.join(c.id for c in write_channels)}"
+                    )
+                    continue
+
+                self.__write_device(data, device_id, device, write_channels)
+
+        except ModbusClientTimeout as e:
+            raise ConnectorError(self, e)
+        except ModbusClientError as e:
             self.__healthy = False
             raise ConnectionError(self, e)
         except SunSpecModbusClientError as e:
             raise ConnectorError(self, e)
         except IOError as e:
-            raise ConnectorError(self, e)
+            self.__healthy = False
+            raise ConnectionError(self, e)
+
+    def __write_device(
+        self,
+        data: pd.DataFrame,
+        device_id: int,
+        device: SunSpecModbusClientDevice,
+        channels: Resources,
+    ) -> None:
+        for channel in channels:
+            channel_data = data.loc[:, channel.id].dropna(axis="index", how="all")
+            if channel_data.empty:
+                continue
+            model_point = self.__resolve(device_id, device, channel)
+            if model_point is None:
+                self._logger.warning(f"Cannot write unresolved SunSpec channel '{channel.id}'")
+                continue
+            value = channel_data.iloc[-1]
+            if hasattr(value, "item"):
+                # Unwrap numpy scalars, which pysunspec2's register packing rejects
+                value = value.item()
+            point = model_point[1]
+            try:
+                point.cvalue = value
+                point.write()
+
+            except (SunSpecModbusValueError, ModelError, TypeError, ValueError) as e:
+                self._logger.warning(f"Invalid value writing SunSpec channel '{channel.id}': {e}")
+                continue
+            except ModbusClientTimeout as e:
+                self._logger.warning(
+                    f"SunSpec device {device_id} timed out writing, benching for {self._interval_reconnect}: {e}"
+                )
+                self.__bench(device_id)
+                return
