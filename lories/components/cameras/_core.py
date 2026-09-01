@@ -14,7 +14,7 @@ from lories.core import Constant
 class _CameraProtector(Component):
     TYPE: str = "protection"
 
-    STATE = Constant(bool, "state", "Camera protection state", alias="protection_state")
+    STATE = Constant(bool, "protection_state", "Camera Protection State")
 
 
 class _Camera(Component):

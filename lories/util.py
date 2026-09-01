@@ -13,7 +13,7 @@ import dateutil.parser
 import re
 from dateutil.relativedelta import relativedelta
 from pydoc import locate
-from typing import Any, Callable, Collection, Dict, List, Mapping, Optional, Tuple, Type, TypeVar
+from typing import Any, Callable, Collection, Dict, List, Literal, Mapping, Optional, Tuple, Type, TypeVar
 
 import tzlocal
 
@@ -23,13 +23,6 @@ import pytz as tz
 from lories._core._configurations import Configurations  # noqa
 from lories._core.typing import Timestamp, Timezone  # noqa
 from lories.core.errors import ResourceError
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 # noinspection SpellCheckingInspection
 INVALID_CHARS = "'!@#$%^&?*;:,./\\|`´+~=- "
@@ -96,12 +89,17 @@ def get_members(
                 raise AttributeError
         except (AttributeError, ResourceError):
             continue
-        if (
-            (private or "__" not in attr)
-            and (filter is None or filter(attr, member))
-            and member not in members.values()
-        ):
-            members[attr] = member
+        if (private or "__" not in attr) and (filter is None or filter(attr, member)):
+            try:
+                duplicate = member in members.values()
+            except (ValueError, TypeError):
+                # Array-like / unhashable values (e.g. numpy arrays) raise on `==` /
+                # `in`. Fall back to identity-based dedup, which is what the check
+                # was effectively guarding against anyway (attribute aliases on the
+                # same instance pointing at one underlying object).
+                duplicate = any(v is member for v in members.values())
+            if not duplicate:
+                members[attr] = member
         processed.add(attr)
     return dict(sorted(members.items()))
 
@@ -287,6 +285,8 @@ def to_timedelta(freq: str) -> relativedelta | pd.Timedelta:
         return pd.Timedelta(hours=freq_val)
     elif freq.endswith("min"):
         return pd.Timedelta(minutes=freq_val)
+    elif freq.endswith("ms"):
+        return pd.Timedelta(milliseconds=freq_val)
     elif freq.endswith("s"):
         return pd.Timedelta(seconds=freq_val)
     else:
@@ -389,6 +389,8 @@ def parse_freq(freq: str) -> Optional[str]:
         return _parse_freq("min")
     elif unit_part.lower() in ["s", "sec", "secs"]:
         return _parse_freq("s")
+    elif unit_part.lower() in ["ms", "milli", "millis", "millisecond", "milliseconds"]:
+        return _parse_freq("ms")
     else:
         raise ValueError(f"Invalid frequency: {freq}")
 

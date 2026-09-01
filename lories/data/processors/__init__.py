@@ -23,6 +23,12 @@ from .differentiator import Differentiator  # noqa: F401
 from . import integrator  # noqa: F401
 from .integrator import Integrator  # noqa: F401
 
+from . import pulse  # noqa: F401
+from .pulse import PulseCount  # noqa: F401
+
+from . import size  # noqa: F401
+from .size import SizeFilter  # noqa: F401
+
 try:
     import cv2  # noqa: F401
 except ImportError:

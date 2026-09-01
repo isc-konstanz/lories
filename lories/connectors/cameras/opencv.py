@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# ruff: noqa: E402  -- OPENCV_LOG_LEVEL must be set before `import cv2`
 """
 lories.connectors.cameras.opencv
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -9,10 +10,19 @@ import os
 import time
 from typing import Any, Dict, Optional
 
+# Silence OpenCV WARNs at videoio init. The FFmpeg interrupt callback
+# logs "Stream timeout triggered after Xms" via CV_LOG_WARNING on every
+# RTSP stall; we surface real disconnects via ConnectionError. The env
+# var is read once during cv2 init, so it must precede `import cv2`.
+# (Older builds — e.g. the OpenCV on isc-agri — don't expose the
+# cv2.utils.logging Python API, so the env var is the portable path.)
+os.environ.setdefault("OPENCV_LOG_LEVEL", "ERROR")
+
 import cv2
 
 from lories.connectors import ConnectionError, ConnectorError, register_connector_type
 from lories.connectors.cameras import CameraConnector
+from lories.core.configs.parameters import ChannelParameter, Parameter
 from lories.typing import Configurations, Resource, Resources
 
 
@@ -26,14 +36,45 @@ class OpenCV(CameraConnector):
     or stream paths.
     """
 
-    PREVIEW_MAIN: str = "Preview_01_main"
-    PREVIEW_SUB: str = "Preview_01_sub"
+    # Vendor → (main-stream path, sub-stream path) appended to "rtsp://<host>:<port>/".
+    VENDOR_PATHS: Dict[str, tuple] = {
+        "reolink": ("Preview_01_main", "Preview_01_sub"),
+        "hikvision": ("Streaming/Channels/101", "Streaming/Channels/102"),
+        "dahua": ("cam/realmonitor?channel=1&subtype=0", "cam/realmonitor?channel=1&subtype=1"),
+        "axis": ("axis-media/media.amp", "axis-media/media.amp"),
+    }
+    DEFAULT_VENDOR: str = "reolink"
+
+    _host = Parameter(key="host", type=str, required=True, desc="RTSP camera hostname or IP address")
+    _port = Parameter(key="port", type=int, default=554, min=1, max=65535, desc="RTSP camera TCP port")
+    _username = Parameter(key="username", type=str, required=False, desc="RTSP authentication username")
+    _password = Parameter(key="password", type=str, required=False, desc="RTSP authentication password")
+    _vendor = Parameter(
+        key="vendor", type=str, required=False, default="reolink", desc="This provides defaults for RTSP addresses"
+    )
+
+    address = ChannelParameter(
+        key="address",
+        type=str,
+        required=False,
+        desc=(
+            "Vendor-specific RTSP path appended to 'rtsp://<host>:<port>/' (e.g. 'Streaming/Channels/101'). "
+            "Defaults to the configured vendor's main or sub stream path."
+        ),
+    )
 
     _host: str
     _port: int
-
     _username: Optional[str]
     _password: Optional[str]
+
+    _vendor: str
+    _preview_main: str
+    _preview_sub: str
+
+    _vendor: str
+    _preview_main: str
+    _preview_sub: str
 
     _captures: Dict[str, cv2.VideoCapture]
 
@@ -49,14 +90,12 @@ class OpenCV(CameraConnector):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
 
-        self._host = configs.get("host")
-        self._port = configs.get_int("port", default=554)
-
-        self._username = configs.get("username", default=None)
-        self._password = configs.get("password", default=None)
-
         if not self._host or not self._port:
             raise ValueError("Camera configuration requires 'host' and 'port'")
+
+        if self._vendor not in OpenCV.VENDOR_PATHS:
+            raise ValueError(f"Unknown camera vendor '{self._vendor}'. Supported: {sorted(OpenCV.VENDOR_PATHS)}")
+        self._preview_main, self._preview_sub = OpenCV.VENDOR_PATHS[self._vendor]
 
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
             "rtsp_transport;tcp|"  # use TCP only
@@ -70,7 +109,7 @@ class OpenCV(CameraConnector):
         # Validate connection only to throw ConnectionError when connect is called by the manager
         for resource in resources:
             streaming = self._is_streaming(resource)
-            address = resource.get("address", default=OpenCV.PREVIEW_SUB if streaming else OpenCV.PREVIEW_MAIN)
+            address = resource.get("address", default=self._preview_sub if streaming else self._preview_main)
 
             if address not in self._captures:
                 # TODO: Make timeouts configurable
@@ -117,7 +156,7 @@ class OpenCV(CameraConnector):
     def read_frame(self, resource: Resource) -> bytes:
         streaming = self._is_streaming(resource)
 
-        address = resource.get("address")
+        address = resource.get("address", default=self._preview_sub if streaming else self._preview_main)
         capture = self._captures.get(address, None)
         try:
             if not streaming and not capture.isOpened():

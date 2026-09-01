@@ -17,9 +17,10 @@ import pytz as tz
 from lories.connectors import ConnectionError, register_connector_type
 from lories.connectors.serial._core import _SerialConnector
 from lories.core.configs.errors import ConfigurationError
+from lories.core.configs.parameters import ChannelParameter, Parameter
 from lories.data import ChannelState
 from lories.typing import Resources
-from lories.util import is_int, to_timedelta
+from lories.util import is_int
 
 
 @register_connector_type("sdi12")
@@ -67,15 +68,35 @@ class Sdi12Connector(_SerialConnector):
         index     = 0          # first value in the frame
     """
 
-    _freq_seconds: float = 60.0
+    _freq = Parameter(
+        key="freq",
+        type=pd.Timedelta,
+        default="60s",
+        desc="Interval between full M!/D! measurement cycles for every sensor on the bus",
+    )
+
+    sensor = ChannelParameter(
+        key="sensor",
+        type=int,
+        required=True,
+        desc="SDI-12 address of the sensor this channel reads from (0-9, typically)",
+    )
+    data = ChannelParameter(
+        key="data",
+        type=int,
+        default=0,
+        desc="D-frame index to read this channel from (D0!, D1!, …)",
+    )
+    index = ChannelParameter(
+        key="index",
+        type=int,
+        required=True,
+        desc="Zero-based position of this channel's value inside the D-frame",
+    )
+
     _last_values: Optional[Dict[str, float]] = None
     _measurement_thread: Optional[Thread] = None
     _stop_event: Optional[Event] = None
-
-    def configure(self, configs) -> None:
-        super().configure(configs)
-        freq = configs.get("freq", default="60s")
-        self._freq_seconds = to_timedelta(freq).total_seconds()
 
     def _on_connect(self, resources: Resources) -> None:
         self._last_values = None
@@ -109,7 +130,7 @@ class Sdi12Connector(_SerialConnector):
                     return
                 except Exception:
                     self._logger.exception("SDI12 background measurement failed")
-            self._stop_event.wait(self._freq_seconds)
+            self._stop_event.wait(self._freq.total_seconds())
 
     def _run_measurement(self, resources: Resources) -> None:
         """Perform a full SDI12 measurement cycle sequentially and cache the result."""

@@ -8,24 +8,19 @@ lories.data.access
 
 from __future__ import annotations
 
-from typing import Any, Callable, Collection, Iterable, Optional, Type, overload
+from collections.abc import Mapping
+from copy import deepcopy
+from typing import Any, Callable, Collection, Iterable, Literal, Optional, Type, overload
 
 import pandas as pd
 from lories._core import _Context, _Registrator  # noqa
 from lories._core._data import DataContext, _DataContext  # noqa
 from lories._core._tasks import TaskContext, _TaskContext  # noqa
-from lories.core import Configurator, Constant, ResourceError
+from lories.core import Configurations, Configurator, Constant, ResourceError
 from lories.core.typing import ChannelsArgument, Registrator, Timestamp
 from lories.data.channels import Channel, Channels
 from lories.data.context import DataContext as _DataAccess
 from lories.util import get_context, update_recursive
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
 
 
 # noinspection PyProtectedMember, PyShadowingBuiltins
@@ -125,13 +120,35 @@ class DataAccess(_DataAccess, Configurator):
             configs = self.configs.get_member(Channels.TYPE)
             defaults = Channel._build_defaults(configs)
             channels.extend(self._load_from_members(self.__registrar, configs))
-        channels.extend(
-            self._load_from_file(self.__registrar, self.configs.dirs, f"{Channels.TYPE}.conf", defaults=defaults)
-        )
+
+        configs_file = f"{Channels.TYPE}.conf"
+        if self.configs.dirs.conf.joinpath(configs_file).is_file():
+            configs = Configurations.load(configs_file, **self.configs.dirs.to_dict())
+            channels.extend(self._load_from_members(self.__registrar, configs, defaults=defaults))
+            self._store_file_channels(configs, defaults)
 
         if sort:
             self.sort()
         return channels
+
+    def _store_file_channels(self, configs: Configurations, defaults: Mapping[str, Any]) -> None:
+        """Merge the channel sections of a ``channels.conf`` file into the ``channels`` member.
+
+        ``_load_from_members`` registers the file's channels from a transient ``Configurations``;
+        without this, ``self.configs`` never learns about them and whatever renders a configurator's
+        configs (e.g. the Dash config modal) shows fewer channels than the runtime has. File-level
+        defaults (flat keys and ``INCLUDES`` sections) are folded into each stored section, as the
+        channel was created with them, so they do not leak onto the channels of the main file.
+        """
+        file_defaults = {
+            k: deepcopy(v) for k, v in configs.items() if not isinstance(v, Mapping) or k in Channel.INCLUDES
+        }
+        channel_keys = [k for k in configs.keys() if k not in defaults and k not in file_defaults]
+        if len(channel_keys) == 0:
+            return
+        channels = self.configs.get_member(Channels.TYPE, ensure_exists=True)
+        for key in channel_keys:
+            channels.update({key: update_recursive(deepcopy(file_defaults), configs.get_member(key))})
 
     def add(self, key: str | Constant, **configs: Any) -> None:
         if isinstance(key, Constant):
@@ -170,9 +187,10 @@ class DataAccess(_DataAccess, Configurator):
         channels: Optional[ChannelsArgument] = None,
         how: Literal["any", "all"] = "any",
         unique: bool = False,
+        interval: Optional[str | pd.Timedelta] = None,
     ) -> None:
         channels = self._filter_by_args(channels)
-        self.__context.register(function, channels=channels, how=how, unique=unique)
+        self.__context.register(function, channels=channels, how=how, unique=unique, interval=interval)
 
     def has_logged(
         self,

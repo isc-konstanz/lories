@@ -10,6 +10,7 @@ from typing import TypeVar
 from ..core.typing import (
     Timestamp,
     Timezone,
+    Duration,
     Entity,
     Context,
     ContextArgument,
@@ -50,6 +51,7 @@ System = TypeVar("System", bound=_System)
 __all__ = [
     "Timestamp",
     "Timezone",
+    "Duration",
     "Entity",
     "Context",
     "ContextArgument",

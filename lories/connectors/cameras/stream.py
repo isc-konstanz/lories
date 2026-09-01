@@ -11,12 +11,13 @@ from multiprocessing.shared_memory import SharedMemory
 from multiprocessing.synchronize import Event as EventType
 from threading import Thread
 from time import sleep, time
+from typing import FrozenSet, Iterable
 
 from lories.connectors.cameras._core import _CameraConnector as CameraConnector
 from lories.connectors.errors import ConnectorError
 from lories.connectors.tasks.process import ProcessContext
 from lories.core import Configurations, Configurator, ResourceUnavailableError
-from lories.data import Channels
+from lories.data import Channel, Channels
 
 
 class CameraStream(Configurator, Thread):
@@ -32,6 +33,7 @@ class CameraStream(Configurator, Thread):
 
     _memory: SharedMemory
     _buffer: memoryview
+    _muted: FrozenSet[str]
 
     # noinspection PyProtectedMember
     def __init__(
@@ -49,6 +51,7 @@ class CameraStream(Configurator, Thread):
         self.__interrupt = _manager.Event()
         self.__trigger = _manager.Event()
         self.__failed = False
+        self._muted = frozenset()
         # Frames the subprocess has written to shared memory. Compared against
         # the main thread's local consumed counter to surface the drop rate.
         self.__produced = _manager.Value("i", 0)
@@ -64,6 +67,29 @@ class CameraStream(Configurator, Thread):
 
     def is_failed(self) -> bool:
         return self.__failed
+
+    @staticmethod
+    def _ids(channels: Iterable[Channel | str]) -> FrozenSet[str]:
+        return frozenset(channel if isinstance(channel, str) else channel.id for channel in channels)
+
+    def is_muted(self, channel: Channel | str) -> bool:
+        return (channel if isinstance(channel, str) else channel.id) in self._muted
+
+    def mute(self, *channels: Channel | str) -> None:
+        """Stop publishing frames to these channels, so their processors and listeners idle; the rest stay live."""
+        self._muted = self._muted | self._ids(channels)
+
+    def unmute(self, *channels: Channel | str) -> None:
+        self._muted = self._muted - self._ids(channels)
+
+    def _publish(self, channels: Channels, data: bytes) -> int:
+        published = 0
+        for channel in channels:
+            if channel.id in self._muted:
+                continue
+            channel.value = data
+            published += 1
+        return published
 
     # noinspection PyProtectedMember
     def start(self):
@@ -96,10 +122,17 @@ class CameraStream(Configurator, Thread):
 
     def stop(self) -> None:
         self.__interrupt.set()
-        self.__context.deactivate()
+        # Join the consumer thread before tearing down the manager — its loop
+        # calls trigger.wait() through the Manager IPC, which raises EOFError
+        # if the manager process dies first.
         if self.is_alive():
             self.join()
+        self.__context.deactivate()
 
+        # Release the memoryview before closing the shared memory segment,
+        # otherwise SharedMemory.close() raises "BufferError: memoryview has
+        # 1 exported buffer" during GC.
+        self._buffer.release()
         self._memory.close()
         self._memory.unlink()
 
@@ -108,35 +141,38 @@ class CameraStream(Configurator, Thread):
         last_report = time()
         last_produced = 0
         last_consumed = 0
-        while not self.__interrupt.is_set():
-            self.__trigger.wait(1)
+        try:
+            while not self.__interrupt.is_set():
+                self.__trigger.wait(1)
 
-            if self.__interrupt.is_set():
-                break
-            if not self.__trigger.is_set():
-                continue
-            length = int.from_bytes(self._buffer[0:4], "little")
-            data = bytes(self._buffer[4 : 4 + length])
-            for channel in channels:
-                channel.value = data
-            self.__trigger.clear()
-            consumed += 1
+                if self.__interrupt.is_set():
+                    break
+                if not self.__trigger.is_set():
+                    continue
+                length = int.from_bytes(self._buffer[0:4], "little")
+                data = bytes(self._buffer[4 : 4 + length])
+                self._publish(channels, data)
+                self.__trigger.clear()
+                consumed += 1
 
-            now = time()
-            if now - last_report >= 5.0:
-                produced = int(self.__produced.value)
-                dp = produced - last_produced
-                dc = consumed - last_consumed
-                drop = (dp - dc) / dp if dp > 0 else 0.0
-                self._logger.debug(
-                    f"stream {self.__connector.id}: "
-                    f"produced={dp / (now - last_report):.1f}/s "
-                    f"consumed={dc / (now - last_report):.1f}/s "
-                    f"dropped={drop:.0%}"
-                )
-                last_report = now
-                last_produced = produced
-                last_consumed = consumed
+                now = time()
+                if now - last_report >= 5.0:
+                    produced = int(self.__produced.value)
+                    dp = produced - last_produced
+                    dc = consumed - last_consumed
+                    drop = (dp - dc) / dp if dp > 0 else 0.0
+                    self._logger.debug(
+                        f"stream {self.__connector.id}: "
+                        f"produced={dp / (now - last_report):.1f}/s "
+                        f"consumed={dc / (now - last_report):.1f}/s "
+                        f"dropped={drop:.0%}"
+                    )
+                    last_report = now
+                    last_produced = produced
+                    last_consumed = consumed
+        except (EOFError, BrokenPipeError, ConnectionResetError):
+            # Manager IPC torn down — treat as shutdown signal.
+            return
 
 
 def _stream(
@@ -147,6 +183,8 @@ def _stream(
     memory_name: str,
     produced,
     fps: int = 30,
+    retries: int = 3,
+    retry_backoff: float = 2.0,
 ) -> None:
     camera.connect(channels)
 
@@ -157,6 +195,7 @@ def _stream(
 
     memory = SharedMemory(name=memory_name)
     buffer = memory.buf
+    failures = 0
     try:
         while not interrupt.is_set():
             now = time()
@@ -164,7 +203,31 @@ def _stream(
                 interrupt.set()
                 return
 
-            payload = camera.read_frame(source)
+            try:
+                payload = camera.read_frame(source)
+                failures = 0
+            except ConnectorError as e:
+                # Transient RTSP corruption (packet loss, h264 decode errors)
+                # surfaces as a single failed grab/retrieve. Reopen the capture
+                # in place instead of dying: a dead subprocess costs a full
+                # ProcessContext respawn plus the framework reconnect interval.
+                # A camera that stays unreachable exhausts the retry budget and
+                # still fails through to the framework's reconnect handling.
+                failures += 1
+                if failures > retries:
+                    raise
+                camera._logger.warning(f"stream read failed ({failures}/{retries}), reopening capture: {e}")
+                camera.disconnect()
+                if interrupt.wait(retry_backoff):
+                    return
+                try:
+                    camera.connect(channels)
+                except ConnectorError as e:
+                    # The reopen attempt itself failed; the next cycle's read
+                    # raises against the closed capture and advances the counter.
+                    camera._logger.debug(f"stream capture reopen failed: {e}")
+                continue
+
             length = len(payload)
             buffer[0:4] = length.to_bytes(4, "little")
             buffer[4 : 4 + length] = payload
@@ -175,6 +238,10 @@ def _stream(
             if sleep_seconds > 0:
                 sleep(sleep_seconds)
     finally:
+        # Match the main-process release: drop the memoryview before
+        # closing the shared memory mapping in this subprocess.
+        buffer.release()
+        memory.close()
         camera.disconnect()
 
 
