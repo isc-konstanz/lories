@@ -5,7 +5,7 @@ lories.connectors.cameras.camera
 
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, FrozenSet, Optional
 
 import pandas as pd
 from lories.connectors.cameras._core import _CameraConnector
@@ -18,6 +18,7 @@ from lories.util import to_bool
 # noinspection PyAbstractClass
 class CameraConnector(_CameraConnector):
     _stream: Optional[CameraStream] = None
+    _muted: FrozenSet[str] = frozenset()
     __stream_lock: bool = False
     __streaming: bool = False
 
@@ -46,6 +47,20 @@ class CameraConnector(_CameraConnector):
             return self._stream is not None and not self._stream.is_failed()
         return True
 
+    def is_muted(self, channel: Channel | str) -> bool:
+        return (channel if isinstance(channel, str) else channel.id) in self._muted
+
+    def mute(self, *channels: Channel | str) -> None:
+        """Stop publishing stream frames to these channels; the other stream channels stay live."""
+        self._muted = self._muted | CameraStream._ids(channels)
+        if self._stream is not None:
+            self._stream.mute(*channels)
+
+    def unmute(self, *channels: Channel | str) -> None:
+        self._muted = self._muted - CameraStream._ids(channels)
+        if self._stream is not None:
+            self._stream.unmute(*channels)
+
     # noinspection PyMethodMayBeStatic
     def _is_streaming(self, channel: Channel) -> bool:
         return to_bool(channel.get("stream", default=False)) or to_bool(channel.get("listener", default=False))
@@ -71,6 +86,8 @@ class CameraConnector(_CameraConnector):
         if self.__streaming:
             self._stream = CameraStream(self, stream_channels, stream_configs)
             self._stream.configure(stream_configs)
+            if self._muted:
+                self._stream.mute(*self._muted)
             self._stream.start()
 
     def disconnect(self) -> None:
