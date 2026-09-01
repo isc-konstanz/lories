@@ -164,6 +164,8 @@ def _stream(
 
     memory = SharedMemory(name=memory_name)
     buffer = memory.buf
+    failure_start_time = None
+    max_failed_read_duration = 5.0
     try:
         while not interrupt.is_set():
             now = time()
@@ -171,12 +173,24 @@ def _stream(
                 interrupt.set()
                 return
 
-            payload = camera.read_frame(source)
-            length = len(payload)
-            buffer[0:4] = length.to_bytes(4, "little")
-            buffer[4 : 4 + length] = payload
-            trigger.set()
-            produced.value += 1
+            try:
+                payload = camera.read_frame(source)
+                failure_start_time = None
+            except ConnectorError as e:
+                if failure_start_time is None:
+                    failure_start_time = now
+                elif now - failure_start_time > max_failed_read_duration:
+                    camera._logger.error(f"stream {camera.id} failing for over {max_failed_read_duration}s: {e}")
+                    raise
+                camera._logger.warning(f"stream {camera.id} dropped a frame: {e}")
+                payload = None
+
+            if payload is not None:
+                length = len(payload)
+                buffer[0:4] = length.to_bytes(4, "little")
+                buffer[4 : 4 + length] = payload
+                trigger.set()
+                produced.value += 1
 
             sleep_seconds = (1 / fps) - (time() - now)
             if sleep_seconds > 0:
