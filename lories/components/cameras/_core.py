@@ -12,12 +12,20 @@ from lories.core import Constant
 
 
 class _CameraProtector(Component):
+    """
+    Base class for a camera protection shutter, declaring its state channel.
+    """
+
     TYPE: str = "protection"
 
-    STATE = Constant(bool, "protection_state", "Camera Protection State")
+    STATE = Constant(bool, "state", "Camera Protection State", context="camera_protection")
 
 
 class _Camera(Component):
+    """
+    Base class for camera components, declaring the frame, stream and motion channels.
+    """
+
     TYPE: str = "camera"
     INCLUDES = ["stream", _CameraProtector.TYPE]
 

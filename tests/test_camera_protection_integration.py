@@ -38,7 +38,7 @@ connector = "opencv"
 delay = "2s"
 cooldown = "3s"
 
-[protection.data.channels.protection_state]
+[protection.data.channels.state]
 type = "bool"
 connector = "dummy"
 
