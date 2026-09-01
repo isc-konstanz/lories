@@ -12,21 +12,14 @@ import logging
 from collections.abc import Callable
 from logging import Logger
 from threading import Lock
-from typing import Any, Dict, Optional, TypeVar
+from typing import Any, Dict, Literal, Optional
 
 import pandas as pd
 import pytz as tz
 from lories._core._channel import Channel  # noqa
-from lories._core._channels import Channels  # noqa
 from lories._core._listener import _Listener  # noqa
 from lories.core import ResourceError
-
-# FIXME: Remove this once Python >= 3.9 is a requirement
-try:
-    from typing import Literal
-
-except ImportError:
-    from typing_extensions import Literal
+from lories.data.channels import Channels
 
 
 # noinspection PyShadowingBuiltins
@@ -40,8 +33,8 @@ class Listener(_Listener):
     _function: Callable[[pd.DataFrame], None]
     channels: Channels
 
-    __start: pd.Timestamp = pd.NaT
-    __complete: pd.Timestamp = pd.NaT
+    __start: pd.Timestamp | pd.NaT = pd.NaT
+    __complete: pd.Timestamp | pd.NaT = pd.NaT
 
     def __init__(
         self,
@@ -75,14 +68,16 @@ class Listener(_Listener):
         try:
             self.__lock.acquire()
             self.run()
+            return self
 
         except Exception as e:
             raise ListenerError(self, str(e))
         finally:
             self.__complete = timestamp
             self.__lock.release()
-            self._logger.debug(f"Listener '{self.id}' finished after {round(self.runtime, 3)} seconds")
-            return self
+            runtime = self.runtime
+            runtime_text = round(runtime, 3) if runtime is not None else "n/a"
+            self._logger.debug(f"Listener '{self.id}' finished after {runtime_text} seconds")
 
     @property
     def timestamp(self) -> pd.Timestamp | pd.NaT:
@@ -119,9 +114,6 @@ class ListenerError(ResourceError):
     """
 
     # noinspection PyArgumentList
-    def __init__(self, listener: ListenerType, *args, **kwargs) -> None:
+    def __init__(self, listener: Listener, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.listener = listener
-
-
-ListenerType = TypeVar("ListenerType", bound=Listener)

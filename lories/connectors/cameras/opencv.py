@@ -38,6 +38,10 @@ class OpenCV(CameraConnector):
     PREVIEW_MAIN: str = "Preview_01_main"
     PREVIEW_SUB: str = "Preview_01_sub"
 
+    _FRAME_READ_RETRIES: int = 3
+    _FRAME_STD_MIN: float = 5.0
+    _RECONNECT_RETRIES: int = 2
+
     _host: str
     _port: int
 
@@ -89,7 +93,7 @@ class OpenCV(CameraConnector):
                 capture.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 3000)
                 self._captures[address] = capture
             else:
-                capture = self._captures.get(address)
+                capture = self._captures[address]
             if not capture.isOpened():
                 self._open_capture(address, capture)
             if not streaming:
@@ -104,13 +108,19 @@ class OpenCV(CameraConnector):
         if not capture.isOpened():
             raise ConnectionError(self, f"Cannot open RTSP stream: 'rtsp://#:#@{address}'")
 
-        status = False
-        for _ in range(3):  # flush stale frames
-            status = capture.grab()
-        if not status:
-            raise ConnectionError(self, "Failed to grab frame")
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline:
+            if not capture.grab():
+                raise ConnectionError(self, "Failed to grab frame")
+            status, frame = capture.retrieve()
+            if status and not self._is_corrupt(frame):
+                break
 
         self._logger.debug(f"Opened VideoCapture to RTSP URL 'rtsp://#:#@{address}'")
+
+    @staticmethod
+    def _is_corrupt(frame) -> bool:
+        return frame is None or frame.size == 0 or frame.std() < OpenCV._FRAME_STD_MIN
 
     def disconnect(self) -> None:
         super().disconnect()
@@ -127,34 +137,47 @@ class OpenCV(CameraConnector):
         streaming = self._is_streaming(resource)
 
         address = resource.get("address", default=OpenCV.PREVIEW_SUB if streaming else OpenCV.PREVIEW_MAIN)
-        capture = self._captures.get(address, None)
+        attempts = 1 if streaming else 1 + self._RECONNECT_RETRIES
+        for attempt in range(attempts - 1):
+            try:
+                return self._read_frame(streaming, address)
+            except ConnectionError as e:
+                self._logger.warning(
+                    f"Read failed for '{address}' ({e}); reconnecting and retrying ({attempt + 2}/{attempts})"
+                )
+        return self._read_frame(streaming, address)
+
+    def _read_frame(self, streaming: bool, address: str) -> bytes:
+        capture = self._captures.get(address)
+        if capture is None:
+            raise ConnectionError(
+                self, f"Cannot open RTSP stream: 'rtsp://#:#@{self._host}:{self._port}/{address}'"
+            )
         try:
             if not streaming and not capture.isOpened():
                 self._open_capture(address, capture)
-            if capture is None or not capture.isOpened():
+            if not capture.isOpened():
                 raise ConnectionError(
                     self, f"Cannot open RTSP stream: 'rtsp://#:#@{self._host}:{self._port}/{address}'"
                 )
 
-            if streaming:
-                # FFmpeg's RTSP demuxer keeps an internal FIFO. CAP_PROP_BUFFERSIZE
-                # is ignored by this backend, so we drain queued frames with cheap
-                # grab() calls (no decode) and only retrieve() the most recent one.
-                # `grab()` is blocking on RTSP: once the backlog is empty it waits
-                # for the next network frame at camera-fps. A fixed-count drain
-                # therefore caps throughput at <1 fps on a fresh buffer. Time-budget
-                # the drain so we exit as soon as the backlog is empty.
-                if not capture.grab():
-                    raise ConnectionError(self, "Failed to grab frame")
-                deadline = time.monotonic() + 0.005  # 5 ms additional drain budget
-                while time.monotonic() < deadline:
+            for _ in range(self._FRAME_READ_RETRIES):
+                if streaming:
                     if not capture.grab():
-                        break
-                status, frame = capture.retrieve()
+                        raise ConnectionError(self, "Failed to grab frame")
+                    deadline = time.monotonic() + 0.005
+                    while time.monotonic() < deadline:
+                        if not capture.grab():
+                            break
+                    status, frame = capture.retrieve()
+                else:
+                    status, frame = capture.read()
+                if not status or frame is None:
+                    raise ConnectionError(self, "Failed to retrieve frame")
+                if not self._is_corrupt(frame):
+                    break
             else:
-                status, frame = capture.read()
-            if not status or frame is None:
-                raise ConnectionError(self, "Failed to retrieve frame")
+                raise ConnectionError(self, "Received only corrupt frames")
 
             status, buffer = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
             if not status:
