@@ -73,6 +73,7 @@ class Listener(_Listener):
         try:
             self.__lock.acquire()
             self.run()
+            return self
 
         except Exception as e:
             raise ListenerError(self, str(e))
@@ -81,7 +82,6 @@ class Listener(_Listener):
             self.__overlap_warned = False
             self.__lock.release()
             self._logger.debug(f"Listener '{self.id}' finished after {round(self.runtime, 3)} seconds")
-            return self
 
     @property
     def timestamp(self) -> pd.Timestamp | pd.NaT:
