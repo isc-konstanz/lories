@@ -91,7 +91,7 @@ class OpenEMSConnector(Connector):
 
         if not self._listeners:
             self._logger.warning(
-                f"{type(self).__name__} '{self.id}': no channels with an 'address' attribute – nothing to subscribe to"
+                f"{type(self).__name__} '{self.id}': no channels with an 'address' attribute - nothing to subscribe to"
             )
 
         ws_url = f"ws://{self._host}:{self._ws_port}/websocket"
@@ -100,7 +100,7 @@ class OpenEMSConnector(Connector):
         self._auth_error = None
 
         def on_open(ws: websocket.WebSocketApp) -> None:
-            self._logger.debug(f"OpenEMS WS opened to {ws_url}, authenticating …")
+            self._logger.debug(f"OpenEMS WS opened to {ws_url}, authenticating ...")
             ws.send(
                 self._json_rpc.build_request(
                     [("authenticateWithPassword", {"username": self._username, "password": self._password})]
@@ -130,7 +130,7 @@ class OpenEMSConnector(Connector):
             if isinstance(result, dict) and "token" in result:
                 # Authentication successful → subscribe
                 self._connected_event.set()
-                self._logger.info(f"OpenEMS WS authenticated at {ws_url} (token={result['token'][:8]}…)")
+                self._logger.info(f"OpenEMS WS authenticated at {ws_url} (token={result['token'][:8]}...)")
                 self._send_subscribe(ws)
 
             elif notification is not None:

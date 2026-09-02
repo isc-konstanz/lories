@@ -152,3 +152,56 @@ def test_make_key_normalizes_addresses():
     assert OpenEMSComponent._make_key("_sum", "GridActivePower") == "sum_gridactivepower"
     assert OpenEMSComponent._make_key("ess0", "Soc") == "ess0_soc"
     assert OpenEMSComponent._make_key("meter0", "Active.Power") == "meter0_active_power"
+
+
+def test_log_available_channels_lists_and_aborts(tmp_path, monkeypatch):
+    # The lories Settings boot reconfigures logging, so caplog cannot capture the
+    # component logger here; the listing format itself is covered by the unit
+    # test below and the abort message carries the discovered count.
+    from lories.core.configs.errors import ConfigurationError
+    from lories.io.rest import Rest
+
+    monkeypatch.setattr(Rest, "get_request", _rest_ok)
+
+    conf = 'type = "openems"\nlog_available_channels = true\n\n[connector]\n'
+    with pytest.raises(ConfigurationError, match="Listed 5 available OpenEMS channels"):
+        _boot_openems(tmp_path, conf)
+
+
+def test_log_available_channels_listing_format():
+    from lories.components.openems import OpenEMSComponent
+
+    records = []
+
+    class _Recorder:
+        def info(self, message):
+            records.append(message)
+
+    component = OpenEMSComponent.__new__(OpenEMSComponent)
+    component._logger = _Recorder()
+    component._log_available_channels({channel["address"]: channel for channel in _DISCOVERED_CHANNELS})
+
+    listing = "\n".join(records)
+    assert "5 OpenEMS channels available in 3 components" in listing
+    assert "  _sum/: EssSoc [INTEGER, %], GridActivePower [INTEGER, W], ProductionActivePower [INTEGER, W]" in listing
+    assert "  ess0/: Soc [INTEGER, %]" in listing
+    assert "  meter0/: ActivePower [FLOAT, W]" in listing
+
+
+def test_log_available_channels_wins_over_configured_channels(tmp_path, monkeypatch):
+    from lories.core.configs.errors import ConfigurationError
+    from lories.io.rest import Rest
+
+    monkeypatch.setattr(Rest, "get_request", _rest_ok)
+
+    conf = 'type = "openems"\nchannels = ["_sum/*"]\nlog_available_channels = true\n\n[connector]\n'
+    with pytest.raises(ConfigurationError, match="remove log_available_channels"):
+        _boot_openems(tmp_path, conf)
+
+
+def test_empty_channels_without_flag_raises_with_hint(tmp_path):
+    from lories.core.configs.errors import ConfigurationError
+
+    conf = 'type = "openems"\n\n[connector]\n'
+    with pytest.raises(ConfigurationError, match="No OpenEMS channels configured"):
+        _boot_openems(tmp_path, conf)
