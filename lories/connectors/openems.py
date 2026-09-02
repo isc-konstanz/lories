@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lories.connectors.openems.connector
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lories.connectors.openems
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """

@@ -4,7 +4,7 @@ tests.test_openems_connector
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Protocol-level unit tests for the OpenEMS WebSocket connector wire format
-(``lories.connectors.openems.connector``). No socket / network use:
+(``lories.connectors.openems``). No socket / network use:
 ``websocket.WebSocketApp`` (as imported by the connector module) is replaced
 with a fake that records outbound ``send()`` payloads and, when scripted,
 feeds a canned reply straight back into the connector's own ``on_message``
@@ -28,10 +28,10 @@ from threading import Event
 
 import pytest
 
-import lories.connectors.openems.connector as openems_connector
+import lories.connectors.openems as openems_connector
 import pandas as pd
 from lories.connectors.errors import ConnectionError, ConnectorError
-from lories.connectors.openems.connector import OpenEMSBackendConnector, OpenEMSEdgeConnector
+from lories.connectors.openems import OpenEMSBackendConnector, OpenEMSEdgeConnector
 from lories.io.jsonrpc import JsonRpc
 
 AUTH_SUCCESS = json.dumps({"jsonrpc": "2.0", "id": "srv-1", "result": {"token": "abcdef1234"}})
