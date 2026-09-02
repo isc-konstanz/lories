@@ -209,13 +209,20 @@ class _RegistratorContext(Context[Registrator], Generic[Registrator]):
                         **configs_dirs.to_dict(),
                         **defaults,
                     )
+                    configs_type = configs.get("type") if "type" in configs else None
                     try:
                         registrators.append(self._load_from_configs(context, configs, **kwargs))
 
-                    except ResourceError:
-                        # Skip files with missing or unknown type
-                        # TODO: Introduce debug logging here
-                        pass
+                    except ResourceError as e:
+                        # A file whose stem is no registered type may be a legitimate
+                        # non-registrator file; an explicit "type" key that fails to
+                        # resolve is a configuration mistake and warrants a warning.
+                        if configs_type is not None:
+                            self._logger.warning(
+                                f"Skipping configuration file '{configs_entry.name}' with type '{configs_type}': {e}"
+                            )
+                        else:
+                            self._logger.debug(f"Skipping configuration file '{configs_entry.name}': {e}")
         return registrators
 
     # noinspection PyUnresolvedReferences, PyTypeChecker
