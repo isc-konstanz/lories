@@ -37,7 +37,7 @@ from lories.io.jsonrpc import JsonRpc
 AUTH_SUCCESS = json.dumps({"jsonrpc": "2.0", "id": "srv-1", "result": {"token": "abcdef1234"}})
 
 
-def _auth_error_frame(message: str = "invalid username or password") -> str:
+def _connect_error_frame(message: str = "invalid username or password") -> str:
     return json.dumps({"jsonrpc": "2.0", "id": "srv-1", "error": {"message": message}})
 
 
@@ -51,8 +51,19 @@ class FakeWebSocketApp:
     queued, feeds it straight back into ``on_message`` before returning.
     """
 
-    def __init__(self, url, on_open=None, on_message=None, on_error=None, on_close=None, responses=None):
+    def __init__(
+        self,
+        url,
+        on_open=None,
+        on_message=None,
+        on_error=None,
+        on_close=None,
+        responses=None,
+        header=None,
+        open_error=None,
+    ):
         self.url = url
+        self.header = header
         self.on_open = on_open
         self.on_message = on_message
         self.on_error = on_error
@@ -60,6 +71,7 @@ class FakeWebSocketApp:
         self.sent = []
         self.closed = False
         self._responses = list(responses) if responses else []
+        self._open_error = open_error
 
     def send(self, payload: str) -> None:
         self.sent.append(payload)
@@ -69,6 +81,11 @@ class FakeWebSocketApp:
                 self.on_message(self, response)
 
     def run_forever(self, ping_interval=None, ping_timeout=None) -> None:
+        if self._open_error is not None:
+            # A rejected upgrade / transport failure: the real client calls
+            # on_error and returns without ever invoking on_open.
+            self.on_error(self, self._open_error)
+            return
         if self.on_open is not None:
             self.on_open(self)
 
@@ -76,14 +93,21 @@ class FakeWebSocketApp:
         self.closed = True
 
 
-def _install_fake_ws_app(monkeypatch, responses=None):
+def _install_fake_ws_app(monkeypatch, responses=None, open_error=None):
     """Patch ``websocket.WebSocketApp`` and return the list of fakes it will build."""
 
     created = []
 
-    def _factory(url, on_open=None, on_message=None, on_error=None, on_close=None, **_kwargs):
+    def _factory(url, on_open=None, on_message=None, on_error=None, on_close=None, header=None, **_kwargs):
         fake = FakeWebSocketApp(
-            url, on_open=on_open, on_message=on_message, on_error=on_error, on_close=on_close, responses=responses
+            url,
+            on_open=on_open,
+            on_message=on_message,
+            on_error=on_error,
+            on_close=on_close,
+            responses=responses,
+            header=header,
+            open_error=open_error,
         )
         created.append(fake)
         return fake
@@ -119,7 +143,7 @@ def _make_connector(cls, *, timeout: int = 10, edge_id: str = None):
     connector._ws_app = None
     connector._ws_thread = None
     connector._connected_event = Event()
-    connector._auth_error = None
+    connector._connect_error = None
     connector._listeners = {}
     connector._subscribe_count = 0
     connector._json_rpc = JsonRpc()
@@ -179,14 +203,25 @@ def test_edge_subscribe_count_increments_across_successive_subscribes(monkeypatc
 # ---------------------------------------------------------------- 3: Backend subscribe payload
 
 
-def test_backend_auth_success_triggers_subscribe_with_expected_payload(monkeypatch):
+def test_backend_connects_via_basic_auth_and_subscribes_immediately(monkeypatch):
+    # Verified against openems/backend 2025.11.0: the B2B websocket authenticates
+    # via HTTP Basic on the upgrade request and aborts the socket on any
+    # unauthenticated frame - no authenticateWithPassword, no token response.
     channel = FakeChannel("Comp/Chan1")
-    connector, fake = _connect(monkeypatch, OpenEMSBackendConnector, responses=[AUTH_SUCCESS], channels=[channel])
+    connector, fake = _connect(monkeypatch, OpenEMSBackendConnector, responses=[], channels=[channel])
 
     assert connector.is_connected() is True
-    subscribe_request = json.loads(fake.sent[1])
+    assert fake.header == {"Authorization": "Basic YWRtaW46YWRtaW4="}  # admin:admin
+
+    assert len(fake.sent) == 1  # no auth frame; subscribe goes out directly on open
+    subscribe_request = json.loads(fake.sent[0])
     assert subscribe_request["method"] == "subscribeEdgesChannels"
     assert subscribe_request["params"] == {"count": 0, "ids": ["edge0"], "channels": ["Comp/Chan1"]}
+
+
+def test_edge_sends_no_upgrade_auth_header(monkeypatch):
+    _, fake = _connect(monkeypatch, OpenEMSEdgeConnector, responses=[AUTH_SUCCESS])
+    assert fake.header is None
 
 
 # ---------------------------------------------------------------- 4: Edge dispatch
@@ -267,9 +302,9 @@ def test_on_message_never_raises_on_malformed_frames(monkeypatch):
 # ---------------------------------------------------------------- 7: auth-error fail-fast
 
 
-def test_auth_error_frame_fails_connect_without_waiting_for_timeout(monkeypatch):
+def test_connect_error_frame_fails_connect_without_waiting_for_timeout(monkeypatch):
     channel = FakeChannel("Comp/Chan1")
-    _install_fake_ws_app(monkeypatch, responses=[_auth_error_frame("invalid username or password")])
+    _install_fake_ws_app(monkeypatch, responses=[_connect_error_frame("invalid username or password")])
     connector = _make_connector(OpenEMSEdgeConnector, timeout=10)
 
     start = time.monotonic()
@@ -278,6 +313,19 @@ def test_auth_error_frame_fails_connect_without_waiting_for_timeout(monkeypatch)
     elapsed = time.monotonic() - start
 
     assert elapsed < 2.0  # nowhere near the configured 10s timeout
+
+
+def test_transport_error_before_connect_fails_fast(monkeypatch):
+    # A rejected upgrade (e.g. HTTP 401 on the Backend's Basic auth) surfaces as
+    # on_error before on_open; connect() must raise immediately, not time out.
+    channel = FakeChannel("Comp/Chan1")
+    _install_fake_ws_app(monkeypatch, open_error=Exception("Handshake status 401 Unauthorized"))
+    connector = _make_connector(OpenEMSBackendConnector, timeout=10)
+
+    start = time.monotonic()
+    with pytest.raises(ConnectionError, match="401 Unauthorized"):
+        connector.connect([channel])
+    assert time.monotonic() - start < 2.0
 
 
 # ---------------------------------------------------------------- 8: timeout path
@@ -331,7 +379,7 @@ def test_edge_disconnect_sends_unsubscribe_and_is_idempotent(monkeypatch):
 
 def test_backend_disconnect_sends_unsubscribe_and_is_idempotent(monkeypatch):
     channel = FakeChannel("Comp/Chan1")
-    connector, fake = _connect(monkeypatch, OpenEMSBackendConnector, responses=[AUTH_SUCCESS], channels=[channel])
+    connector, fake = _connect(monkeypatch, OpenEMSBackendConnector, responses=[], channels=[channel])
 
     connector.disconnect()
 

@@ -8,6 +8,7 @@ lories.connectors.openems
 
 from __future__ import annotations
 
+import base64
 import json
 from abc import abstractmethod
 from threading import Event, Thread
@@ -62,7 +63,7 @@ class OpenEMSConnector(Connector):
     _ws_app: Optional[websocket.WebSocketApp]
     _ws_thread: Optional[Thread]
     _connected_event: Event
-    _auth_error: Optional[str]
+    _connect_error: Optional[str]
     _listeners: Dict[str, "OpenEMSListener"]
     _json_rpc: JsonRpc
 
@@ -71,7 +72,7 @@ class OpenEMSConnector(Connector):
         self._ws_app = None
         self._ws_thread = None
         self._connected_event = Event()
-        self._auth_error = None
+        self._connect_error = None
         self._listeners = {}
         self._subscribe_count = 0
         self._json_rpc = JsonRpc()
@@ -97,15 +98,11 @@ class OpenEMSConnector(Connector):
         ws_url = f"ws://{self._host}:{self._ws_port}/websocket"
         self._connected_event.clear()
         self._subscribe_count = 0
-        self._auth_error = None
+        self._connect_error = None
 
         def on_open(ws: websocket.WebSocketApp) -> None:
-            self._logger.debug(f"OpenEMS WS opened to {ws_url}, authenticating ...")
-            ws.send(
-                self._json_rpc.build_request(
-                    [("authenticateWithPassword", {"username": self._username, "password": self._password})]
-                )
-            )
+            self._logger.debug(f"OpenEMS WS opened to {ws_url}")
+            self._on_ws_open(ws)
 
         def on_message(ws: websocket.WebSocketApp, message: str) -> None:
             try:
@@ -118,7 +115,7 @@ class OpenEMSConnector(Connector):
                 if not self._connected_event.is_set():
                     # Authentication failed: unblock connect()'s wait immediately, instead
                     # of letting it block for the full timeout and raise a misleading error.
-                    self._auth_error = str(data["error"])
+                    self._connect_error = str(data["error"])
                     self._connected_event.set()
                 else:
                     self._logger.error(f"OpenEMS WS JSON-RPC error: {data['error']}")
@@ -138,7 +135,13 @@ class OpenEMSConnector(Connector):
                 self._dispatch_notification(notification, data.get("params", {}), self._listeners, timestamp)
 
         def on_error(ws: websocket.WebSocketApp, error: Exception) -> None:
-            self._logger.error(f"OpenEMS WS error: {error}")
+            if not self._connected_event.is_set():
+                # Transport/handshake failure before the connection was established
+                # (e.g. rejected upgrade): unblock connect()'s wait immediately.
+                self._connect_error = str(error)
+                self._connected_event.set()
+            else:
+                self._logger.error(f"OpenEMS WS error: {error}")
 
         def on_close(ws: websocket.WebSocketApp, close_status_code, close_msg) -> None:
             self._connected_event.clear()
@@ -146,6 +149,7 @@ class OpenEMSConnector(Connector):
 
         self._ws_app = websocket.WebSocketApp(
             ws_url,
+            header=self._ws_headers(),
             on_open=on_open,
             on_message=on_message,
             on_error=on_error,
@@ -168,9 +172,9 @@ class OpenEMSConnector(Connector):
                 f"Timeout ({self._timeout}s) waiting for OpenEMS authentication at {ws_url}",
             )
 
-        if self._auth_error is not None:
+        if self._connect_error is not None:
             self._ws_app.close()
-            raise ConnectionError(self, f"OpenEMS authentication failed at {ws_url}: {self._auth_error}")
+            raise ConnectionError(self, f"OpenEMS connect failed at {ws_url}: {self._connect_error}")
 
     def disconnect(self) -> None:
         # Unsubscribe gracefully before closing
@@ -197,6 +201,26 @@ class OpenEMSConnector(Connector):
 
     def write(self, data: pd.DataFrame) -> None:
         raise ConnectorError(self, f"{type(self).__name__} does not support write().")
+
+    # ------------------------------------------------------------------
+    # Overridable connection hooks
+    # ------------------------------------------------------------------
+
+    def _ws_headers(self) -> Optional[Dict[str, str]]:
+        """Additional HTTP headers for the WebSocket upgrade request (None by default)."""
+        return None
+
+    def _on_ws_open(self, ws: websocket.WebSocketApp) -> None:
+        """First action once the socket is open.
+
+        Default: authenticate with a JSON-RPC ``authenticateWithPassword`` frame;
+        the auth response's token then triggers the subscribe (see ``on_message``).
+        """
+        ws.send(
+            self._json_rpc.build_request(
+                [("authenticateWithPassword", {"username": self._username, "password": self._password})]
+            )
+        )
 
     # ------------------------------------------------------------------
     # Abstract protocol hooks (implemented by subclasses)
@@ -324,17 +348,34 @@ class OpenEMSEdgeConnector(OpenEMSConnector):
 class OpenEMSBackendConnector(OpenEMSConnector):
     """Connection via OpenEMS **Backend B2B** WebSocket.
 
+    Authentication is HTTP Basic on the WebSocket upgrade request (verified
+    against openems/backend 2025.11.0): there is no ``authenticateWithPassword``
+    frame and no token response - an unauthenticated frame makes the server
+    abort the socket. The connection counts as established as soon as the
+    upgrade succeeds, so the subscribe is sent directly from ``on_open``.
+
     Wire protocol::
 
         subscribe method   : subscribeEdgesChannels
         subscribe params   : {"count": N, "ids": ["edge0"], "channels": ["Comp/Chan", …]}
         notification method: edgesCurrentData
         notification params: {"edge0": {"Comp/Chan": value, …}}
+
+    The default B2B port is 8076 (not exposed by the stock Docker compose).
     """
 
     _edge_id = Parameter(key="edge_id", type=str, default="edge0", desc="OpenEMS Backend edge ID")
 
     _edge_id: str
+
+    def _ws_headers(self) -> Dict[str, str]:
+        token = base64.b64encode(f"{self._username}:{self._password}".encode()).decode()
+        return {"Authorization": f"Basic {token}"}
+
+    def _on_ws_open(self, ws: websocket.WebSocketApp) -> None:
+        self._connected_event.set()
+        self._logger.info(f"OpenEMS B2B WS connected to {self._host}:{self._ws_port}")
+        self._send_subscribe(ws)
 
     def _send_subscribe(self, ws: websocket.WebSocketApp) -> None:
         ws.send(
