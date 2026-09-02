@@ -63,7 +63,10 @@ def test_duplicate_via_alias_raises_registration_error_not_stopiteration():
         registry.register(_Backend, "openems")
 
 
-def test_replace_still_overrides():
+def test_replace_still_overrides_a_key():
+    # Known limitation, unchanged here: replace=True over a name owned by another
+    # registration's ALIAS inserts a new entry but from_type still returns the
+    # first insertion-order match. Only key collisions truly override.
     registry = Registry[_Thing]()
     registry.register(_Edge, "openems_edge")
     registry.register(_Backend, "openems_edge", replace=True)
