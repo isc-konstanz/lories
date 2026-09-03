@@ -3,7 +3,11 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
+import textwrap
+from pathlib import Path
 
 import pytest
 
@@ -60,6 +64,48 @@ def test_mocked_connectors_fail_clearly(connectors):
         ]
         assert flagged, f"{name} loaded against a mock but no class is flagged unavailable"
         assert all("not installed" in getattr(obj, "__import_error__", "") for obj in flagged)
+
+
+def test_mocked_connector_warns_at_import(tmp_path):
+    """A connector rescued by a mock still warns 'unavailable (missing: ...)' — parity with hard import failures.
+
+    Runs in a subprocess (import-time behavior can't be re-observed in-process) with ``sympy``
+    blocked, so ``math`` takes the mock path even on a full install.
+    """
+    repo_root = Path(__file__).resolve().parents[1]
+    script = tmp_path / "probe_mocked_warning.py"
+    script.write_text(
+        textwrap.dedent(
+            """
+            import importlib.abc
+            import logging
+            import sys
+
+
+            class Blocker(importlib.abc.MetaPathFinder):
+                def find_spec(self, name, path=None, target=None):
+                    if name.split(".")[0] == "sympy":
+                        raise ModuleNotFoundError(f"No module named '{name}'", name=name)
+                    return None
+
+
+            sys.meta_path.insert(0, Blocker())
+            logging.basicConfig(level=logging.WARNING, format="%(message)s", stream=sys.stdout)
+
+            import lories.connectors as connectors
+
+            assert "math" in connectors._mocked, connectors._mocked
+            """
+        ),
+        encoding="utf-8",
+    )
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(p for p in (str(repo_root), env.get("PYTHONPATH")) if p)
+    result = subprocess.run(
+        [sys.executable, str(script)], capture_output=True, text=True, env=env, cwd=repo_root, timeout=120
+    )
+    assert result.returncode == 0, f"probe failed:\n{result.stdout}\n{result.stderr}"
+    assert "Connector 'math' unavailable (missing: sympy)" in result.stdout
 
 
 def test_mock_module_contract_and_no_leak():

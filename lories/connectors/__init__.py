@@ -74,6 +74,7 @@ for _connector in CONNECTORS:
         try:
             importlib.import_module(f".{_connector}", "lories.connectors")
             if _attempts > 0:
+                _logger.warning("Connector '%s' unavailable (missing: %s)", _connector, _missing_dep)
                 _mocked[_connector] = _missing_dep
             break
 
