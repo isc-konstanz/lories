@@ -137,6 +137,33 @@ def test_submodule_importing_connector_mocks_and_warns(tmp_path):
     assert "smbus2" in i2c_lines[0] and "bme280" in i2c_lines[0]
 
 
+def test_registry_reflects_availability(connectors):
+    """Registration.available/error mirror the class __available__/__import_error__ flags (docs page contract)."""
+    from lories.connectors.context import registry
+
+    for key in registry.get_types():
+        registration = registry.from_type(key)
+        expected = getattr(registration.type, "__available__", True)
+        assert registration.available is expected, key
+        if not expected:
+            assert "not installed" in registration.error
+
+
+def test_unavailable_registration_refuses_initialize():
+    """Initializing an unavailable registration raises a clear RegistrationError instead of a mock RuntimeError."""
+    from lories.core.register.registration import Registration, RegistrationError
+
+    class Dummy:
+        __available__ = False
+        __import_error__ = "'nope' is not installed."
+
+    registration = Registration(Dummy, "dummy")
+    assert registration.available is False
+    assert registration.error == "'nope' is not installed."
+    with pytest.raises(RegistrationError, match="Cannot instantiate 'dummy'"):
+        registration.initialize()
+
+
 def test_inject_mock_covers_submodules():
     """After inject_mock, imports below the mocked prefix load MockModules instead of failing."""
     import importlib
