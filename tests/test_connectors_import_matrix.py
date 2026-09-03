@@ -137,6 +137,36 @@ def test_submodule_importing_connector_mocks_and_warns(tmp_path):
     assert "smbus2" in i2c_lines[0] and "bme280" in i2c_lines[0]
 
 
+def test_transitive_dep_attributed_to_owning_connector(tmp_path):
+    """A dep failing through a transitive chain is attributed to the connector that imports it.
+
+    Importing ``virtual`` (first in the loop) pulls lories.typing -> components ->
+    components.openems -> connectors.openems -> websocket. The missing dep belongs to
+    ``openems``; ``virtual`` must stay available.
+    """
+    result = _run_probe(
+        tmp_path,
+        ["websocket"],
+        """
+        import sys
+
+        assert "virtual" not in connectors._mocked, connectors._mocked
+        assert "openems" in connectors._mocked, connectors._mocked
+        assert connectors._mocked["openems"] == "websocket"
+
+        from lories.connectors.context import registry
+
+        assert registry.from_type("virtual").available is True
+
+        mod = sys.modules["lories.connectors.openems"]
+        flagged = [o for o in vars(mod).values() if isinstance(o, type) and getattr(o, "__available__", True) is False]
+        assert flagged, "openems loaded against mocks but no class is flagged unavailable"
+        """,
+    )
+    assert "Connector 'openems' unavailable (missing: websocket)" in result.stdout
+    assert "Connector 'virtual' unavailable" not in result.stdout
+
+
 def test_registry_reflects_availability(connectors):
     """Registration.available/error mirror the class __available__/__import_error__ flags (docs page contract)."""
     from lories.connectors.context import registry
