@@ -108,8 +108,14 @@ def _run_probe(tmp_path, blocked, body: str):
 
 
 def test_mocked_connector_warns_at_import(tmp_path):
-    """A connector rescued by a mock still warns 'unavailable (missing: ...)' — parity with hard import failures."""
-    result = _run_probe(tmp_path, ["sympy"], 'assert "math" in connectors._mocked, connectors._mocked\n')
+    """A connector rescued by a mock still warns 'unavailable (missing: ...)' — parity with hard import failures.
+
+    The torch stack is blocked alongside sympy: an installed torchvision hard-depends on
+    sympy and would import the sympy MOCK mid-cascade, crashing on it in non-ImportError
+    ways (a combination pip can't produce, since torch always installs sympy).
+    """
+    blocked = ["sympy", "torch", "torchvision", "onnxruntime"]
+    result = _run_probe(tmp_path, blocked, 'assert "math" in connectors._mocked, connectors._mocked\n')
     assert "Connector 'math' unavailable (missing: sympy)" in result.stdout
 
 
