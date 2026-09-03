@@ -242,9 +242,11 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
     # noinspection PyUnresolvedReferences, PyTypeChecker
     @wraps(_Connector.connect, updated=())
     def _do_connect(self, resources: Resources, locking: bool = True, *args, **kwargs) -> None:
+        # Acquire outside the try: a failed acquire must not reach the finally, whose
+        # release() would otherwise free a lock that another thread may still hold.
+        if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
+            raise ConnectorError(self, f"Timeout acquiring lock for connecting {type(self).__name__}: {self.id}")
         try:
-            if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
-                raise ConnectorError(self, f"Timeout acquiring lock for connecting {type(self).__name__}: {self.id}")
             if not self.is_enabled():
                 raise ConfigurationError(f"Trying to connect disabled {type(self).__name__}: {self.id}")
             if not self.is_configured():
@@ -281,10 +283,9 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
     # noinspection PyUnresolvedReferences, PyTypeChecker
     @wraps(_Connector.disconnect, updated=())
     def _do_disconnect(self, locking: bool = True) -> None:
+        if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
+            raise ConnectorError(self, f"Timeout acquiring lock for disconnecting {type(self).__name__}: {self.id}")
         try:
-            if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
-                raise ConnectorError(self, f"Timeout acquiring lock for disconnecting {type(self).__name__}: {self.id}")
-
             self._timestamp_connect = pd.NaT
             self._timestamp_disconnect = pd.Timestamp.now(tz.UTC)
 
@@ -306,9 +307,9 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
     # noinspection PyUnresolvedReferences, PyTypeChecker
     @wraps(_Connector.read, updated=())
     def _do_read(self, resources: Resources, locking: bool = True, *args, **kwargs) -> pd.DataFrame:
+        if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
+            raise ConnectorError(self, f"Timeout acquiring lock for reading {type(self).__name__}: {self.id}")
         try:
-            if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
-                raise ConnectorError(self, f"Timeout acquiring lock for reading {type(self).__name__}: {self.id}")
             if not self._is_connected():
                 raise ConnectionError(self, f"Trying to read from unconnected {type(self).__name__}: {self.id}")
 
@@ -335,9 +336,9 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
     # noinspection PyUnresolvedReferences, PyTypeChecker
     @wraps(_Connector.write, updated=())
     def _do_write(self, data: pd.DataFrame, locking: bool = True, *args, **kwargs) -> None:
+        if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
+            raise ConnectorError(self, f"Timeout acquiring lock for writing {type(self).__name__}: {self.id}")
         try:
-            if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
-                raise ConnectorError(self, f"Timeout acquiring lock for writing {type(self).__name__}: {self.id}")
             if not self._is_connected():
                 raise ConnectionError(self, f"Trying to write to unconnected {type(self).__name__}: {self.id}")
             unknown = [c for c in data.columns if c not in self.resources]

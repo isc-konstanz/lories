@@ -8,10 +8,11 @@ lories.connectors.modbus.client
 
 from __future__ import annotations
 
-from typing import Literal, Mapping
+from typing import Literal, Mapping, Optional
 
 from pymodbus import FramerType, ModbusException
 from pymodbus.client import ModbusBaseSyncClient, ModbusSerialClient, ModbusTcpClient, ModbusUdpClient
+from pymodbus.exceptions import ModbusIOException
 
 import pandas as pd
 import pytz as tz
@@ -110,6 +111,11 @@ class ModbusClient(Connector):
         desc="Modbus function code selecting which register table to access",
     )
     device = ChannelParameter(type=int, required=False, desc="Slave device ID / unit identifier (defaults to 1)")
+    device_id = ChannelParameter(
+        type=int,
+        required=False,
+        desc="Alias for 'device' in the pymodbus vocabulary; 'device' wins when both are set",
+    )
     data_type = ChannelParameter(
         type=str, required=False, desc="Override register data type (e.g. float32, int16, uint32, string)"
     )
@@ -188,45 +194,79 @@ class ModbusClient(Connector):
         super().disconnect()
         self.__client.close()
 
+    @staticmethod
+    def _device_of(resource) -> Optional[int]:
+        # "device_id" is the pymodbus vocabulary; "device" stays the primary key
+        # and wins when both are set.
+        device = resource.get("device", default=None)
+        if device is None:
+            device = resource.get("device_id", default=None)
+        return device
+
     # noinspection PyTypeChecker, PyShadowingBuiltins
     def read(self, resources: Resources) -> pd.DataFrame:
         timestamp = pd.Timestamp.now(tz.UTC).floor(freq="s")
         data = pd.DataFrame(index=[timestamp], columns=resources.ids)
         try:
-            for device, device_resources in resources.groupby("device"):
+            for device, device_resources in resources.groupby(self._device_of):
                 if device is None:
                     device = 1
 
-                # TODO: Implement reading adjacent blocks of registers of same device ID
-                for resource in device_resources:
-                    try:
-                        register = self.__registers[resource.id]
-                        function = getattr(self.__client, f"read_{register.function}s")
-
+                handled = set()
+                try:
+                    # TODO: Implement reading adjacent blocks of registers of same device ID
+                    for resource in device_resources:
                         try:
-                            result = function(register.address, count=register.length, device_id=device)
-                        except TypeError:
-                            try:
-                                result = function(register.address, count=register.length, slave=device)
-                            except TypeError:
-                                result = function(register.address, count=register.length, unit=device)
+                            register = self.__registers[resource.id]
+                            function = getattr(self.__client, f"read_{register.function}s")
 
-                        if result.isError():
-                            data.at[timestamp, resource.id] = ChannelState.UNKNOWN_ERROR
-                            self._logger.warning(f"Error reading register '{resource.id}'")
+                            try:
+                                result = function(register.address, count=register.length, device_id=device)
+                            except TypeError:
+                                try:
+                                    result = function(register.address, count=register.length, slave=device)
+                                except TypeError:
+                                    result = function(register.address, count=register.length, unit=device)
+
+                            if result.isError():
+                                data.at[timestamp, resource.id] = ChannelState.UNKNOWN_ERROR
+                                handled.add(resource.id)
+                                self._logger.warning(f"Error reading register '{resource.id}'")
+                                continue
+
+                            try:
+                                value = self.__client.convert_from_registers(
+                                    result.registers, register.type, word_order=self._endian
+                                )
+                            except ModbusException as e:
+                                # A malformed response (e.g. wrong register count) is a
+                                # per-resource fault, not a device or transport failure.
+                                data.at[timestamp, resource.id] = ChannelState.UNKNOWN_ERROR
+                                handled.add(resource.id)
+                                self._logger.warning(f"Invalid response for register '{resource.id}': {e}")
+                                continue
+                            data.at[timestamp, resource.id] = value
+                            handled.add(resource.id)
+
+                        except ConfigurationError as e:
+                            data.at[timestamp, resource.id] = ChannelState.ARGUMENT_SYNTAX_ERROR
+                            handled.add(resource.id)
+                            self._logger.warning(f"Invalid register configuration for resource '{resource.id}': {e}")
+                            continue
+                        except KeyError:
+                            data.at[timestamp, resource.id] = ChannelState.NOT_AVAILABLE
+                            handled.add(resource.id)
                             continue
 
-                        data.at[timestamp, resource.id] = self.__client.convert_from_registers(
-                            result.registers, register.type, word_order=self._endian
-                        )
-
-                    except ConfigurationError as e:
-                        data.at[timestamp, resource.id] = ChannelState.ARGUMENT_SYNTAX_ERROR
-                        self._logger.warning(f"Invalid register configuration for resource '{resource.id}': {e}")
-                        continue
-                    except KeyError:
-                        data.at[timestamp, resource.id] = ChannelState.NOT_AVAILABLE
-                        continue
+                except ModbusIOException as e:
+                    # A device that does not answer RAISES (pymodbus returns an error
+                    # result only for protocol exception responses, not for silence).
+                    # Mark this device's unhandled resources and continue with the
+                    # remaining devices instead of aborting the whole connector read.
+                    for resource in device_resources:
+                        if resource.id not in handled:
+                            data.at[timestamp, resource.id] = ChannelState.UNKNOWN_ERROR
+                    self._logger.warning(f"No response from modbus device {device} of '{self.id}': {e}")
             return data
 
         except ModbusException as e:
@@ -236,26 +276,43 @@ class ModbusClient(Connector):
 
     def write(self, data: pd.DataFrame) -> None:
         try:
-            for device, device_channels in self.channels.groupby("device"):
+            for device, device_channels in self.channels.groupby(self._device_of):
                 if device is None:
                     device = 1
 
-                for channel in device_channels:
-                    if channel.id not in data.columns:
-                        continue
-                    channel_data = data.loc[:, channel.id].dropna(axis="index", how="all")
-                    if channel_data.empty:
-                        continue
-                    register = self.__registers[channel.id]
-                    try:
-                        values = self.__client.convert_to_registers(
-                            channel_data.iloc[-1], register.type, word_order=self._endian
-                        )
-                        self.__client.write_registers(register.address, values, slave=device)
+                handled = set()
+                try:
+                    for channel in device_channels:
+                        if channel.id not in data.columns:
+                            continue
+                        channel_data = data.loc[:, channel.id].dropna(axis="index", how="all")
+                        if channel_data.empty:
+                            continue
+                        register = self.__registers[channel.id]
+                        try:
+                            values = self.__client.convert_to_registers(
+                                channel_data.iloc[-1], register.type, word_order=self._endian
+                            )
+                            self.__client.write_registers(register.address, values, slave=device)
+                            handled.add(channel.id)
 
-                    except ConfigurationError as e:
-                        self._logger.warning(f"Invalid register configuration for channel '{channel.id}': {e}")
-                        continue
+                        except ConfigurationError as e:
+                            handled.add(channel.id)
+                            self._logger.warning(f"Invalid register configuration for channel '{channel.id}': {e}")
+                            continue
+
+                except ModbusIOException as e:
+                    # Same isolation as read, but a write has no returned frame to carry
+                    # states back: mark the group's unwritten channels WRITE_ERROR, else
+                    # the VALID state that set_frame stamped before the task ran stands,
+                    # and a write that never reached the device reports success.
+                    for channel in device_channels:
+                        if channel.id not in data.columns or channel.id in handled:
+                            continue
+                        if data.loc[:, channel.id].dropna(axis="index", how="all").empty:
+                            continue
+                        channel.state = ChannelState.WRITE_ERROR
+                    self._logger.warning(f"No response from modbus device {device} of '{self.id}': {e}")
 
         except ModbusException as e:
             raise ConnectionError(self, e)

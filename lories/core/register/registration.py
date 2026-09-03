@@ -60,7 +60,7 @@ class Registration(Generic[Registrator]):
         return self.key == type or self.is_alias(type)
 
     def is_alias(self, type: str) -> bool:
-        return any(type.startswith(a) for a in self.alias)
+        return type in self.alias
 
     def is_instance(self, registrator: Registrator) -> bool:
         return isinstance(registrator, self.__class)

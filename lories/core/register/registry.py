@@ -37,10 +37,11 @@ class Registry(Generic[Registrator]):
         if not issubclass(cls, type):
             raise ValueError(f"Can only register {type} types")
         if self.has_type(key) and not replace:
-            raise RegistrationError(
-                f"Registration '{key}' does already exist: "
-                f"{next(t for t in self.__types.values() if key == t.key).name}"
-            )
+            # from_type matches keys AND aliases -- a key-only search crashed with a
+            # bare StopIteration when the collision came from another type's alias.
+            conflict = self.from_type(key)
+            via_alias = "" if conflict.key == key else f" (as alias of '{conflict.key}')"
+            raise RegistrationError(f"Registration '{key}' does already exist{via_alias}: {conflict.name}")
         registration = Registration[Registrator](cls, key, *alias, factory=factory)
         self.__types[key] = registration
 
