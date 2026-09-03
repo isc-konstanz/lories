@@ -26,6 +26,7 @@ from lories._core import _Application, _Context  # noqa
 from lories.application import Interface, Settings
 from lories.components import Component, ComponentContext, Weather
 from lories.connectors import Connector, ConnectorContext, Database, DatabaseError
+from lories.connectors import unavailable as unavailable_connectors
 from lories.connectors.tasks import LogTask, ReadTask
 from lories.core.configs import Configurations, ConfigurationUnavailableError
 from lories.core.configs.parameters import Parameter, ParameterGroup
@@ -92,6 +93,7 @@ class Application(_Application, DataContext, TaskContext):
 
     def __init__(self, settings: Settings, **kwargs) -> None:
         super().__init__(configs=settings, key=validate_key(settings["name"]), name=settings["name"], **kwargs)
+        self._log_unavailable_connectors()
         signal.signal(signal.SIGINT, self._request_stop)
         signal.signal(signal.SIGTERM, self._request_stop)
         self.__interrupt = Event()
@@ -271,6 +273,14 @@ class Application(_Application, DataContext, TaskContext):
             self._logger.warning(f"Failed notifying listener '{listener.id}': {str(exception)}")
             if self._logger.getEffectiveLevel() <= logging.DEBUG:
                 self._logger.exception(exception)
+
+    def _log_unavailable_connectors(self) -> None:
+        # The registry records missing optional dependencies at import time; report them here,
+        # once, through the configured logging (Settings has run _load_logging by now).
+        missing = unavailable_connectors()
+        if missing:
+            summary = ", ".join(f"{name} ({deps})" for name, deps in missing.items())
+            self._logger.info("Optional connectors not installed: %s", summary)
 
     @property
     def interface(self) -> Interface:

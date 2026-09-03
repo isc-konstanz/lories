@@ -17,6 +17,7 @@ from typing import Optional
 
 import dash
 import dash_bootstrap_components as dbc
+import flask.cli
 from dash import Dash, dcc, html
 from dash_bootstrap_components import themes
 
@@ -31,6 +32,15 @@ from lories.core.configs.parameters import Parameter
 from lories.typing import Configurations
 
 logging.getLogger("werkzeug").setLevel(logging.WARNING)
+
+
+def _no_server_banner(*args, **kwargs) -> None:
+    """Flask prints " * Serving Flask app ..." and " * Debug mode: ..." via click.echo on
+    every server start and offers no switch for it; the banner carries nothing the
+    configured logging does not already say."""
+
+
+flask.cli.show_server_banner = _no_server_banner
 
 
 # noinspection PyProtectedMember
@@ -93,6 +103,9 @@ class ViewInterface(Interface, Dash):
             assets_folder=assets_path,
             pages_folder=pages_path,
             use_pages=True,
+            # Dash would attach its own stdout handler to the "dash.dash" logger, so
+            # "Dash is running on ..." printed twice: bare, then through the root handler.
+            add_log_handler=False,
             server=True,  # TODO: Replace this with local Flask server, to create custom REST API ?
         )
         theme_defaults = {
