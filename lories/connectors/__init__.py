@@ -45,6 +45,7 @@ import logging
 import sys
 
 from lories.core.importing import inject_mock as _inject_mock
+from lories.core.importing import is_mocked as _is_mocked
 
 _logger = logging.getLogger(__name__)
 
@@ -71,29 +72,70 @@ CONNECTORS = [
 
 _unavailable: dict[str, str] = {}
 _mocked: dict[str, str] = {}
+_deps_by_owner: dict[str, list[str]] = {}
+
+
+def _import_origin(error):
+    # Innermost lories frame in the traceback = the module whose import statement failed.
+    origin = None
+    tb = error.__traceback__
+    while tb is not None:
+        name = tb.tb_frame.f_globals.get("__name__")
+        if isinstance(name, str) and (name == "lories" or name.startswith("lories.")):
+            origin = name
+        tb = tb.tb_next
+    return origin
+
+
+def _resolve_owner(origin, current):
+    # Attribute a missing dep to the connector whose module performed the failing import.
+    # Importing one connector can transitively import another (e.g. virtual -> lories.typing
+    # -> components -> components.openems -> connectors.openems -> websocket), and the dep
+    # belongs to the imported connector, not the one the loop is currently on. None means
+    # the failing import happened outside lories.connectors entirely.
+    if origin is None:
+        return current
+    if not origin.startswith("lories.connectors."):
+        return None
+    key = origin[len("lories.connectors.") :]
+    for name in CONNECTORS:
+        if key == name or key.startswith(name + "."):
+            return name
+    return current
+
 
 for _connector in CONNECTORS:
-    _attempts = 0
-    _missing_dep = None
     while True:
         try:
             importlib.import_module(f".{_connector}", "lories.connectors")
-            if _attempts > 0:
-                _mocked[_connector] = _missing_dep
             break
 
         except ImportError as e:
             _missing_dep = e.name or str(e).split("'")[1]
+            _origin = _import_origin(e)
+            _owner = _resolve_owner(_origin, _connector)
 
-            if _attempts > 0:
-                _logger.warning("Connector '%s' unavailable (missing: %s)", _connector, _missing_dep)
-                _unavailable[_connector] = _missing_dep
+            if _is_mocked(_missing_dep):
+                # Mocking this dependency didn't (or won't) help — give up on the module.
+                if _owner is not None:
+                    _logger.warning("Connector '%s' unavailable (missing: %s)", _owner, _missing_dep)
+                    _unavailable[_owner] = _missing_dep
+                else:
+                    _logger.warning("Module '%s' unavailable (missing: %s)", _origin, _missing_dep)
                 break
 
             _logger.debug("Retrying '%s' with mock for missing dep '%s'", _connector, _missing_dep)
             _inject_mock(_missing_dep)
+            if _owner is not None:
+                _deps_by_owner.setdefault(_owner, []).append(_missing_dep)
+            else:
+                _logger.warning("Module '%s' unavailable (missing: %s)", _origin, _missing_dep)
             sys.modules.pop(f"lories.connectors.{_connector}", None)
-            _attempts += 1
+
+for _connector, _deps in _deps_by_owner.items():
+    _missing_dep = ", ".join(_deps)
+    _logger.warning("Connector '%s' unavailable (missing: %s)", _connector, _missing_dep)
+    _mocked[_connector] = _missing_dep
 
 for _connector, _dep in _mocked.items():
     _mod = sys.modules.get(f"lories.connectors.{_connector}")
@@ -101,7 +143,9 @@ for _connector, _dep in _mocked.items():
         continue
     _mod_name = f"lories.connectors.{_connector}"
     for _obj in vars(_mod).values():
-        if isinstance(_obj, type) and _obj.__module__ == _mod_name:
+        # Match classes defined in the connector module itself or, for package
+        # connectors (e.g. serial.i2c), anywhere inside the package.
+        if isinstance(_obj, type) and (_obj.__module__ == _mod_name or _obj.__module__.startswith(_mod_name + ".")):
             _obj.__available__ = False
             _obj.__import_error__ = f"'{_dep}' is not installed."
 
