@@ -42,6 +42,7 @@ import logging
 import sys
 
 from lories.core.importing import inject_mock as _inject_mock
+from lories.core.importing import is_mocked as _is_mocked
 
 _logger = logging.getLogger(__name__)
 
@@ -68,12 +69,12 @@ _unavailable: dict[str, str] = {}
 _mocked: dict[str, str] = {}
 
 for _connector in CONNECTORS:
-    _attempts = 0
-    _missing_dep = None
+    _mocked_deps: list[str] = []
     while True:
         try:
             importlib.import_module(f".{_connector}", "lories.connectors")
-            if _attempts > 0:
+            if _mocked_deps:
+                _missing_dep = ", ".join(_mocked_deps)
                 _logger.warning("Connector '%s' unavailable (missing: %s)", _connector, _missing_dep)
                 _mocked[_connector] = _missing_dep
             break
@@ -81,15 +82,16 @@ for _connector in CONNECTORS:
         except ImportError as e:
             _missing_dep = e.name or str(e).split("'")[1]
 
-            if _attempts > 0:
+            if _is_mocked(_missing_dep):
+                # Mocking this dependency didn't (or won't) help — give up on the module.
                 _logger.warning("Connector '%s' unavailable (missing: %s)", _connector, _missing_dep)
                 _unavailable[_connector] = _missing_dep
                 break
 
             _logger.debug("Retrying '%s' with mock for missing dep '%s'", _connector, _missing_dep)
             _inject_mock(_missing_dep)
+            _mocked_deps.append(_missing_dep)
             sys.modules.pop(f"lories.connectors.{_connector}", None)
-            _attempts += 1
 
 for _connector, _dep in _mocked.items():
     _mod = sys.modules.get(f"lories.connectors.{_connector}")
@@ -97,7 +99,9 @@ for _connector, _dep in _mocked.items():
         continue
     _mod_name = f"lories.connectors.{_connector}"
     for _obj in vars(_mod).values():
-        if isinstance(_obj, type) and _obj.__module__ == _mod_name:
+        # Match classes defined in the connector module itself or, for package
+        # connectors (e.g. serial.i2c), anywhere inside the package.
+        if isinstance(_obj, type) and (_obj.__module__ == _mod_name or _obj.__module__.startswith(_mod_name + ".")):
             _obj.__available__ = False
             _obj.__import_error__ = f"'{_dep}' is not installed."
 
