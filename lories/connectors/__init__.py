@@ -66,6 +66,7 @@ CONNECTORS = [
     "revpi",
     "entsoe",
     "opcua",
+    "openems",
 ]
 
 _unavailable: dict[str, str] = {}

@@ -41,3 +41,6 @@ from .tariff import Tariff  # noqa: F401
 
 from . import environment  # noqa: F401
 from .environment import Environment  # noqa: F401
+
+from . import openems  # noqa: F401
+from .openems import OpenEMSComponent  # noqa: F401

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lories.components.camera
-~~~~~~~~~~~~~~~~~~~~~~~~
+lories.components.cameras.camera
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 """
 
@@ -19,6 +19,18 @@ from lories.core.configs.parameters import BoolParameter, IntParameter, Paramete
 # noinspection SpellCheckingInspection
 @register_component_type("camera")
 class Camera(_Camera):
+    """
+    Live camera feed exposed as a component.
+
+    Captures frames from a camera connector (such as ``opencv``) and publishes them as data
+    channels. A live video stream and per-frame motion detection can each be enabled, and the
+    most recent frame can be previewed in the dashboard.
+
+    An optional protection shutter closes the camera when motion is detected and reopens it
+    after a delay. It is opt-in through a ``[protection]`` section and requires motion detection
+    to be enabled.
+    """
+
     _channels = ParameterGroup(
         key="channels",
         desc="Channels exposed by this camera",
@@ -45,12 +57,16 @@ class Camera(_Camera):
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
         self.preview = self._preview
-        self.protection = CameraProtector(
-            self,
-            name=f"{self.name} Protection",
-            configs=configs.get_member(CameraProtector.TYPE, defaults={}),
-        )
-        self.components.add(self.protection)
+
+        if configs.has_member(CameraProtector.TYPE, includes=True):
+            protection = configs.get_member(CameraProtector.TYPE, defaults={})
+            if protection.enabled:
+                self.protection = CameraProtector(
+                    self,
+                    name=f"{self.name} Protection",
+                    configs=protection,
+                )
+                self.components.add(self.protection)
 
         channels = self._channels
 

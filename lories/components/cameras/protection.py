@@ -28,6 +28,10 @@ class CameraProtector(_CameraProtector):
     view channel) is muted while the shutter is closed and until the ``cooldown`` after
     it opens has passed, so no frames of the shutter reach the motion detector or any
     other consumer.
+
+    The open/closed state is published as a data channel, and the cycle can also be
+    triggered manually from the dashboard. Requires the parent camera to have motion
+    detection enabled.
     """
 
     _delay = DurationParameter(

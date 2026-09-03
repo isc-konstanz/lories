@@ -74,6 +74,9 @@ mqtt = [
     "paho-mqtt",
     "jsonpath_ng",
 ]
+openems = [
+    "websocket-client",
+]
 revpi = [
     "revpimodio2",
 ]
