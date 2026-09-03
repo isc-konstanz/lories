@@ -17,6 +17,10 @@ from typing import Any, Dict, Optional
 # (Older builds — e.g. the OpenCV on isc-agri — don't expose the
 # cv2.utils.logging Python API, so the env var is the portable path.)
 os.environ.setdefault("OPENCV_LOG_LEVEL", "ERROR")
+# FFmpeg's own decoder log ("Overread VUI by 8 bits" on every RTSP open) bypasses
+# OPENCV_LOG_LEVEL. OpenCV reads this once at backend init; 8 = AV_LOG_FATAL, so only
+# fatal decoder errors still print.
+os.environ.setdefault("OPENCV_FFMPEG_LOGLEVEL", "8")
 
 import cv2
 

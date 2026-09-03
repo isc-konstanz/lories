@@ -107,16 +107,26 @@ def _run_probe(tmp_path, blocked, body: str):
     return result
 
 
-def test_mocked_connector_warns_at_import(tmp_path):
-    """A connector rescued by a mock still warns 'unavailable (missing: ...)' — parity with hard import failures.
+def test_mocked_connector_recorded_without_import_noise(tmp_path):
+    """A connector rescued by a mock is recorded as unavailable, and the import itself stays quiet.
+
+    Every process that imports lories (spawned camera-stream workers included) would otherwise
+    print a bare line per missing dependency; the application logs the summary once instead.
 
     The torch stack is blocked alongside sympy: an installed torchvision hard-depends on
     sympy and would import the sympy MOCK mid-cascade, crashing on it in non-ImportError
     ways (a combination pip can't produce, since torch always installs sympy).
     """
     blocked = ["sympy", "torch", "torchvision", "onnxruntime"]
-    result = _run_probe(tmp_path, blocked, 'assert "math" in connectors._mocked, connectors._mocked\n')
-    assert "Connector 'math' unavailable (missing: sympy)" in result.stdout
+    result = _run_probe(
+        tmp_path,
+        blocked,
+        """
+        assert "math" in connectors._mocked, connectors._mocked
+        assert connectors.unavailable()["math"] == "sympy", connectors.unavailable()
+        """,
+    )
+    assert "unavailable (missing" not in result.stdout, result.stdout
 
 
 def test_submodule_importing_connector_mocks_and_warns(tmp_path):
@@ -135,12 +145,13 @@ def test_submodule_importing_connector_mocks_and_warns(tmp_path):
         mod = sys.modules["lories.connectors.influxdb2"]
         flagged = [o for o in vars(mod).values() if isinstance(o, type) and getattr(o, "__available__", True) is False]
         assert flagged, "influxdb2 loaded against mocks but no class is flagged unavailable"
+
+        unavailable = connectors.unavailable()
+        assert unavailable["influxdb2"] == "influxdb_client", unavailable
+        assert unavailable["serial.i2c"] == "smbus2, bme280", unavailable
         """,
     )
-    assert "Connector 'influxdb2' unavailable (missing: influxdb_client)" in result.stdout
-    i2c_lines = [line for line in result.stdout.splitlines() if "Connector 'serial.i2c' unavailable" in line]
-    assert len(i2c_lines) == 1, result.stdout
-    assert "smbus2" in i2c_lines[0] and "bme280" in i2c_lines[0]
+    assert "unavailable (missing" not in result.stdout, result.stdout
 
 
 def test_transitive_dep_attributed_to_owning_connector(tmp_path):
@@ -167,10 +178,13 @@ def test_transitive_dep_attributed_to_owning_connector(tmp_path):
         mod = sys.modules["lories.connectors.openems"]
         flagged = [o for o in vars(mod).values() if isinstance(o, type) and getattr(o, "__available__", True) is False]
         assert flagged, "openems loaded against mocks but no class is flagged unavailable"
+
+        unavailable = connectors.unavailable()
+        assert unavailable["openems"] == "websocket", unavailable
+        assert "virtual" not in unavailable, unavailable
         """,
     )
-    assert "Connector 'openems' unavailable (missing: websocket)" in result.stdout
-    assert "Connector 'virtual' unavailable" not in result.stdout
+    assert "unavailable (missing" not in result.stdout, result.stdout
 
 
 def test_registry_reflects_availability(connectors):

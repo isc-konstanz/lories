@@ -113,10 +113,11 @@ for _connector in CONNECTORS:
             if _is_mocked(_missing_dep):
                 # Mocking this dependency didn't (or won't) help — give up on the module.
                 if _owner is not None:
-                    _logger.warning("Connector '%s' unavailable (missing: %s)", _owner, _missing_dep)
+                    _logger.debug("Connector '%s' unavailable (missing: %s)", _owner, _missing_dep)
                     _unavailable[_owner] = _missing_dep
                 else:
-                    _logger.warning("Module '%s' unavailable (missing: %s)", _origin, _missing_dep)
+                    _logger.debug("Module '%s' unavailable (missing: %s)", _origin, _missing_dep)
+                    _unavailable[str(_origin)] = _missing_dep
                 break
 
             _logger.debug("Retrying '%s' with mock for missing dep '%s'", _connector, _missing_dep)
@@ -124,12 +125,13 @@ for _connector in CONNECTORS:
             if _owner is not None:
                 _deps_by_owner.setdefault(_owner, []).append(_missing_dep)
             else:
-                _logger.warning("Module '%s' unavailable (missing: %s)", _origin, _missing_dep)
+                _logger.debug("Module '%s' unavailable (missing: %s)", _origin, _missing_dep)
+                _unavailable[str(_origin)] = _missing_dep
             sys.modules.pop(f"lories.connectors.{_connector}", None)
 
 for _connector, _deps in _deps_by_owner.items():
     _missing_dep = ", ".join(_deps)
-    _logger.warning("Connector '%s' unavailable (missing: %s)", _connector, _missing_dep)
+    _logger.debug("Connector '%s' unavailable (missing: %s)", _connector, _missing_dep)
     _mocked[_connector] = _missing_dep
 
 for _connector, _dep in _mocked.items():
@@ -145,3 +147,13 @@ for _connector, _dep in _mocked.items():
             _obj.__import_error__ = f"'{_dep}' is not installed."
 
 del importlib
+
+
+def unavailable() -> dict[str, str]:
+    """Optional connectors whose dependencies are not installed, mapped to the missing distributions.
+
+    Recorded here at import time and logged once by the application after logging is
+    configured. Logging from this module would print a bare line per connector in every
+    process that imports lories, including the spawned camera-stream workers.
+    """
+    return {**_unavailable, **_mocked}
