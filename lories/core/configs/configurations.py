@@ -315,14 +315,14 @@ class Configurations(_Configurations):
         return self.__dirs.conf.joinpath(self.__path.name.replace(".conf", ".d"))
 
     def has_member(self, key: str, includes: bool = False) -> bool:
+        # A member declared solely as a "<name>.d/<key>.conf" file is absent from this mapping until
+        # it is loaded, so the file has to be checked before the lookup, not after.
+        if includes and self._members_dir.joinpath(f"{key}.conf").exists():
+            return True
         member = self.get(key, default=None)
         if member is None:
             return False
-        if isinstance(member, (Configurations, bool)):
-            return True
-        if includes and self._members_dir.joinpath(f"{key}.conf").exists():
-            return True
-        return False
+        return isinstance(member, (Configurations, bool))
 
     def get_members(
         self,
