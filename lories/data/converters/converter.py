@@ -86,6 +86,12 @@ class Converter(_Converter, Registrator, Generic[T]):
         except TypeError:
             raise ConversionError(f"Expected str or {self.dtype}, not: {type(data)}")
 
+    # noinspection PyProtectedMember, PyUnresolvedReferences
+    def from_value(self, value: Any, channel: _Channel) -> Optional[T]:
+        """Convert one pushed value the way `from_series` converts a read frame."""
+        converter_args = channel.converter._get_configs()
+        return self.to_dtype(self.convert(value, **converter_args), **converter_args)
+
     # noinspection PyMethodMayBeStatic, PyUnusedLocal
     def convert(self, value: Any, **kwargs) -> Optional[T]:
         return value
@@ -100,6 +106,12 @@ class _NumberConverter(Converter[T]):
             else:
                 value *= factor
         return self.to_dtype(value, **kwargs)
+
+    # noinspection PyProtectedMember, PyUnresolvedReferences
+    def from_value(self, value: Any, channel: _Channel) -> Optional[T]:
+        factor = to_float(channel.get("scale", default=None))
+        converter_args = channel.converter._get_configs()
+        return self.scale(self.convert(value, **converter_args), factor, **converter_args)
 
     # noinspection PyProtectedMember, PyUnresolvedReferences
     def from_series(self, data: pd.Series, channel: _Channel) -> pd.Series:

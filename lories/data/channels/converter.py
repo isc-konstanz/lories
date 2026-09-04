@@ -18,6 +18,8 @@ from lories.data.channels._core import _ChannelWrapper
 
 
 class ChannelConverter(_ChannelWrapper[Converter]):
+    _channel: Channel
+
     # noinspection PyProtectedMember, PyUnresolvedReferences, PyTypeChecker
     @classmethod
     def build(cls, channel: Channel, **configs) -> ChannelConverter:
@@ -29,7 +31,9 @@ class ChannelConverter(_ChannelWrapper[Converter]):
             converter = converter_context.get_by_dtype(channel.type)
         else:
             converter = cls._build_registrator(converter_context, channel.path, converter_id)
-        return cls(_Converter, converter, **configs)
+        channel_converter = cls(_Converter, converter, **configs)
+        channel_converter._channel = channel
+        return channel_converter
 
     @classmethod
     def _assert_registrator(cls, converter) -> Converter:
@@ -42,12 +46,11 @@ class ChannelConverter(_ChannelWrapper[Converter]):
         return self._get_registrator()
 
     def __call__(self, data: Any) -> Any:
-        converter_args = self._get_configs()
+        # Pushed values take the same path as a read frame (`from_series`), so a channel's
+        # `scale` applies whether a connector polls or pushes.
         if isinstance(data, pd.Series):
-            converted_data = data.apply(self._converter.convert, **converter_args)
-            return converted_data.apply(self._converter.to_dtype, **converter_args)
-        converted_data = self._converter.convert(data, **converter_args)
-        return self._converter.to_dtype(converted_data, **converter_args)
+            return data.apply(self._converter.from_value, args=(self._channel,))
+        return self._converter.from_value(data, self._channel)
 
     def to_str(self, value: Any) -> str:
         return self._converter.to_str(value)
