@@ -4,7 +4,7 @@ tests.test_openems_connector
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Protocol-level unit tests for the OpenEMS WebSocket connector wire format
-(``lories.connectors.openems``). No socket / network use:
+(``lories.connectors.openems.client``). No socket / network use:
 ``websocket.WebSocketApp`` (as imported by the connector module) is replaced
 with a fake that records outbound ``send()`` payloads and, when scripted,
 feeds a canned reply straight back into the connector's own ``on_message``
@@ -28,11 +28,12 @@ from threading import Event
 
 import pytest
 
-import lories.connectors.openems as openems_connector
+import lories.connectors.openems.client as openems_client
 import pandas as pd
 from lories.connectors.errors import ConnectionError, ConnectorError
-from lories.connectors.openems import OpenEMSBackendConnector, OpenEMSEdgeConnector
+from lories.connectors.openems import ChannelInfo, OpenEMSBackendConnector, OpenEMSEdgeConnector
 from lories.io.jsonrpc import JsonRpc
+from lories.io.rest import Rest
 
 AUTH_SUCCESS = json.dumps({"jsonrpc": "2.0", "id": "srv-1", "result": {"token": "abcdef1234"}})
 
@@ -112,16 +113,28 @@ def _install_fake_ws_app(monkeypatch, responses=None, open_error=None):
         created.append(fake)
         return fake
 
-    monkeypatch.setattr(openems_connector.websocket, "WebSocketApp", _factory)
+    monkeypatch.setattr(openems_client.websocket, "WebSocketApp", _factory)
     return created
 
 
 class FakeChannel:
-    """Records ``(timestamp, value)`` pairs handed to it, like a real ``Channel.set``."""
+    """Records ``(timestamp, value)`` pairs handed to it, like a real ``Channel.set``.
 
-    def __init__(self, address: str):
-        self.address = address
+    Addressing goes through ``get()``, the way the connector reads the ``component`` and
+    ``channel`` config keys off a real ``Channel``.
+    """
+
+    def __init__(self, address: str, id: str = "test.channel"):
+        self.id = id
+        if address is None:
+            self._configs = {}
+        else:
+            component, _, channel = address.partition("/")
+            self._configs = {"component": component, "channel": channel or None}
         self.calls = []
+
+    def get(self, attr, default=None):
+        return self._configs.get(attr, default)
 
     def set(self, timestamp, value) -> None:
         self.calls.append((timestamp, value))
@@ -139,6 +152,9 @@ def _make_connector(cls, *, timeout: int = 10, edge_id: str = None):
     connector._username = "admin"
     connector._password = "admin"
     connector._timeout = timeout
+    connector._rest_port = 8084
+    connector._rest_endpoint = "rest"
+    connector._discovered = None
     connector._edge_id = edge_id if edge_id is not None else ("0" if cls is OpenEMSEdgeConnector else "edge0")
     connector._ws_app = None
     connector._ws_thread = None
@@ -389,3 +405,145 @@ def test_backend_disconnect_sends_unsubscribe_and_is_idempotent(monkeypatch):
 
     assert connector.is_connected() is False
     connector.disconnect()  # second call must be a safe no-op
+
+
+# ---------------------------------------------------------------- 11: address split
+
+
+def test_subscribe_composes_the_address_from_component_and_channel(monkeypatch):
+    channel = FakeChannel("meter0/ActivePower")
+    _, fake = _connect(monkeypatch, OpenEMSEdgeConnector, responses=[AUTH_SUCCESS], channels=[channel])
+
+    inner = json.loads(fake.sent[1])["params"]["payload"]
+    assert inner["params"]["channels"] == ["meter0/ActivePower"]
+
+
+@pytest.mark.parametrize("address", [None, "meter0/", "/ActivePower"])
+def test_channel_without_component_or_channel_is_rejected(monkeypatch, address):
+    channel = FakeChannel(address, id="test.broken")
+    _install_fake_ws_app(monkeypatch, responses=[AUTH_SUCCESS])
+    connector = _make_connector(OpenEMSEdgeConnector)
+
+    with pytest.raises(ConnectorError, match="test.broken"):
+        connector.connect([channel])
+
+
+# ---------------------------------------------------------------- 12: REST discovery
+
+_LISTING = [
+    {"address": "meter0/ActivePower", "type": "INTEGER", "unit": "W", "accessMode": "RO"},
+    {"address": "meter0/Current", "type": "INTEGER", "unit": "mA", "accessMode": "RO"},
+    {"address": "meter0/ActiveProductionEnergy", "type": "LONG", "unit": "Wh_Σ", "accessMode": "RO"},
+    {"address": "_sum/State", "type": "INTEGER", "unit": "", "accessMode": "RO"},
+    {"address": "no-slash-here", "type": "STRING", "unit": "", "accessMode": "RO"},
+]
+
+
+def _install_rest(monkeypatch, *responses):
+    """Script ``Rest.get_request``: each entry is either a payload string or an exception."""
+    calls = []
+
+    def _get_request(self, path, params=None):
+        calls.append(path)
+        response = responses[min(len(calls), len(responses)) - 1]
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    monkeypatch.setattr(Rest, "get_request", _get_request)
+    monkeypatch.setattr(openems_client.time, "sleep", lambda seconds: None)
+    return calls
+
+
+def test_discover_parses_the_listing_and_skips_addresses_without_a_component(monkeypatch):
+    calls = _install_rest(monkeypatch, json.dumps(_LISTING))
+    connector = _make_connector(OpenEMSEdgeConnector)
+
+    discovered = connector.discover()
+
+    assert calls == ["channel/.*/.*"]
+    assert set(discovered) == {"meter0/ActivePower", "meter0/Current", "meter0/ActiveProductionEnergy", "_sum/State"}
+    power = discovered["meter0/ActivePower"]
+    assert power == ChannelInfo(
+        address="meter0/ActivePower",
+        component="meter0",
+        channel="ActivePower",
+        type="INTEGER",
+        unit="W",
+        access_mode="RO",
+    )
+    assert discovered["_sum/State"].unit is None  # empty unit normalizes to None
+
+
+def test_discover_retries_and_succeeds_on_the_third_attempt(monkeypatch):
+    calls = _install_rest(
+        monkeypatch,
+        OSError("REST unreachable"),
+        OSError("REST unreachable"),
+        json.dumps(_LISTING),
+    )
+    connector = _make_connector(OpenEMSEdgeConnector)
+
+    assert "meter0/ActivePower" in connector.discover()
+    assert len(calls) == 3
+
+
+def test_discover_raises_connector_error_after_three_failed_attempts(monkeypatch):
+    calls = _install_rest(monkeypatch, OSError("REST unreachable"))
+    connector = _make_connector(OpenEMSEdgeConnector)
+
+    with pytest.raises(ConnectorError, match="discovery failed after 3 attempts"):
+        connector.discover()
+
+    assert len(calls) == 3
+
+
+def test_discover_caches_until_refresh_is_requested(monkeypatch):
+    calls = _install_rest(monkeypatch, json.dumps(_LISTING))
+    connector = _make_connector(OpenEMSEdgeConnector)
+
+    first = connector.discover()
+    assert connector.discover() is first
+    assert len(calls) == 1
+
+    refreshed = connector.discover(refresh=True)
+    assert len(calls) == 2
+    assert refreshed == first
+
+
+def test_discover_raises_connector_error_on_a_payload_that_is_not_a_list(monkeypatch):
+    _install_rest(monkeypatch, json.dumps({"address": "meter0/ActivePower"}))
+    connector = _make_connector(OpenEMSEdgeConnector)
+
+    with pytest.raises(ConnectorError, match="expected a list of channels"):
+        connector.discover()
+
+
+def test_discover_raises_connector_error_on_a_null_payload(monkeypatch):
+    _install_rest(monkeypatch, "null")
+    connector = _make_connector(OpenEMSEdgeConnector)
+
+    with pytest.raises(ConnectorError, match="expected a list of channels"):
+        connector.discover()
+
+
+def test_discover_raises_connector_error_on_a_malformed_body(monkeypatch):
+    calls = _install_rest(monkeypatch, "not json at all {")
+    connector = _make_connector(OpenEMSEdgeConnector)
+
+    with pytest.raises(ConnectorError, match="discovery failed after 3 attempts"):
+        connector.discover()
+
+    assert len(calls) == 3
+
+
+def test_backend_discovery_is_refused_pointing_at_the_edge(monkeypatch):
+    # Discovery is a REST call the Edge answers; the Backend B2B socket has no listing,
+    # so a bound device must name an openems_edge connector.
+    calls = _install_rest(monkeypatch, json.dumps(_LISTING))
+    connector = _make_connector(OpenEMSBackendConnector)
+
+    with pytest.raises(ConnectorError, match="only available on an OpenEMS Edge"):
+        connector.discover()
+
+    assert calls == []

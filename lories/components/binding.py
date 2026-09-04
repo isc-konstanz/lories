@@ -8,10 +8,11 @@ lories.components.binding
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 from lories.components.component import Component
 from lories.core import ConfigurationError, Constant
+from lories.core.typing import Connector
 from lories.typing import Configurations
 
 
@@ -95,7 +96,17 @@ class BindableComponent(Component):
 
     def _on_configure(self, configs: Configurations) -> None:
         super()._on_configure(configs)
-        unresolved = [key for key in getattr(self, "_bound", []) if not self.data[key].has_connector()]
+        self._check_bound(getattr(self, "_bound", []))
+
+    def _check_bound(self, keys: Iterable[str]) -> None:
+        """Assert the named bound channels resolved a connector, of this family if one is declared.
+
+        `_on_configure` runs this over everything a binding claimed. A component that adds
+        channels later - once the connectors exist, e.g. from a device listing - runs it again
+        over those keys, because they were not declared yet when the seam checked.
+        """
+        keys = list(keys)
+        unresolved = [key for key in keys if not self.data[key].has_connector()]
         if unresolved:
             raise ConfigurationError(
                 f"{type(self).__name__} '{self.id}' cannot resolve connector '{self._connector_id}' for channels "
@@ -106,7 +117,7 @@ class BindableComponent(Component):
             from lories.connectors import registry as connector_registry
 
             families = tuple(connector_registry.from_type(name).type for name in type(self).CONNECTOR_TYPES)
-            for key in self._bound:
+            for key in keys:
                 channel = self.data[key]
                 connector = channel.connector._connector
                 if not isinstance(connector, families):
@@ -114,3 +125,23 @@ class BindableComponent(Component):
                         f"{type(self).__name__} '{self.id}' channel '{key}' connector '{self._connector_id}' "
                         f"resolved to {type(connector).__name__}, expected one of {type(self).CONNECTOR_TYPES}"
                     )
+
+    def _resolve_connector(self) -> Optional[Connector]:
+        """Resolve the device's `connector` id to the live connector, or None when nothing matches.
+
+        Mirrors how a channel resolves its own connector (`_ChannelWrapper._build_registrator`):
+        a bare id is tried against every prefix of this component's id path, innermost first,
+        and then as given, so an application-level `[connectors.<id>]` resolves as well as one
+        declared here or on a parent. A dotted id is only looked up as written.
+        """
+        if self._connector_id is None:
+            return None
+        context = self.connectors.context
+        connector_id = self._connector_id
+        if "." not in connector_id:
+            for i in reversed(range(1, len(self.path) + 1)):
+                _id = ".".join([*self.path[:i], connector_id])
+                if _id in context.keys():
+                    connector_id = _id
+                    break
+        return context.get(connector_id, None)
