@@ -24,6 +24,7 @@ from lories.data.converters.converter import (
     StringConverter,
     TimestampConverter,
 )
+from lories.data.converters.linear import LinearConverter
 
 CONVERTERS_BUILTINS = [
     DatetimeConverter,
@@ -36,6 +37,11 @@ CONVERTERS_BUILTINS = [
     ListConverter,
 ]
 
+# Converters that always exist as one instance, keyed by name rather than by dtype.
+CONVERTERS_DEFAULTS = {
+    "linear": LinearConverter,
+}
+
 registry = Registry[Converter]()
 registry.register(DatetimeConverter, "datetime")
 registry.register(TimestampConverter, "timestamp")
@@ -45,6 +51,7 @@ registry.register(IntConverter, "int", "integer")
 registry.register(BoolConverter, "bool", "boolean")
 registry.register(BytesConverter, "byte", "bytes")
 registry.register(ListConverter, "list")
+registry.register(LinearConverter, "linear")
 
 
 def register_converter_type(
@@ -81,8 +88,9 @@ class ConverterContext(_ConverterContext, RegistratorContext[Converter]):
         converter_dirs = configs.dirs.to_dict()
         converter_dirs["conf_dir"] = str(configs.dirs.conf.joinpath("converters.d"))
         converter_generics = [c.type for c in registry.filter(lambda r: r.type in CONVERTERS_BUILTINS)]
-        for converter_cls in converter_generics:
-            converter_key = converter_cls.dtype.__name__.lower()
+        converter_defaults = [(c.dtype.__name__.lower(), c) for c in converter_generics]
+        converter_defaults.extend(CONVERTERS_DEFAULTS.items())
+        for converter_key, converter_cls in converter_defaults:
             converter_configs = Configurations.load(
                 f"{converter_key}.conf",
                 require=False,
@@ -108,4 +116,6 @@ class ConverterContext(_ConverterContext, RegistratorContext[Converter]):
         return converters[0]
 
     def _get_by_dtypes(self, dtype: Type) -> List[Converter]:
-        return [t for t in self.values() if issubclass(t.dtype, dtype)]
+        # Only the generic dtype converters serve as a channel's default; `linear` and any named
+        # instance share a dtype with them but must be selected explicitly.
+        return [t for t in self.values() if type(t) in CONVERTERS_BUILTINS and issubclass(t.dtype, dtype)]

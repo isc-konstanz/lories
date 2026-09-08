@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-from typing import Any, Generic, Optional, Type, TypeVar
+from typing import Any, Collection, Generic, Optional, Type, TypeVar
 
 import pandas as pd
 import pytz as tz
@@ -25,6 +25,14 @@ T = TypeVar("T", bound=Any)
 
 # noinspection PyAbstractClass
 class Converter(_Converter, Registrator, Generic[T]):
+    # Keys a channel may set in its `converter = { ... }` table; anything else is rejected at build.
+    ARGUMENTS: Collection[str] = ()
+
+    # noinspection PyMethodMayBeStatic, PyUnusedLocal
+    def assert_channel(self, channel: _Channel) -> None:
+        """Raise a ConfigurationError if this converter cannot serve the channel's declared type."""
+        return
+
     def to_str(self, value: T | pd.Series) -> str:
         return self.to_json(value)
 
@@ -86,30 +94,15 @@ class Converter(_Converter, Registrator, Generic[T]):
         except TypeError:
             raise ConversionError(f"Expected str or {self.dtype}, not: {type(data)}")
 
+    # noinspection PyProtectedMember, PyUnresolvedReferences
+    def from_value(self, value: Any, channel: _Channel) -> Optional[T]:
+        """Convert one pushed value the way `from_series` converts a read frame."""
+        converter_args = channel.converter._get_configs()
+        return self.to_dtype(self.convert(value, **converter_args), **converter_args)
+
     # noinspection PyMethodMayBeStatic, PyUnusedLocal
     def convert(self, value: Any, **kwargs) -> Optional[T]:
         return value
-
-
-# noinspection PyAbstractClass, PyMethodMayBeStatic
-class _NumberConverter(Converter[T]):
-    def scale(self, value: T, factor: Optional[T], invert: bool = False, **kwargs) -> T:
-        if value is not None and factor is not None:
-            if invert:
-                value /= factor
-            else:
-                value *= factor
-        return self.to_dtype(value, **kwargs)
-
-    # noinspection PyProtectedMember, PyUnresolvedReferences
-    def from_series(self, data: pd.Series, channel: _Channel) -> pd.Series:
-        try:
-            factor = to_float(channel.get("scale", default=None))
-            converter_args = channel.converter._get_configs()
-            converted_data = data.apply(self.convert, **converter_args)
-            return converted_data.apply(self.scale, args=(factor,), **converter_args)
-        except TypeError:
-            raise ConversionError(f"Expected str or {self.dtype}, not: {type(data)}")
 
 
 # noinspection PyMethodMayBeStatic
@@ -146,7 +139,8 @@ class StringConverter(Converter[str]):
 
 
 # noinspection PyMethodMayBeStatic
-class FloatConverter(_NumberConverter[float]):
+class FloatConverter(Converter[float]):
+    ARGUMENTS: Collection[str] = ("decimals",)
     dtype: Type[float] = float
 
     def is_dtype(self, value: str | float) -> bool:
@@ -160,7 +154,7 @@ class FloatConverter(_NumberConverter[float]):
 
 
 # noinspection PyMethodMayBeStatic
-class IntConverter(_NumberConverter[int]):
+class IntConverter(Converter[int]):
     dtype: Type[int] = int
 
     def is_dtype(self, value: str | int) -> bool:
