@@ -14,7 +14,7 @@ import dash_bootstrap_components as dbc
 from dash import Input, Output, callback, html
 
 import pandas as pd
-from lories.application.view._dash_format import format_bytes_label
+from lories.application.view._dash_format import format_bytes_label, format_number
 from lories.application.view.pages.layout import PageLayout
 from lories.application.view.pages.page import Page
 from lories.application.view.pages.widgets import build_configs_editor_modal
@@ -127,11 +127,10 @@ class ConnectorPage(Page, Generic[ConnectorType]):
             elif channel.type == list:
                 value = "—" if value is None else f"({len(value)} values)"
             elif not pd.isna(value) and channel.type == float:
-                # Format with 3 significant figures, trailing zeros preserved
-                # (``#`` flag). Reads as "0.00", "0.120", "0.0100" — consistent
-                # precision regardless of magnitude. Avoids the prior
-                # ``round(value, 2)`` which collapsed sub-0.01 values to 0.0.
-                value = f"{value:#.3g}"
+                # 3 significant figures, trailing zeros preserved. Reads as
+                # "0.00", "0.120", "1234" — plain decimals for everyday power
+                # and energy magnitudes, scientific notation only outside them.
+                value = format_number(value)
             header_items.append(html.Span(str(value), className="mb-1", style={"margin-right": "0.2rem"}))
             header_items.append(html.Span(channel.unit, className="text-muted", style={"margin-right": "2rem"}))
         header_items.append(html.Small(state.title(), className=f"text-{color}", style={"margin-right": "1rem"}))
