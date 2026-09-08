@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-lories.connectors.openems
-~~~~~~~~~~~~~~~~~~~~~~~~~
+lories.connectors.openems.client
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 """
@@ -10,10 +10,13 @@ from __future__ import annotations
 
 import base64
 import json
+import time
 from abc import abstractmethod
+from dataclasses import dataclass
 from threading import Event, Thread
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
+import requests
 import websocket
 
 import pandas as pd
@@ -23,7 +26,20 @@ from lories.connectors.errors import ConnectionError, ConnectorError
 from lories.core.configs.parameters import ChannelParameter, Parameter
 from lories.data.channels import Channel
 from lories.io.jsonrpc import JsonRpc
-from lories.typing import Resources
+from lories.io.rest import Rest
+from lories.typing import Resource, Resources
+
+
+@dataclass(frozen=True)
+class ChannelInfo:
+    """One entry of the OpenEMS REST channel listing."""
+
+    address: str
+    component: str
+    channel: str
+    type: Optional[str]
+    unit: Optional[str]
+    access_mode: Optional[str]
 
 
 # noinspection PyAbstractClass
@@ -49,16 +65,27 @@ class OpenEMSConnector(Connector):
         min=1,
         desc="Seconds to wait for authentication to complete before failing connect",
     )
+    _rest_port = Parameter(
+        key="rest_port", type=int, default=8084, min=1, max=65535, desc="OpenEMS REST/JSON server port"
+    )
+    _rest_endpoint = Parameter(
+        key="rest_endpoint", type=str, default="rest", desc="OpenEMS REST/JSON server endpoint path"
+    )
 
     # Per-channel parameters
-    address = ChannelParameter(type=str, required=True, desc="OpenEMS channel address 'Component/Channel'")
+    component = ChannelParameter(type=str, required=True, desc="OpenEMS component id, e.g. 'meter0'")
+    channel = ChannelParameter(type=str, required=True, desc="OpenEMS channel name, e.g. 'ActivePower'")
 
     _host: str
     _ws_port: int
     _username: str
     _password: str
     _timeout: int
+    _rest_port: int
+    _rest_endpoint: str
     _subscribe_count: int
+
+    _discovered: Optional[Dict[str, ChannelInfo]] = None
 
     _ws_app: Optional[websocket.WebSocketApp]
     _ws_thread: Optional[Thread]
@@ -76,6 +103,85 @@ class OpenEMSConnector(Connector):
         self._listeners = {}
         self._subscribe_count = 0
         self._json_rpc = JsonRpc()
+        self._discovered = None
+
+    # ------------------------------------------------------------------
+    # Discovery
+    # ------------------------------------------------------------------
+
+    def discover(self, refresh: bool = False) -> Dict[str, ChannelInfo]:
+        """Return every channel the OpenEMS device offers, keyed by 'Component/Channel'.
+
+        The listing is fetched once over the REST/JSON API and cached for the lifetime of
+        this connector; pass ``refresh`` to fetch it again. Only the configured parameters
+        are needed, so this may be called before ``connect()`` - a bound component uses it
+        at configure time to validate its addresses.
+        """
+        if self._discovered is not None and not refresh:
+            return self._discovered
+
+        rest = Rest(
+            host=self._host,
+            port=self._rest_port,
+            username=self._username,
+            password=self._password,
+            endpoint=self._rest_endpoint,
+            timeout=self._timeout,
+        )
+        raw = None
+        fetched = False
+        error: Optional[Exception] = None
+        for attempt in range(1, 4):
+            try:
+                # Rest.get_request raises the built-in ConnectionError on a non-200 and lets
+                # requests' own errors through; both are OSError subclasses, and a malformed
+                # body surfaces from json.loads as a ValueError.
+                raw = json.loads(rest.get_request("channel/.*/.*"))
+                fetched = True
+                break
+            except (requests.RequestException, ValueError, OSError) as e:
+                error = e
+                self._logger.warning(f"OpenEMS REST channel discovery attempt {attempt}/3 failed: {e}")
+                if attempt < 3:
+                    time.sleep(attempt)
+        if not fetched:
+            raise ConnectorError(self, f"OpenEMS REST channel discovery failed after 3 attempts: {error}")
+        if not isinstance(raw, list):
+            raise ConnectorError(
+                self, f"OpenEMS REST channel discovery returned {type(raw).__name__}, expected a list of channels"
+            )
+
+        self._discovered = {c.address: c for c in (self._build_info(entry) for entry in raw) if c is not None}
+        return self._discovered
+
+    @staticmethod
+    def _build_info(entry: Dict[str, Any]) -> Optional[ChannelInfo]:
+        if not isinstance(entry, dict):
+            return None
+        address = entry.get("address")
+        if not isinstance(address, str) or "/" not in address:
+            return None
+        component, channel = address.split("/", 1)
+        unit = entry.get("unit")
+        return ChannelInfo(
+            address=address,
+            component=component,
+            channel=channel,
+            type=entry.get("type"),
+            unit=unit if unit else None,
+            access_mode=entry.get("accessMode"),
+        )
+
+    def _address(self, resource: Resource) -> str:
+        """Compose the OpenEMS address a channel subscribes to from its two config keys."""
+        component = resource.get("component")
+        channel = resource.get("channel")
+        if not component or not channel:
+            raise ConnectorError(
+                self,
+                f"Channel '{resource.id}' is missing the OpenEMS 'component' and/or 'channel' config key",
+            )
+        return f"{component}/{channel}"
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -85,15 +191,14 @@ class OpenEMSConnector(Connector):
         return self._ws_app is not None and self._connected_event.is_set()
 
     def connect(self, resources: Resources) -> None:
-        # Build address → OpenEMSListener map from all channels bound to us
+        # Build address -> OpenEMSListener map from all channels bound to us
         self._listeners = {}
         for resource in resources:
-            self._listeners[resource.address] = OpenEMSListener(resource.address, resource)
+            address = self._address(resource)
+            self._listeners[address] = OpenEMSListener(address, resource)
 
         if not self._listeners:
-            self._logger.warning(
-                f"{type(self).__name__} '{self.id}': no channels with an 'address' attribute - nothing to subscribe to"
-            )
+            self._logger.warning(f"{type(self).__name__} '{self.id}': no channels bound - nothing to subscribe to")
 
         ws_url = f"ws://{self._host}:{self._ws_port}/websocket"
         self._connected_event.clear()
@@ -367,6 +472,12 @@ class OpenEMSBackendConnector(OpenEMSConnector):
     _edge_id = Parameter(key="edge_id", type=str, default="edge0", desc="OpenEMS Backend edge ID")
 
     _edge_id: str
+
+    def discover(self, refresh: bool = False) -> Dict[str, ChannelInfo]:
+        raise ConnectorError(
+            self,
+            "Channel discovery is only available on an OpenEMS Edge (REST); bind devices to an openems_edge connector",
+        )
 
     def _ws_headers(self) -> Dict[str, str]:
         token = base64.b64encode(f"{self._username}:{self._password}".encode()).decode()
