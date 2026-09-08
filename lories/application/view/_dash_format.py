@@ -41,13 +41,13 @@ def format_number(value: float, digits: int = 3) -> str:
     """Render a scalar for the dash UI with ``digits`` significant figures.
 
     Values with ``PLAIN_MIN <= |value| < PLAIN_MAX`` print in plain decimal
-    notation, so power and energy readings in the kilo/mega range stay
-    readable (``1234`` instead of ``1.23e+03``). Integer digits are never
-    rounded away; the fractional part is trimmed to reach ``digits``
-    significant figures, with trailing zeros kept (``0.500``, ``12.3``,
-    ``1234``). Zero prints as ``0.00``. Anything smaller or larger than
-    the plain range prints in scientific notation with the same number
-    of significant figures (``5.00e-04``, ``1.23e+07``).
+    notation with at least two decimals, so power and energy readings in
+    the kilo/mega range stay readable and their decimal points line up in
+    a right-aligned column (``1234.00``, ``12.35``, ``0.50``). Values below
+    one keep ``digits`` significant figures instead, so ``0.0123`` does not
+    collapse to ``0.01``. Zero prints as ``0.00``. Anything smaller or
+    larger than the plain range prints in scientific notation with
+    ``digits`` significant figures (``5.00e-04``, ``1.23e+07``).
     """
     v = float(value)
     if math.isnan(v):
@@ -59,8 +59,31 @@ def format_number(value: float, digits: int = 3) -> str:
     magnitude = abs(v)
     if magnitude < PLAIN_MIN or magnitude >= PLAIN_MAX:
         return f"{v:.{digits - 1}e}"
-    decimals = max(0, digits - 1 - math.floor(math.log10(magnitude)))
+    decimals = max(2, digits - 1 - math.floor(math.log10(magnitude)))
     return f"{v:.{decimals}f}"
+
+
+# Header columns of a channel accordion item: value right-aligned, unit
+# left-aligned, state left-aligned, each with a fixed minimum width so the
+# columns line up across rows and the value/unit boundary is unambiguous.
+HEADER_VALUE_STYLE: dict[str, str] = {
+    "display": "inline-block",
+    "minWidth": "7rem",
+    "textAlign": "right",
+    "fontVariantNumeric": "tabular-nums",
+}
+HEADER_UNIT_STYLE: dict[str, str] = {
+    "display": "inline-block",
+    "minWidth": "3.5rem",
+    "textAlign": "left",
+    "marginRight": "1rem",
+}
+HEADER_STATE_STYLE: dict[str, str] = {
+    "display": "inline-block",
+    "minWidth": "6rem",
+    "textAlign": "left",
+    "marginRight": "1rem",
+}
 
 
 def format_bytes_label(channel: Any, value: Any) -> str:
