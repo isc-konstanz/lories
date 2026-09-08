@@ -16,7 +16,7 @@ import dash_bootstrap_components as dbc
 from dash import Input, Output, callback, html
 
 import pandas as pd
-from lories.application.view._dash_format import IMAGE_UNITS, format_bytes_label
+from lories.application.view._dash_format import IMAGE_UNITS, format_bytes_label, format_number
 from lories.application.view.pages import Page, PageLayout
 from lories.application.view.pages.widgets import build_configs_editor_modal
 from lories.typing import Channel, Channels, Component, Components, Configurations, Connector, Connectors, Data
@@ -275,7 +275,7 @@ class ComponentPage(Page, Generic[Component]):
                 # (e.g. predictor diagnostics at the IC row) don't print "nan".
                 if pd.isna(v):
                     return "—"
-                return f"{v:#.3g}"
+                return format_number(v)
             if isinstance(v, pd.Timestamp):
                 return v.isoformat(sep=" ", timespec="seconds")
             return str(v)
@@ -441,7 +441,7 @@ class ComponentPage(Page, Generic[Component]):
             else:
                 last = latest.iloc[-1]
                 if channel.type == float and isinstance(last, (int, float)):
-                    formatted = f"{last:#.3g}"
+                    formatted = format_number(last)
                 elif isinstance(last, pd.Timestamp):
                     formatted = last.isoformat(sep=" ", timespec="seconds")
                 else:
@@ -453,10 +453,10 @@ class ComponentPage(Page, Generic[Component]):
                 style={"margin-right": "0.2rem"},
             )
         if channel.type == float:
-            # 3 significant figures with trailing zeros preserved (``#``
-            # flag) — reads as "0.00", "0.120", "0.0100" so small values
-            # don't collapse to "0.0" the way ``round(value, 2)`` did.
-            value = f"{channel.value:#.3g}"
+            # 3 significant figures with trailing zeros preserved — reads as
+            # "0.00", "0.120", "1234" — plain decimals for everyday power and
+            # energy magnitudes, scientific notation only outside them.
+            value = format_number(channel.value)
         if channel.type == bytes:
             value = None
         # React does not render bare bools (False → empty). Stringify so the channel value is always visible.
