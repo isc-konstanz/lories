@@ -33,13 +33,14 @@ class OpenEMSBinding:
     a device by: `component` is a reserved lories config key (`Component.TYPE`), and a flat
     `component = "meter0"` is replaced by the registrator's own `[component]` member while the
     component is being built, long before `configure()` sees it. Because a binding is written as
-    ordinary channel config, TOML can still override `component`, `channel`, `scale` or
-    `connector` per channel.
+    ordinary channel config, TOML can still override `component`, `channel`, `connector` or the
+    `converter` table (`converter = { type = "linear", scale = ... }`) per channel.
 
     At configure time, once the connectors exist, every bound address is checked against the
     connector's REST discovery listing, and the unit the device reports is checked against the
-    native unit the channel's own unit and scale imply - the channel's, not the table's, so a
-    TOML override of `scale`, `unit`, `channel` or `connector` is validated as configured.
+    native unit the channel's own unit and its linear converter's `scale` imply - the channel's,
+    not the table's, so a TOML override of `converter`, `unit`, `channel` or `connector` is
+    validated as configured.
     Both mismatches fail the start. Discovery is a REST call on the Edge, so bound devices are
     `openems_edge` only; a Backend connector has no listing to check against.
 
@@ -86,7 +87,7 @@ class OpenEMSBinding:
         }
         scale = self._scale(constant)
         if scale is not None:
-            binding["scale"] = scale
+            binding["converter"] = {"type": "linear", "scale": scale}
         return binding
 
     def _point(self, constant: Constant) -> Optional[str]:
@@ -148,7 +149,7 @@ class OpenEMSBinding:
 
     def _validate_unit(self, key: str, address: str, discovered: Dict[str, ChannelInfo]) -> None:
         channel = self.data[key]
-        expected = self._expected_unit(channel.unit, channel.get("scale"))
+        expected = self._expected_unit(channel.unit, channel.converter.get("scale"))
         if expected is None:
             return
         unit = discovered[address].unit

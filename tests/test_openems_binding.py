@@ -5,10 +5,11 @@ tests.test_openems_binding
 
 Boots a real, headless ``lories`` application from a temporary project to drive
 ``OpenEMSBinding`` against canned per-connector discovery listings: a ``POINTS`` entry
-becomes a ``component`` / ``channel`` / ``connector`` triple with a ``scale`` only where
-the entry carries a factor, every bound address must exist on the connector that channel
-actually resolved to, and the unit the device reports must match the native unit the
-channel's own unit and scale imply - with the cumulated-energy marker normalized away.
+becomes a ``component`` / ``channel`` / ``connector`` triple with a ``linear`` converter
+only where the entry carries a factor, every bound address must exist on the connector
+that channel actually resolved to, and the unit the device reports must match the native
+unit the channel's own unit and converter scale imply - with the cumulated-energy marker
+normalized away.
 """
 
 from __future__ import annotations
@@ -106,18 +107,19 @@ def load_project(tmp_path, monkeypatch):
     return _load
 
 
-def test_bind_emits_component_channel_connector_and_scale_only_for_tuples(load_project):
+def test_bind_emits_component_channel_connector_and_converter_only_for_tuples(load_project):
     device = load_project()
 
     power = device.data[POWER.key]
     assert power.get("component") == "meter0"
     assert power.get("channel") == "ActivePower"
     assert power.connector.id == "sys.oe"
-    assert power.get("scale") is None
+    assert power.converter.key == "float"
 
     current = device.data[CURRENT.key]
     assert current.get("channel") == "Current"
-    assert current.get("scale") == 0.001
+    assert current.converter.key == "linear"
+    assert current.converter.get("scale") == 0.001
 
     # Constants outside POINTS stay unbound and are not validated
     assert not device.data[NOTE.key].has_connector()
@@ -180,17 +182,18 @@ def test_unitless_discovered_channel_skips_the_unit_check(load_project, monkeypa
 def test_toml_overrides_are_validated_per_channel_and_per_connector(load_project):
     # 'power' moves to a second connector whose listing has nothing else; the remaining
     # channels must still be checked against their own connector's listing. 'current' is
-    # repointed at the amp channel and its scale dropped, which only validates because the
-    # check reads the channel's configured unit and scale, not the POINTS table.
+    # repointed at the amp channel and its factor set to 1, which only validates because the
+    # check reads the channel's configured unit and converter, not the POINTS table.
     device = load_project(
         _DEVICE_CONF + '\n[data.channels.power]\nconnector = "oe2"\n'
-        '\n[data.channels.current]\nchannel = "CurrentAmps"\nscale = 1.0\n'
+        '\n[data.channels.current]\nchannel = "CurrentAmps"\n'
+        'converter = { type = "linear", scale = 1.0 }\n'
     )
 
     assert device.data[POWER.key].connector.id == "sys.oe2"
     assert device.data[CURRENT.key].connector.id == "sys.oe"
     assert device.data[CURRENT.key].get("channel") == "CurrentAmps"
-    assert device.data[CURRENT.key].get("scale") == 1.0
+    assert device.data[CURRENT.key].converter.get("scale") == 1.0
 
 
 def test_channel_without_a_composable_address_raises_naming_the_key(load_project, monkeypatch):

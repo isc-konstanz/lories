@@ -82,7 +82,7 @@ class SunSpecBinding:
         }
         scale = self._scale(constant)
         if scale is not None:
-            binding["scale"] = scale
+            binding["converter"] = {"type": "linear", "scale": scale}
         return binding
 
     def _point(self, constant: Constant) -> Optional[str]:

@@ -49,9 +49,6 @@ class ModbusClient(Connector):
     _retries = Parameter(
         key="retries", type=int, default=3, min=0, desc="Number of retry attempts on failed reads/writes"
     )
-    _scale = Parameter(
-        key="scale", type=float, default=1.0, desc="Multiplication scale factor applied to all read values"
-    )
     # TCP / UDP
     _host = Parameter(
         key="host", type=str, required=False, desc="Remote device hostname or IP (used by tcp/udp protocols)"
@@ -124,7 +121,6 @@ class ModbusClient(Connector):
     _endian: Literal["big", "little"]
     _timeout: pd.Timedelta
     _retries: int
-    _scale: float
     _host: str
     _port: int
     _com_port: str

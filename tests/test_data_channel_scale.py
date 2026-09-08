@@ -3,10 +3,11 @@
 tests.test_data_channel_scale
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A channel's ``scale`` must apply to a value a connector pushes through ``Channel.set``
-exactly as it applies to a frame a polling connector reads (``from_series``); before this
-was pinned, only the read path scaled and every push-based binding silently kept raw
-units and signs.
+A ``linear`` converter declared programmatically through ``_add_data`` (the way a binding
+mixin declares it) must apply to a value a connector pushes through ``Channel.set`` exactly
+as it applies to a frame a polling connector reads (``from_series``). Before this was pinned,
+only the read path converted and every push-based binding silently kept raw units and signs.
+The TOML side of the same guarantee lives in ``tests.test_data_converter_linear``.
 """
 
 from __future__ import annotations
@@ -27,9 +28,9 @@ _SYSTEM_CONF = 'key = "sys"\nname = "Scale Test System"\n'
 @register_component_type("scaletest")
 class ScaleTestDevice(BindableComponent):
     def _add_channels(self, configs: Configurations) -> None:
-        self._add_data("milli", type=float, scale=0.001)
-        self._add_data("flipped", type=float, scale=-1)
-        self._add_data("counter", type=int, scale=1000)
+        self._add_data("milli", type=float, converter={"type": "linear", "scale": 0.001})
+        self._add_data("flipped", type=float, converter={"type": "linear", "scale": -1})
+        self._add_data("shifted", type=float, converter={"type": "linear", "scale": 0.1, "offset": -273.15})
         self._add_data("plain", type=float)
         self._add_data("label", type=str)
 
@@ -54,22 +55,22 @@ def device(tmp_path):
     return device
 
 
-def test_pushed_value_is_scaled(device):
+def test_pushed_value_is_converted(device):
     now = pd.Timestamp.now(tz="UTC")
     device.data["milli"].set(now, 1500)
     device.data["flipped"].set(now, 769)
-    device.data["counter"].set(now, 3)
+    device.data["shifted"].set(now, 2981.5)
     device.data["plain"].set(now, 1500)
     device.data["label"].set(now, "abc")
 
     assert device.data["milli"].value == pytest.approx(1.5)
     assert device.data["flipped"].value == -769
-    assert device.data["counter"].value == 3000
+    assert device.data["shifted"].value == pytest.approx(25.0)
     assert device.data["plain"].value == 1500
     assert device.data["label"].value == "abc"
 
 
-def test_pushed_series_is_scaled(device):
+def test_pushed_series_is_converted(device):
     index = pd.date_range("2026-01-01", periods=2, freq="1s", tz="UTC")
     device.data["milli"].set(index[-1], pd.Series([1000.0, 2500.0], index=index))
 

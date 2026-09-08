@@ -3,7 +3,7 @@
 tests.test_connectors_sunspec_binding
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Unit tests for the ``SunSpecBinding`` mixin: ``_bind`` emits a ``scale`` factor only for a
+Unit tests for the ``SunSpecBinding`` mixin: ``_bind`` emits a ``linear`` converter only for a
 ``(point, scale)`` ``POINTS`` entry, the ``__init_subclass__`` guard rejects a mixin used
 without a ``BindableComponent`` base or listed after it in the MRO, and the mixin module
 itself stays importable -- yielding the real class, not a mock -- even with ``sunspec2``
@@ -48,10 +48,10 @@ def _bind_configured(constant: Constant, device: int = 1, model: int = 103, inst
     return stub._bind(constant)
 
 
-def test_bind_emits_scale_only_for_tuple_points():
+def test_bind_emits_linear_converter_only_for_tuple_points():
     power = _bind_configured(POWER)
     assert power["point"] == "W"
-    assert power["scale"] == 0.1
+    assert power["converter"] == {"type": "linear", "scale": 0.1}
     assert power["device"] == 1
     assert power["model"] == 103
     assert power["instance"] == 1
@@ -59,7 +59,7 @@ def test_bind_emits_scale_only_for_tuple_points():
 
     energy = _bind_configured(ENERGY)
     assert energy["point"] == "WH"
-    assert "scale" not in energy
+    assert "converter" not in energy
 
 
 def test_bind_returns_empty_for_unbound_constant():

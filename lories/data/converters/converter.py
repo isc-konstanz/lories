@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-from typing import Any, Generic, Optional, Type, TypeVar
+from typing import Any, Collection, Generic, Optional, Type, TypeVar
 
 import pandas as pd
 import pytz as tz
 from lories._core import _Channel, _Channels, _Converter  # noqa
-from lories.core import Registrator
+from lories.core import ConfigurationError, Configurations, Registrator
 from lories.data.converters.errors import ConversionError
 from lories.data.validation import validate_index
 from lories.util import is_bool, is_float, is_int, to_bool, to_date, to_float, to_int
@@ -25,6 +25,14 @@ T = TypeVar("T", bound=Any)
 
 # noinspection PyAbstractClass
 class Converter(_Converter, Registrator, Generic[T]):
+    # Keys a channel may set in its `converter = { ... }` table; anything else is rejected at build.
+    ARGUMENTS: Collection[str] = ()
+
+    # noinspection PyMethodMayBeStatic, PyUnusedLocal
+    def assert_channel(self, channel: _Channel) -> None:
+        """Raise a ConfigurationError if this converter cannot serve the channel's declared type."""
+        return
+
     def to_str(self, value: T | pd.Series) -> str:
         return self.to_json(value)
 
@@ -97,31 +105,55 @@ class Converter(_Converter, Registrator, Generic[T]):
         return value
 
 
-# noinspection PyAbstractClass, PyMethodMayBeStatic
+# noinspection PyAbstractClass
 class _NumberConverter(Converter[T]):
-    def scale(self, value: T, factor: Optional[T], invert: bool = False, **kwargs) -> T:
-        if value is not None and factor is not None:
-            if invert:
-                value /= factor
-            else:
-                value *= factor
-        return self.to_dtype(value, **kwargs)
+    """
+    Plausibility bounds for numeric channels, checked on the converted value in the channel's
+    unit (after a `linear` scale and offset). Out of range is rejected: the value becomes NaN, so
+    a read frame leaves the channel NOT_AVAILABLE and a pushed value sets that state. With
+    `clamp = true` the value is clipped to the bound instead. Instance-level `min`/`max`/`clamp`
+    from `converters.d/` are defaults; a channel's converter table overrides them.
+    """
+
+    ARGUMENTS: Collection[str] = ("min", "max", "clamp")
+
+    _min: Optional[float] = None
+    _max: Optional[float] = None
+    _clamp: bool = False
+
+    def configure(self, configs: Configurations) -> None:
+        super().configure(configs)
+        self._min = to_float(configs.get("min", default=None))
+        self._max = to_float(configs.get("max", default=None))
+        self._clamp = to_bool(configs.get("clamp", default=False))
+        if self._min is not None and self._max is not None and self._min > self._max:
+            raise ConfigurationError(f"Invalid bounds for converter '{self.id}': min {self._min} > max {self._max}")
 
     # noinspection PyProtectedMember, PyUnresolvedReferences
     def from_value(self, value: Any, channel: _Channel) -> Optional[T]:
-        factor = to_float(channel.get("scale", default=None))
-        converter_args = channel.converter._get_configs()
-        return self.scale(self.convert(value, **converter_args), factor, **converter_args)
+        return self.bound(super().from_value(value, channel), channel)
 
     # noinspection PyProtectedMember, PyUnresolvedReferences
     def from_series(self, data: pd.Series, channel: _Channel) -> pd.Series:
-        try:
-            factor = to_float(channel.get("scale", default=None))
-            converter_args = channel.converter._get_configs()
-            converted_data = data.apply(self.convert, **converter_args)
-            return converted_data.apply(self.scale, args=(factor,), **converter_args)
-        except TypeError:
-            raise ConversionError(f"Expected str or {self.dtype}, not: {type(data)}")
+        return super().from_series(data, channel).apply(self.bound, args=(channel,))
+
+    # noinspection PyProtectedMember, PyUnresolvedReferences
+    def bound(self, value: Optional[T], channel: _Channel) -> Optional[T]:
+        if value is None or pd.isna(value):
+            return value
+        configs = channel.converter
+        minimum = to_float(configs.get("min", self._min))
+        maximum = to_float(configs.get("max", self._max))
+        if minimum is not None and value < minimum:
+            limit = minimum
+        elif maximum is not None and value > maximum:
+            limit = maximum
+        else:
+            return value
+        if to_bool(configs.get("clamp", self._clamp)):
+            return self.dtype(limit)
+        self._logger.warning(f"Rejected value {value} for channel '{channel.id}' outside [{minimum}, {maximum}]")
+        return float("nan")
 
 
 # noinspection PyMethodMayBeStatic
@@ -159,6 +191,7 @@ class StringConverter(Converter[str]):
 
 # noinspection PyMethodMayBeStatic
 class FloatConverter(_NumberConverter[float]):
+    ARGUMENTS: Collection[str] = (*_NumberConverter.ARGUMENTS, "decimals")
     dtype: Type[float] = float
 
     def is_dtype(self, value: str | float) -> bool:
