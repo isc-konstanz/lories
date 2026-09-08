@@ -205,7 +205,8 @@ def test_float_channel_without_converter_is_not_routed_through_linear(tmp_path):
 
 def test_unknown_converter_argument_fails_at_load(tmp_path):
     with pytest.raises(
-        ConfigurationError, match=r"Unknown converter argument\(s\) \['scale'\].*'float' accepts: decimals"
+        ConfigurationError,
+        match=r"Unknown converter argument\(s\) \['scale'\].*'float' accepts: min, max, clamp, decimals",
     ):
         _load(
             tmp_path,

@@ -161,6 +161,9 @@ class Channel(_Channel, Resource):
         state: Optional[str | ChannelState] = ChannelState.VALID,
     ) -> None:
         value = self.converter(value)
+        if state == ChannelState.VALID and self._is_empty(value):
+            # The converter produced nothing (e.g. a value outside its bounds was rejected).
+            state = ChannelState.NOT_AVAILABLE
         self._set(timestamp, value, state)
 
     # noinspection PyUnresolvedReferences
