@@ -147,44 +147,43 @@ class ComponentPage(Page, Generic[Component]):
                 className="w-100",
             ),
             children=[
-                dbc.Row(
+                self._build_channel_row("ID:", html.Small(channel.id, className="text-muted font-monospace")),
+                self._build_channel_row("Type:", html.Small(channel.type.__name__, className="text-muted")),
+                self._build_channel_row("Interval:", html.Small(channel.freq or "—", className="text-muted")),
+                self._build_channel_row("Connector:", self._build_channel_member(channel.connector)),
+                self._build_channel_row("Logger:", self._build_channel_member(channel.logger)),
+                self._build_channel_row(
+                    "Value:",
                     [
-                        dbc.Col(
-                            html.Span("Value:", className="text-muted"),
-                            width=1,
-                            style={"minWidth": "5.5rem"},
-                        ),
-                        dbc.Col(
-                            [
-                                self._build_channel_value(channel),
-                                self._build_channel_unit(channel),
-                            ],
-                            width="auto",
-                        ),
+                        self._build_channel_value(channel),
+                        self._build_channel_unit(channel),
                     ],
-                    justify="start",
                 ),
-                dbc.Row(
-                    [
-                        dbc.Col(
-                            html.Span("Updated:", className="text-muted"),
-                            width=1,
-                            style={"minWidth": "5.5rem"},
-                        ),
-                        dbc.Col(self._build_channel_timestamp(channel), width="auto"),
-                    ],
-                    justify="start",
-                ),
-                dbc.Row(
-                    [
-                        dbc.Col(None, width=1, style={"minWidth": "5.5rem"}),
-                        dbc.Col(self._build_channel_body(channel), width="auto"),
-                    ],
-                    justify="start",
-                ),
+                self._build_channel_row("Updated:", self._build_channel_timestamp(channel)),
+                self._build_channel_row(None, self._build_channel_body(channel)),
             ],
             id=f"{self.id}-data-{self._encode_id(channel.key)}",
         )
+
+    # noinspection PyMethodMayBeStatic
+    def _build_channel_row(self, label: Optional[str], content) -> dbc.Row:
+        return dbc.Row(
+            [
+                dbc.Col(
+                    html.Span(label, className="text-muted") if label else None,
+                    width=1,
+                    style={"minWidth": "6.5rem"},
+                ),
+                dbc.Col(content, width="auto"),
+            ],
+            justify="start",
+        )
+
+    # noinspection PyMethodMayBeStatic
+    def _build_channel_member(self, member) -> html.Small:
+        if member is None or not member.enabled or member.id is None:
+            return html.Small("—", className="text-muted")
+        return html.Small(member.id, className="text-muted font-monospace")
 
     # noinspection PyMethodMayBeStatic
     def _build_channel_title(self, channel: Channel) -> html.Span:
