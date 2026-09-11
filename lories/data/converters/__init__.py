@@ -9,6 +9,7 @@ lories.data.converters
 from .errors import ConversionError  # noqa: F401
 
 from .converter import Converter  # noqa: F401
+from .linear import LinearConverter  # noqa: F401
 
 from . import access  # noqa: F401
 from .access import ConverterAccess  # noqa: F401

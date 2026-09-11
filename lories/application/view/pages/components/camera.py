@@ -92,7 +92,7 @@ class CameraPage(ComponentPage[Camera]):
         def _on_click(n_clicks, _):
             if ctx.triggered_id == button_id and n_clicks:
                 self.protection.trigger()
-            state = self.protection.data.protection_state
+            state = self.protection.data.get(CameraProtector.STATE)
             closed = state.is_valid() and bool(state.value)
             if closed:
                 return "Closed — protection running", "fs-5 fw-semibold text-warning", True

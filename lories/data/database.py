@@ -84,11 +84,11 @@ class Database(_Database, Connector, metaclass=DatabaseMeta):
         *args,
         **kwargs,
     ) -> Optional[str]:
+        # Acquire outside the try: a failed acquire must not reach the finally, whose
+        # release() would otherwise free a lock that another thread may still hold.
+        if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
+            raise ConnectorError(self, f"Timeout acquiring lock for hashing {type(self).__name__}: {self.id}")
         try:
-            if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
-                raise ConnectorError(
-                    self, f"Timeout acquiring lock for disconnecting " f"{type(self).__name__}: {self.id}"
-                )
             if not self._is_connected():
                 raise ConnectionError(self, f"Database '{self.id}' not connected")
 
@@ -119,9 +119,12 @@ class Database(_Database, Connector, metaclass=DatabaseMeta):
         *args,
         **kwargs,
     ) -> bool:
+        if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
+            raise ConnectorError(
+                self,
+                f"Timeout acquiring lock for checking existence of {type(self).__name__}: {self.id}",
+            )
         try:
-            if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
-                raise ConnectorError(self, f"Timeout acquiring lock for disconnecting {type(self).__name__}: {self.id}")
             if not self._is_connected():
                 raise ConnectionError(self, f"Database '{self.id}' not connected")
 
@@ -159,9 +162,9 @@ class Database(_Database, Connector, metaclass=DatabaseMeta):
         *args,
         **kwargs,
     ) -> pd.DataFrame:
+        if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
+            raise ConnectorError(self, f"Timeout acquiring lock for reading {type(self).__name__}: {self.id}")
         try:
-            if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
-                raise ConnectorError(self, f"Timeout acquiring lock for disconnecting {type(self).__name__}: {self.id}")
             if not self._is_connected():
                 raise ConnectionError(self, f"Trying to read from unconnected {type(self).__name__}: {self.id}")
 
@@ -177,12 +180,12 @@ class Database(_Database, Connector, metaclass=DatabaseMeta):
 
     @wraps(read_first, updated=())
     def _do_read_first(self, resources: Resources, locking: bool = True, *args, **kwargs) -> Optional[pd.DataFrame]:
+        if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
+            raise ConnectorError(
+                self,
+                f"Timeout acquiring lock for reading first values of {type(self).__name__}: {self.id}",
+            )
         try:
-            if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
-                raise ConnectorError(
-                    self,
-                    f"Timeout acquiring lock for reading first values " f"of {type(self).__name__}: {self.id}",
-                )
             if not self._is_connected():
                 raise ConnectionError(self, f"Database '{self.id}' not connected")
 
@@ -202,12 +205,12 @@ class Database(_Database, Connector, metaclass=DatabaseMeta):
 
     @wraps(read_first_index, updated=())
     def _do_read_first_index(self, resources: Resources, locking: bool = True, *args, **kwargs) -> Optional[Any]:
+        if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
+            raise ConnectorError(
+                self,
+                f"Timeout acquiring lock for reading first index of {type(self).__name__}: {self.id}",
+            )
         try:
-            if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
-                raise ConnectorError(
-                    self,
-                    f"Timeout acquiring lock for reading first index " f"of {type(self).__name__}: {self.id}",
-                )
             if not self._is_connected():
                 raise ConnectionError(self, f"Database '{self.id}' not connected")
 
@@ -224,12 +227,12 @@ class Database(_Database, Connector, metaclass=DatabaseMeta):
 
     @wraps(read_last, updated=())
     def _do_read_last(self, resources: Resources, locking: bool = True, *args, **kwargs) -> Optional[pd.DataFrame]:
+        if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
+            raise ConnectorError(
+                self,
+                f"Timeout acquiring lock for reading last values of {type(self).__name__}: {self.id}",
+            )
         try:
-            if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
-                raise ConnectorError(
-                    self,
-                    f"Timeout acquiring lock for reading last values " f"of {type(self).__name__}: {self.id}",
-                )
             if not self._is_connected():
                 raise ConnectionError(self, f"Database '{self.id}' not connected")
 
@@ -249,12 +252,12 @@ class Database(_Database, Connector, metaclass=DatabaseMeta):
 
     @wraps(read_last_index, updated=())
     def _do_read_last_index(self, resources: Resources, locking: bool = True, *args, **kwargs) -> Optional[Any]:
+        if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
+            raise ConnectorError(
+                self,
+                f"Timeout acquiring lock for reading last index of {type(self).__name__}: {self.id}",
+            )
         try:
-            if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
-                raise ConnectorError(
-                    self,
-                    f"Timeout acquiring lock for reading last index " f"of {type(self).__name__}: {self.id}",
-                )
             if not self._is_connected():
                 raise ConnectionError(self, f"Database '{self.id}' not connected")
 
@@ -326,12 +329,12 @@ class Database(_Database, Connector, metaclass=DatabaseMeta):
         *args,
         **kwargs,
     ) -> None:
+        if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
+            raise ConnectorError(
+                self,
+                f"Timeout acquiring lock for deleting data of {type(self).__name__}: {self.id}",
+            )
         try:
-            if not self._lock.acquire(blocking=locking, timeout=self._lock_timeout):
-                raise ConnectorError(
-                    self,
-                    f"Timeout acquiring lock for deleting data " f"of {type(self).__name__}: {self.id}",
-                )
             if not self._is_connected():
                 raise ConnectionError(self, f"Database '{self.id}' not connected")
 

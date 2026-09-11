@@ -23,8 +23,17 @@ from .differentiator import Differentiator  # noqa: F401
 from . import integrator  # noqa: F401
 from .integrator import Integrator  # noqa: F401
 
+from . import lowpass  # noqa: F401
+from .lowpass import LowPass  # noqa: F401
+
+from . import mean  # noqa: F401
+from .mean import Mean  # noqa: F401
+
 from . import pulse  # noqa: F401
 from .pulse import PulseCount  # noqa: F401
+
+from . import size  # noqa: F401
+from .size import SizeFilter  # noqa: F401
 
 try:
     import cv2  # noqa: F401

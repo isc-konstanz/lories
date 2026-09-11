@@ -17,7 +17,7 @@ import pytz as tz
 from lories._core._channel import ChannelState, _Channel  # noqa
 from lories._core._tasks import TaskContext, _TaskContext  # noqa
 from lories._core.typing import Timestamp  # noqa
-from lories.core import Resource, ResourceError
+from lories.core import ConfigurationError, Resource, ResourceError
 from lories.data.channels import ChannelConnector, ChannelConverter, ChannelProcessors, Channels
 from lories.data.processors import Processor
 from lories.util import parse_freq, to_bool, to_timedelta
@@ -49,6 +49,11 @@ class Channel(_Channel, Resource):
         logger: Optional[Dict[str, Any] | str] = None,
         **configs: Any,
     ) -> None:
+        if "scale" in configs:
+            raise ConfigurationError(
+                f"Channel '{id}' uses the removed 'scale' key. "
+                f'Replace it with: converter = {{ type = "linear", scale = {configs["scale"]} }}'
+            )
         super().__init__(id=id, key=key, name=name, type=type, **configs)
         self._context = self._assert_context(context)
         self.processors = ChannelProcessors.build(self, processors)
@@ -156,6 +161,9 @@ class Channel(_Channel, Resource):
         state: Optional[str | ChannelState] = ChannelState.VALID,
     ) -> None:
         value = self.converter(value)
+        if state == ChannelState.VALID and self._is_empty(value):
+            # The converter produced nothing (e.g. a value outside its bounds was rejected).
+            state = ChannelState.NOT_AVAILABLE
         self._set(timestamp, value, state)
 
     # noinspection PyUnresolvedReferences

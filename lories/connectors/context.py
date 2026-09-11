@@ -40,6 +40,12 @@ def register_connector_type(
 
 # noinspection PyProtectedMember
 class ConnectorContext(_ConnectorContext, RegistratorContext[Connector]):
+    __reconnect_futures: Dict[str, Future]
+
+    def __init__(self, context, **kwargs) -> None:
+        super().__init__(context, **kwargs)
+        self.__reconnect_futures = {}
+
     @property
     def _registry(self) -> Registry[Connector]:
         return registry
@@ -157,8 +163,20 @@ class ConnectorContext(_ConnectorContext, RegistratorContext[Connector]):
                 self._disconnect(connector)
                 continue
 
+            pending = self.__reconnect_futures.get(connector.id)
+            if pending is not None and not pending.done():
+                # A slow connect outlives the main-loop interval; without this
+                # guard every interval queues another ConnectTask and the backlog
+                # drains as a burst of duplicate connects once the first finishes.
+                self._logger.debug(
+                    f"Skipping reconnect of {type(connector).__name__} '{connector.name}': "
+                    f"{connector.id} connect still in flight"
+                )
+                continue
+
             connect_task = self.__connect(connector, connector.channels)
             connect_future = self.context._submit(connect_task)
+            self.__reconnect_futures[connector.id] = connect_future
             connect_future.add_done_callback(self.__connect_callback)
 
     # noinspection PyShadowingBuiltins

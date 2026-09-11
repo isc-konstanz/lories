@@ -16,7 +16,14 @@ import dash_bootstrap_components as dbc
 from dash import Input, Output, callback, html
 
 import pandas as pd
-from lories.application.view._dash_format import IMAGE_UNITS, format_bytes_label
+from lories.application.view._dash_format import (
+    HEADER_STATE_STYLE,
+    HEADER_UNIT_STYLE,
+    HEADER_VALUE_STYLE,
+    IMAGE_UNITS,
+    format_bytes_label,
+    format_number,
+)
 from lories.application.view.pages import Page, PageLayout
 from lories.application.view.pages.widgets import build_configs_editor_modal
 from lories.typing import Channel, Channels, Component, Components, Configurations, Connector, Connectors, Data
@@ -185,13 +192,18 @@ class ComponentPage(Page, Generic[Component]):
         return html.Span(channel.name, className="mb-1")
 
     # noinspection PyMethodMayBeStatic
-    def _build_channel_header(self, channel: Channel) -> Collection[html.Span]:
-        channel_header = []
-        if channel.is_valid():
-            channel_header.append(self._build_channel_value(channel))
-            channel_header.append(self._build_channel_unit(channel))
-        channel_header.append(self._build_channel_state(channel))
-        return channel_header
+    def _build_channel_header(self, channel: Channel) -> html.Div:
+        """Value | unit | state as three fixed-width columns. Invalid channels
+        keep empty value and unit cells so the state column still lines up."""
+        valid = channel.is_valid()
+        return html.Div(
+            [
+                html.Div(self._build_channel_value(channel) if valid else None, style=HEADER_VALUE_STYLE),
+                html.Div(self._build_channel_unit(channel) if valid else None, style=HEADER_UNIT_STYLE),
+                html.Div(self._build_channel_state(channel), style=HEADER_STATE_STYLE),
+            ],
+            className="d-flex align-items-baseline",
+        )
 
     # noinspection PyMethodMayBeStatic
     def _build_channel_body(self, channel: Channel) -> Optional[html.Div]:
@@ -275,7 +287,7 @@ class ComponentPage(Page, Generic[Component]):
                 # (e.g. predictor diagnostics at the IC row) don't print "nan".
                 if pd.isna(v):
                     return "—"
-                return f"{v:#.3g}"
+                return format_number(v)
             if isinstance(v, pd.Timestamp):
                 return v.isoformat(sep=" ", timespec="seconds")
             return str(v)
@@ -415,19 +427,15 @@ class ComponentPage(Page, Generic[Component]):
         value = channel.value
         if channel.type == list:
             if value is None:
-                return html.Span("—", className="text-muted mb-1", style={"margin-right": "0.2rem"})
-            return html.Span(
-                f"({len(value)} values)",
-                className="text-muted mb-1",
-                style={"margin-right": "0.2rem"},
-            )
+                return html.Span("—", className="text-muted mb-1")
+            return html.Span(f"({len(value)} values)", className="text-muted mb-1")
         # ``pd.isna`` returns an ndarray for non-scalar values, which then
         # blows up the truth-value check. Short-circuit on collections.
         if value is None or (not isinstance(value, (str, bytes, bytearray, Collection)) and pd.isna(value)):
-            return html.Span("—", className="text-muted mb-1", style={"margin-right": "0.2rem"})
+            return html.Span("—", className="text-muted mb-1")
         if channel.type == bytes:
             label = format_bytes_label(channel, value)
-            return html.Span(label, className="text-muted mb-1", style={"margin-right": "0.2rem"})
+            return html.Span(label, className="text-muted mb-1")
         # Multi-row channel values (e.g. forecast trajectories the soil
         # predictor publishes as a length-N ``pd.Series`` indexed by target
         # timestamp) cannot go through scalar format specifiers — ``f"{s:#.3g}"``
@@ -441,30 +449,25 @@ class ComponentPage(Page, Generic[Component]):
             else:
                 last = latest.iloc[-1]
                 if channel.type == float and isinstance(last, (int, float)):
-                    formatted = f"{last:#.3g}"
+                    formatted = format_number(last)
                 elif isinstance(last, pd.Timestamp):
                     formatted = last.isoformat(sep=" ", timespec="seconds")
                 else:
                     formatted = str(last)
                 summary = f"({len(value)} values, latest={formatted})"
-            return html.Span(
-                summary,
-                className="text-muted mb-1",
-                style={"margin-right": "0.2rem"},
-            )
+            return html.Span(summary, className="text-muted mb-1")
         if channel.type == float:
-            # 3 significant figures with trailing zeros preserved (``#``
-            # flag) — reads as "0.00", "0.120", "0.0100" so small values
-            # don't collapse to "0.0" the way ``round(value, 2)`` did.
-            value = f"{channel.value:#.3g}"
+            # Two decimals in the plain range ("0.00", "1234.00"), three
+            # significant figures below one, scientific notation outside.
+            value = format_number(channel.value)
         if channel.type == bytes:
             value = None
         # React does not render bare bools (False → empty). Stringify so the channel value is always visible.
-        return html.Span(str(value), className="mb-1", style={"margin-right": "0.2rem"})
+        return html.Span(str(value), className="mb-1")
 
     # noinspection PyMethodMayBeStatic
     def _build_channel_unit(self, channel: Channel) -> html.Span:
-        return html.Span(channel.unit, className="text-muted", style={"margin-right": "2rem"})
+        return html.Span(channel.unit, className="text-muted", style={"marginLeft": "0.3rem"})
 
     # noinspection PyMethodMayBeStatic
     def _build_channel_state(self, channel: Channel) -> html.Small:
@@ -472,7 +475,7 @@ class ComponentPage(Page, Generic[Component]):
         color = "success" if channel.is_valid() else "warning"
         if state.lower().endswith("error") or state.lower() == "disabled":
             color = "danger"
-        return html.Small(state.title(), className=f"text-{color}", style={"margin-right": "1rem"})
+        return html.Small(state.title(), className=f"text-{color}")
 
     def _create_connectors_layout(self, layout: PageLayout) -> None:
         connectors = list(self._component.connectors.values())

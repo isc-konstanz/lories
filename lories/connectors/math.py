@@ -31,7 +31,8 @@ class MathConnector(Connector):
     The Math connector evaluates symbolic mathematical expressions at runtime using the SymPy computer algebra
     library. It maps free symbols in an expression to live channel values, enabling computed or derived channels
     such as unit conversions, aggregations, or physical formulas. Expressions can be triggered reactively via
-    listeners or evaluated on demand during read cycles. However, complex expressions with many symbols may
+    listeners (``listener = true``, re-evaluating on ``update_on = "any"`` or ``"all"`` input updates) or
+    evaluated on demand during read cycles (``freq``). However, complex expressions with many symbols may
     introduce noticeable computation overhead.
     """
 
@@ -56,13 +57,19 @@ class MathConnector(Connector):
         default={},
         desc="Per-channel symbol-to-channel mapping; overrides the connector-wide mapping",
     )
-    listen = ChannelParameter(
-        type=str, required=False, desc="Channel ID whose updates trigger re-evaluation of this expression"
-    )
     listener = ChannelParameter(
         type=bool,
         required=False,
-        desc="Re-evaluate on each upstream channel update (defaults to True when 'listen' is set)",
+        desc="Re-evaluate whenever an upstream channel updates (defaults to True when 'update_on' is set)",
+    )
+    update_on = ChannelParameter(
+        type=str,
+        required=False,
+        default="any",
+        desc=(
+            "Which upstream updates re-evaluate a listening expression:",
+            "'any' (default) fires on every input update, 'all' waits until every input has updated",
+        ),
     )
 
     _exprs: Dict[str, ChannelExpr]
@@ -99,9 +106,12 @@ class MathConnector(Connector):
                 channel_symbols.append(ChannelSymbol(symbol, channel))
             channel_expr = ChannelExpr(expr, resource, channel_symbols)
 
-            listen = resource.get("listen", default=None)
-            if to_bool(resource.get("listener", default=listen is not None)):
-                data.register(channel_expr, channels, how=listen, unique=True)
+            update_on = resource.get("update_on", default=None)
+            if to_bool(resource.get("listener", default=update_on is not None)):
+                update_on = "any" if update_on is None else str(update_on).strip().lower()
+                if update_on not in ("any", "all"):
+                    raise ConfigurationError(f"Unknown 'update_on' mode '{update_on}', expected 'any' or 'all'")
+                data.register(channel_expr, channels, how=update_on, unique=True)
 
             return channel_expr
 
