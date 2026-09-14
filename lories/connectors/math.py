@@ -19,7 +19,7 @@ import pytz as tz
 from lories.connectors import Connector, register_connector_type
 from lories.core import ConfigurationError
 from lories.core.configs.parameters import ChannelParameter, ParameterGroup
-from lories.data import Channel, DataContext
+from lories.data import Channel, ChannelState, DataContext
 from lories.typing import Resource, Resources
 from lories.util import get_context, to_bool
 
@@ -73,15 +73,38 @@ class MathConnector(Connector):
     )
 
     _exprs: Dict[str, ChannelExpr]
+    _errors: Dict[str, ConfigurationError]
 
     def connect(self, resources: Resources) -> None:
         self._exprs = {}
+        self._errors = {}
 
         for resource in resources:
             resource_mappings = deepcopy(self._mapping)
             resource_mappings.update(resource.get("mapping", default={}))
 
-            self._exprs[resource.id] = self._build_expr(resource, **resource_mappings)
+            # One broken expression must not take the whole connector down: the other channels
+            # still connect, the broken one is flagged and stays out of evaluation.
+            try:
+                self._exprs[resource.id] = self._build_expr(resource, **resource_mappings)
+            except ConfigurationError as e:
+                self._errors[resource.id] = e
+                self._logger.warning(f"Skipping math channel '{resource.id}': {e}")
+                if isinstance(resource, Channel):
+                    resource.state = ChannelState.ARGUMENT_SYNTAX_ERROR
+
+        if len(self._errors) > 0 and len(self._exprs) == 0:
+            raise ConfigurationError(
+                f"No valid math expression among {len(self._errors)} channel(s): "
+                + "; ".join(str(e) for e in self._errors.values())
+            )
+
+    def set_channels(self, state: ChannelState) -> None:
+        super().set_channels(state)
+        if state == ChannelState.CONNECTED:
+            # The connect task stamps CONNECTED over everything it handed us; keep the broken ones visible.
+            for channel in self.channels.filter(lambda c: c.id in self._errors):
+                channel.state = ChannelState.ARGUMENT_SYNTAX_ERROR
 
     # noinspection PyTypeChecker, PyUnresolvedReferences
     def _build_expr(self, resource: Resource, **mappings: str) -> ChannelExpr:
@@ -128,9 +151,12 @@ class MathConnector(Connector):
         data = []
         for resource in resources:
             columns.append(resource.id)
-            data.append(self._exprs[resource.id].evaluate())
+            if resource.id in self._exprs:
+                data.append(self._exprs[resource.id].evaluate())
+            else:
+                data.append(ChannelState.ARGUMENT_SYNTAX_ERROR)
 
-        return pd.DataFrame(index=[timestamp], data=data, columns=columns)
+        return pd.DataFrame(index=[timestamp], data=[data], columns=columns)
 
     def write(self, data: pd.DataFrame) -> None:
         raise NotImplementedError("Math connector does not support writing data")
