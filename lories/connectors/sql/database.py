@@ -314,6 +314,48 @@ class SqlDatabase(Database, Mapping[str, Table]):
         results = sorted(results, key=lambda d: min(d.index))
         return pd.concat(results, axis="columns")
 
+    def read_groups(
+        self,
+        resources: Resources,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
+    ) -> Optional[list[dict[str, Any]]]:
+        """Discover the distinct surrogate-key groups present for ``resources``' table(s).
+
+        Runs a ``SELECT DISTINCT`` over each table's surrogate-key columns (see
+        :meth:`lories.connectors.sql.table.Table.read_groups`) and returns the surrogate
+        resource-attribute dicts, so a caller can enumerate one resource per group even when
+        the values (e.g. an append-per-run ``timestamp_creation``) are not known ahead of time.
+        ``start``/``end`` bound the discovery to groups with records in that index window.
+        Returns ``None`` when no table has surrogate keys (resources address their data as
+        declared), as opposed to an empty list: surrogate-keyed tables without any group in
+        the window, where there is nothing the resources could address.
+        """
+        groups: Optional[list[dict[str, Any]]] = None
+        try:
+            with self.engine.connect() as connection:
+                for table_schema, schema_resources in resources.groupby("schema"):
+                    for table_name, table_resources in schema_resources.groupby(
+                        lambda c: c.get("table", default=c.group)
+                    ):
+                        table_key = table_name if table_schema is None else f"{table_schema}.{table_name}"
+                        if table_key not in self.__tables:
+                            raise DatabaseError(self, f"Table '{table_key}' not available")
+
+                        table = self.get(table_key)
+                        select = table.read_groups(start, end)
+                        if select is None:
+                            continue
+                        if groups is None:
+                            groups = []
+                        result = connection.execute(select)
+                        for group in table.extract_groups(result):
+                            if group not in groups:
+                                groups.append(group)
+        except SQLAlchemyError as e:
+            self._raise(e)
+        return groups
+
     # noinspection PyUnresolvedReferences, PyTypeChecker
     def read_first(self, resources: Resources) -> pd.DataFrame:
         results = []
