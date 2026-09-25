@@ -199,8 +199,36 @@ class ModbusClient(Connector):
             device = resource.get("device_id", default=None)
         return device
 
-    # noinspection PyTypeChecker, PyShadowingBuiltins
     def read(self, resources: Resources) -> pd.DataFrame:
+        return self._with_reconnect(self._read_registers, resources)
+
+    def write(self, data: pd.DataFrame) -> None:
+        self._with_reconnect(self._write_registers, data)
+
+    def _with_reconnect(self, action, *args):
+        # pymodbus' sync clients raise the raw socket error (BrokenPipeError,
+        # ConnectionResetError) when the peer closed the connection and keep the
+        # dead socket, so client.connected stays True. Close it and retry once:
+        # sync_execute reconnects by itself on the next request. A second failure
+        # raises ConnectionError so the task tears the connector down and the main
+        # loop reconnects after _interval_reconnect.
+        try:
+            return action(*args)
+        except ConnectorError:
+            # Already classified by the action (lories ConnectionError is an OSError too)
+            raise
+        except IOError as e:
+            self._logger.warning(f"Connection lost to '{self.__client}', reconnecting: {e}")
+            self.__client.close()
+            try:
+                return action(*args)
+            except ConnectorError:
+                raise
+            except IOError as e:
+                raise ConnectionError(self, f"Connection lost to '{self.__client}': {e}")
+
+    # noinspection PyTypeChecker, PyShadowingBuiltins
+    def _read_registers(self, resources: Resources) -> pd.DataFrame:
         timestamp = pd.Timestamp.now(tz.UTC).floor(freq="s")
         data = pd.DataFrame(index=[timestamp], columns=resources.ids)
         try:
@@ -267,14 +295,8 @@ class ModbusClient(Connector):
 
         except ModbusException as e:
             raise ConnectionError(self, e)
-        except IOError as e:
-            # pymodbus' sync clients raise the raw socket error (BrokenPipeError,
-            # ConnectionResetError) and keep the dead socket, so client.connected
-            # stays True. Raise ConnectionError so the task tears the connector
-            # down and the main loop reconnects after _interval_reconnect.
-            raise ConnectionError(self, f"Connection lost to '{self.__client}': {e}")
 
-    def write(self, data: pd.DataFrame) -> None:
+    def _write_registers(self, data: pd.DataFrame) -> None:
         try:
             for device, device_channels in self.channels.groupby(self._device_of):
                 if device is None:
@@ -316,9 +338,3 @@ class ModbusClient(Connector):
 
         except ModbusException as e:
             raise ConnectionError(self, e)
-        except IOError as e:
-            # pymodbus' sync clients raise the raw socket error (BrokenPipeError,
-            # ConnectionResetError) and keep the dead socket, so client.connected
-            # stays True. Raise ConnectionError so the task tears the connector
-            # down and the main loop reconnects after _interval_reconnect.
-            raise ConnectionError(self, f"Connection lost to '{self.__client}': {e}")

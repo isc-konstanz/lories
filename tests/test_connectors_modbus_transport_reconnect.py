@@ -11,9 +11,13 @@ connector down, ``_is_reconnectable()`` stayed False and every interval repeated
 ``Failed reading connector '...': [Errno 32] Broken pipe`` until a restart
 (lories-frictions issue 06, ISC box outage 2026-09-25).
 
-A transport ``IOError`` now raises ``ConnectionError`` from read and write, so
-``ConnectorTask`` disconnects the connector and the main loop reconnects after
-``_interval_reconnect``.
+A transport ``IOError`` now closes the dead socket and retries the read or write
+once (pymodbus' ``sync_execute`` reconnects by itself on the next request, so a
+peer that merely reset the session costs one warning and no samples). A second
+failure raises ``ConnectionError``, so ``ConnectorTask`` disconnects the connector
+and the main loop reconnects after ``_interval_reconnect``. Errors the action
+already classified (a pymodbus ``ConnectionException`` on a host that is down)
+are not retried.
 """
 
 from __future__ import annotations
@@ -27,6 +31,8 @@ import pytest
 import pandas as pd
 
 pytest.importorskip("pymodbus")
+
+from pymodbus.exceptions import ConnectionException  # noqa: E402
 
 from lories._core._connector import ConnectType  # noqa: E402
 from lories.connectors.connector import Connector  # noqa: E402
@@ -64,6 +70,7 @@ class _DeadSocketClient:
     def __init__(self, error=BrokenPipeError(32, "Broken pipe")):
         self.error = error
         self.connected = True
+        self.closed = 0
 
     def read_holding_registers(self, address, *, count=1, slave=1):
         raise self.error
@@ -76,7 +83,34 @@ class _DeadSocketClient:
         raise self.error
 
     def close(self):
+        self.closed += 1
         self.connected = False
+
+
+class _FlakySocketClient(_DeadSocketClient):
+    """Raises the socket error once, then answers: the peer reset the session, the retry reconnected."""
+
+    def __init__(self, error=BrokenPipeError(32, "Broken pipe")):
+        super().__init__(error)
+        self.failed = False
+        self.written = []
+
+    def _fail_once(self):
+        if not self.failed:
+            self.failed = True
+            raise self.error
+
+    def read_holding_registers(self, address, *, count=1, slave=1):
+        self._fail_once()
+        return SimpleNamespace(registers=[7], isError=lambda: False)
+
+    @staticmethod
+    def convert_from_registers(registers, type, word_order):
+        return registers[0]
+
+    def write_registers(self, address, values, slave=1):
+        self._fail_once()
+        self.written.append((slave, address, tuple(values)))
 
 
 class _ProbeModbusClient(ModbusClient):
@@ -163,3 +197,54 @@ def test_write_task_disconnects_on_transport_error():
 
     assert client.connected is False
     assert probe._connected is False
+
+
+def test_read_closes_the_dead_socket_and_retries_once(caplog):
+    resources = Resources([_FakeResource("a", device=1)])
+    client = _FlakySocketClient()
+    probe = _probe(client, resources)
+
+    with caplog.at_level(logging.WARNING, logger="test.modbus_probe"):
+        row = probe.read(resources).iloc[0]
+
+    assert row["a"] == 7
+    assert client.closed == 1
+    assert any("reconnecting" in r.getMessage() for r in caplog.records)
+
+
+def test_write_closes_the_dead_socket_and_retries_once():
+    resources = Resources([_FakeResource("a", device=1)])
+    client = _FlakySocketClient()
+    probe = _probe(client, resources)
+    probe._test_channels = resources
+    type(probe).channels = property(lambda self: self._test_channels)
+    try:
+        probe.write(pd.DataFrame({"a": [1]}, index=[pd.Timestamp.now(tz="UTC")]))
+    finally:
+        del type(probe).channels
+
+    assert client.written == [(1, 0, (1,))]
+    assert client.closed == 1
+
+
+def test_read_gives_up_after_one_retry():
+    resources = Resources([_FakeResource("a", device=1)])
+    client = _DeadSocketClient()
+    probe = _probe(client, resources)
+
+    with pytest.raises(ConnectionError, match="Connection lost"):
+        probe.read(resources)
+    assert client.closed == 1
+
+
+def test_pymodbus_connection_exception_is_not_retried():
+    # pymodbus already reconnected (and failed) inside sync_execute: the action maps
+    # it to ConnectionError, and the wrapper must not mistake it for a dead socket
+    # just because lories' ConnectionError is an OSError too.
+    resources = Resources([_FakeResource("a", device=1)])
+    client = _DeadSocketClient(ConnectionException("Failed to connect"))
+    probe = _probe(client, resources)
+
+    with pytest.raises(ConnectionError):
+        probe.read(resources)
+    assert client.closed == 0
