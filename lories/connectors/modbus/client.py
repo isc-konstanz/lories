@@ -268,7 +268,11 @@ class ModbusClient(Connector):
         except ModbusException as e:
             raise ConnectionError(self, e)
         except IOError as e:
-            raise ConnectorError(self, e)
+            # pymodbus' sync clients raise the raw socket error (BrokenPipeError,
+            # ConnectionResetError) and keep the dead socket, so client.connected
+            # stays True. Raise ConnectionError so the task tears the connector
+            # down and the main loop reconnects after _interval_reconnect.
+            raise ConnectionError(self, f"Connection lost to '{self.__client}': {e}")
 
     def write(self, data: pd.DataFrame) -> None:
         try:
@@ -313,4 +317,8 @@ class ModbusClient(Connector):
         except ModbusException as e:
             raise ConnectionError(self, e)
         except IOError as e:
-            raise ConnectorError(self, e)
+            # pymodbus' sync clients raise the raw socket error (BrokenPipeError,
+            # ConnectionResetError) and keep the dead socket, so client.connected
+            # stays True. Raise ConnectionError so the task tears the connector
+            # down and the main loop reconnects after _interval_reconnect.
+            raise ConnectionError(self, f"Connection lost to '{self.__client}': {e}")
