@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from datetime import timedelta
 
+import pandas as pd
 from lories.scheduler import TickScheduler
 
 
@@ -84,6 +86,67 @@ def test_exception_logs_traceback_at_error(caplog):
     # The traceback must be attached at ERROR level, not gated behind DEBUG.
     assert all(r.exc_info is not None for r in failures)
     assert failures[0].levelno == logging.ERROR
+
+
+def test_is_interrupted_tracks_stop_and_restart():
+    scheduler = TickScheduler(lambda: None, interval=timedelta(minutes=1), name="interrupt")
+    scheduler.start()
+    try:
+        assert not scheduler.is_interrupted()
+    finally:
+        scheduler.stop()
+    assert scheduler.is_interrupted()
+
+    scheduler.start()
+    try:
+        assert not scheduler.is_interrupted()
+    finally:
+        scheduler.stop()
+
+
+def test_failures_count_consecutive_raising_runs_and_reset_on_success(caplog):
+    raising = True
+
+    def on_slot() -> None:
+        if raising:
+            raise RuntimeError("boom")
+
+    scheduler = TickScheduler(on_slot, interval=timedelta(minutes=1), name="failures")
+    assert scheduler.failures == 0
+
+    with caplog.at_level(logging.ERROR, logger="lories.scheduler"):
+        scheduler._run_slot()
+        scheduler._run_slot()
+    assert scheduler.failures == 2
+    assert "run failed (2 consecutive)" in caplog.records[-1].getMessage()
+
+    raising = False
+    scheduler._run_slot()
+    assert scheduler.failures == 0
+
+    raising = True
+    scheduler._run_slot()
+    assert scheduler.failures == 1
+
+
+def test_overrun_warning_reports_skipped_slots(caplog, monkeypatch):
+    scheduler = TickScheduler(lambda: None, interval=timedelta(seconds=10), name="overrun")
+    start = pd.Timestamp("2026-01-01 00:00:00", tz="UTC")
+
+    def overran(duration: pd.Timedelta) -> list[logging.LogRecord]:
+        times = iter([start, start + duration])
+        monkeypatch.setattr(scheduler, "_now", lambda: next(times))
+        caplog.clear()
+        with caplog.at_level(logging.WARNING, logger="lories.scheduler"):
+            scheduler._run_slot()
+        return [r for r in caplog.records if "overran its slot" in r.getMessage()]
+
+    records = overran(pd.Timedelta(seconds=25))
+    assert len(records) == 1
+    assert records[0].levelno == logging.WARNING
+    assert "slots_skipped=2" in records[0].getMessage()
+
+    assert overran(pd.Timedelta(seconds=1)) == []
 
 
 def test_rejects_non_positive_interval():

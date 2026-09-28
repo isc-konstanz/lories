@@ -28,8 +28,9 @@ class TickScheduler:
 
     Runs are aligned to ``k * interval + offset`` in ``timezone``. A run slower than ``interval``
     does not backlog: the next slot is computed from the moment the run finishes, so missed slots
-    are skipped rather than queued. Exceptions raised by ``on_slot`` are logged and swallowed so a
-    single failing run never kills the loop.
+    are skipped rather than queued, and a run that overruns its slot is logged as a warning.
+    Exceptions raised by ``on_slot`` are logged and swallowed so a single failing run never kills
+    the loop; ``failures`` counts the consecutive raising runs and resets after a successful one.
     """
 
     _WAIT_MAX_SECONDS: float = 60.0
@@ -56,8 +57,14 @@ class TickScheduler:
         self._interrupt = threading.Event()
         self._thread: Optional[threading.Thread] = None
 
+        self.failures = 0
+
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
+
+    def is_interrupted(self) -> bool:
+        """Cancel predicate for a long ``on_slot`` run: true from ``stop()`` until the next ``start()``."""
+        return self._interrupt.is_set()
 
     def start(self) -> None:
         if self.is_running():
@@ -105,7 +112,19 @@ class TickScheduler:
             slot = self._next_slot(self._now())
 
     def _run_slot(self) -> None:
+        start = self._now()
         try:
             self._on_slot()
         except Exception:
-            logger.exception("Tick scheduler '%s' run failed", self._name)
+            self.failures += 1
+            logger.exception("Tick scheduler '%s' run failed (%d consecutive)", self._name, self.failures)
+        else:
+            self.failures = 0
+        duration = self._now() - start
+        if duration >= self._interval:
+            logger.warning(
+                "Tick scheduler '%s' run overran its slot (duration=%s, slots_skipped=%d)",
+                self._name,
+                duration,
+                int(duration // self._interval),
+            )
