@@ -560,7 +560,7 @@ class ComponentPage(Page, Generic[Component]):
         if not connector.is_enabled():
             badge = dbc.Badge("Disabled", color="secondary")
             timestamp_str = "—"
-        elif connector._is_connected():
+        elif connector._connected:
             badge = dbc.Badge("Connected", color="success")
             ts = connector._timestamp_connect
             timestamp_str = ts.isoformat(sep=" ", timespec="seconds") if not pd.isna(ts) else "—"

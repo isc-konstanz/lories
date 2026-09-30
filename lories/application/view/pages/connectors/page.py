@@ -90,7 +90,7 @@ class ConnectorPage(Page, Generic[ConnectorType]):
         def _update_status(*_):
             if not self._connector.is_enabled():
                 return [dbc.Badge("Disabled", color="secondary")]
-            connected = self._connector._is_connected()
+            connected = self._connector._connected
             color = "success" if connected else "danger"
             label = "Connected" if connected else "Disconnected"
             timestamp = self._connector._timestamp_connect if connected else self._connector._timestamp_disconnect
