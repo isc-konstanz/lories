@@ -44,7 +44,7 @@ def test_image_without_unit_is_served_as_jpeg():
     [
         ((), 404),
         ((_channel(1.0, type_=float),), 400),
-        ((_channel(None),), 503),
+        ((_channel(None),), 404),
     ],
 )
 def test_image_errors(channels, status):

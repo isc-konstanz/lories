@@ -3,10 +3,7 @@
 tests.test_view_live_values
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Channel accordions on the component and connector pages are built once. Each update changes
-only the items of channels that changed since the client's last update, through the items'
-own props: dash-renderer re-creates every child of a component whose ``children`` prop changes,
-which resets hover highlights and open animations.
+Channel accordions are built once; updates send only the items of changed channels.
 """
 
 from __future__ import annotations
@@ -122,15 +119,21 @@ def _connector_page(channels):
 
 
 @pytest.mark.parametrize("page", [_component_page, _connector_page])
-def test_later_updates_change_items_in_place(page):
+def test_updates_send_changed_items_only(page):
     channels = [_channel(i) for i in range(3)]
     page = page(channels)
-    page.update()
+    assert sorted(page.update()) == [0, 1, 2]
     assert page.redrawn
 
+    assert page.update() == {}
+    assert page.answered == page.tick
+
     channels[1].value = 42.0
-    assert list(page.update()) == [1]
+    channels[1].timestamp = pd.Timestamp("2026-09-30 12:01:00", tz="UTC")
+    updated = page.update()
+    assert list(updated) == [1]
     assert not page.redrawn
+    assert "42.00" in json.dumps(updated[1]["title"])
 
 
 def test_many_changes_redraw_the_list():
@@ -145,34 +148,7 @@ def test_many_changes_redraw_the_list():
 
 
 @pytest.mark.parametrize("page", [_component_page, _connector_page])
-def test_first_update_patches_every_item(page):
-    assert sorted(page([_channel(i) for i in range(3)]).update()) == [0, 1, 2]
-
-
-@pytest.mark.parametrize("page", [_component_page, _connector_page])
-def test_unchanged_channels_are_not_resent(page):
-    page = page([_channel(i) for i in range(3)])
-    page.update()
-    assert page.update() == {}
-    assert page.answered == page.tick
-
-
-@pytest.mark.parametrize("page", [_component_page, _connector_page])
-def test_only_changed_channels_are_resent(page):
-    channels = [_channel(i) for i in range(3)]
-    page = page(channels)
-    page.update()
-
-    channels[1].value = 42.0
-    channels[1].timestamp = pd.Timestamp("2026-09-30 12:01:00", tz="UTC")
-    updated = page.update()
-
-    assert list(updated) == [1]
-    assert "42.00" in json.dumps(updated[1])
-
-
-@pytest.mark.parametrize("page", [_component_page, _connector_page])
-def test_new_value_object_with_same_timestamp_is_resent(page):
+def test_new_value_with_same_timestamp_is_resent(page):
     channels = [_channel(0)]
     page = page(channels)
     page.update()
@@ -229,7 +205,7 @@ def test_image_details_link_the_image_route():
     page = _component_page([channel])
     page.update()
 
-    details = json.dumps(page.update(active=channel.id)[0]["children"])
+    details = json.dumps(page.update(active=[channel.id])[0]["children"])
     assert f"/api/image/{channel.id}?v=" in details
     assert "base64" not in details
 

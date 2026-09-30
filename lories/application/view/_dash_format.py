@@ -12,6 +12,7 @@ display logic.
 from __future__ import annotations
 
 import math
+from collections.abc import Hashable
 from typing import Any, List, Optional, Sequence, Set, Tuple
 
 # Channel units that the UI should render as image previews. Compared
@@ -124,8 +125,9 @@ def format_bytes_label(channel: Any, value: Any) -> str:
 
 
 def channel_fingerprint(channel: Any) -> str:
-    """Short token that changes with the channel's timestamp, state or value object."""
-    return format(hash((str(channel.timestamp), str(channel.state), id(channel.value))) & 0xFFFFFFFF, "08x")
+    """Short token that changes with the channel's timestamp, state or value."""
+    value = channel.value if isinstance(channel.value, Hashable) else id(channel.value)
+    return format(hash((str(channel.timestamp), str(channel.state), value)) & 0xFFFFFFFF, "08x")
 
 
 def changed_channels(channels: Sequence[Any], shown: Optional[Sequence[str]]) -> Tuple[List[str], Set[int]]:

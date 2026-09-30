@@ -35,16 +35,11 @@ function(tick, ...args) {
 """
 
 
-_REDRAW_BUDGET = 1000
+_REDRAW_BUDGET = 1000  # changed items × items on the page
 
 
 def update_items(item_ids: Sequence[str], updates: Dict[int, Dict[str, Any]], redraw: bool = False) -> Any:
-    """Apply prop updates to the accordion items at the given indices.
-
-    Items are updated in place with ``set_props``, which keeps hover states and open animations but
-    costs dash-renderer a pass over the page per item. With ``redraw``, or once changed items times
-    page size exceed a budget, they are sent instead as one Patch of the accordion's children, the
-    return value, which re-creates every item."""
+    """Update items in place, or as one Patch of the accordion's children when redrawing or above the budget."""
     if not updates:
         return no_update
     if not redraw and len(updates) * len(item_ids) <= _REDRAW_BUDGET:
@@ -59,9 +54,7 @@ def update_items(item_ids: Sequence[str], updates: Dict[int, Dict[str, Any]], re
 
 
 def gate_updates(requested_id: str, received_id: str, *triggers: Input) -> None:
-    """Request an update in ``requested_id`` on each view-update tick or other trigger, but only once
-    the update callback echoed the previous request into ``received_id``: a slow update delays the next
-    one instead of being superseded by it. Without an answer for ten ticks, it requests again."""
+    """Forward ticks and triggers to requested_id one at a time; resend after ten ticks without an echo."""
     dash.clientside_callback(
         _UPDATE_GATE,
         Output(requested_id, "data"),

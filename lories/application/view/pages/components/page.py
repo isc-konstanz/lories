@@ -139,7 +139,7 @@ class ComponentPage(Page, Generic[Component]):
         def _update_data(requested, active, shown):
             fingerprints, changed = changed_channels(channels, (shown or {}).get("channels"))
             details = dict((shown or {}).get("details", {}))
-            opened = [indices[i] for i in ({active} if isinstance(active, str) else set(active or [])) if i in indices]
+            opened = [indices[i] for i in active or [] if i in indices]
             stale = [index for index in opened if details.get(channels[index].id) != fingerprints[index]]
             if not changed and not stale:
                 return no_update, no_update, requested
@@ -284,8 +284,7 @@ class ComponentPage(Page, Generic[Component]):
 
     # noinspection PyMethodMayBeStatic
     def _build_bytes_img(self, channel: Channel) -> Optional[html.Div]:
-        """Render an image channel as an ``<img>`` served by ``/api/image``. Returns
-        ``None`` for empty values and for units that are not images."""
+        """``<img>`` from ``/api/image`` for image units, ``None`` otherwise."""
         value = channel.value
         unit = (channel.unit or "").strip().lower()
         if unit not in IMAGE_UNITS or not isinstance(value, (bytes, bytearray)) or len(value) == 0:

@@ -3,9 +3,7 @@
 tests.test_view_camera_streams
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-An MJPEG stream holds one browser connection for as long as its ``<img>`` exists, and
-browsers allow six per host. Only the viewer on the camera page embeds streams; the
-overview card and the channel details show still images.
+Only the camera page's viewer embeds MJPEG streams; the overview card and channel details show stills.
 """
 
 from __future__ import annotations

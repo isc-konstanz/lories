@@ -90,8 +90,7 @@ def register_stream_routes(
         When ``True``, reject requests from unauthenticated users with 401.
     """
 
-    @server.route("/api/stream/<path:channel_id>")
-    def stream_route(channel_id: str):  # noqa: WPS430 — Flask requires a named view
+    def _bytes_channel(channel_id: str):
         if require_login:
             from flask_login import current_user
 
@@ -102,8 +101,12 @@ def register_stream_routes(
             abort(404)
         if getattr(channel, "type", None) is not bytes:
             abort(400)
+        return channel
+
+    @server.route("/api/stream/<path:channel_id>")
+    def stream_route(channel_id: str):  # noqa: WPS430 — Flask requires a named view
         response = Response(
-            _mjpeg_frames(channel),
+            _mjpeg_frames(_bytes_channel(channel_id)),
             mimetype="multipart/x-mixed-replace; boundary=frame",
             direct_passthrough=True,
         )
@@ -115,19 +118,10 @@ def register_stream_routes(
 
     @server.route("/api/image/<path:channel_id>")
     def image_route(channel_id: str):  # noqa: WPS430 — Flask requires a named view
-        if require_login:
-            from flask_login import current_user
-
-            if not getattr(current_user, "is_authenticated", False):
-                abort(401)
-        channel = find_channel(channel_id)
-        if channel is None:
-            abort(404)
-        if getattr(channel, "type", None) is not bytes:
-            abort(400)
+        channel = _bytes_channel(channel_id)
         value = channel.value
         if not isinstance(value, (bytes, bytearray)):
-            abort(503)
+            abort(404)
         unit = (getattr(channel, "unit", None) or "").strip().lower()
         response = Response(bytes(value), mimetype=mimetypes.types_map.get(f".{unit}", "image/jpeg"))
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"

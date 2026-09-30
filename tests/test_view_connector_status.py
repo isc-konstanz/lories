@@ -3,8 +3,7 @@
 tests.test_view_connector_status
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The component and connector pages show a connector's status from its lifecycle flag and
-timestamps. They never call ``is_connected()``, which does network I/O for SQL and InfluxDB.
+Pages show a connector's status from its lifecycle flag, never from ``is_connected()``.
 """
 
 from __future__ import annotations

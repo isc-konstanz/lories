@@ -65,7 +65,6 @@ class CameraPage(ComponentPage[Camera]):
 
         sections = self._build_channels() if self._component.preview else {}
         if sections:
-            # A live stream holds one browser connection while shown, so the overview card shows the still frame.
             if _Camera.FRAME in sections:
                 layout.card.append(self._arrange_channels(sections[_Camera.FRAME]), focus=True)
             # Default width (12), not "auto": an auto Col shrinks to its
@@ -184,9 +183,7 @@ class CameraPage(ComponentPage[Camera]):
         )
 
     def _build_channel_body(self, channel: Channel) -> Optional[html.Div]:
-        # For bytes channels owned by this camera, route through the HTTP
-        # endpoints — base64 in the accordion would otherwise show a frozen
-        # snapshot for non-streaming channels. Live streams stay in the viewer.
+        # Streams stay in the viewer; the accordion shows stills.
         if channel.type == bytes and channel.id in self._component.data:
             if not self._component.preview:
                 return html.Div(html.I("Preview disabled", className="text-muted"))
