@@ -11,8 +11,7 @@ from __future__ import annotations
 from typing import Generic, TypeVar
 
 import dash_bootstrap_components as dbc
-from dash import Input, Output, Patch, State, callback, dcc, html
-from dash.exceptions import PreventUpdate
+from dash import Input, Output, Patch, State, callback, dcc, html, no_update
 
 import pandas as pd
 from lories.application.view._dash_format import (
@@ -24,7 +23,7 @@ from lories.application.view._dash_format import (
     format_number,
 )
 from lories.application.view.pages.layout import PageLayout
-from lories.application.view.pages.page import Page
+from lories.application.view.pages.page import Page, gate_updates
 from lories.application.view.pages.widgets import build_configs_editor_modal
 from lories.connectors import Connector
 from lories.typing import Channel, Channels, Configurations
@@ -106,25 +105,31 @@ class ConnectorPage(Page, Generic[ConnectorType]):
     def _build_channels(self, channels: Channels) -> html.Div:
         channels = list(channels)
         fingerprints_id = f"{self.id}-channels-fingerprints"
+        requested_id = f"{self.id}-channels-requested"
+        received_id = f"{self.id}-channels-received"
+        gate_updates(requested_id, received_id)
 
         @callback(
             Output(f"{self.id}-channels", "children"),
             Output(fingerprints_id, "data"),
-            Input("view-update", "n_intervals"),
+            Output(received_id, "data"),
+            Input(requested_id, "data"),
             State(fingerprints_id, "data"),
         )
-        def _update_channels(_, shown):
+        def _update_channels(requested, shown):
             fingerprints, changed = changed_channels(channels, shown)
             if not changed:
-                raise PreventUpdate
+                return no_update, no_update, requested
             items = Patch()
             for index in changed:
                 items[index] = self._build_channel(channels[index])
-            return items, fingerprints
+            return items, fingerprints, requested
 
         return html.Div(
             [
                 dcc.Store(id=fingerprints_id),
+                dcc.Store(id=requested_id),
+                dcc.Store(id=received_id),
                 dbc.Accordion(
                     id=f"{self.id}-channels",
                     children=[self._build_channel(channel) for channel in channels],

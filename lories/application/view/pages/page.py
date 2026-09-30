@@ -15,11 +15,34 @@ from functools import wraps
 from typing import Any, Optional
 
 import dash
+from dash import Input, Output, State
 
 import pandas as pd
 from lories.application import InterfaceException
 from lories.application.view.pages.layout import PageLayout
 from lories.util import validate_key
+
+_UPDATE_GATE = """
+function(tick, requested, received) {
+    if (requested == null || requested === received || tick - requested >= 10) {
+        return tick;
+    }
+    return window.dash_clientside.no_update;
+}
+"""
+
+
+def gate_updates(requested_id: str, received_id: str) -> None:
+    """Forward a view-update tick into ``requested_id`` only after the update callback answered the
+    previous one in ``received_id``, so a slow update delays the next tick instead of being superseded
+    by it. Without an answer for ten ticks, the next tick is forwarded anyway."""
+    dash.clientside_callback(
+        _UPDATE_GATE,
+        Output(requested_id, "data"),
+        Input("view-update", "n_intervals"),
+        State(requested_id, "data"),
+        State(received_id, "data"),
+    )
 
 
 class PageMeta(ABCMeta):

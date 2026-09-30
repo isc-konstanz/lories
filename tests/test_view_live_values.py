@@ -63,13 +63,18 @@ class _Page:
 
         self.accordion = f"{page.id}-{accordion}"
         self.store = f"{self.accordion}-fingerprints"
+        self.requested = f"{self.accordion}-requested"
+        self.received = f"{self.accordion}-received"
         self._callback = next(key for key in app.callback_map if self.store in key)
         self._opens = opens
         self.shown = None
+        self.tick = 0
+        self.answered = None
 
     def update(self, active=None):
         """Patched items by index, each as ``{patched prop or "item": value}``."""
-        inputs = [{"id": "view-update", "property": "n_intervals", "value": 1}]
+        self.tick += 1
+        inputs = [{"id": self.requested, "property": "data", "value": self.tick}]
         if self._opens:
             inputs.append({"id": self.accordion, "property": "active_item", "value": active})
         response = self._client.post(
@@ -79,19 +84,19 @@ class _Page:
                 "outputs": [
                     {"id": self.accordion, "property": "children"},
                     {"id": self.store, "property": "data"},
+                    {"id": self.received, "property": "data"},
                 ],
                 "inputs": inputs,
-                "changedPropIds": ["view-update.n_intervals"],
+                "changedPropIds": [f"{self.requested}.data"],
                 "state": [{"id": self.store, "property": "data", "value": self.shown}],
             },
         )
-        if response.status_code == 204:
-            return {}
         assert response.status_code == 200, response.data
         result = response.get_json()["response"]
-        self.shown = result[self.store]["data"]
+        self.answered = result[self.received]["data"]
+        self.shown = result.get(self.store, {}).get("data", self.shown)
         patched = {}
-        for operation in result[self.accordion]["children"]["operations"]:
+        for operation in result.get(self.accordion, {}).get("children", {}).get("operations", []):
             index, *prop = operation["location"]
             patched.setdefault(index, {})[prop[-1] if prop else "item"] = operation["params"]["value"]
         return patched
@@ -119,6 +124,7 @@ def test_unchanged_channels_are_not_resent(page):
     page = page([_channel(i) for i in range(3)])
     page.update()
     assert page.update() == {}
+    assert page.answered == page.tick
 
 
 @pytest.mark.parametrize("page", [_component_page, _connector_page])

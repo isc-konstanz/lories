@@ -12,8 +12,7 @@ import base64
 from typing import Collection, Generic, List, Optional
 
 import dash_bootstrap_components as dbc
-from dash import Input, Output, Patch, State, callback, dcc, html
-from dash.exceptions import PreventUpdate
+from dash import Input, Output, Patch, State, callback, dcc, html, no_update
 
 import pandas as pd
 from lories.application.view._dash_format import (
@@ -27,6 +26,7 @@ from lories.application.view._dash_format import (
     format_number,
 )
 from lories.application.view.pages import Page, PageLayout
+from lories.application.view.pages.page import gate_updates
 from lories.application.view.pages.widgets import build_configs_editor_modal
 from lories.typing import Channel, Channels, Component, Components, Configurations, Connector, Connectors, Data
 
@@ -122,22 +122,26 @@ class ComponentPage(Page, Generic[Component]):
         channels = list(channels)
         indices = {channel.id: index for index, channel in enumerate(channels)}
         fingerprints_id = f"{self.id}-data-fingerprints"
+        requested_id = f"{self.id}-data-requested"
+        received_id = f"{self.id}-data-received"
+        gate_updates(requested_id, received_id)
 
         @callback(
             Output(f"{self.id}-data", "children"),
             Output(fingerprints_id, "data"),
-            Input("view-update", "n_intervals"),
+            Output(received_id, "data"),
+            Input(requested_id, "data"),
             Input(f"{self.id}-data", "active_item"),
             State(fingerprints_id, "data"),
         )
-        def _update_data(_, active, shown):
+        def _update_data(requested, active, shown):
             shown = shown or {}
             fingerprints, changed = changed_channels(channels, shown.get("channels"))
             details = dict(shown.get("details", {}))
             opened = [indices[i] for i in ({active} if isinstance(active, str) else set(active or [])) if i in indices]
             stale = [index for index in opened if details.get(channels[index].id) != fingerprints[index]]
             if not changed and not stale:
-                raise PreventUpdate
+                return no_update, no_update, requested
 
             items = Patch()
             for index in changed:
@@ -145,11 +149,13 @@ class ComponentPage(Page, Generic[Component]):
             for index in stale:
                 items[index]["props"]["children"] = self._build_channel_details(channels[index])
                 details[channels[index].id] = fingerprints[index]
-            return items, {"channels": fingerprints, "details": details}
+            return items, {"channels": fingerprints, "details": details}, requested
 
         return html.Div(
             [
                 dcc.Store(id=fingerprints_id),
+                dcc.Store(id=requested_id),
+                dcc.Store(id=received_id),
                 dbc.Accordion(
                     id=f"{self.id}-data",
                     children=[self._build_channel(channel) for channel in channels],
