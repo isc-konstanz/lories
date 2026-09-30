@@ -6,12 +6,13 @@ lories.application.view.pages.components.camera
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Dict, Optional
 
 import dash_bootstrap_components as dbc
 from dash import Input, Output, callback, ctx, dcc, html
 
 import pandas as pd
+from lories.application.view._dash_format import channel_fingerprint
 from lories.application.view.pages import ComponentPage, PageLayout, register_component_group, register_component_page
 from lories.components.cameras import Camera, CameraProtector
 from lories.components.cameras._core import _Camera
@@ -62,15 +63,17 @@ class CameraPage(ComponentPage[Camera]):
     def create_layout(self, layout: PageLayout) -> None:
         super().create_layout(layout)
 
-        channels = self._build_channels() if self._component.preview else None
-        if channels is not None:
-            layout.card.append(channels, focus=True)
+        sections = self._build_channels() if self._component.preview else {}
+        if sections:
+            # A live stream holds one browser connection while shown, so the overview card shows the still frame.
+            if _Camera.FRAME in sections:
+                layout.card.append(self._arrange_channels(sections[_Camera.FRAME]), focus=True)
             # Default width (12), not "auto": an auto Col shrinks to its
             # children's intrinsic size — 0 px while frames haven't loaded.
-            layout.append(dbc.Row(dbc.Col(channels)))
+            layout.append(dbc.Row(dbc.Col(self._arrange_channels(*sections.values()))))
 
         if self.has_protection():
-            if channels is not None:
+            if sections:
                 layout.card.append(html.Hr())
                 layout.append(html.Hr())
             switch = self._build_switch()
@@ -119,8 +122,8 @@ class CameraPage(ComponentPage[Camera]):
             ]
         )
 
-    def _build_channels(self) -> html.Div | None:
-        sections = []
+    def _build_channels(self) -> Dict[str, html.Div]:
+        sections = {}
         for key, label in self._CHANNEL_VIEWS:
             if key not in self._component.data:
                 continue
@@ -131,22 +134,22 @@ class CameraPage(ComponentPage[Camera]):
             # flex: 1 1 0 + min-width: 0 forces equal column shares; without
             # the min-width override the <img>'s intrinsic size would act as
             # a min-width floor on the flex item.
-            sections.append(
-                html.Div(
-                    [html.H5(label), viewer],
-                    style={
-                        "flex": "1 1 0",
-                        "minWidth": 0,
-                        "border": "1px solid var(--bs-border-color, #dee2e6)",
-                        "borderRadius": "0.375rem",
-                        "padding": "0.75rem",
-                    },
-                )
+            sections[key] = html.Div(
+                [html.H5(label), viewer],
+                style={
+                    "flex": "1 1 0",
+                    "minWidth": 0,
+                    "border": "1px solid var(--bs-border-color, #dee2e6)",
+                    "borderRadius": "0.375rem",
+                    "padding": "0.75rem",
+                },
             )
-        if not sections:
-            return None
+        return sections
+
+    @staticmethod
+    def _arrange_channels(*sections: html.Div) -> html.Div:
         return html.Div(
-            sections,
+            list(sections),
             style={"display": "flex", "gap": "1rem", "width": "100%", "alignItems": "flex-start"},
         )
 
@@ -181,14 +184,14 @@ class CameraPage(ComponentPage[Camera]):
         )
 
     def _build_channel_body(self, channel: Channel) -> Optional[html.Div]:
-        # For bytes channels owned by this camera, route through the same
-        # endpoints the channels block uses — base64 in the accordion would
-        # otherwise show a frozen snapshot for non-streaming channels.
+        # For bytes channels owned by this camera, route through the HTTP
+        # endpoints — base64 in the accordion would otherwise show a frozen
+        # snapshot for non-streaming channels. Live streams stay in the viewer.
         if channel.type == bytes and channel.id in self._component.data:
             if not self._component.preview:
                 return html.Div(html.I("Preview disabled", className="text-muted"))
             if bool(channel.get("stream", default=False)):
-                src = f"/api/stream/{channel.id}"
+                src = f"/api/image/{channel.id}?v={channel_fingerprint(channel)}"
             else:
                 # Cache-bust with the frame's update timestamp so the browser
                 # only refetches when the channel actually updates.

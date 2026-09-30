@@ -248,7 +248,7 @@ class ComponentPage(Page, Generic[Component]):
             if bool(channel.get("stream", default=False)):
                 return html.Div(
                     html.Img(
-                        src=f"/api/stream/{channel.id}",
+                        src=f"/api/image/{channel.id}?v={channel_fingerprint(channel)}",
                         style={"maxWidth": "100%", "height": "auto"},
                     )
                 )
