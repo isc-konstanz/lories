@@ -51,7 +51,7 @@ def _channel(index, value=1.5, **kwargs):
 class _Page:
     """A page's update callback behind the Dash server, called the way dash-renderer calls it."""
 
-    def __init__(self, module: str, cls: str, build: str, accordion: str, channels) -> None:
+    def __init__(self, module: str, cls: str, build: str, accordion: str, channels, opens=False) -> None:
         page = object.__new__(getattr(importlib.import_module(module), cls))
         page.id = f"live-{next(_pages)}"
         body = getattr(page, build)(channels)
@@ -64,9 +64,14 @@ class _Page:
         self.accordion = f"{page.id}-{accordion}"
         self.store = f"{self.accordion}-fingerprints"
         self._callback = next(key for key in app.callback_map if self.store in key)
+        self._opens = opens
         self.shown = None
 
-    def update(self, *inputs):
+    def update(self, active=None):
+        """Patched items by index, each as ``{patched prop or "item": value}``."""
+        inputs = [{"id": "view-update", "property": "n_intervals", "value": 1}]
+        if self._opens:
+            inputs.append({"id": self.accordion, "property": "active_item", "value": active})
         response = self._client.post(
             "/_dash-update-component",
             json={
@@ -75,7 +80,7 @@ class _Page:
                     {"id": self.accordion, "property": "children"},
                     {"id": self.store, "property": "data"},
                 ],
-                "inputs": [{"id": "view-update", "property": "n_intervals", "value": 1}, *inputs],
+                "inputs": inputs,
                 "changedPropIds": ["view-update.n_intervals"],
                 "state": [{"id": self.store, "property": "data", "value": self.shown}],
             },
@@ -87,12 +92,15 @@ class _Page:
         self.shown = result[self.store]["data"]
         patched = {}
         for operation in result[self.accordion]["children"]["operations"]:
-            patched.setdefault(operation["location"][0], []).append(operation["params"]["value"])
+            index, *prop = operation["location"]
+            patched.setdefault(index, {})[prop[-1] if prop else "item"] = operation["params"]["value"]
         return patched
 
 
 def _component_page(channels):
-    return _Page("lories.application.view.pages.components.page", "ComponentPage", "_build_data", "data", channels)
+    return _Page(
+        "lories.application.view.pages.components.page", "ComponentPage", "_build_data", "data", channels, opens=True
+    )
 
 
 def _connector_page(channels):
@@ -146,3 +154,54 @@ def test_state_change_is_resent(page):
     channels[0].state = "disconnected"
     channels[0].is_valid = lambda: False
     assert "Disconnected" in json.dumps(page.update()[0])
+
+
+def test_details_are_built_only_for_open_items():
+    channels = [_channel(i, has_logger=lambda *_: True) for i in range(2)]
+    page = _component_page(channels)
+    assert all(set(item) == {"title"} for item in page.update().values())
+
+    opened = page.update(active=[channels[0].id])
+    assert list(opened) == [0] and set(opened[0]) == {"children"}
+    assert "Placeholder" in json.dumps(opened[0]["children"])
+    assert page.update(active=[channels[0].id]) == {}
+
+
+def test_open_details_follow_channel_changes():
+    channels = [_channel(0, has_logger=lambda *_: True)]
+    page = _component_page(channels)
+    page.update(active=[channels[0].id])
+
+    channels[0].value = 3.5
+    assert set(page.update(active=[channels[0].id])[0]) == {"title", "children"}
+
+
+def test_closed_details_are_rebuilt_on_reopen_only_after_a_change():
+    channels = [_channel(0, has_logger=lambda *_: True)]
+    page = _component_page(channels)
+    page.update(active=[channels[0].id])
+
+    channels[0].value = 3.5
+    assert set(page.update(active=[])[0]) == {"title"}
+    assert set(page.update(active=[channels[0].id])[0]) == {"children"}
+    assert page.update(active=[]) == {}
+    assert page.update(active=[channels[0].id]) == {}
+
+
+def test_image_details_link_the_image_route():
+    channel = _channel(0, value=b"\x89PNG\r\n", type=bytes, unit="png")
+    page = _component_page([channel])
+    page.update()
+
+    details = json.dumps(page.update(active=channel.id)[0]["children"])
+    assert f"/api/image/{channel.id}?v=" in details
+    assert "base64" not in details
+
+
+def test_binary_details_show_the_size_only():
+    channel = _channel(0, value=b"\x00" * 2048, type=bytes, unit="-")
+    page = _component_page([channel])
+    assert "(2,048 bytes)" in json.dumps(page.update()[0]["title"])
+
+    details = json.dumps(page.update(active=[channel.id])[0]["children"])
+    assert "data:image" not in details and "/api/image" not in details
