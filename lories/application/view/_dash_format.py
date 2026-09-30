@@ -12,7 +12,7 @@ display logic.
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import Any, List, Optional, Sequence, Set, Tuple
 
 # Channel units that the UI should render as image previews. Compared
 # case-insensitively after stripping whitespace.
@@ -121,3 +121,16 @@ def format_bytes_label(channel: Any, value: Any) -> str:
     if size <= 0:
         return "(binary)"
     return f"({size:,} bytes)"
+
+
+def channel_fingerprint(channel: Any) -> str:
+    """Short token that changes with the channel's timestamp, state or value object."""
+    return format(hash((str(channel.timestamp), str(channel.state), id(channel.value))) & 0xFFFFFFFF, "08x")
+
+
+def changed_channels(channels: Sequence[Any], shown: Optional[Sequence[str]]) -> Tuple[List[str], Set[int]]:
+    """Fingerprints of ``channels`` and the indices of those that differ from the ``shown`` fingerprints."""
+    fingerprints = [channel_fingerprint(channel) for channel in channels]
+    shown = shown or []
+    changed = {i for i, fingerprint in enumerate(fingerprints) if i >= len(shown) or shown[i] != fingerprint}
+    return fingerprints, changed

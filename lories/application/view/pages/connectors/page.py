@@ -11,13 +11,15 @@ from __future__ import annotations
 from typing import Generic, TypeVar
 
 import dash_bootstrap_components as dbc
-from dash import Input, Output, callback, html
+from dash import Input, Output, Patch, State, callback, dcc, html
+from dash.exceptions import PreventUpdate
 
 import pandas as pd
 from lories.application.view._dash_format import (
     HEADER_STATE_STYLE,
     HEADER_UNIT_STYLE,
     HEADER_VALUE_STYLE,
+    changed_channels,
     format_bytes_label,
     format_number,
 )
@@ -102,21 +104,35 @@ class ConnectorPage(Page, Generic[ConnectorType]):
         return html.Div(id=f"{self.id}-status", children=_update_status())
 
     def _build_channels(self, channels: Channels) -> html.Div:
+        channels = list(channels)
+        fingerprints_id = f"{self.id}-channels-fingerprints"
+
         @callback(
             Output(f"{self.id}-channels", "children"),
+            Output(fingerprints_id, "data"),
             Input("view-update", "n_intervals"),
+            State(fingerprints_id, "data"),
         )
-        def _update_channels(*_):
-            return [self._build_channel(ch) for ch in channels]
+        def _update_channels(_, shown):
+            fingerprints, changed = changed_channels(channels, shown)
+            if not changed:
+                raise PreventUpdate
+            items = Patch()
+            for index in changed:
+                items[index] = self._build_channel(channels[index])
+            return items, fingerprints
 
         return html.Div(
-            dbc.Accordion(
-                id=f"{self.id}-channels",
-                children=_update_channels(),
-                start_collapsed=True,
-                always_open=True,
-                flush=True,
-            )
+            [
+                dcc.Store(id=fingerprints_id),
+                dbc.Accordion(
+                    id=f"{self.id}-channels",
+                    children=[self._build_channel(channel) for channel in channels],
+                    start_collapsed=True,
+                    always_open=True,
+                    flush=True,
+                ),
+            ]
         )
 
     def _build_channel(self, channel: Channel) -> dbc.AccordionItem:

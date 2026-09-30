@@ -9,11 +9,11 @@ lories.application.view.pages.components.page
 from __future__ import annotations
 
 import base64
-from collections.abc import Sequence
 from typing import Collection, Generic, List, Optional
 
 import dash_bootstrap_components as dbc
-from dash import Input, Output, callback, html
+from dash import Input, Output, Patch, State, callback, dcc, html
+from dash.exceptions import PreventUpdate
 
 import pandas as pd
 from lories.application.view._dash_format import (
@@ -21,6 +21,7 @@ from lories.application.view._dash_format import (
     HEADER_UNIT_STYLE,
     HEADER_VALUE_STYLE,
     IMAGE_UNITS,
+    changed_channels,
     format_bytes_label,
     format_number,
 )
@@ -117,18 +118,30 @@ class ComponentPage(Page, Generic[Component]):
         # TODO: append data-update separately to view
 
     def _build_data(self, channels: Channels) -> html.Div:
+        channels = list(channels)
+        fingerprints_id = f"{self.id}-data-fingerprints"
+
         @callback(
             Output(f"{self.id}-data", "children"),
+            Output(fingerprints_id, "data"),
             Input("view-update", "n_intervals"),
+            State(fingerprints_id, "data"),
         )
-        def _update_data(*_) -> Sequence[dbc.AccordionItem]:
-            return [self._build_channel(channel) for channel in channels]
+        def _update_data(_, shown):
+            fingerprints, changed = changed_channels(channels, shown)
+            if not changed:
+                raise PreventUpdate
+            items = Patch()
+            for index in changed:
+                items[index] = self._build_channel(channels[index])
+            return items, fingerprints
 
         return html.Div(
             [
+                dcc.Store(id=fingerprints_id),
                 dbc.Accordion(
                     id=f"{self.id}-data",
-                    children=_update_data(),
+                    children=[self._build_channel(channel) for channel in channels],
                     start_collapsed=True,
                     always_open=True,
                     flush=True,
