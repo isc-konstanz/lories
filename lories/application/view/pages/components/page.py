@@ -12,7 +12,7 @@ import base64
 from typing import Collection, Generic, List, Optional
 
 import dash_bootstrap_components as dbc
-from dash import Input, Output, Patch, State, callback, dcc, html, no_update
+from dash import Input, Output, State, callback, dcc, html, no_update
 
 import pandas as pd
 from lories.application.view._dash_format import (
@@ -26,7 +26,7 @@ from lories.application.view._dash_format import (
     format_number,
 )
 from lories.application.view.pages import Page, PageLayout
-from lories.application.view.pages.page import gate_updates
+from lories.application.view.pages.page import gate_updates, update_items
 from lories.application.view.pages.widgets import build_configs_editor_modal
 from lories.typing import Channel, Channels, Component, Components, Configurations, Connector, Connectors, Data
 
@@ -124,31 +124,31 @@ class ComponentPage(Page, Generic[Component]):
         fingerprints_id = f"{self.id}-data-fingerprints"
         requested_id = f"{self.id}-data-requested"
         received_id = f"{self.id}-data-received"
-        gate_updates(requested_id, received_id)
+        gate_updates(requested_id, received_id, Input(f"{self.id}-data", "active_item"))
+
+        item_ids = [self._item_id(channel) for channel in channels]
 
         @callback(
             Output(f"{self.id}-data", "children"),
             Output(fingerprints_id, "data"),
             Output(received_id, "data"),
             Input(requested_id, "data"),
-            Input(f"{self.id}-data", "active_item"),
+            State(f"{self.id}-data", "active_item"),
             State(fingerprints_id, "data"),
         )
         def _update_data(requested, active, shown):
-            shown = shown or {}
-            fingerprints, changed = changed_channels(channels, shown.get("channels"))
-            details = dict(shown.get("details", {}))
+            fingerprints, changed = changed_channels(channels, (shown or {}).get("channels"))
+            details = dict((shown or {}).get("details", {}))
             opened = [indices[i] for i in ({active} if isinstance(active, str) else set(active or [])) if i in indices]
             stale = [index for index in opened if details.get(channels[index].id) != fingerprints[index]]
             if not changed and not stale:
                 return no_update, no_update, requested
 
-            items = Patch()
-            for index in changed:
-                items[index]["props"]["title"] = self._build_channel_summary(channels[index])
+            updates = {index: {"title": self._build_channel_summary(channels[index])} for index in changed}
             for index in stale:
-                items[index]["props"]["children"] = self._build_channel_details(channels[index])
+                updates.setdefault(index, {})["children"] = self._build_channel_details(channels[index])
                 details[channels[index].id] = fingerprints[index]
+            items = update_items(item_ids, updates, redraw=shown is None)
             return items, {"channels": fingerprints, "details": details}, requested
 
         return html.Div(
@@ -166,10 +166,13 @@ class ComponentPage(Page, Generic[Component]):
             ]
         )
 
+    def _item_id(self, channel: Channel) -> str:
+        return f"{self.id}-data-{self._encode_id(channel.key)}"
+
     def _build_channel(self, channel: Channel) -> dbc.AccordionItem:
         return dbc.AccordionItem(
             title=self._build_channel_summary(channel),
-            id=f"{self.id}-data-{self._encode_id(channel.key)}",
+            id=self._item_id(channel),
             item_id=channel.id,
         )
 

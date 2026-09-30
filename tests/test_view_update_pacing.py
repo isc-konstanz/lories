@@ -45,13 +45,13 @@ def _channel():
 
 
 @pytest.mark.parametrize(
-    "module, cls, build, section",
+    "module, cls, build, section, triggers",
     [
-        ("lories.application.view.pages.components.page", "ComponentPage", "_build_data", "data"),
-        ("lories.application.view.pages.connectors.page", "ConnectorPage", "_build_channels", "channels"),
+        ("lories.application.view.pages.components.page", "ComponentPage", "_build_data", "data", ["active_item"]),
+        ("lories.application.view.pages.connectors.page", "ConnectorPage", "_build_channels", "channels", []),
     ],
 )
-def test_ticks_pass_through_the_gate(module, cls, build, section):
+def test_ticks_pass_through_the_gate(module, cls, build, section, triggers):
     page = object.__new__(getattr(importlib.import_module(module), cls))
     page.id = f"gate-{cls.lower()}"
     body = getattr(page, build)([_channel()])
@@ -64,12 +64,14 @@ def test_ticks_pass_through_the_gate(module, cls, build, section):
 
     (gate,) = [d for d in dependencies if d["output"] == f"{requested}.data"]
     assert gate["clientside_function"] is not None
-    assert [(i["id"], i["property"]) for i in gate["inputs"]] == [("view-update", "n_intervals")]
+    assert [(i["id"], i["property"]) for i in gate["inputs"]] == [
+        ("view-update", "n_intervals"),
+        *[(f"{page.id}-{section}", trigger) for trigger in triggers],
+    ]
     assert [s["id"] for s in gate["state"]] == [requested, received]
 
     (update,) = [d for d in dependencies if f"{received}.data" in d["output"]]
-    assert ("view-update", "n_intervals") not in [(i["id"], i["property"]) for i in update["inputs"]]
-    assert (requested, "data") in [(i["id"], i["property"]) for i in update["inputs"]]
+    assert [(i["id"], i["property"]) for i in update["inputs"]] == [(requested, "data")]
 
 
 def test_update_interval_setting(write_conf):

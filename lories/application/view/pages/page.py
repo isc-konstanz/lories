@@ -12,10 +12,10 @@ import logging
 import re
 from abc import ABC, ABCMeta, abstractmethod
 from functools import wraps
-from typing import Any, Optional
+from typing import Any, Dict, Optional, Sequence
 
 import dash
-from dash import Input, Output, State
+from dash import Input, Output, Patch, State, no_update, set_props
 
 import pandas as pd
 from lories.application import InterfaceException
@@ -23,23 +23,50 @@ from lories.application.view.pages.layout import PageLayout
 from lories.util import validate_key
 
 _UPDATE_GATE = """
-function(tick, requested, received) {
-    if (requested == null || requested === received || tick - requested >= 10) {
-        return tick;
+function(tick, ...args) {
+    const received = args.pop();
+    const requested = args.pop();
+    const answered = !requested || (received && received.n === requested.n);
+    if (!answered && tick - requested.tick < 10) {
+        return window.dash_clientside.no_update;
     }
-    return window.dash_clientside.no_update;
+    return {n: requested ? requested.n + 1 : 1, tick: tick};
 }
 """
 
 
-def gate_updates(requested_id: str, received_id: str) -> None:
-    """Forward a view-update tick into ``requested_id`` only after the update callback answered the
-    previous one in ``received_id``, so a slow update delays the next tick instead of being superseded
-    by it. Without an answer for ten ticks, the next tick is forwarded anyway."""
+_REDRAW_BUDGET = 1000
+
+
+def update_items(item_ids: Sequence[str], updates: Dict[int, Dict[str, Any]], redraw: bool = False) -> Any:
+    """Apply prop updates to the accordion items at the given indices.
+
+    Items are updated in place with ``set_props``, which keeps hover states and open animations but
+    costs dash-renderer a pass over the page per item. With ``redraw``, or once changed items times
+    page size exceed a budget, they are sent instead as one Patch of the accordion's children, the
+    return value, which re-creates every item."""
+    if not updates:
+        return no_update
+    if not redraw and len(updates) * len(item_ids) <= _REDRAW_BUDGET:
+        for index, props in updates.items():
+            set_props(item_ids[index], props)
+        return no_update
+    items = Patch()
+    for index, props in updates.items():
+        for prop, value in props.items():
+            items[index]["props"][prop] = value
+    return items
+
+
+def gate_updates(requested_id: str, received_id: str, *triggers: Input) -> None:
+    """Request an update in ``requested_id`` on each view-update tick or other trigger, but only once
+    the update callback echoed the previous request into ``received_id``: a slow update delays the next
+    one instead of being superseded by it. Without an answer for ten ticks, it requests again."""
     dash.clientside_callback(
         _UPDATE_GATE,
         Output(requested_id, "data"),
         Input("view-update", "n_intervals"),
+        *triggers,
         State(requested_id, "data"),
         State(received_id, "data"),
     )

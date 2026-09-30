@@ -3,8 +3,10 @@
 tests.test_view_live_values
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Channel accordions on the component and connector pages are built once. Each update patches
-only the items of channels that changed since the client's last update.
+Channel accordions on the component and connector pages are built once. Each update changes
+only the items of channels that changed since the client's last update, through the items'
+own props: dash-renderer re-creates every child of a component whose ``children`` prop changes,
+which resets hover highlights and open animations.
 """
 
 from __future__ import annotations
@@ -65,41 +67,46 @@ class _Page:
         self.store = f"{self.accordion}-fingerprints"
         self.requested = f"{self.accordion}-requested"
         self.received = f"{self.accordion}-received"
-        self._callback = next(key for key in app.callback_map if self.store in key)
+        self.callback = next(key for key in app.callback_map if self.store in key)
+        self._items = {page._item_id(channel): index for index, channel in enumerate(channels)}
         self._opens = opens
         self.shown = None
         self.tick = 0
         self.answered = None
+        self.redrawn = None
 
     def update(self, active=None):
-        """Patched items by index, each as ``{patched prop or "item": value}``."""
+        """Updated items by index, each as ``{prop: value}``, whether redrawn or updated in place."""
         self.tick += 1
-        inputs = [{"id": self.requested, "property": "data", "value": self.tick}]
-        if self._opens:
-            inputs.append({"id": self.accordion, "property": "active_item", "value": active})
+        state = [{"id": self.accordion, "property": "active_item", "value": active}] if self._opens else []
         response = self._client.post(
             "/_dash-update-component",
             json={
-                "output": self._callback,
+                "output": self.callback,
                 "outputs": [
                     {"id": self.accordion, "property": "children"},
                     {"id": self.store, "property": "data"},
                     {"id": self.received, "property": "data"},
                 ],
-                "inputs": inputs,
+                "inputs": [{"id": self.requested, "property": "data", "value": {"n": self.tick, "tick": self.tick}}],
                 "changedPropIds": [f"{self.requested}.data"],
-                "state": [{"id": self.store, "property": "data", "value": self.shown}],
+                "state": [*state, {"id": self.store, "property": "data", "value": self.shown}],
             },
         )
         assert response.status_code == 200, response.data
-        result = response.get_json()["response"]
-        self.answered = result[self.received]["data"]
+        body = response.get_json()
+        result = body["response"]
+        self.answered = result[self.received]["data"]["n"]
         self.shown = result.get(self.store, {}).get("data", self.shown)
-        patched = {}
-        for operation in result.get(self.accordion, {}).get("children", {}).get("operations", []):
-            index, *prop = operation["location"]
-            patched.setdefault(index, {})[prop[-1] if prop else "item"] = operation["params"]["value"]
-        return patched
+        patch = result.get(self.accordion, {}).get("children")
+        self.redrawn = patch is not None
+        updated = {}
+        for operation in (patch or {}).get("operations", []):
+            index, _, prop = operation["location"]
+            updated.setdefault(index, {})[prop] = operation["params"]["value"]
+        for item, props in body.get("sideUpdate", {}).items():
+            updated.setdefault(self._items[item], {}).update(props)
+        return updated
 
 
 def _component_page(channels):
@@ -112,6 +119,29 @@ def _connector_page(channels):
     return _Page(
         "lories.application.view.pages.connectors.page", "ConnectorPage", "_build_channels", "channels", channels
     )
+
+
+@pytest.mark.parametrize("page", [_component_page, _connector_page])
+def test_later_updates_change_items_in_place(page):
+    channels = [_channel(i) for i in range(3)]
+    page = page(channels)
+    page.update()
+    assert page.redrawn
+
+    channels[1].value = 42.0
+    assert list(page.update()) == [1]
+    assert not page.redrawn
+
+
+def test_many_changes_redraw_the_list():
+    channels = [_channel(i) for i in range(40)]
+    page = _connector_page(channels)
+    page.update()
+
+    for channel in channels:
+        channel.value = 42.0
+    assert len(page.update()) == 40
+    assert page.redrawn
 
 
 @pytest.mark.parametrize("page", [_component_page, _connector_page])

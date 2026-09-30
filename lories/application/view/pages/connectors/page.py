@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Generic, TypeVar
 
 import dash_bootstrap_components as dbc
-from dash import Input, Output, Patch, State, callback, dcc, html, no_update
+from dash import Input, Output, State, callback, dcc, html, no_update
 
 import pandas as pd
 from lories.application.view._dash_format import (
@@ -23,7 +23,7 @@ from lories.application.view._dash_format import (
     format_number,
 )
 from lories.application.view.pages.layout import PageLayout
-from lories.application.view.pages.page import Page, gate_updates
+from lories.application.view.pages.page import Page, gate_updates, update_items
 from lories.application.view.pages.widgets import build_configs_editor_modal
 from lories.connectors import Connector
 from lories.typing import Channel, Channels, Configurations
@@ -109,6 +109,8 @@ class ConnectorPage(Page, Generic[ConnectorType]):
         received_id = f"{self.id}-channels-received"
         gate_updates(requested_id, received_id)
 
+        item_ids = [self._item_id(channel) for channel in channels]
+
         @callback(
             Output(f"{self.id}-channels", "children"),
             Output(fingerprints_id, "data"),
@@ -120,10 +122,14 @@ class ConnectorPage(Page, Generic[ConnectorType]):
             fingerprints, changed = changed_channels(channels, shown)
             if not changed:
                 return no_update, no_update, requested
-            items = Patch()
-            for index in changed:
-                items[index] = self._build_channel(channels[index])
-            return items, fingerprints, requested
+            updates = {
+                index: {
+                    "title": self._build_channel_summary(channels[index]),
+                    "children": self._build_channel_updated(channels[index]),
+                }
+                for index in changed
+            }
+            return update_items(item_ids, updates, redraw=shown is None), fingerprints, requested
 
         return html.Div(
             [
@@ -140,7 +146,18 @@ class ConnectorPage(Page, Generic[ConnectorType]):
             ]
         )
 
+    def _item_id(self, channel: Channel) -> str:
+        return f"{self.id}-ch-{self._encode_id(channel.id)}"
+
     def _build_channel(self, channel: Channel) -> dbc.AccordionItem:
+        return dbc.AccordionItem(
+            title=self._build_channel_summary(channel),
+            children=self._build_channel_updated(channel),
+            id=self._item_id(channel),
+        )
+
+    # noinspection PyMethodMayBeStatic
+    def _build_channel_summary(self, channel: Channel) -> dbc.Row:
         state = str(channel.state).replace("_", " ")
         color = "success" if channel.is_valid() else "warning"
         if state.lower().endswith("error") or state.lower() == "disabled":
@@ -169,29 +186,27 @@ class ConnectorPage(Page, Generic[ConnectorType]):
             ],
             className="d-flex align-items-baseline",
         )
+        return dbc.Row(
+            [
+                dbc.Col(html.Span(channel.name, className="mb-1"), width="auto"),
+                dbc.Col(header_items, width="auto"),
+            ],
+            justify="between",
+            className="w-100",
+        )
 
+    # noinspection PyMethodMayBeStatic
+    def _build_channel_updated(self, channel: Channel) -> dbc.Row:
         timestamp = channel.timestamp
         timestamp_str = timestamp.isoformat(sep=" ", timespec="seconds") if not pd.isna(timestamp) else "—"
-
-        return dbc.AccordionItem(
-            title=dbc.Row(
-                [
-                    dbc.Col(html.Span(channel.name, className="mb-1"), width="auto"),
-                    dbc.Col(header_items, width="auto"),
-                ],
-                justify="between",
-                className="w-100",
-            ),
-            children=dbc.Row(
-                [
-                    dbc.Col(
-                        html.Span("Updated:", className="text-muted"),
-                        width=1,
-                        style={"minWidth": "5.5rem"},
-                    ),
-                    dbc.Col(html.Small(timestamp_str, className="text-muted"), width="auto"),
-                ],
-                justify="start",
-            ),
-            id=f"{self.id}-ch-{self._encode_id(channel.key)}",
+        return dbc.Row(
+            [
+                dbc.Col(
+                    html.Span("Updated:", className="text-muted"),
+                    width=1,
+                    style={"minWidth": "5.5rem"},
+                ),
+                dbc.Col(html.Small(timestamp_str, className="text-muted"), width="auto"),
+            ],
+            justify="start",
         )
