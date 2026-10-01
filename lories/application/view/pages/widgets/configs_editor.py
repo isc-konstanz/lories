@@ -17,11 +17,15 @@ Add and Remove are immediate actions: they call the live ``RegistratorAccess``
 APIs of the parent and persist to disk independently of the Save button.
 
 The page layout only ships the button and an empty modal shell; the modal body
-(both tabs) is built server-side when the open button is clicked and cleared
-again on close. The body made up half to two thirds of every page's layout
+(both tabs) is built server-side when the open button is clicked and reset to a
+spinner on close. The body made up half to two thirds of every page's layout
 payload on real systems, while building it on demand costs milliseconds — and
 a body built per open renders the current config values instead of the values
 baked in at startup.
+
+The modal itself opens through a clientside callback, so the click gives
+immediate feedback (spinner) even when the server is busy — on a loaded box
+the body response queues behind the per-second view-update callbacks.
 """
 
 from __future__ import annotations
@@ -32,7 +36,7 @@ from collections.abc import Mapping
 from typing import Any, Dict, List, Optional, Tuple
 
 import dash_bootstrap_components as dbc
-from dash import ALL, Input, Output, State, callback, ctx, html, no_update
+from dash import ALL, Input, Output, State, callback, clientside_callback, ctx, html, no_update
 
 from lories.application.view.pages.widgets.configs import build_configs_widget
 from lories.core.configs.parameters import (
@@ -76,7 +80,7 @@ def build_configs_editor_modal(
             dbc.ModalBody(
                 [
                     html.Div(id=f"{entity_id}-config-feedback"),
-                    html.Div(id=f"{entity_id}-config-body"),
+                    html.Div(_build_body_placeholder(), id=f"{entity_id}-config-body"),
                 ]
             ),
             dbc.ModalFooter(
@@ -113,6 +117,10 @@ def build_configs_editor_modal(
     )
 
     return open_button, modal
+
+
+def _build_body_placeholder() -> html.Div:
+    return html.Div(dbc.Spinner(color="primary"), className="text-center py-4")
 
 
 def _build_modal_body(
@@ -754,19 +762,29 @@ def _register_callbacks(
         triggered = ctx.triggered_id
 
         if triggered == f"{_id}-config-open-btn":
-            body = _build_modal_body(
-                configs,
-                configurator_type,
-                _id,
-                components,
-                connectors,
-                components_access,
-                connectors_access,
-            )
-            return True, "", body
+            # The clientside callback below already opened the modal; returning
+            # no_update for is_open keeps a late body response from re-opening
+            # a modal the user closed in the meantime.
+            try:
+                body = _build_modal_body(
+                    configs,
+                    configurator_type,
+                    _id,
+                    components,
+                    connectors,
+                    components_access,
+                    connectors_access,
+                )
+            except Exception as exc:
+                body = dbc.Alert(
+                    f"Error building configuration view: {exc}",
+                    color="danger",
+                    className="mb-0",
+                )
+            return no_update, "", body
 
         if triggered == f"{_id}-config-discard-btn":
-            return False, "", []
+            return False, "", _build_body_placeholder()
 
         if triggered == f"{_id}-config-save-btn":
             try:
@@ -790,7 +808,7 @@ def _register_callbacks(
                         duration=3000,
                         className="mb-0",
                     ),
-                    [],
+                    _build_body_placeholder(),
                 )
 
             except Exception as exc:
@@ -806,6 +824,13 @@ def _register_callbacks(
                 )
 
         return is_open, "", no_update
+
+    clientside_callback(
+        "function(n_clicks) { return true; }",
+        Output(f"{_id}-config-modal", "is_open", allow_duplicate=True),
+        Input(f"{_id}-config-open-btn", "n_clicks"),
+        prevent_initial_call=True,
+    )
 
     if components_access is not None:
         _register_entity_callbacks(_id, "comp", components_access, "component")
