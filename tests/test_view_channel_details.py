@@ -56,9 +56,8 @@ def _rows(channel) -> dict:
     page_mod = importlib.import_module("lories.application.view.pages.components.page")
     page = object.__new__(page_mod.ComponentPage)
     page.id = "test"
-    item = page._build_channel(channel)
     rows = {}
-    for row in item.children:
+    for row in page._build_channel_details(channel):
         label_col, content_col = row.children
         rows[_text(label_col)] = content_col.children
     return rows

@@ -3,17 +3,20 @@
 lories.application.view.stream
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-MJPEG streaming for ``bytes`` channels (e.g. camera streams).
+MJPEG streams and single images for ``bytes`` channels (e.g. camera streams).
 
 A Flask route at ``/api/stream/<channel_id>`` returns a
 ``multipart/x-mixed-replace; boundary=frame`` response that the browser
 embeds via ``<img src="/api/stream/...">``. No JSON, no base64 — the
 browser decodes JPEG frames natively, so frame rate is limited by the
 camera and the network rather than by Dash.
+
+``/api/image/<channel_id>`` returns the channel's current value as one image.
 """
 
 from __future__ import annotations
 
+import mimetypes
 import time
 from typing import Callable, Optional
 
@@ -74,7 +77,7 @@ def register_stream_routes(
     *,
     require_login: bool = False,
 ) -> None:
-    """Register the MJPEG streaming route on *server*.
+    """Register the MJPEG stream and image routes on *server*.
 
     Parameters
     ----------
@@ -87,8 +90,7 @@ def register_stream_routes(
         When ``True``, reject requests from unauthenticated users with 401.
     """
 
-    @server.route("/api/stream/<path:channel_id>")
-    def stream_route(channel_id: str):  # noqa: WPS430 — Flask requires a named view
+    def _bytes_channel(channel_id: str):
         if require_login:
             from flask_login import current_user
 
@@ -99,8 +101,12 @@ def register_stream_routes(
             abort(404)
         if getattr(channel, "type", None) is not bytes:
             abort(400)
+        return channel
+
+    @server.route("/api/stream/<path:channel_id>")
+    def stream_route(channel_id: str):  # noqa: WPS430 — Flask requires a named view
         response = Response(
-            _mjpeg_frames(channel),
+            _mjpeg_frames(_bytes_channel(channel_id)),
             mimetype="multipart/x-mixed-replace; boundary=frame",
             direct_passthrough=True,
         )
@@ -108,4 +114,15 @@ def register_stream_routes(
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
         response.headers["X-Accel-Buffering"] = "no"
+        return response
+
+    @server.route("/api/image/<path:channel_id>")
+    def image_route(channel_id: str):  # noqa: WPS430 — Flask requires a named view
+        channel = _bytes_channel(channel_id)
+        value = channel.value
+        if not isinstance(value, (bytes, bytearray)):
+            abort(404)
+        unit = (getattr(channel, "unit", None) or "").strip().lower()
+        response = Response(bytes(value), mimetype=mimetypes.types_map.get(f".{unit}", "image/jpeg"))
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         return response

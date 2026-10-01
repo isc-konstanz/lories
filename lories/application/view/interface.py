@@ -21,6 +21,7 @@ import flask.cli
 from dash import Dash, dcc, html
 from dash_bootstrap_components import themes
 
+import pandas as pd
 from lories.application import Application
 from lories.application.interface import Interface, register_interface_type
 from lories.application.view import LoginPage, PageFooter, PageHeader, View
@@ -28,7 +29,7 @@ from lories.application.view.pages.docs import DocsPage
 from lories.application.view.snapshot import register_snapshot_routes
 from lories.application.view.stream import register_stream_routes
 from lories.components.cameras._core import _Camera
-from lories.core.configs.parameters import Parameter
+from lories.core.configs.parameters import DurationParameter, Parameter
 from lories.typing import Configurations
 
 logging.getLogger("werkzeug").setLevel(logging.WARNING)
@@ -50,11 +51,18 @@ class ViewInterface(Interface, Dash):
     _host = Parameter(key="host", type=str, default="127.0.0.1", desc="Host address to bind to")
     _port = Parameter(key="port", type=int, default=8050, desc="TCP port number")
     _reload = Parameter(key="reload", type=bool, default=False, desc="Enable the development server auto-reloader")
+    _update_interval = DurationParameter(
+        key="update_interval",
+        default="1s",
+        min="1s",
+        desc="Interval at which pages refresh the values they show",
+    )
 
     _proxy: Optional[str]
     _host: str
     _port: int
     _reload: bool
+    _update_interval: pd.Timedelta
 
     def __init__(self, context: Application, configs: Configurations) -> None:
         def get_custom_path(key: str, default: Optional[str] = None) -> str:
@@ -204,7 +212,7 @@ class ViewInterface(Interface, Dash):
                 dash.page_container,
                 dcc.Interval(
                     id="view-update",
-                    interval=1000,
+                    interval=int(self._update_interval.total_seconds() * 1000),
                 ),
             ],
         )

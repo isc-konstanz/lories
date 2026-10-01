@@ -9,11 +9,10 @@ lories.application.view.pages.components.page
 from __future__ import annotations
 
 import base64
-from collections.abc import Sequence
 from typing import Collection, Generic, List, Optional
 
 import dash_bootstrap_components as dbc
-from dash import Input, Output, callback, html
+from dash import Input, Output, State, callback, dcc, html, no_update
 
 import pandas as pd
 from lories.application.view._dash_format import (
@@ -21,10 +20,13 @@ from lories.application.view._dash_format import (
     HEADER_UNIT_STYLE,
     HEADER_VALUE_STYLE,
     IMAGE_UNITS,
+    changed_channels,
+    channel_fingerprint,
     format_bytes_label,
     format_number,
 )
 from lories.application.view.pages import Page, PageLayout
+from lories.application.view.pages.page import gate_updates, update_items
 from lories.application.view.pages.widgets import build_configs_editor_modal
 from lories.typing import Channel, Channels, Component, Components, Configurations, Connector, Connectors, Data
 
@@ -117,18 +119,46 @@ class ComponentPage(Page, Generic[Component]):
         # TODO: append data-update separately to view
 
     def _build_data(self, channels: Channels) -> html.Div:
+        channels = list(channels)
+        indices = {channel.id: index for index, channel in enumerate(channels)}
+        fingerprints_id = f"{self.id}-data-fingerprints"
+        requested_id = f"{self.id}-data-requested"
+        received_id = f"{self.id}-data-received"
+        gate_updates(requested_id, received_id, Input(f"{self.id}-data", "active_item"))
+
+        item_ids = [self._item_id(channel) for channel in channels]
+
         @callback(
             Output(f"{self.id}-data", "children"),
-            Input("view-update", "n_intervals"),
+            Output(fingerprints_id, "data"),
+            Output(received_id, "data"),
+            Input(requested_id, "data"),
+            State(f"{self.id}-data", "active_item"),
+            State(fingerprints_id, "data"),
         )
-        def _update_data(*_) -> Sequence[dbc.AccordionItem]:
-            return [self._build_channel(channel) for channel in channels]
+        def _update_data(requested, active, shown):
+            fingerprints, changed = changed_channels(channels, (shown or {}).get("channels"))
+            details = dict((shown or {}).get("details", {}))
+            opened = [indices[i] for i in active or [] if i in indices]
+            stale = [index for index in opened if details.get(channels[index].id) != fingerprints[index]]
+            if not changed and not stale:
+                return no_update, no_update, requested
+
+            updates = {index: {"title": self._build_channel_summary(channels[index])} for index in changed}
+            for index in stale:
+                updates.setdefault(index, {})["children"] = self._build_channel_details(channels[index])
+                details[channels[index].id] = fingerprints[index]
+            items = update_items(item_ids, updates, redraw=shown is None)
+            return items, {"channels": fingerprints, "details": details}, requested
 
         return html.Div(
             [
+                dcc.Store(id=fingerprints_id),
+                dcc.Store(id=requested_id),
+                dcc.Store(id=received_id),
                 dbc.Accordion(
                     id=f"{self.id}-data",
-                    children=_update_data(),
+                    children=[self._build_channel(channel) for channel in channels],
                     start_collapsed=True,
                     always_open=True,
                     flush=True,
@@ -136,34 +166,43 @@ class ComponentPage(Page, Generic[Component]):
             ]
         )
 
+    def _item_id(self, channel: Channel) -> str:
+        return f"{self.id}-data-{self._encode_id(channel.key)}"
+
     def _build_channel(self, channel: Channel) -> dbc.AccordionItem:
         return dbc.AccordionItem(
-            title=dbc.Row(
-                [
-                    dbc.Col(self._build_channel_title(channel), width="auto"),
-                    dbc.Col(self._build_channel_header(channel), width="auto"),
-                ],
-                justify="between",
-                className="w-100",
-            ),
-            children=[
-                self._build_channel_row("ID:", html.Small(channel.id, className="text-muted font-monospace")),
-                self._build_channel_row("Type:", html.Small(channel.type.__name__, className="text-muted")),
-                self._build_channel_row("Interval:", html.Small(channel.freq or "—", className="text-muted")),
-                self._build_channel_row("Connector:", self._build_channel_member(channel.connector)),
-                self._build_channel_row("Logger:", self._build_channel_member(channel.logger)),
-                self._build_channel_row(
-                    "Value:",
-                    [
-                        self._build_channel_value(channel),
-                        self._build_channel_unit(channel),
-                    ],
-                ),
-                self._build_channel_row("Updated:", self._build_channel_timestamp(channel)),
-                self._build_channel_row(None, self._build_channel_body(channel)),
-            ],
-            id=f"{self.id}-data-{self._encode_id(channel.key)}",
+            title=self._build_channel_summary(channel),
+            id=self._item_id(channel),
+            item_id=channel.id,
         )
+
+    def _build_channel_summary(self, channel: Channel) -> dbc.Row:
+        return dbc.Row(
+            [
+                dbc.Col(self._build_channel_title(channel), width="auto"),
+                dbc.Col(self._build_channel_header(channel), width="auto"),
+            ],
+            justify="between",
+            className="w-100",
+        )
+
+    def _build_channel_details(self, channel: Channel) -> List[dbc.Row]:
+        return [
+            self._build_channel_row("ID:", html.Small(channel.id, className="text-muted font-monospace")),
+            self._build_channel_row("Type:", html.Small(channel.type.__name__, className="text-muted")),
+            self._build_channel_row("Interval:", html.Small(channel.freq or "—", className="text-muted")),
+            self._build_channel_row("Connector:", self._build_channel_member(channel.connector)),
+            self._build_channel_row("Logger:", self._build_channel_member(channel.logger)),
+            self._build_channel_row(
+                "Value:",
+                [
+                    self._build_channel_value(channel),
+                    self._build_channel_unit(channel),
+                ],
+            ),
+            self._build_channel_row("Updated:", self._build_channel_timestamp(channel)),
+            self._build_channel_row(None, self._build_channel_body(channel)),
+        ]
 
     # noinspection PyMethodMayBeStatic
     def _build_channel_row(self, label: Optional[str], content) -> dbc.Row:
@@ -212,7 +251,7 @@ class ComponentPage(Page, Generic[Component]):
             if bool(channel.get("stream", default=False)):
                 return html.Div(
                     html.Img(
-                        src=f"/api/stream/{channel.id}",
+                        src=f"/api/image/{channel.id}?v={channel_fingerprint(channel)}",
                         style={"maxWidth": "100%", "height": "auto"},
                     )
                 )
@@ -225,7 +264,7 @@ class ComponentPage(Page, Generic[Component]):
             # summary otherwise.
             if isinstance(value, pd.Series):
                 return self._build_channel_series_table(channel, value)
-            return self._build_bytes_img(value)
+            return self._build_bytes_img(channel)
         if channel.type == list:
             value = channel.value
             if value is None:
@@ -244,15 +283,15 @@ class ComponentPage(Page, Generic[Component]):
         return html.Div(html.I("Placeholder", className="text-muted"))
 
     # noinspection PyMethodMayBeStatic
-    def _build_bytes_img(self, value) -> Optional[html.Div]:
-        """Render one bytes blob as an inline ``<img>`` block. Returns
-        ``None`` for empty / non-bytes input."""
-        if not isinstance(value, (bytes, bytearray)) or len(value) == 0:
+    def _build_bytes_img(self, channel: Channel) -> Optional[html.Div]:
+        """``<img>`` from ``/api/image`` for image units, ``None`` otherwise."""
+        value = channel.value
+        unit = (channel.unit or "").strip().lower()
+        if unit not in IMAGE_UNITS or not isinstance(value, (bytes, bytearray)) or len(value) == 0:
             return None
-        encoded = base64.b64encode(value).decode("ascii")
         return html.Div(
             html.Img(
-                src=f"data:image/jpeg;base64,{encoded}",
+                src=f"/api/image/{channel.id}?v={channel_fingerprint(channel)}",
                 style={"maxWidth": "100%", "height": "auto"},
             )
         )
@@ -523,7 +562,7 @@ class ComponentPage(Page, Generic[Component]):
         if not connector.is_enabled():
             badge = dbc.Badge("Disabled", color="secondary")
             timestamp_str = "—"
-        elif connector._is_connected():
+        elif connector._connected:
             badge = dbc.Badge("Connected", color="success")
             ts = connector._timestamp_connect
             timestamp_str = ts.isoformat(sep=" ", timespec="seconds") if not pd.isna(ts) else "—"
