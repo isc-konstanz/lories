@@ -15,6 +15,13 @@ Renders a per-entity "Edit Configs" button that opens a ``dbc.Modal`` with:
 
 Add and Remove are immediate actions: they call the live ``RegistratorAccess``
 APIs of the parent and persist to disk independently of the Save button.
+
+The page layout only ships the button and an empty modal shell; the modal body
+(both tabs) is built server-side when the open button is clicked and cleared
+again on close. The body made up half to two thirds of every page's layout
+payload on real systems, while building it on demand costs milliseconds — and
+a body built per open renders the current config values instead of the values
+baked in at startup.
 """
 
 from __future__ import annotations
@@ -69,15 +76,7 @@ def build_configs_editor_modal(
             dbc.ModalBody(
                 [
                     html.Div(id=f"{entity_id}-config-feedback"),
-                    _build_modal_body(
-                        configs,
-                        configurator_type,
-                        entity_id,
-                        components,
-                        connectors,
-                        components_access,
-                        connectors_access,
-                    ),
+                    html.Div(id=f"{entity_id}-config-body"),
                 ]
             ),
             dbc.ModalFooter(
@@ -106,6 +105,7 @@ def build_configs_editor_modal(
     _register_callbacks(
         entity_id,
         configs,
+        configurator_type,
         components,
         connectors,
         components_access,
@@ -714,6 +714,7 @@ def _remove_child(access, key: str) -> None:
 def _register_callbacks(
     entity_id: str,
     configs,
+    configurator_type: type,
     components: Optional[List],
     connectors: Optional[List],
     components_access,
@@ -725,6 +726,7 @@ def _register_callbacks(
     @callback(
         Output(f"{_id}-config-modal", "is_open"),
         Output(f"{_id}-config-feedback", "children"),
+        Output(f"{_id}-config-body", "children"),
         Input(f"{_id}-config-open-btn", "n_clicks"),
         Input(f"{_id}-config-save-btn", "n_clicks"),
         Input(f"{_id}-config-discard-btn", "n_clicks"),
@@ -752,10 +754,19 @@ def _register_callbacks(
         triggered = ctx.triggered_id
 
         if triggered == f"{_id}-config-open-btn":
-            return True, ""
+            body = _build_modal_body(
+                configs,
+                configurator_type,
+                _id,
+                components,
+                connectors,
+                components_access,
+                connectors_access,
+            )
+            return True, "", body
 
         if triggered == f"{_id}-config-discard-btn":
-            return False, ""
+            return False, "", []
 
         if triggered == f"{_id}-config-save-btn":
             try:
@@ -771,22 +782,30 @@ def _register_callbacks(
                 _apply_toggles(comp_ids, comp_values, components_access, components)
                 _apply_toggles(conn_ids, conn_values, connectors_access, connectors)
 
-                return False, dbc.Alert(
-                    "Configuration saved successfully.",
-                    color="success",
-                    duration=3000,
-                    className="mb-0",
+                return (
+                    False,
+                    dbc.Alert(
+                        "Configuration saved successfully.",
+                        color="success",
+                        duration=3000,
+                        className="mb-0",
+                    ),
+                    [],
                 )
 
             except Exception as exc:
-                return True, dbc.Alert(
-                    f"Error saving configuration: {exc}",
-                    color="danger",
-                    dismissable=True,
-                    className="mb-0",
+                return (
+                    True,
+                    dbc.Alert(
+                        f"Error saving configuration: {exc}",
+                        color="danger",
+                        dismissable=True,
+                        className="mb-0",
+                    ),
+                    no_update,
                 )
 
-        return is_open, ""
+        return is_open, "", no_update
 
     if components_access is not None:
         _register_entity_callbacks(_id, "comp", components_access, "component")
