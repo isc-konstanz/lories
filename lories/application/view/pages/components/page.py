@@ -31,6 +31,22 @@ from lories.application.view.pages.widgets import build_configs_editor_modal
 from lories.typing import Channel, Channels, Component, Components, Configurations, Connector, Connectors, Data
 
 
+def _component_fingerprint(component: Component) -> List:
+    return [component.is_enabled(), component.is_active()]
+
+
+def _connector_fingerprint(connector: Connector) -> List:
+    def _timestamp(timestamp) -> Optional[str]:
+        return None if pd.isna(timestamp) else str(timestamp)
+
+    return [
+        connector.is_enabled(),
+        connector._connected,
+        _timestamp(connector._timestamp_connect),
+        _timestamp(connector._timestamp_disconnect),
+    ]
+
+
 class ComponentPage(Page, Generic[Component]):
     _component: Component
 
@@ -539,21 +555,31 @@ class ComponentPage(Page, Generic[Component]):
         )
 
     def _build_connectors(self, connectors: List[Connector]) -> html.Div:
+        fingerprints_id = f"{self.id}-connectors-fingerprints"
+
         @callback(
             Output(f"{self.id}-connectors", "children"),
+            Output(fingerprints_id, "data"),
             Input("view-update", "n_intervals"),
+            State(fingerprints_id, "data"),
         )
-        def _update(*_):
-            return [self._build_connector_item(c) for c in connectors]
+        def _update(_, shown):
+            fingerprints = [_connector_fingerprint(c) for c in connectors]
+            if shown == fingerprints:
+                return no_update, no_update
+            return [self._build_connector_item(c) for c in connectors], fingerprints
 
         return html.Div(
-            dbc.Accordion(
-                id=f"{self.id}-connectors",
-                children=_update(),
-                start_collapsed=True,
-                always_open=True,
-                flush=True,
-            )
+            [
+                dcc.Store(id=fingerprints_id),
+                dbc.Accordion(
+                    id=f"{self.id}-connectors",
+                    children=[self._build_connector_item(c) for c in connectors],
+                    start_collapsed=True,
+                    always_open=True,
+                    flush=True,
+                ),
+            ]
         )
 
     def _build_connector_item(self, connector: Connector) -> dbc.AccordionItem:
@@ -624,21 +650,31 @@ class ComponentPage(Page, Generic[Component]):
         )
 
     def _build_components(self, components: List[Component]) -> html.Div:
+        fingerprints_id = f"{self.id}-components-fingerprints"
+
         @callback(
             Output(f"{self.id}-components", "children"),
+            Output(fingerprints_id, "data"),
             Input("view-update", "n_intervals"),
+            State(fingerprints_id, "data"),
         )
-        def _update(*_):
-            return [self._build_component_item(c) for c in components]
+        def _update(_, shown):
+            fingerprints = [_component_fingerprint(c) for c in components]
+            if shown == fingerprints:
+                return no_update, no_update
+            return [self._build_component_item(c) for c in components], fingerprints
 
         return html.Div(
-            dbc.Accordion(
-                id=f"{self.id}-components",
-                children=_update(),
-                start_collapsed=True,
-                always_open=True,
-                flush=True,
-            )
+            [
+                dcc.Store(id=fingerprints_id),
+                dbc.Accordion(
+                    id=f"{self.id}-components",
+                    children=[self._build_component_item(c) for c in components],
+                    start_collapsed=True,
+                    always_open=True,
+                    flush=True,
+                ),
+            ]
         )
 
     def _build_component_item(self, component: Component) -> dbc.AccordionItem:
