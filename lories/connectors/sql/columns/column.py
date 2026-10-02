@@ -13,13 +13,38 @@ import datetime as dt
 from typing import Any, AnyStr, Optional, Type, TypeVar
 
 import sqlalchemy as sql
-from sqlalchemy.types import BLOB, BOOLEAN, DATETIME, FLOAT, INTEGER, TIMESTAMP, String, TypeEngine
+from sqlalchemy.types import BLOB, BOOLEAN, DATETIME, FLOAT, INTEGER, JSON, TIMESTAMP, String, TypeDecorator, TypeEngine
 
 import numpy as np
 import pandas as pd
 from lories.core import ConfigurationError, ResourceError
 
 ColumnType = TypeVar("ColumnType", Type[TypeEngine], TypeEngine)
+
+
+def _to_json(value: Any) -> Any:
+    if isinstance(value, np.generic):
+        value = value.item()
+    if isinstance(value, np.ndarray):
+        value = value.tolist()
+    if isinstance(value, (list, tuple)):
+        return [_to_json(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _to_json(v) for k, v in value.items()}
+    if isinstance(value, float) and np.isnan(value):
+        return None
+    return value
+
+
+class JsonType(TypeDecorator):
+    impl = JSON
+    cache_ok = True
+
+    def __init__(self) -> None:
+        super().__init__(none_as_null=True)
+
+    def process_bind_param(self, value: Any, dialect: Any) -> Any:
+        return _to_json(value)
 
 
 class Column(sql.Column):
@@ -72,6 +97,8 @@ def parse_type(type: Type | AnyStr, length: Optional[int] = None) -> Type[TypeEn
             type = "STRING"
         elif issubclass(type, (bytes, bytearray)):
             type = "BYTE"
+        elif issubclass(type, list):
+            type = "JSON"
 
     if isinstance(type, str):
         type = type.upper()
@@ -91,6 +118,8 @@ def to_type_engine(type: Type | AnyStr, length: Optional[int] = None) -> Type[Ty
         return BOOLEAN
     if type in ["BYTE", "BYTES"]:
         return BLOB(length=4294967295)
+    if type == "JSON":
+        return JsonType()
     if type == "DATETIME":
         return DATETIME
     if type == "TIMESTAMP":
