@@ -31,6 +31,20 @@ C = TypeVar("C")  # , bound=Context)
 V = TypeVar("V")
 
 
+def to_json_compatible(value: Any) -> Any:
+    if isinstance(value, np.generic):
+        value = value.item()
+    if isinstance(value, np.ndarray):
+        value = value.tolist()
+    if isinstance(value, (list, tuple)):
+        return [to_json_compatible(v) for v in value]
+    if isinstance(value, dict):
+        return {k: to_json_compatible(v) for k, v in value.items()}
+    if isinstance(value, float) and np.isnan(value):
+        return None
+    return value
+
+
 # noinspection PyShadowingBuiltins
 def get_context(object: Any, type: Type[C] | Collection[Type[C]]) -> Optional[C]:
     _context = object

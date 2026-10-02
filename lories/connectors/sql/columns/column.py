@@ -18,22 +18,9 @@ from sqlalchemy.types import BLOB, BOOLEAN, DATETIME, FLOAT, INTEGER, JSON, TIME
 import numpy as np
 import pandas as pd
 from lories.core import ConfigurationError, ResourceError
+from lories.util import to_json_compatible
 
 ColumnType = TypeVar("ColumnType", Type[TypeEngine], TypeEngine)
-
-
-def _to_json(value: Any) -> Any:
-    if isinstance(value, np.generic):
-        value = value.item()
-    if isinstance(value, np.ndarray):
-        value = value.tolist()
-    if isinstance(value, (list, tuple)):
-        return [_to_json(v) for v in value]
-    if isinstance(value, dict):
-        return {k: _to_json(v) for k, v in value.items()}
-    if isinstance(value, float) and np.isnan(value):
-        return None
-    return value
 
 
 class JsonType(TypeDecorator):
@@ -44,7 +31,7 @@ class JsonType(TypeDecorator):
         super().__init__(none_as_null=True)
 
     def process_bind_param(self, value: Any, dialect: Any) -> Any:
-        return _to_json(value)
+        return to_json_compatible(value)
 
 
 class Column(sql.Column):
