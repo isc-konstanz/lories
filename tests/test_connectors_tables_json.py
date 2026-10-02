@@ -22,6 +22,7 @@ pytest.importorskip("tables")
 
 SCALAR_ID = "sim.field.ghi"
 LIST_ID = "sim.field.seg_ghi"
+SOIL_ID = "sim.field.soil.top_in"
 
 
 def _connect(tmp_path):
@@ -51,6 +52,7 @@ def _connect(tmp_path):
         [
             Resource(id=SCALAR_ID, key="ghi", type=float, group="field"),
             Resource(id=LIST_ID, key="seg_ghi", type=list, group="field"),
+            Resource(id=SOIL_ID, key="top_in", type=float, group="field_soil"),
         ]
     )
     database = app.connectors.get("h5")
@@ -119,3 +121,30 @@ def test_numpy_content_round_trips(database):
     data = database.read(resources, T0, T0)
 
     assert data[LIST_ID].iloc[0] == [2.0, 3]
+
+
+def _soil_frame(times, values) -> pd.DataFrame:
+    return pd.DataFrame({SOIL_ID: values}, index=pd.DatetimeIndex(times, tz="UTC", name="timestamp"))
+
+
+def test_read_skips_a_parent_path_that_holds_no_table(database):
+    database, resources = database
+    database.write(_soil_frame([T0], [1.0]))
+
+    data = database.read(resources, T0, T0)
+
+    assert list(data.columns) == [SOIL_ID]
+    assert data[SOIL_ID].tolist() == [1.0]
+
+
+def test_list_group_written_after_its_nested_child_keeps_the_width(database):
+    database, resources = database
+    long_list = [123.45678901234567, -0.00012345678901234567]
+    database.write(_soil_frame([T0], [1.0]))
+    database.write(_frame([T0 + pd.Timedelta(hours=1)], [1.0], [[1.0, 2.5]]))
+    database.write(_frame([T0 + pd.Timedelta(hours=2)], [2.0], [long_list]))
+
+    data = database.read(resources, T0, T0 + pd.Timedelta(hours=2))
+
+    assert data[LIST_ID].dropna().tolist() == [[1.0, 2.5], long_list]
+    assert data[SOIL_ID].dropna().tolist() == [1.0]

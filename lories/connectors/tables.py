@@ -134,7 +134,7 @@ class HDFDatabase(Database):
         try:
             for group, group_resources in resources.groupby("group"):
                 group_key = _format_key(group)
-                if group_key not in self.__store:
+                if group_key not in self.__store.keys():
                     continue
 
                 group_columns = self.__build_columns(group_resources)
@@ -160,7 +160,7 @@ class HDFDatabase(Database):
         try:
             for group, group_resources in resources.groupby("group"):
                 group_key = _format_key(group)
-                if group_key not in self.__store:
+                if group_key not in self.__store.keys():
                     continue
 
                 group_data = self.__store.select(group_key, stop=1, columns=self.__build_columns(group_resources))
@@ -181,7 +181,7 @@ class HDFDatabase(Database):
         try:
             for group, group_resources in resources.groupby("group"):
                 group_key = _format_key(group)
-                if group_key not in self.__store:
+                if group_key not in self.__store.keys():
                     continue
 
                 group_data = self.__store.select(group_key, start=-1, columns=self.__build_columns(group_resources))
@@ -205,7 +205,7 @@ class HDFDatabase(Database):
         try:
             for group, group_resources in resources.groupby("group"):
                 group_key = _format_key(group)
-                if group_key not in self.__store:
+                if group_key not in self.__store.keys():
                     continue
 
                 self.__store.remove(group_key)
@@ -233,16 +233,15 @@ class HDFDatabase(Database):
                     if name not in group_data.columns:
                         continue
                     group_data[name], widths[name] = _encode_lists(group_data[name])
-                if group_key not in self.__store:
-                    self.__store.put(
-                        group_key,
-                        group_data,
-                        format="table",
-                        encoding="UTF-8",
-                        min_itemsize=widths or None,
-                    )
-                else:
-                    self.__store.append(group_key, group_data, format="table", encoding="UTF-8")
+                # put() would first remove a node at this path, including tables nested below it.
+                is_new = group_key not in self.__store.keys()
+                self.__store.append(
+                    group_key,
+                    group_data,
+                    format="table",
+                    encoding="UTF-8",
+                    min_itemsize=(widths or None) if is_new else None,
+                )
 
         except IOError as e:
             raise ConnectionError(self, str(e))
