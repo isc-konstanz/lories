@@ -23,6 +23,7 @@ html = pytest.importorskip("dash").html
 
 def _channel(value=4793.25, unit="W", valid=True, state="valid", type_=float):
     return SimpleNamespace(
+        id="pv.inverter.power",
         key="power",
         name="Power",
         value=value,
