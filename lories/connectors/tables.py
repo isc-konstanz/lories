@@ -70,6 +70,7 @@ class HDFDatabase(Database):
     group = ChannelParameter(type=str, required=False, desc="HDF5 group key under which this channel is stored")
 
     __store: HDFStore = None
+    __skipped_ids: set
 
     _store_dir: str
     _store_path: str
@@ -82,6 +83,7 @@ class HDFDatabase(Database):
     # noinspection PyTypeChecker
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
+        self.__skipped_ids = set()
 
         if self._path is not None:
             path = self._path
@@ -217,6 +219,12 @@ class HDFDatabase(Database):
         try:
             for group, group_resources in self.resources.filter(lambda c: c.id in data.columns).groupby("group"):
                 group_key = _format_key(group)
+                bytes_ids = [r.id for r in group_resources if issubclass(r.type, (bytes, bytearray))]
+                if len(bytes_ids) > 0:
+                    self.__warn_skipped(bytes_ids)
+                    group_resources = group_resources.filter(lambda r: r.id not in bytes_ids)
+                    if len(group_resources) == 0:
+                        continue
                 group_data = data[group_resources.ids].dropna(axis="index", how="all").dropna(axis="columns", how="all")
                 group_data.index.name = "index"
 
@@ -245,6 +253,16 @@ class HDFDatabase(Database):
 
         except IOError as e:
             raise ConnectionError(self, str(e))
+
+    def __warn_skipped(self, ids: Sequence[str]) -> None:
+        new_ids = [i for i in ids if i not in self.__skipped_ids]
+        if len(new_ids) == 0:
+            return
+        self.__skipped_ids.update(new_ids)
+        self._logger.warning(
+            f"HDF database cannot store bytes channels, skipping: {', '.join(new_ids)}. "
+            "Use a SQL database to keep them."
+        )
 
     def __build_columns(self, resources: Resources) -> Sequence[str]:
         if self._columns_unique:

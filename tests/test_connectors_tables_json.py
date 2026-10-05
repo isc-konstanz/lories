@@ -8,6 +8,7 @@ tests.test_connectors_tables_json
 from __future__ import annotations
 
 import os
+from unittest.mock import patch
 
 import pytest
 
@@ -23,6 +24,8 @@ pytest.importorskip("tables")
 SCALAR_ID = "sim.field.ghi"
 LIST_ID = "sim.field.seg_ghi"
 SOIL_ID = "sim.field.soil.top_in"
+BLOB_ID = "sim.field.state"
+PNG_ID = "sim.blob.png"
 
 
 def _connect(tmp_path):
@@ -53,6 +56,8 @@ def _connect(tmp_path):
             Resource(id=SCALAR_ID, key="ghi", type=float, group="field"),
             Resource(id=LIST_ID, key="seg_ghi", type=list, group="field"),
             Resource(id=SOIL_ID, key="top_in", type=float, group="field_soil"),
+            Resource(id=BLOB_ID, key="state", type=bytes, group="field"),
+            Resource(id=PNG_ID, key="png", type=bytes, group="blob"),
         ]
     )
     database = app.connectors.get("h5")
@@ -148,3 +153,43 @@ def test_list_group_written_after_its_nested_child_keeps_the_width(database):
 
     assert data[LIST_ID].dropna().tolist() == [[1.0, 2.5], long_list]
     assert data[SOIL_ID].dropna().tolist() == [1.0]
+
+
+def _bytes_frame(times, scalars, lists, blobs) -> pd.DataFrame:
+    frame = _frame(times, scalars, lists)
+    frame[BLOB_ID] = pd.Series(blobs, index=frame.index, dtype=object)
+    return frame
+
+
+def test_bytes_column_is_skipped_on_write(database):
+    database, resources = database
+    times = [T0, T0 + pd.Timedelta(hours=1)]
+    database.write(_bytes_frame(times, [1.0, 2.0], [[1.0, 2.5], [3.0, 4.0]], [b"ab", b"c"]))
+
+    data = database.read(resources, T0, times[-1])
+
+    assert list(data[SCALAR_ID]) == [1.0, 2.0]
+    assert data[LIST_ID].iloc[1] == [3.0, 4.0]
+    assert BLOB_ID not in data.columns
+
+
+def test_group_with_only_bytes_writes_nothing(database):
+    database, resources = database
+    frame = pd.DataFrame({PNG_ID: [b"PNG"]}, index=pd.DatetimeIndex([T0], name="timestamp"))
+
+    database.write(frame)
+
+    assert database.read(resources, T0, T0).empty
+
+
+def test_bytes_warning_logged_once(database):
+    database, _ = database
+    frame = _bytes_frame([T0], [1.0], [[1.0]], [b"a"])
+    later = _bytes_frame([T0 + pd.Timedelta(hours=1)], [2.0], [[2.0]], [b"b"])
+
+    with patch.object(database, "_logger") as logger:
+        database.write(frame)
+        database.write(later)
+
+    assert logger.warning.call_count == 1
+    assert BLOB_ID in logger.warning.call_args.args[0]
