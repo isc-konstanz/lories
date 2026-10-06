@@ -8,14 +8,17 @@ lories.connectors.tables
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from typing import Optional, Sequence
 
+import numpy as np
 import pandas as pd
 from lories.connectors import ConnectionError, Database, register_connector_type
 from lories.core.configs.parameters import ChannelParameter, Parameter, SelectParameter
 from lories.typing import Configurations, Resources, Timestamp
+from lories.util import to_json_compatible
 from pandas import HDFStore
 
 
@@ -67,6 +70,7 @@ class HDFDatabase(Database):
     group = ChannelParameter(type=str, required=False, desc="HDF5 group key under which this channel is stored")
 
     __store: HDFStore = None
+    __skipped_ids: set
 
     _store_dir: str
     _store_path: str
@@ -79,6 +83,7 @@ class HDFDatabase(Database):
     # noinspection PyTypeChecker
     def configure(self, configs: Configurations) -> None:
         super().configure(configs)
+        self.__skipped_ids = set()
 
         if self._path is not None:
             path = self._path
@@ -131,7 +136,7 @@ class HDFDatabase(Database):
         try:
             for group, group_resources in resources.groupby("group"):
                 group_key = _format_key(group)
-                if group_key not in self.__store:
+                if group_key not in self.__store.keys():
                     continue
 
                 group_columns = self.__build_columns(group_resources)
@@ -157,7 +162,7 @@ class HDFDatabase(Database):
         try:
             for group, group_resources in resources.groupby("group"):
                 group_key = _format_key(group)
-                if group_key not in self.__store:
+                if group_key not in self.__store.keys():
                     continue
 
                 group_data = self.__store.select(group_key, stop=1, columns=self.__build_columns(group_resources))
@@ -178,7 +183,7 @@ class HDFDatabase(Database):
         try:
             for group, group_resources in resources.groupby("group"):
                 group_key = _format_key(group)
-                if group_key not in self.__store:
+                if group_key not in self.__store.keys():
                     continue
 
                 group_data = self.__store.select(group_key, start=-1, columns=self.__build_columns(group_resources))
@@ -202,7 +207,7 @@ class HDFDatabase(Database):
         try:
             for group, group_resources in resources.groupby("group"):
                 group_key = _format_key(group)
-                if group_key not in self.__store:
+                if group_key not in self.__store.keys():
                     continue
 
                 self.__store.remove(group_key)
@@ -214,6 +219,12 @@ class HDFDatabase(Database):
         try:
             for group, group_resources in self.resources.filter(lambda c: c.id in data.columns).groupby("group"):
                 group_key = _format_key(group)
+                bytes_ids = [r.id for r in group_resources if issubclass(r.type, (bytes, bytearray))]
+                if len(bytes_ids) > 0:
+                    self.__warn_skipped(bytes_ids)
+                    group_resources = group_resources.filter(lambda r: r.id not in bytes_ids)
+                    if len(group_resources) == 0:
+                        continue
                 group_data = data[group_resources.ids].dropna(axis="index", how="all").dropna(axis="columns", how="all")
                 group_data.index.name = "index"
 
@@ -222,13 +233,36 @@ class HDFDatabase(Database):
                         columns={r.id: r.get("column", default=r.key) for r in group_resources},
                         inplace=True,
                     )
-                if group_key not in self.__store:
-                    self.__store.put(group_key, group_data, format="table", encoding="UTF-8")
-                else:
-                    self.__store.append(group_key, group_data, format="table", encoding="UTF-8")
+                widths = {}
+                for resource in group_resources:
+                    if not issubclass(resource.type, list):
+                        continue
+                    name = resource.id if self._columns_unique else resource.get("column", default=resource.key)
+                    if name not in group_data.columns:
+                        continue
+                    group_data[name], widths[name] = _encode_lists(group_data[name])
+                # put() would first remove a node at this path, including tables nested below it.
+                is_new = group_key not in self.__store.keys()
+                self.__store.append(
+                    group_key,
+                    group_data,
+                    format="table",
+                    encoding="UTF-8",
+                    min_itemsize=(widths or None) if is_new else None,
+                )
 
         except IOError as e:
             raise ConnectionError(self, str(e))
+
+    def __warn_skipped(self, ids: Sequence[str]) -> None:
+        new_ids = [i for i in ids if i not in self.__skipped_ids]
+        if len(new_ids) == 0:
+            return
+        self.__skipped_ids.update(new_ids)
+        self._logger.warning(
+            f"HDF database cannot store bytes channels, skipping: {', '.join(new_ids)}. "
+            "Use a SQL database to keep them."
+        )
 
     def __build_columns(self, resources: Resources) -> Sequence[str]:
         if self._columns_unique:
@@ -238,8 +272,35 @@ class HDFDatabase(Database):
     def __extract_data(self, resources: Resources, data: pd.DataFrame) -> pd.DataFrame:
         data.dropna(axis="columns", how="all", inplace=True)
         if not self._columns_unique:
-            return data.rename(columns={r.get("column", default=r.key): r.id for r in resources})
+            data = data.rename(columns={r.get("column", default=r.key): r.id for r in resources})
+        for resource in resources:
+            if issubclass(resource.type, list) and resource.id in data.columns:
+                data[resource.id] = _decode_lists(data[resource.id])
         return data
+
+
+def _is_missing(value) -> bool:
+    if isinstance(value, (list, tuple, np.ndarray)):
+        return False
+    return bool(pd.isna(value))
+
+
+def _encode_lists(column: pd.Series) -> tuple[pd.Series, int]:
+    width = 1
+    cells = []
+    for value in column:
+        if _is_missing(value):
+            cells.append(np.nan)
+            continue
+        cell = json.dumps(to_json_compatible(value), separators=(",", ":"), allow_nan=False)
+        width = max(width, len(cell), 25 * len(value) + 1)
+        cells.append(cell)
+    return pd.Series(cells, index=column.index, dtype=object, name=column.name), width
+
+
+def _decode_lists(column: pd.Series) -> pd.Series:
+    cells = [json.loads(v) if isinstance(v, str) else np.nan for v in column]
+    return pd.Series(cells, index=column.index, dtype=object, name=column.name)
 
 
 def _format_key(key: str) -> str:
