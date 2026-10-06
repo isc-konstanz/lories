@@ -8,8 +8,11 @@ A channel's connector wrapper exposes the extra configs of its connector table.
 
 from __future__ import annotations
 
+import copy
 import os
 from textwrap import dedent
+
+import pytest
 
 from lories.components import Component, register_component_type
 
@@ -72,3 +75,26 @@ def test_channel_connector_str_lists_its_configs(tmp_path):
     text = str(device.data["reading"].connector)
     assert f"id={connector.id}" in text
     assert "address=40001" in text
+
+
+def test_channel_connector_attribute_reads_its_configs(tmp_path):
+    app, device, connector = _load(tmp_path)
+    channel_connector = device.data["reading"].connector
+
+    assert channel_connector.address == 40001
+    assert getattr(channel_connector, "address", None) == 40001
+
+
+def test_channel_connector_missing_attribute_names_the_config(tmp_path):
+    app, device, connector = _load(tmp_path)
+
+    with pytest.raises(AttributeError, match="no configuration 'missing'"):
+        device.data["reading"].connector.missing
+
+
+def test_channel_connector_copy_keeps_its_configs(tmp_path):
+    app, device, connector = _load(tmp_path)
+
+    duplicate = copy.copy(device.data["reading"].connector)
+
+    assert duplicate.address == 40001
