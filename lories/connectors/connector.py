@@ -254,10 +254,10 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
 
             try:
                 if not self._is_connected():
+                    self.__resources = resources
                     self._at_connect(resources)
                     self._run_connect(resources, *args, **kwargs)
                     self._on_connect(resources)
-                    self.__resources = resources
                 else:
                     self._logger.warning(f"{type(self).__name__} '{self.id}' already connected")
 

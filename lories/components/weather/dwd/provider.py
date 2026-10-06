@@ -45,8 +45,6 @@ CHANNEL_ADDRESS_ALIAS = {
 }
 
 CHANNEL_AGGREGATE_ALIAS = {
-    Weather.SUNSHINE: "sum",
-    Weather.PRECIPITATION: "sum",
     Weather.WIND_SPEED_GUST: "max",
     "condition": None,
     "icon": None,

@@ -36,7 +36,7 @@ class ChannelConnector(_ChannelWrapper[Connector]):
     def _get_vars(self) -> Dict[str, Any]:
         return {
             _Connector.TYPE: self._connector,
-            **self.__configs,
+            **self._get_configs(),
             "timestamp": self.timestamp,
             "enabled": self.enabled,
         }

@@ -12,14 +12,57 @@ import logging
 import re
 from abc import ABC, ABCMeta, abstractmethod
 from functools import wraps
-from typing import Any, Optional
+from typing import Any, Dict, Optional, Sequence
 
 import dash
+from dash import Input, Output, Patch, State, no_update, set_props
 
 import pandas as pd
 from lories.application import InterfaceException
 from lories.application.view.pages.layout import PageLayout
 from lories.util import validate_key
+
+_UPDATE_GATE = """
+function(tick, ...args) {
+    const received = args.pop();
+    const requested = args.pop();
+    const answered = !requested || (received && received.n === requested.n);
+    if (!answered && tick - requested.tick < 10) {
+        return window.dash_clientside.no_update;
+    }
+    return {n: requested ? requested.n + 1 : 1, tick: tick};
+}
+"""
+
+
+_REDRAW_BUDGET = 1000  # changed items × items on the page
+
+
+def update_items(item_ids: Sequence[str], updates: Dict[int, Dict[str, Any]], redraw: bool = False) -> Any:
+    """Update items in place, or as one Patch of the accordion's children when redrawing or above the budget."""
+    if not updates:
+        return no_update
+    if not redraw and len(updates) * len(item_ids) <= _REDRAW_BUDGET:
+        for index, props in updates.items():
+            set_props(item_ids[index], props)
+        return no_update
+    items = Patch()
+    for index, props in updates.items():
+        for prop, value in props.items():
+            items[index]["props"][prop] = value
+    return items
+
+
+def gate_updates(requested_id: str, received_id: str, *triggers: Input) -> None:
+    """Forward ticks and triggers to requested_id one at a time; resend after ten ticks without an echo."""
+    dash.clientside_callback(
+        _UPDATE_GATE,
+        Output(requested_id, "data"),
+        Input("view-update", "n_intervals"),
+        *triggers,
+        State(requested_id, "data"),
+        State(received_id, "data"),
+    )
 
 
 class PageMeta(ABCMeta):

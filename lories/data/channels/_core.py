@@ -113,7 +113,7 @@ class _ChannelWrapper(ABC, Generic[Registrator]):
     def __getattr__(self, attr):
         # __getattr__ gets called when the item is not found via __getattribute__
         # To avoid recursion, call __getattribute__ directly to get components dict
-        configs = _ChannelWrapper.__getattribute__(self, f"_{_ChannelWrapper.__name__}__configs")
+        configs = _ChannelWrapper.__getattribute__(self, "_ChannelWrapper__configs")
         if attr in configs.keys():
             return configs[attr]
         raise AttributeError(f"'{type(self).__name__}' object has no configuration '{attr}'")

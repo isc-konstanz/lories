@@ -11,18 +11,19 @@ from __future__ import annotations
 from typing import Generic, TypeVar
 
 import dash_bootstrap_components as dbc
-from dash import Input, Output, callback, html
+from dash import Input, Output, State, callback, dcc, html, no_update
 
 import pandas as pd
 from lories.application.view._dash_format import (
     HEADER_STATE_STYLE,
     HEADER_UNIT_STYLE,
     HEADER_VALUE_STYLE,
+    changed_channels,
     format_bytes_label,
     format_number,
 )
 from lories.application.view.pages.layout import PageLayout
-from lories.application.view.pages.page import Page
+from lories.application.view.pages.page import Page, gate_updates, update_items
 from lories.application.view.pages.widgets import build_configs_editor_modal
 from lories.connectors import Connector
 from lories.typing import Channel, Channels, Configurations
@@ -89,7 +90,7 @@ class ConnectorPage(Page, Generic[ConnectorType]):
         def _update_status(*_):
             if not self._connector.is_enabled():
                 return [dbc.Badge("Disabled", color="secondary")]
-            connected = self._connector._is_connected()
+            connected = self._connector._connected
             color = "success" if connected else "danger"
             label = "Connected" if connected else "Disconnected"
             timestamp = self._connector._timestamp_connect if connected else self._connector._timestamp_disconnect
@@ -102,24 +103,61 @@ class ConnectorPage(Page, Generic[ConnectorType]):
         return html.Div(id=f"{self.id}-status", children=_update_status())
 
     def _build_channels(self, channels: Channels) -> html.Div:
+        channels = list(channels)
+        fingerprints_id = f"{self.id}-channels-fingerprints"
+        requested_id = f"{self.id}-channels-requested"
+        received_id = f"{self.id}-channels-received"
+        gate_updates(requested_id, received_id)
+
+        item_ids = [self._item_id(channel) for channel in channels]
+
         @callback(
             Output(f"{self.id}-channels", "children"),
-            Input("view-update", "n_intervals"),
+            Output(fingerprints_id, "data"),
+            Output(received_id, "data"),
+            Input(requested_id, "data"),
+            State(fingerprints_id, "data"),
         )
-        def _update_channels(*_):
-            return [self._build_channel(ch) for ch in channels]
+        def _update_channels(requested, shown):
+            fingerprints, changed = changed_channels(channels, shown)
+            if not changed:
+                return no_update, no_update, requested
+            updates = {
+                index: {
+                    "title": self._build_channel_summary(channels[index]),
+                    "children": self._build_channel_updated(channels[index]),
+                }
+                for index in changed
+            }
+            return update_items(item_ids, updates, redraw=shown is None), fingerprints, requested
 
         return html.Div(
-            dbc.Accordion(
-                id=f"{self.id}-channels",
-                children=_update_channels(),
-                start_collapsed=True,
-                always_open=True,
-                flush=True,
-            )
+            [
+                dcc.Store(id=fingerprints_id),
+                dcc.Store(id=requested_id),
+                dcc.Store(id=received_id),
+                dbc.Accordion(
+                    id=f"{self.id}-channels",
+                    children=[self._build_channel(channel) for channel in channels],
+                    start_collapsed=True,
+                    always_open=True,
+                    flush=True,
+                ),
+            ]
         )
 
+    def _item_id(self, channel: Channel) -> str:
+        return f"{self.id}-ch-{self._encode_id(channel.id)}"
+
     def _build_channel(self, channel: Channel) -> dbc.AccordionItem:
+        return dbc.AccordionItem(
+            title=self._build_channel_summary(channel),
+            children=self._build_channel_updated(channel),
+            id=self._item_id(channel),
+        )
+
+    # noinspection PyMethodMayBeStatic
+    def _build_channel_summary(self, channel: Channel) -> dbc.Row:
         state = str(channel.state).replace("_", " ")
         color = "success" if channel.is_valid() else "warning"
         if state.lower().endswith("error") or state.lower() == "disabled":
@@ -148,29 +186,27 @@ class ConnectorPage(Page, Generic[ConnectorType]):
             ],
             className="d-flex align-items-baseline",
         )
+        return dbc.Row(
+            [
+                dbc.Col(html.Span(channel.name, className="mb-1"), width="auto"),
+                dbc.Col(header_items, width="auto"),
+            ],
+            justify="between",
+            className="w-100",
+        )
 
+    # noinspection PyMethodMayBeStatic
+    def _build_channel_updated(self, channel: Channel) -> dbc.Row:
         timestamp = channel.timestamp
         timestamp_str = timestamp.isoformat(sep=" ", timespec="seconds") if not pd.isna(timestamp) else "—"
-
-        return dbc.AccordionItem(
-            title=dbc.Row(
-                [
-                    dbc.Col(html.Span(channel.name, className="mb-1"), width="auto"),
-                    dbc.Col(header_items, width="auto"),
-                ],
-                justify="between",
-                className="w-100",
-            ),
-            children=dbc.Row(
-                [
-                    dbc.Col(
-                        html.Span("Updated:", className="text-muted"),
-                        width=1,
-                        style={"minWidth": "5.5rem"},
-                    ),
-                    dbc.Col(html.Small(timestamp_str, className="text-muted"), width="auto"),
-                ],
-                justify="start",
-            ),
-            id=f"{self.id}-ch-{self._encode_id(channel.key)}",
+        return dbc.Row(
+            [
+                dbc.Col(
+                    html.Span("Updated:", className="text-muted"),
+                    width=1,
+                    style={"minWidth": "5.5rem"},
+                ),
+                dbc.Col(html.Small(timestamp_str, className="text-muted"), width="auto"),
+            ],
+            justify="start",
         )

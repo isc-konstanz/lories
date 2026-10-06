@@ -83,6 +83,15 @@ class ListenerContext(_ListenerContext):
             )
         listener.channels.extend(channels)
 
+    # noinspection PyUnresolvedReferences
+    @staticmethod
+    def _build_id(function: Callable[[pd.DataFrame], None]) -> str:
+        try:
+            context = function.__self__.id
+        except AttributeError:
+            context = function.__module__
+        return f"{context}.{function.__name__}"
+
     # noinspection PyUnresolvedReferences, PyProtectedMember
     def register(
         self,
@@ -93,15 +102,17 @@ class ListenerContext(_ListenerContext):
         interval: Optional[str | pd.Timedelta] = None,
     ) -> None:
         key = function.__name__
-        try:
-            context = function.__self__.id
-        except AttributeError:
-            context = function.__module__
-        id = f"{context}.{key}"
+        id = self._build_id(function)
         if self._contains(id):
             self._update(id, channels, how, unique)
         else:
             self._add(self._create(id, key, function, channels, how=how, unique=unique, interval=interval))
+
+    def unregister(self, function: Callable[[pd.DataFrame], None]) -> None:
+        id = self._build_id(function)
+        with self:
+            if self._contains(id):
+                self._remove(id)
 
     def notify(self, *channels: Channel) -> Collection[Listener]:
         listeners = []
