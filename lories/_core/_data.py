@@ -52,6 +52,10 @@ class _DataContext(_Context[Channel]):
     ) -> None:
         pass
 
+    @abstractmethod
+    def unregister(self, function: Callable[[pd.DataFrame], None]) -> None:
+        pass
+
     @overload
     def has_logged(
         self,

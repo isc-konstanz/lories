@@ -192,6 +192,9 @@ class DataAccess(_DataAccess, Configurator):
         channels = self._filter_by_args(channels)
         self.__context.register(function, channels=channels, how=how, unique=unique, interval=interval)
 
+    def unregister(self, function: Callable[[pd.DataFrame], None]) -> None:
+        self.__context.unregister(function)
+
     def has_logged(
         self,
         channels: Optional[ChannelsArgument] = None,
