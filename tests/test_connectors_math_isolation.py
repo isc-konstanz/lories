@@ -19,6 +19,7 @@ import pytest
 import pandas as pd
 from lories._core._channel import ChannelState  # noqa
 from lories.components import Component, register_component_type
+from lories.connectors import ConnectorError
 from lories.connectors.tasks.connect import ConnectTask
 from lories.core import ConfigurationError
 
@@ -122,6 +123,15 @@ def test_all_expressions_broken_is_a_configuration_error(tmp_path):
     app, device, connector = _load(tmp_path, _ALL_BROKEN)
     with pytest.raises(ConfigurationError, match="No valid math expression"):
         connector.connect(_math_channels(app, connector))
+
+
+def test_failed_connect_task_keeps_the_broken_channels_visible(tmp_path):
+    app, device, connector = _load(tmp_path, _ALL_BROKEN)
+    with pytest.raises(ConnectorError, match="No valid math expression"):
+        ConnectTask(connector, _math_channels(app, connector))()
+
+    assert device.data["broken1"].state == ChannelState.ARGUMENT_SYNTAX_ERROR
+    assert device.data["broken2"].state == ChannelState.ARGUMENT_SYNTAX_ERROR
 
 
 def test_read_marks_the_broken_channel_and_evaluates_the_rest(tmp_path):
