@@ -141,6 +141,8 @@ class Brightsky(Connector):
         # Convert global horizontal irradiance from kWh/m^2 during the previous hour to W/m^2
         data["solar"] = data["solar"] * 1000
 
+        # Precipitation and sunshine during the previous hour already are the hourly rates in mm/h and min/h
+
         # Convert wind speeds from km/h to m/s
         for wind_column in ["wind_speed", "wind_gust_speed"]:
             if wind_column in data.columns:
