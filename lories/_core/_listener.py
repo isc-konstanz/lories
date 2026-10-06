@@ -56,6 +56,9 @@ class _ListenerContext(_Context[Listener]):
     ) -> None: ...
 
     @abstractmethod
+    def unregister(self, function: Callable[[pd.DataFrame], None]) -> None: ...
+
+    @abstractmethod
     def notify(self, *channels: Channel) -> Collection[Listener]: ...
 
 

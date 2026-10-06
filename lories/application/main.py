@@ -211,6 +211,9 @@ class Application(_Application, DataContext, TaskContext):
     ) -> None:
         self._listeners.register(function, self._filter_by_args(channels), how=how, unique=unique, interval=interval)
 
+    def unregister(self, function: Callable[[pd.DataFrame], None]) -> None:
+        self._listeners.unregister(function)
+
     # noinspection PyTypeChecker
     @property
     def settings(self) -> Settings:

@@ -142,8 +142,10 @@ class MathConnector(Connector):
             raise ConfigurationError(f"Error parsing math expression for channel '{resource.id}': {expression}: {e}")
 
     def disconnect(self) -> None:
-        for expr in self._exprs.keys():
-            self.context.context.unregister(self._exprs.pop(expr))
+        data = get_context(self.context, DataContext)
+        for expr in list(self._exprs.values()):
+            data.unregister(expr)
+        self._exprs.clear()
 
     def read(self, resources: Resources) -> pd.DataFrame:
         timestamp = pd.Timestamp.now(tz.UTC).floor(freq="s")
