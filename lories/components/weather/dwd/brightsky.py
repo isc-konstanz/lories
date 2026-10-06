@@ -16,10 +16,11 @@ import requests
 import numpy as np
 import pandas as pd
 from lories.components.weather import Weather
-from lories.connectors import Connector, register_connector_type
+from lories.connectors import Connector, ConnectorError, register_connector_type
 from lories.core.configs.parameters import Parameter
 from lories.location import Location
 from lories.typing import Configurations, Resources, Timestamp
+from lories.util import convert_timezone
 
 
 @register_connector_type("brightsky")
@@ -36,6 +37,7 @@ class Brightsky(Connector):
 
     address = Parameter(key="address", type=str, default="https://api.brightsky.dev/", desc="Brightsky API base URL")
     horizon = Parameter(key="horizon", type=int, default=10, min=-1, max=10, desc="Forecast horizon (days)")
+    _timeout = Parameter(key="timeout", type=pd.Timedelta, default="30s", min="1s", desc="HTTP request timeout")
 
     location: Location
     address: str
@@ -78,7 +80,8 @@ class Brightsky(Connector):
             source_data = source_data.rename(columns={r.address: r.id for r in source_resources})
 
             if source == "forecast":
-                source_end = source_start + pd.Timedelta(days=self.horizon)
+                if end is None:
+                    source_end = source_start + pd.Timedelta(days=self.horizon)
 
             elif any(s in ["historical", "current"] for s in source.split(",")):
                 if all(t is None for t in [start, end]):
@@ -89,6 +92,8 @@ class Brightsky(Connector):
                     source_start:source_end, [r.id for r in source_resources if r.id in source_data.columns]
                 ]
             )
+        if len(data) == 0:
+            return pd.DataFrame()
         return pd.concat(data, axis="index")
 
     # noinspection PyPackageRequirements
@@ -99,23 +104,29 @@ class Brightsky(Connector):
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         if date is None:
             date = pd.Timestamp.now(tz=self.location.timezone)
+        date = convert_timezone(date, self.location.timezone)
         if date_last is None:
             date_last = date + pd.Timedelta(days=self.horizon)
+        else:
+            # Bright Sky reads a bare last_date as 00:00 of that day
+            date_last = convert_timezone(date_last, self.location.timezone) + pd.Timedelta(days=1)
         parameters = {
-            "date": date.strftime("%Y-%m-%d"),
+            # A day earlier, as today may not have its first observation yet
+            "date": (date - pd.Timedelta(days=1)).strftime("%Y-%m-%d"),
             "last_date": date_last.strftime("%Y-%m-%d"),
             "lat": self.location.latitude,
             "lon": self.location.longitude,
-            "tz": self.location.timezone.zone,
+            # Fixed offsets have no name, so the dates are read as UTC, which the day of padding covers
+            "tz": getattr(self.location.timezone, "zone", None),
         }
-        response = requests.get(self.address + "weather", params=parameters)
+        try:
+            response = requests.get(self.address + "weather", params=parameters, timeout=self._timeout.total_seconds())
+            if response.status_code != 200:
+                raise ConnectorError(self, f"Response returned with error {response.status_code}: {response.reason}")
+            response_json = json.loads(response.text)
 
-        if response.status_code != 200:
-            raise requests.HTTPError(
-                "Response returned with error " + str(response.status_code) + ": " + response.reason
-            )
-
-        response_json = json.loads(response.text)
+        except (requests.RequestException, ValueError) as e:
+            raise ConnectorError(self, f"Request to Bright Sky failed: {e}") from e
 
         sources = pd.DataFrame(response_json["sources"])
         sources = sources.set_index("id")
@@ -127,10 +138,8 @@ class Brightsky(Connector):
         data = data.set_index("timestamp").tz_convert(self.location.timezone)
         data.index.name = "timestamp"
 
-        hours = pd.Series(data=data.index, index=data.index).diff().bfill().dt.total_seconds() / 3600.0
-
-        # Convert global horizontal irradiance from kWh/m^2 to W/m^2
-        data["solar"] = data["solar"] * hours * 1000
+        # Convert global horizontal irradiance from kWh/m^2 during the previous hour to W/m^2
+        data["solar"] = data["solar"] * 1000
 
         # Convert wind speeds from km/h to m/s
         for wind_column in ["wind_speed", "wind_gust_speed"]:
