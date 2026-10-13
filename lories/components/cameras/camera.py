@@ -34,8 +34,13 @@ class Camera(_Camera):
         if configs.get_bool("frame", default=True):
             self.data.add(Camera.FRAME, aggregate="last")
 
+        channels = configs.get_member("data").get_member("channels", ensure_exists=True)
+        for key in ("stream", "motion"):
+            if not configs.get_bool(key, default=False):
+                channels.pop(key)
+
         if configs.get_bool("stream", default=False):
-            self.data.add(Camera.STREAM, aggregate="last", freq=None, stream=True)
+            self.data.add(Camera.STREAM, aggregate="last", freq=None, stream=True, logger={"enabled": False})
 
         if configs.get_bool("motion", default=False):
             self.data.add(

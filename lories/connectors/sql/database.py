@@ -242,6 +242,29 @@ class SqlDatabase(Database, Mapping[str, Table]):
             self._raise(e)
         return False
 
+    def count(
+        self,
+        resources: Resources,
+        start: Optional[Timestamp] = None,
+        end: Optional[Timestamp] = None,
+    ) -> int:
+        count = 0
+        if not self._lock.acquire(timeout=self._lock_timeout):
+            raise DatabaseError(self, f"Timeout acquiring lock for counting {type(self).__name__}: {self.id}")
+        try:
+            for table_schema, schema_resources in resources.groupby("schema"):
+                for table_name, table_resources in schema_resources.groupby(lambda c: c.get("table", default=c.group)):
+                    if table_name not in self.__tables:
+                        raise DatabaseError(self, f"Table '{table_name}' not available")
+
+                    table = self.get(table_name)
+                    count += int(self.connection.execute(table.exists(table_resources, start, end)).scalar() or 0)
+        except SQLAlchemyError as e:
+            self._raise(e)
+        finally:
+            self._lock.release()
+        return count
+
     # noinspection PyUnresolvedReferences, PyTypeChecker
     def read(
         self,

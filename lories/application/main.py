@@ -172,6 +172,8 @@ class Application(_Application, DataContext, TaskContext):
 
     def interrupt(self, *_) -> None:
         self.__interrupt.set()
+        # Stop component threads before the executor they submit reads to is shut down
+        self._components.deactivate()
         super().interrupt()
         if self.__runner.is_alive():
             self.__runner.join()

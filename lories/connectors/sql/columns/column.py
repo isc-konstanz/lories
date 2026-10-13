@@ -13,7 +13,7 @@ import datetime as dt
 from typing import Any, AnyStr, Optional, Type, TypeVar
 
 import sqlalchemy as sql
-from sqlalchemy.types import BLOB, BOOLEAN, DATETIME, FLOAT, INTEGER, TIMESTAMP, String, TypeEngine
+from sqlalchemy.types import BLOB, BOOLEAN, DATETIME, FLOAT, INTEGER, TIMESTAMP, String, Text, TypeEngine
 
 import numpy as np
 import pandas as pd
@@ -100,6 +100,9 @@ def to_type_engine(type: Type | AnyStr, length: Optional[int] = None) -> Type[Ty
             raise ConfigurationError(f"Invalid SQL data type '{type}' without configured length")
         if length is None:
             return String
+        if length > 16383:
+            # Beyond the max VARCHAR length of utf8mb4, MySQL picks the smallest fitting TEXT type
+            return Text(length)
         return String(length)
 
     raise ConfigurationError(f"Unknown SQL data type: {type}")

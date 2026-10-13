@@ -125,7 +125,7 @@ _RUNNERS = {
 
 
 class Model:
-   
+
     def __init__(
         self,
         path: str,
@@ -149,7 +149,7 @@ class Model:
         else:
             self._runner = runner_cls(str(file), self._device)
 
-        self.meta: Dict[str, Any] = dict(getattr(self._runner, "meta", {}))
+        self.meta: Dict[str, Any] = self._runner.meta
         _logger.info("Model loaded from %s (%s) on %s", path, ext, self._device)
 
     @property

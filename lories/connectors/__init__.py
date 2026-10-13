@@ -48,7 +48,6 @@ CONNECTORS = [
     "influxdb2",
     "tables",
     "cameras",
-    "models",
     "serial.sdi12",
     "serial.i2c",
     "modbus",
