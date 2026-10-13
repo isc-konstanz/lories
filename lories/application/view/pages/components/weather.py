@@ -15,10 +15,17 @@ import plotly.graph_objs as go
 from dash import Input, Output, callback, dcc, html
 
 import pandas as pd
-import pytz as tz
 from lories.application.view.pages import ComponentPage, PageLayout, register_component_page
 from lories.components.weather import Weather, WeatherForecast
 from lories.util import floor_date
+
+HISTORY = pd.Timedelta(days=7)
+HORIZON = pd.Timedelta(days=3)
+
+COLOR_IRRADIANCE = "#F2A900"
+COLOR_TEMPERATURE = "#E45756"
+COLOR_PRECIPITATION = "#4C78A8"
+COLOR_PRECIPITATION_FORECAST = "#95BAE6"
 
 
 @register_component_page(Weather)
@@ -71,97 +78,134 @@ class WeatherPage(ComponentPage[Weather]):
     def _build_forecast(self) -> html.Div:
         @callback(
             Output(f"{self.id}-forecast-graph", "figure"),
-            Output(f"{self.id}-forecast-icons", "children"),
             Input(f"{self.id}-forecast-update", "n_intervals"),
         )
         def _update_forecast(*_):
-            start = floor_date(pd.Timestamp.now(tz.UTC), freq="h")
-            end = start + pd.Timedelta(hours=23)
-            forecast = self.forecast.get(start, end)
-            if forecast.empty:
-                forecast = pd.DataFrame(index=pd.date_range(start, end, freq="h"), columns=["icon", Weather.TEMP_AIR])
-
-            return self._build_forecast_graph(forecast), self._build_forecast_icons(forecast)
+            now = pd.Timestamp.now(tz=self._component.location.timezone)
+            start = floor_date(now - HISTORY, freq="h")
+            end = floor_date(now + HORIZON, freq="h")
+            measured = self._read_measured(start, now)
+            forecast = self.forecast.get(now, end)
+            return self._build_forecast_graph(measured, forecast, now, start, end)
 
         return html.Div(
             [
-                dbc.Row(id=f"{self.id}-forecast-icons"),
-                dbc.Row(
-                    dbc.Col(
-                        [
-                            dcc.Graph(id=f"{self.id}-forecast-graph", config={"displayModeBar": False}),
-                            dcc.Interval(id=f"{self.id}-forecast-update", interval=60000, n_intervals=0),
-                        ]
-                    )
-                ),
+                dcc.Graph(id=f"{self.id}-forecast-graph", config={"displayModeBar": False}),
+                dcc.Interval(id=f"{self.id}-forecast-update", interval=300000, n_intervals=0),
             ],
             id=f"{self.id}-forecast",
-            # className="weather-forecast",
-            # TODO: Move this to separate style sheet
-            style={
-                "padding-top": "1rem",
-                "padding-bottom": "1rem",
-                "background-image": "linear-gradient(#91d0ff, #c2e4ff)",
-                "background-repeat": "no-repeat",
-                # "border-radius": "var(--bs-border-radius)",
-                # Background should stop above padding x axis margin (32px)
-                "background-size": "100% calc(100% - 32px - 1rem)",
-            },
         )
 
-    def _build_forecast_graph(self, forecast: pd.DataFrame):
-        temperature = forecast[Weather.TEMP_AIR]
-
-        # Create the graph trace
-        data = go.Scatter(
-            x=temperature.index,
-            y=temperature.values,
-            mode="lines",
-            line={"color": "#e4002c"},
-        )
-
-        ticks = self._slice_forecast_index(forecast)
-
-        # Create the graph layout
-        layout = go.Layout(
-            xaxis=go.layout.XAxis(
-                visible=True,
-                range=[min(temperature.index), max(temperature.index)],
-                tickmode="array",
-                tickvals=ticks,
-                ticktext=[t.strftime("%H:%M") for t in ticks],
-            ),
-            yaxis=go.layout.YAxis(
-                visible=False,
-                range=[
-                    round(min(temperature.values) - 10),
-                    round(max(temperature.values) + 10),
-                ],
-            ),
-            margin=go.layout.Margin(l=0, r=0, b=32, t=12),
-            height=250,
-            dragmode=False,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-        )
-        return {"data": [data], "layout": layout}
-
-    def _build_forecast_icons(self, forecast: pd.DataFrame):
-        icons = []
-        for timestamp in self._slice_forecast_index(forecast):
-            icon = forecast.loc[timestamp, "icon"]
-            if not pd.isna(icon):
-                icons.append(dbc.Col(html.Div(icon, style={"fontSize": ".75rem", "text-align": "center"})))
-            else:
-                icons.append(dbc.Col(dbc.Spinner()))
-        return icons
+    def _read_measured(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
+        channels = self.data.filter(lambda c: c.key in (Weather.GHI, Weather.TEMP_AIR, Weather.PRECIPITATION))
+        if len(channels) == 0:
+            return pd.DataFrame()
+        return self.data.from_logger(channels, start=start, end=end)
 
     @staticmethod
-    def _slice_forecast_index(forecast: pd.DataFrame, hours: int = 4) -> pd.DatetimeIndex:
-        times = []
-        time = floor_date(forecast.index[0], freq=f"{hours}h")
-        while time <= forecast.index[-1]:
-            if time in forecast.index:
-                times.append(time)
-            time += pd.Timedelta(hours=hours)
-        return pd.DatetimeIndex(times)
+    def _build_forecast_graph(
+        measured: pd.DataFrame,
+        forecast: pd.DataFrame,
+        now: pd.Timestamp,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+    ) -> dict:
+        # plotly.js drops UTC offsets, so all frames must share one timezone to line up
+        frames = []
+        for frame in (measured, forecast):
+            if not frame.empty:
+                frame = frame.tz_convert(now.tz)
+            frames.append(frame)
+        measured, forecast = frames
+
+        def resampled(frame: pd.DataFrame, key: str, freq: str) -> pd.Series:
+            if frame.empty or key not in frame.columns:
+                return pd.Series(dtype=float)
+            return frame[key].resample(freq).mean().dropna()
+
+        data = []
+        for frame, is_forecast in ((measured, False), (forecast, True)):
+            suffix = " forecast" if is_forecast else ""
+            dash = "dash" if is_forecast else None
+
+            series = resampled(frame, Weather.GHI, "15min")
+            if not series.empty:
+                data.append(
+                    go.Scatter(
+                        x=list(series.index),
+                        y=series.values,
+                        name=f"Irradiance{suffix}",
+                        yaxis="y",
+                        mode="lines",
+                        fill="tozeroy",
+                        line=dict(color=COLOR_IRRADIANCE, dash=dash),
+                    )
+                )
+            series = resampled(frame, Weather.TEMP_AIR, "15min")
+            if not series.empty:
+                data.append(
+                    go.Scatter(
+                        x=list(series.index),
+                        y=series.values,
+                        name=f"Temperature{suffix}",
+                        yaxis="y3",
+                        mode="lines",
+                        line=dict(color=COLOR_TEMPERATURE, dash=dash),
+                    )
+                )
+            series = resampled(frame, Weather.PRECIPITATION, "30min")
+            if not series.empty:
+                data.append(
+                    go.Bar(
+                        x=list(series.index),
+                        y=series.values,
+                        name=f"Precipitation{suffix}",
+                        yaxis="y2",
+                        marker=dict(color=COLOR_PRECIPITATION_FORECAST if is_forecast else COLOR_PRECIPITATION),
+                    )
+                )
+
+        layout = dict(
+            template="plotly_white",
+            hovermode="x unified",
+            showlegend=False,
+            height=400,
+            dragmode=False,
+            margin=dict(l=60, r=20, t=20, b=40),
+            xaxis=dict(domain=[0, 0.88], range=[start, end]),
+            yaxis=dict(
+                title=dict(text="Irradiance [W/m²]", font=dict(color=COLOR_IRRADIANCE)),
+                tickfont=dict(color=COLOR_IRRADIANCE),
+                rangemode="tozero",
+            ),
+            yaxis3=dict(
+                title=dict(text="Temperature [°C]", font=dict(color=COLOR_TEMPERATURE)),
+                tickfont=dict(color=COLOR_TEMPERATURE),
+                overlaying="y",
+                side="right",
+                showgrid=False,
+            ),
+            yaxis2=dict(
+                title=dict(text="Precipitation [mm/h]", font=dict(color=COLOR_PRECIPITATION)),
+                tickfont=dict(color=COLOR_PRECIPITATION),
+                overlaying="y",
+                side="right",
+                anchor="free",
+                position=0.96,
+                rangemode="tozero",
+                showgrid=False,
+            ),
+            shapes=[
+                dict(
+                    type="line",
+                    xref="x",
+                    yref="paper",
+                    x0=now,
+                    x1=now,
+                    y0=0,
+                    y1=1,
+                    line=dict(color="#888888", width=1, dash="dot"),
+                )
+            ],
+        )
+        return {"data": data, "layout": layout}
