@@ -8,7 +8,7 @@ case "$1" in
         # Initiate the virtual environment, if it does not exist
         python=/usr/lib/lories/bin/python
         if [ ! -e $python ]; then
-            python3 -m venv /usr/lib/lories
+            python3 -m venv --system-site-packages /usr/lib/lories
         fi
         $python -m pip install --upgrade pip || true
         ;;
