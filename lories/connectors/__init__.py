@@ -130,6 +130,17 @@ for _connector in CONNECTORS:
                 _unavailable[str(_origin)] = _missing_dep
             sys.modules.pop(f"lories.connectors.{_connector}", None)
 
+        except Exception as e:
+            # A module can fail against its mocks in non-ImportError ways, e.g. a metaclass
+            # conflict when a class subclasses a mocked one.
+            if _resolve_owner(_import_origin(e), _connector) != _connector or _connector not in _deps_by_owner:
+                raise
+            _missing_dep = ", ".join(_deps_by_owner.pop(_connector))
+            _logger.debug("Connector '%s' unavailable (missing: %s)", _connector, _missing_dep)
+            _unavailable[_connector] = _missing_dep
+            sys.modules.pop(f"lories.connectors.{_connector}", None)
+            break
+
 for _connector, _deps in _deps_by_owner.items():
     _missing_dep = ", ".join(_deps)
     _logger.debug("Connector '%s' unavailable (missing: %s)", _connector, _missing_dep)

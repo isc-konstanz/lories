@@ -187,6 +187,28 @@ def test_transitive_dep_attributed_to_owning_connector(tmp_path):
     assert "unavailable (missing" not in result.stdout, result.stdout
 
 
+def test_connector_failing_against_mock_recorded_unavailable(tmp_path):
+    """A connector whose module cannot load against a mock is recorded unavailable instead of breaking the import.
+
+    ``sql.Schema`` subclasses both ``Configurator`` and sqlalchemy's ``MetaData``; with sqlalchemy
+    mocked, the two metaclasses conflict and the class statement raises a ``TypeError``.
+    """
+    result = _run_probe(
+        tmp_path,
+        ["sqlalchemy"],
+        """
+        import sys
+
+        assert "sql" in connectors._unavailable, (connectors._unavailable, connectors._mocked)
+        assert "sql" not in connectors._mocked, connectors._mocked
+        assert connectors.unavailable()["sql"] == "sqlalchemy", connectors.unavailable()
+        assert "lories.connectors.sql" not in sys.modules
+        assert "virtual" not in connectors.unavailable(), connectors.unavailable()
+        """,
+    )
+    assert "unavailable (missing" not in result.stdout, result.stdout
+
+
 def test_registry_reflects_availability(connectors):
     """Registration.available/error mirror the class __available__/__import_error__ flags (docs page contract)."""
     from lories.connectors.context import registry
