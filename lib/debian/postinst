@@ -1,8 +1,11 @@
 #!/bin/sh
 set -e
 
+# Let the virtual environment use the compiled Debian Python packages
+sed -i 's/^include-system-site-packages = false$/include-system-site-packages = true/' /usr/lib/lories/pyvenv.cfg
+
 # Install the current specific version package
-/usr/lib/lories/bin/pip install lories==<version> || true
+/usr/lib/lories/bin/pip install lories==<version>
 
 #DEBHELPER#
 

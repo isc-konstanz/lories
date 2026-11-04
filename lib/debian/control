@@ -10,5 +10,5 @@ Vcs-Git: https://github.com/isc-konstanz/lories.git
 
 Package: lories
 Architecture: all
-Depends: ${misc:Depends}, python3, python3-venv
+Depends: ${misc:Depends}, python3, python3-venv, python3-numpy, python3-pandas
 Description: Debian package of the lories framework.
