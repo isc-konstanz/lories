@@ -72,7 +72,7 @@ class ComponentContext(_ComponentContext, RegistratorContext[Component]):
                     f"Skipping to deactivate already deactivated {type(component).__name__} '{component.name}': "
                     f"{component.id}"
                 )
-                return
+                continue
             self.__deactivate(component)
 
     def __deactivate(self, component: Component) -> None:
