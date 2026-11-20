@@ -21,8 +21,8 @@ class PulseCount(Processor):
 
     Emits ``factor`` whenever the input value is truthy (e.g. a rising-edge
     listener event on a digital input). Falsy values pass through as ``0``.
-    Combined with logger ``aggregate="sum"`` this turns a debounced edge
-    listener into a per-bucket volume / count without relying on a hardware
+    Combined with a logger ``freq`` and ``aggregate="sum"`` this turns a debounced
+    edge listener into a per-interval volume / count without relying on a hardware
     pulse counter — debouncing belongs upstream (e.g. the RevPi listener's
     ``cooldown`` parameter).
     """
