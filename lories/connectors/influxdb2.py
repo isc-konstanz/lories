@@ -48,6 +48,12 @@ class InfluxDB2(Database):
         type=str, required=False, desc="InfluxDB measurement name (defaults to the channel group)"
     )
     tag = ChannelParameter(type=str, required=False, desc="Optional tag key for grouping fields within a measurement")
+    field = ChannelParameter(
+        type=str, required=False, desc="InfluxDB field name for this channel (defaults to the channel id)"
+    )
+    column = ChannelParameter(
+        type=str, required=False, desc="Column name for this channel (defaults to the channel id)"
+    )
 
     host: str
     port: int

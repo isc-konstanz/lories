@@ -79,12 +79,16 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
     _interval_reconnect: pd.Timedelta = pd.Timedelta(minutes=1)
 
     __resources: Resources
+    __warned_logger_keys: set
 
     _lock_timeout: int = 60
     _lock: Lock
 
     _WARN_UNDECLARED_CHANNEL_CONFIGS: bool = True
     _CHANNEL_CONFIGS_RESERVED_KEYS: frozenset = frozenset({"enabled"})
+    _LOGGER_CONFIGS_RESERVED_KEYS: frozenset = frozenset(
+        {"enabled", "connector", "freq", "frequency", "resolution", "aggregate"}
+    )
 
     def __init__(
         self,
@@ -94,6 +98,7 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
     ) -> None:
         super().__init__(context=context, configs=configs, **kwargs)
         self.__resources = Resources()
+        self.__warned_logger_keys = set()
         self._lock = Lock()
 
     def __getstate__(self) -> Dict[str, Any]:
@@ -212,6 +217,41 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
                         key,
                     )
 
+    def _warn_undeclared_logger_configs(self, resources: Resources) -> None:
+        cls = type(self)
+        if not cls._WARN_UNDECLARED_CHANNEL_CONFIGS:
+            return
+        logger = logging.getLogger(cls.__module__)
+        declared: frozenset = frozenset(p._resolve_key() for p in cls.__channel_parameters__.values())
+        reserved: frozenset = cls._LOGGER_CONFIGS_RESERVED_KEYS | cls._CHANNEL_CONFIGS_RESERVED_KEYS
+
+        try:
+            cls_file = inspect.getfile(cls)
+        except (TypeError, OSError):
+            cls_file = "<unknown file>"
+
+        for resource in resources:
+            channel_logger = getattr(resource, "logger", None)
+            if channel_logger is None or not getattr(channel_logger, "enabled", False):
+                continue
+            registrator = channel_logger._get_registrator()
+            if registrator is not None and not isinstance(registrator, cls):
+                continue
+            for key in channel_logger._copy_configs():
+                if key in reserved or key in declared or key in self.__warned_logger_keys:
+                    continue
+                self.__warned_logger_keys.add(key)
+                logger.warning(
+                    f"{_WH}%s (module: %s, file: %s): "
+                    f"channel '%s' uses logger config key '{_WK}%s{_WH}' "
+                    f"with no ChannelParameter declaration{_WR}",
+                    cls.__name__,
+                    cls.__module__,
+                    cls_file,
+                    resource.id,
+                    key,
+                )
+
     def _is_disconnected(self) -> bool:
         return not self._is_connected()
 
@@ -276,6 +316,7 @@ class Connector(_Connector, Registrator, metaclass=ConnectorMeta):
 
     def _at_connect(self, resources: Resources) -> None:
         type(self)._warn_undeclared_channel_configs(resources)
+        self._warn_undeclared_logger_configs(resources)
 
     def _on_connect(self, resources: Resources) -> None:
         pass
