@@ -365,7 +365,7 @@ class Application(_Application, DataContext, TaskContext):
 
                 self._connectors.reconnect(lambda c: c._is_reconnectable())
                 self.__notify(timeout=self._interval / 4)
-                self.__log()
+                self.__log(now=now)
 
                 _sleep(interval, self.__interrupt.wait)
 
@@ -374,7 +374,7 @@ class Application(_Application, DataContext, TaskContext):
                 break
 
         self.__notify()
-        self.__log()
+        self.__log(now=pd.Timestamp.now(tz.UTC), final=True)
 
     def has_logged(
         self,
@@ -469,9 +469,16 @@ class Application(_Application, DataContext, TaskContext):
         timeout: Optional[float] = None,
         blocking: bool = False,
         force: bool = False,
+        now: Optional[pd.Timestamp] = None,
+        final: bool = False,
     ) -> None:
         if channels is None:
             channels = self.channels
+        if now is None:
+            now = pd.Timestamp.now(tz.UTC)
+        finished_until = now if final else now - pd.Timedelta(seconds=self._interval)
+        interval_channels = channels.filter(lambda c: c.log_freq is not None and c.has_logger())
+        logged_channels = set()
 
         log_futures = {}
         for id, connector in self.connectors.items():
@@ -491,11 +498,24 @@ class Application(_Application, DataContext, TaskContext):
 
                 return channel.timestamp >= channel.logger.timestamp + channel.timedelta
 
-            log_channels = channels.filter(lambda c: (c.has_logger(id) and c.is_valid() and has_update(c)))
-            if len(log_channels) == 0:
+            log_channels = channels.filter(
+                lambda c: c.log_freq is None and c.has_logger(id) and c.is_valid() and has_update(c)
+            )
+            interval_rows = []
+            for channel in interval_channels.filter(lambda c: c.has_logger(id)):
+                logged_channels.add(channel.id)
+                rows = channel.pop_log_rows(finished_until, drop_unfinished=final)
+                if len(rows) > 0:
+                    channel.logger.timestamp = rows.index[-1]
+                    interval_rows.append(rows)
+            interval_data = None
+            if len(interval_rows) > 0:
+                interval_data = pd.concat(interval_rows, axis="columns").sort_index()
+                interval_data.index.name = Channel.TIMESTAMP
+            if len(log_channels) == 0 and interval_data is None:
                 continue
 
-            log_task = LogTask(connector, log_channels)
+            log_task = LogTask(connector, log_channels, data=interval_data)
             log_future = self._submit(log_task)
             log_futures[log_future] = log_task
             if not blocking:
@@ -505,6 +525,9 @@ class Application(_Application, DataContext, TaskContext):
                 channel.logger.timestamp = channel.timestamp
 
             log_channels.apply(update_timestamp, inplace=True)
+
+        for channel in interval_channels.filter(lambda c: c.id not in logged_channels):
+            channel.pop_log_rows(finished_until, drop_unfinished=final)
 
         if blocking:
             self._write_futures(log_futures, timeout, inplace=False)
