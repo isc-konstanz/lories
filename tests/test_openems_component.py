@@ -135,6 +135,40 @@ def test_connector_of_another_family_raises_naming_the_class(load_project):
         )
 
 
+def test_channel_freq_never_polls_the_push_only_connector(load_project, monkeypatch):
+    import pandas as pd
+    from lories.connectors.openems import OpenEMSEdgeConnector
+    from lories.io.rest import Rest
+
+    monkeypatch.setattr(Rest, "get_request", _rest_ok)
+
+    app, component = load_project(
+        'connector = "oe"\nchannels = ["ess0/Soc"]\n\n[data.channels]\nfreq = "1min"\n', system_extra=_EDGE
+    )
+    channel = component.data.get("ess0_soc")
+    assert channel.is_listener()
+    assert channel.timedelta == pd.Timedelta(minutes=1)
+
+    connector = app.connectors["sys.oe"]
+    reads = []
+    read = connector._run_read
+
+    def read_spy(resources, *args, **kwargs):
+        reads.append(resources)
+        return read(resources, *args, **kwargs)
+
+    monkeypatch.setattr(connector, "_run_read", read_spy)
+    monkeypatch.setattr(OpenEMSEdgeConnector, "_is_connected", lambda self: True)
+    monkeypatch.setattr(OpenEMSEdgeConnector, "is_connected", lambda self: True)
+
+    now = pd.Timestamp.now(tz="UTC").floor("s")
+    channel.set(now, 42)
+    app._Application__read(now, timeout=5)
+
+    assert reads == []
+    assert channel.is_valid()
+
+
 def test_underscore_prefixed_pattern_is_not_hidden(load_project, monkeypatch):
     from lories.io.rest import Rest
 

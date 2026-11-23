@@ -115,6 +115,7 @@ class OpenEMSComponent(BindableComponent):
                 type=self._map_type(channel.type),
                 unit=channel.unit,
                 aggregate="last",
+                listener=True,
                 component=channel.component,
                 channel=channel.channel,
                 connector=self._connector_id,
