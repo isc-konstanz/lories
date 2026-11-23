@@ -180,6 +180,41 @@ the `type`, `key` and `name` configs may be specified in a separate `[component]
 
 This section contains (or will contain) detailed information on the configuration of channels.
 
+#### Logging
+
+A channel's `freq` sets how often it is read. Its `logger` table names the database it is logged
+to, and may set its own log interval and aggregation:
+
+```toml
+[data.channels]
+freq = "15s"
+
+[data.channels.logger]
+connector = "sql"
+table     = "measurements"
+freq      = "1min"
+aggregate = "mean"
+```
+
+Without `logger.freq`, every new value is logged, or one value per channel `freq` if the channel
+has one.
+
+With `logger.freq`, the values a channel receives in each interval `(t - freq, t]` are combined into
+one row stamped at `t`. Intervals are aligned in UTC: with `freq = "1min"`, the row at 12:01:00
+covers the values after 12:00:00 up to and including 12:01:00. An interval without values writes
+no row. The interval must have a fixed length, in days (`D`), hours (`h`), minutes (`min`) or
+seconds (`s`).
+
+The values are combined with `logger.aggregate`, else the channel's `aggregate`, else `last`.
+Allowed are `sum`, `mean`, `min`, `max` and `last`. All but `last` need a numeric or boolean
+channel; `True` counts as 1. A channel whose logger is disabled ignores `logger.freq`.
+
+Collection starts with the application's first log step, so the first interval after a start is
+partial. An interval that ends while the database is not connected is not written.
+
+Keys under `logger` that neither lories nor the database uses are reported at WARNING when the
+database connects.
+
 
 ## Connectors
 

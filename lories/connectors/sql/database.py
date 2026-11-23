@@ -57,6 +57,26 @@ class SqlDatabase(Database, Mapping[str, Table]):
     table = ChannelParameter(
         type=str, required=False, desc="Table name for this channel (defaults to the channel group)"
     )
+    column = ChannelParameter(
+        type=str, required=False, desc="Column name for this channel (defaults to the channel id)"
+    )
+    length = ChannelParameter(
+        type=int, required=False, desc="Maximum length of this channel's string column (defaults to 255)"
+    )
+    primary = ChannelParameter(
+        type=bool, required=False, desc="Whether this channel's column is part of the primary key"
+    )
+    default = ChannelParameter(type=None, required=False, desc="Default value of this channel's column")
+    nullable = ChannelParameter(type=bool, required=False, desc="Whether this channel's column allows NULL values")
+    foreign = ChannelParameter(type=str, required=False, desc="Foreign key target of this primary key column")
+    attribute = ChannelParameter(
+        type=str, required=False, desc="Attribute name making this primary key column a surrogate key column"
+    )
+    timezone = ChannelParameter(
+        type=None,
+        required=False,
+        desc="Timezone of this datetime column (defaults to UTC; primary keys are always UTC)",
+    )
 
     dialect: Dialect
 

@@ -9,7 +9,8 @@ lories.data.channels.channel
 from __future__ import annotations
 
 from collections import OrderedDict
-from typing import Any, Collection, Dict, List, Optional, Type
+from threading import Lock
+from typing import Any, Collection, Dict, List, Optional, Tuple, Type
 
 import numpy as np
 import pandas as pd
@@ -20,7 +21,9 @@ from lories._core.typing import Timestamp  # noqa
 from lories.core import ConfigurationError, Resource, ResourceError
 from lories.data.channels import ChannelConnector, ChannelConverter, ChannelProcessors, Channels
 from lories.data.processors import Processor
-from lories.util import parse_freq, to_bool, to_timedelta
+from lories.util import floor_date, parse_freq, to_bool, to_timedelta
+
+LOG_AGGREGATES = ("sum", "mean", "min", "max", "last")
 
 
 class Channel(_Channel, Resource):
@@ -34,6 +37,11 @@ class Channel(_Channel, Resource):
     connector: ChannelConnector
     converter: ChannelConverter
     processors: ChannelProcessors
+
+    _log_freq: Optional[str] = None
+    _log_aggregate: str = "last"
+    _log_buffer: Optional[List[Tuple[pd.Timestamp, Any]]] = None
+    _log_lock: Lock
 
     # noinspection PyShadowingBuiltins
     def __init__(
@@ -60,6 +68,36 @@ class Channel(_Channel, Resource):
         self.converter = ChannelConverter.build(self, **Channel._build_member(converter, "converter"))
         self.connector = ChannelConnector.build(self, **Channel._build_member(connector, "connector"))
         self.logger = ChannelConnector.build(self, **Channel._build_member(logger, "connector"))
+        self._log_lock = Lock()
+        self._configure_log()
+
+    def _configure_log(self) -> None:
+        log_freq = None
+        if self.logger.enabled:
+            log_freq = self.logger.get(next((k for k in ["freq", "frequency", "resolution"] if k in self.logger), None))
+        self._log_freq = parse_freq(log_freq) if log_freq is not None else None
+        if self._log_freq is None:
+            self._log_aggregate = "last"
+            return
+        if not self._log_freq.endswith(("D", "h", "min", "s")):
+            raise ConfigurationError(
+                f"Channel '{self.id}' has invalid logger freq '{log_freq}', expected a unit of: D, h, min, s"
+            )
+
+        aggregate = self.logger.get("aggregate")
+        if aggregate is None:
+            aggregate = self.get("aggregate", default="last")
+        aggregate = str(aggregate).lower()
+        if aggregate not in LOG_AGGREGATES:
+            raise ConfigurationError(
+                f"Channel '{self.id}' has invalid logger aggregate '{aggregate}', "
+                f"expected one of: {', '.join(LOG_AGGREGATES)}"
+            )
+        if aggregate != "last" and not issubclass(self.type, (int, float, bool, np.number, np.bool_)):
+            raise ConfigurationError(
+                f"Channel '{self.id}' of type '{self.type.__name__}' does not support logger aggregate '{aggregate}'"
+            )
+        self._log_aggregate = aggregate
 
     @classmethod
     def _assert_context(cls, context: TaskContext) -> TaskContext:
@@ -107,6 +145,18 @@ class Channel(_Channel, Resource):
     @property
     def timedelta(self) -> Optional[pd.Timedelta]:
         return to_timedelta(self.freq)
+
+    @property
+    def log_freq(self) -> Optional[str]:
+        return self._log_freq
+
+    @property
+    def log_timedelta(self) -> Optional[pd.Timedelta]:
+        return to_timedelta(self._log_freq)
+
+    @property
+    def log_aggregate(self) -> str:
+        return self._log_aggregate
 
     @property
     def timestamp(self) -> pd.Timestamp:
@@ -188,6 +238,48 @@ class Channel(_Channel, Resource):
         self._timestamp = timestamp
         self._value = value
         self._state = state
+        if state == ChannelState.VALID and self._log_freq is not None:
+            with self._log_lock:
+                if self._log_buffer is not None:
+                    self._log_buffer.append((timestamp, value))
+
+    def _log_interval_end(self, timestamp: pd.Timestamp) -> pd.Timestamp:
+        timestamp = timestamp.tz_localize(tz.UTC) if timestamp.tzinfo is None else timestamp.tz_convert(tz.UTC)
+        start = floor_date(timestamp, freq=self._log_freq)
+        return start if start == timestamp else start + self.log_timedelta
+
+    def pop_log_rows(self, until: pd.Timestamp, drop_unfinished: bool = False) -> pd.Series:
+        """
+        Removes the buffered values of all log intervals ending at or before ``until``
+        and returns one aggregated value per interval, indexed by the interval end.
+        """
+        with self._log_lock:
+            samples = self._log_buffer or []
+            self._log_buffer = []
+            finished = {}
+            unfinished = []
+            for sample in samples:
+                end = self._log_interval_end(sample[0])
+                if end <= until:
+                    finished.setdefault(end, []).append(sample)
+                else:
+                    unfinished.append(sample)
+            if not drop_unfinished:
+                self._log_buffer = unfinished
+
+        ends = sorted(finished.keys())
+        values = [self._aggregate_log(finished[end]) for end in ends]
+        return pd.Series(values, index=pd.DatetimeIndex(ends, tz=tz.UTC), name=self.id)
+
+    def _aggregate_log(self, samples: List[Tuple[pd.Timestamp, Any]]) -> Any:
+        values = [s[1] for s in sorted(samples, key=lambda s: s[0])]
+        if self._log_aggregate == "last":
+            return values[-1]
+        if self._log_aggregate == "sum":
+            return sum(int(v) if isinstance(v, (bool, np.bool_)) else v for v in values)
+        if self._log_aggregate == "mean":
+            return sum(float(v) for v in values) / len(values)
+        return min(values) if self._log_aggregate == "min" else max(values)
 
     # noinspection PyShadowingBuiltins, PyProtectedMember
     def _update(
@@ -204,6 +296,7 @@ class Channel(_Channel, Resource):
         if logger is not None:
             self.logger._update(**Channel._build_member(logger, "connector"))
         super()._update(**configs)
+        self._configure_log()
 
     def _copy_args(self) -> Dict[str, Any]:
         return {
