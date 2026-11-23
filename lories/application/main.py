@@ -504,8 +504,8 @@ class Application(_Application, DataContext, TaskContext):
             interval_rows = []
             for channel in interval_channels.filter(lambda c: c.has_logger(id)):
                 logged_channels.add(channel.id)
-                rows = channel.pop_log_rows(finished_until, drop_unfinished=final)
-                if len(rows) > 0:
+                rows = self.__pop_log_rows(channel, finished_until, final)
+                if rows is not None and len(rows) > 0:
                     channel.logger.timestamp = rows.index[-1]
                     interval_rows.append(rows)
             interval_data = None
@@ -527,10 +527,19 @@ class Application(_Application, DataContext, TaskContext):
             log_channels.apply(update_timestamp, inplace=True)
 
         for channel in interval_channels.filter(lambda c: c.id not in logged_channels):
-            channel.pop_log_rows(finished_until, drop_unfinished=final)
+            self.__pop_log_rows(channel, finished_until, final)
 
         if blocking:
             self._write_futures(log_futures, timeout, inplace=False)
+
+    def __pop_log_rows(self, channel: Channel, until: pd.Timestamp, final: bool) -> Optional[pd.Series]:
+        try:
+            return channel.pop_log_rows(until, drop_unfinished=final)
+        except Exception as e:
+            self._logger.warning(f"Failed aggregating logged values of channel '{channel.id}': {str(e)}")
+            if self._logger.getEffectiveLevel() <= logging.DEBUG:
+                self._logger.exception(e)
+            return None
 
     def rotate(
         self,

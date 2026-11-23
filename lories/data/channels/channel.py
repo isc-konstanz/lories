@@ -239,9 +239,10 @@ class Channel(_Channel, Resource):
         self._value = value
         self._state = state
         if state == ChannelState.VALID and self._log_freq is not None:
+            samples = list(value.dropna().items()) if isinstance(value, pd.Series) else [(timestamp, value)]
             with self._log_lock:
                 if self._log_buffer is not None:
-                    self._log_buffer.append((timestamp, value))
+                    self._log_buffer.extend(samples)
 
     def _log_interval_end(self, timestamp: pd.Timestamp) -> pd.Timestamp:
         timestamp = timestamp.tz_localize(tz.UTC) if timestamp.tzinfo is None else timestamp.tz_convert(tz.UTC)
