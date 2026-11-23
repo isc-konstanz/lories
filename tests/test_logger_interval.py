@@ -425,3 +425,58 @@ def test_collection_starts_with_first_pop(app):
     assert channel.pop_log_rows(_ts(100)).empty
     channel.set(_ts(130), 2.0)
     assert channel._log_buffer == [(_ts(130), 2.0)]
+
+
+def test_series_value_is_collected_per_timestamp(app):
+    channel = _channel(app, logger={"freq": "1min", "aggregate": "mean"})
+    for second, value in zip([15, 30, 45, 60], [1.0, 2.0, 3.0, 4.0]):
+        series = pd.Series([value], index=[_ts(second)])
+        channel.set(series.index[0], series)
+
+    _log(app, _ts(61))
+
+    stored = _stored(app)
+    assert list(stored.index) == [_ts(60)]
+    assert stored.iloc[0] == pytest.approx(2.5)
+
+
+def test_multi_row_series_value_contributes_each_row_to_its_interval(app):
+    channel = _channel(app, logger={"freq": "1min", "aggregate": "sum"})
+    series = pd.Series([1.0, 2.0, 3.0, 4.0], index=[_ts(30), _ts(60), _ts(90), _ts(120)])
+    channel.set(series.index[0], series)
+
+    _log(app, _ts(121))
+
+    stored = _stored(app)
+    assert list(stored.index) == [_ts(60), _ts(120)]
+    assert list(stored) == [pytest.approx(3.0), pytest.approx(7.0)]
+
+
+def test_failing_channel_does_not_stop_the_log_step(app):
+    import logging
+
+    failing = _channel(app, id="failing", logger={"freq": "1min", "aggregate": "mean"})
+    healthy = _channel(app, id="healthy", logger={"freq": "1min", "aggregate": "mean"})
+    _feed(failing, [30, 90], [1.0, 2.0])
+    _feed(healthy, [30], [5.0])
+
+    def fail(samples):
+        raise TypeError("cannot aggregate")
+
+    failing._aggregate_log = fail
+
+    records = []
+    handler = logging.Handler()
+    handler.emit = records.append
+    module_logger = logging.getLogger("lories.application.main")
+    module_logger.addHandler(handler)
+    try:
+        _log(app, _ts(61))
+    finally:
+        module_logger.removeHandler(handler)
+
+    assert list(_stored(app, "healthy").index) == [_ts(60)]
+    assert _stored(app, "failing").empty
+    warnings = [r for r in records if r.levelno == logging.WARNING and "failing" in r.getMessage()]
+    assert len(warnings) == 1
+    assert [s[0] for s in failing._log_buffer] == [_ts(90)]
